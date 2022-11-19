@@ -26,6 +26,38 @@ download the compiled version for Windows and Mac here https://drive.google.com/
 
 Did this help you out? All Donations cherished https://cryptogainz.store/pages/donate or with Bitcoin bc1qm0sykhxhhqey9yg2t93mqp4jzgdl88ewa82q3s
 
-Gainz, does not provide Legal, Financial, or Tax Advice. Please consult with your certified advisor(s) to validate results.
+**Gainz, does not provide Legal, Financial, or Tax Advice. Please consult with your certified advisor(s) to validate results.**
 
 Thank you for the interest and support and I hope it's exactly what you were looking for!
+
+**Steps for use**
+
+Step 4: HODL and Accounting
+How to use this page
+Use this page to find and resolve common discrepencies in your data.
+
+Gainz uses Universal Wallet for accounting.
+This means it does not matter where the crypto resides sells can be linked to buys even if there was no transfer between wallets. This greatly simplifies cost basis calculation bypassing the need to import all xpubs, addresses, and transactions mapping the movement of coins overtime. We only are interested in taxable events. By importing exchange csv’s and entering in known off exchange occurrences (like that time you used shapeshift to convert ETH to BTC) we can make a best effort cost basis calculation. What we need to know is outside of everything entered into Gainz did you buy, sell, convert, gift, lose your coins? Gainz uses the data entered, including HODL (if provided) to true up discrepancies. An example of a common discrepancy is based on data provided you bought 3 BTC, sold 1, HODL 1. This indicates that you sold, converted, gifted, or lost 1 BTC. You can manually enter what happened by adding a transaction or Gainz can convert sends into sells or lost to resolve.
+
+Received Crypto has no cost basis info
+Say you upload your transactions from coinbase it says you bought 1 BTC, and sold 2 BTC.
+Your cost basis for the 1 you bought from coinbase can be calculated with the information provided from coinbase.
+What about that other 1 BTC? Where did they come from, when was it purchased, and for how much?
+
+Gainz helps build the story and the picture that is needed to properly calculate a true cost basis.
+
+Sold/lost True-Up
+Say you upload your transactions from coinbase it says you bought 3 BTC and sold 1 BTC, but you only have 1 BTC across all of your wallets(Your HODL).
+This indicates 1 BTC sold on other exchanges, traded for goods or services (sold), or lost.
+These coins need to be accounted for or you may use a cost basis that is no longer valid because it was sold on other exchanges, traded for goods or services (sold), or lost.
+
+Maths
+Buys - Sells = Sold_or_Lost_or_HODL
+If HODL information provided:
+Sold_or_Lost_or_HODL - HODL = Sold_or_Lost
+
+The two auto options available are to convert sends into sells or convert buys into lost using the earliest sends/buys possible.
+
+Select an Asset to populate pre-check information.
+
+All conversion operations are saved for reference and exportation.
