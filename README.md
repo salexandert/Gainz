@@ -30,7 +30,7 @@ Did this help you out? All Donations cherished https://cryptogainz.store/pages/d
 
 Thank you for the interest and support and I hope it's exactly what you were looking for!
 
-**Steps for use**
+**Steps for use - Move to Wiki**
 
 Step 4: HODL and Accounting
 How to use this page
