@@ -1,0 +1,67 @@
+{% extends "base_site.html" %}
+
+{% block title %} Import Transactions {% endblock title %}
+
+{% block stylesheets %}
+  {{ super() }}
+{% endblock stylesheets %}
+
+{% block content %}
+
+
+<!-- Page Description and Instructions -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Step 1: Import CSV's from exchange</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+                How to use this page
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapseOne" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+              <div class="card-body">
+                Drag and Drop exchange CSV's into the upload area below. Currently Coinbase and Cashapp formats are supported. 
+                <br> Transaction type of Convert will be imported as a sell @ USD Spot price at transaction and a buy @ USD Total (inclusive of fees)
+                <br> Open CMD for progress on Coinbase Pro Imports as it may take a while to lookup prices from coinbase API. 
+                <br> keep coinbase, coinbase pro, kraken, in the filename respecitvly for identification. 
+                <br><br>
+                Upload one file at a time.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Page Description and Instructions -->
+      
+
+<!-- Upload -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <form id="upload_csv_form" action="{{ url_for('import_transactions_blueprint.import_wizard')}}" class="dropzone"></form>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Upload  -->
+
+
+
+
+{% endblock content %}
+
+{% block javascripts %}
+  {{ super()}}
+{% endblock javascripts %}
+
+
+

@@ -1,0 +1,237 @@
+{% extends "base_site.html" %}
+
+{% block title %} HODL & Accounting {% endblock title %}
+
+{% block stylesheets %}
+  {{ super() }}
+{% endblock stylesheets %}
+
+{% block content %}
+
+<!-- Page Description and Instructions -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">      
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Step 4: HODL and Accounting</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_1" aria-expanded="true" aria-controls="collapseOne">
+                How to use this page
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_1" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+              <div class="card-body">
+                Use this page to find and resolve common discrepencies in your data.
+                <br>
+                <br><b>Gainz uses Universal Wallet for accounting.</b> <br>
+                 This means it does not matter where the crypto resides sells can be linked to buys even if there was no
+                  transfer between wallets. This greatly simplifies cost basis calculation bypassing the need to import all xpubs,
+                   addresses, and transactions mapping the movement of coins overtime. We only are interested in taxable events.
+                    By importing exchange csv’s and entering in known off exchange occurrences (like that time you used shapeshift to convert 
+                    ETH to BTC) we can make a best effort cost basis calculation. What we need to know is outside of everything 
+                    entered into Gainz did you buy, sell, convert, gift, lose your coins? Gainz uses the data entered,
+                     including HODL (if provided) to true up discrepancies. An example of a common discrepancy is based on data 
+                     provided you bought 3 BTC, sold 1, HODL 1. This indicates that you sold, converted, gifted, or lost 1 BTC. 
+                     You can manually enter what happened by adding a transaction or Gainz can convert sends into sells or lost to resolve.
+                <br>
+                <br><b>Received Crypto has no cost basis info</b>
+                <br> Say you upload your transactions from coinbase it says you bought 1 BTC, and sold 2 BTC. 
+                <br> Your cost basis for the 1 you bought from coinbase can be calculated with the information provided from coinbase. 
+                <br> What about that other 1 BTC? Where did they come from, when was it purchased, and for how much? 
+                <br>
+                <br> Gainz helps build the story and the picture that is needed to properly calculate a true cost basis. 
+                <br>
+                <br><b>Sold/lost True-Up</b>
+                <br>Say you upload your transactions from coinbase it says you bought 3 BTC and sold 1 BTC, but you only have 1 BTC across all of your wallets(Your HODL).
+                <br>This indicates 1 BTC sold on other exchanges, traded for goods or services (sold), or lost.
+                <br>These coins need to be accounted for or you may use a cost basis that is no longer valid because it was sold on other exchanges, traded for goods or services (sold), or lost.
+                <br>
+                <br><b>Maths</b>
+                <br> Buys - Sells = Sold_or_Lost_or_HODL
+                <br> If HODL information provided:
+                <br> Sold_or_Lost_or_HODL - HODL = Sold_or_Lost
+                <br>
+                <br>The two auto options available are to convert sends into sells or convert buys into lost using the earliest sends/buys possible.
+                <br>
+                <br>Select an Asset to populate pre-check information.
+                <br>
+                <br>All conversion operations are saved for reference and exportation.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Page Description and Instructions -->
+  
+     
+<!-- Stats Table -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Select an asset</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_2" aria-expanded="true" aria-controls="collapseOne">
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_2" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+              
+              <!-- Card Body -->
+              <div class="card-body ">
+                <table id="eh_stats_datatable" class="table table-striped table-bordered" style="width:100%">
+                  <thead>
+                    <tr>
+                      <th>Asset</th>
+                      <th>Purchased</th>
+                      <th>Sold</th>
+                      <th>Sent</th>
+                      <th>Received</th>
+                      <th>Quantity Sold Unlinked</th>
+                      <th>Quantity Purchased Unlinked</th>
+                      <th>Purchased in USD</th>
+                      <th>Sold in USD</th>
+                      <th>HODL</th> 
+                      
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {% for row in stats_table_data %}
+
+                    <tr>
+                      <td>{{ row['symbol'] }}</td>
+                      <td>{{ row['total_purchased_quantity'] }}</td>
+                      <td>{{ row['total_sold_quantity'] }}</td>
+                      <td>{{ row['total_sent_quantity']  }}</td>
+                      <td>{{ row['total_received_quantity']}}</td>
+                      <td>{{ row['total_sold_unlinked_quantity'] }}</td>
+                      <td>{{ row['total_purchased_unlinked_quantity'] }}</td>
+                      <td>{{ row['total_purchased_usd'] }}</td>
+                      <td>{{ row['total_sold_usd']  }}</td>
+                      <td>{{ row['hodl']  }}</td>
+                      
+                    </tr>
+                    
+                    {% endfor %}
+                  
+                  </tbody>
+                
+                </table>
+              </div>
+              <!-- /Card Body -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Stats Table End -->
+
+
+<!-- Auto Actions Table -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Accomplishments & Suggestions</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_7" aria-expanded="true" aria-controls="collapseOne">
+                
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_3" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+              
+              <!-- Card Body -->
+              <div class="card-body ">
+              
+                <table id="auto_actions_datatable" class="table table-striped table-bordered" style="width:100%">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Description</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                </table>
+
+                <!-- <button type="button" id="auto_action_button" class="btn btn-success">Confirm Selected</button> -->
+            
+              </div>
+              <!-- /Card Body -->
+            
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Auto Actions Table End -->
+
+<!-- Input and Options  -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Info and Actions</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_3" aria-expanded="true" aria-controls="collapseOne">
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_3" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+              
+              <!-- Card Body -->
+              <div class="card-body ">
+                <b>Sold True-Up</b>
+                <p id='eh_options'> Select a row from Stats Table to Populate </p>
+                <input type="number" id='hodl_quantity' placeholder="Current HODL">
+                <button type="button" id="submit_hodl_button" class="btn btn-success">Submit HODL</button> <br>
+                
+                <br>
+                
+                <p id='convert_text'></p>
+                <input type="number" id='convert_quantity' placeholder="Quantity to Convert">
+                
+                <button type="button" id="sends_to_sells_button" class="btn btn-warning">Convert Sends to Sells</button>
+                <button type="button" id="buys_to_lost_button" class="btn btn-warning">Convert Buys to Lost</button>
+                
+                <br><br>
+              
+              </div>
+              <!-- /Card Body -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Add Transaction End -->
+
+
+
+
+{% endblock content %}
+
+{% block javascripts %}
+  {{ super()}}
+{% endblock javascripts %}
+
+
+

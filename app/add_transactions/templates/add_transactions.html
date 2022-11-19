@@ -1,0 +1,379 @@
+{% extends "base_site.html" %}
+
+{% block title %} Manage Transactions {% endblock title %}
+
+{% block stylesheets %}
+  {{ super() }}
+{% endblock stylesheets %}
+
+{% block content %}
+
+<!-- Page Description and Instructions -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">      
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Step 2: Add and Manage Transactions</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_1" aria-expanded="true" aria-controls="collapseOne">
+                How to use this page
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_1" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+              <div class="card-body">
+                Use this page to manually add, delete, and convert, transactions. Add any buys or sells that were not imported from CSV. 
+                <br> Additionally you can convert sends to sells or receives to buys when appropriate.
+                <br>
+                <br>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Page Description and Instructions -->
+            
+<!-- Manually Add Transaction  -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Manually Add a Transaction</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_2" aria-expanded="true" aria-controls="collapseOne">
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_2" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+              
+              <!-- Card Body -->
+              <div class="card-body ">
+
+                <form method="POST">
+                  {{ manual_trans.hidden_tag() }}
+                  
+                  <label>{{ manual_trans.type.label }}<span class="required">*</span></label>
+                  <div class="form-group">
+                    {{manual_trans.type}}
+                  </div>
+                  
+                  <label>{{ manual_trans.timestamp.label }}<span class="required">*</span></label>
+                  <div class="form-group">
+                    {{manual_trans.timestamp}}
+                  </div>
+                  
+                  <label>{{ manual_trans.usd_spot.label }}<span class="required">*</span></label>
+                  <div class="form-group">
+                    {{manual_trans.usd_spot}}
+                  </div>
+
+                  <label>{{ manual_trans.quantity.label }}<span class="required">*</span></label>
+                  <div class="form-group">
+                    {{manual_trans.quantity}}
+                  </div>
+
+                  <label>{{ manual_trans.symbol.label }}<span class="required">*</span></label>
+                  <div class="form-group">
+                    {{manual_trans.symbol}}
+                  </div>
+                  
+                  <div class="card-footer ">
+                    {{ manual_trans.submit(class_="btn btn-info btn-round") }}
+                  </div>
+                
+                </form>
+              
+              </div>
+              <!-- /Card Body -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Add Transaction -->
+
+
+
+
+<!-- Stats Table -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Select an asset</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_3" aria-expanded="true" aria-controls="collapseOne">
+                
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_3" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+              
+              <!-- Card Body -->
+              <div class="card-body ">
+              
+                <table id="add_transactions_stats_datatable" class="table table-striped table-bordered" style="width:100%">
+                  <thead>
+                    <tr>
+                      <th>Asset</th>
+                      <th>Quantity Purchased</th>
+                      <th>Quantity Sold</th>
+                      <th>Quantity Sold Unlinked</th>
+                      <th>Quantity Purchased Unlinked</th>
+                      <th>Purchased in USD</th>
+                      <th>Sold in USD</th>
+                      <th>Gain or Loss</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {% for row in stats_table_data %}
+
+                    <tr>
+                      <td>{{ row['symbol'] }}</td>
+                      <td>{{ row['total_purchased_quantity'] }}</td>
+                      <td>{{ row['total_sold_quantity'] }}</td>
+                      <td>{{ row['total_sold_unlinked_quantity'] }}</td>
+                      <td>{{ row['total_purchased_unlinked_quantity'] }}</td>
+                      <td>{{ row['total_purchased_usd'] }}</td>
+                      <td>{{ row['total_sold_usd']  }}</td>
+                      <td>{{ row['total_profit_loss']  }}</td>
+                    </tr>
+                  
+                    {% endfor %}
+                
+                  </tbody>
+                </table>
+            
+              </div>
+              <!-- /Card Body -->
+            
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Stats Table End -->
+
+
+<!-- Sells  -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Sells</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_4" aria-expanded="true" aria-controls="collapseOne">
+                
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_4" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+                          
+              <!-- Card Body -->
+              <div class="card-body ">
+
+                <table id="add_transactions_sells_datatable" class="table table-striped table-bordered" style="width:100%">
+                  <thead>
+                      <tr>
+                        <th>Source</th>
+                        <th>Asset</th>
+                        <th>Time Stamp</th>
+                        <th>Quantity</th>
+                        <th>Quantity Unlinked</th>
+                        <th>USD Spot</th>
+                        <th>Quantity in USD</th>
+                      </tr>
+                    </thead>
+                </table>
+                <button type="button" id="sells_delete_button" class="btn btn-danger">Delete</button>
+                              
+              </div>
+              <!-- /Card Body -->
+            
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Sells End -->
+
+<!-- Buys Table  -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Buys</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <input id="manage_trans_buys_checkbox_unlinked" type="checkbox" class="flat" checked='checked'> Has Quantity Unlinked Remaining
+              &nbsp;
+              <br>
+              <br>
+              <div class="col-sm-2">
+                <label class="col-form-label">USD Spot:</label>
+                <div class="form-group">
+                  <input id='manage_transactions_usd_spot' class="form-control" type="text" name="number" number="true" />
+                </div>
+              </div>
+
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_5" aria-expanded="true" aria-controls="collapseOne">
+                
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_5" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+                          
+              <!-- Card Body -->
+              <div class="card-body ">      
+                      
+                <table id="add_transactions_buys_datatable" class="table table-striped table-bordered" style="width:100%">
+                  <thead>
+                    <tr>
+                      <th>Source</th>
+                      <th>Asset</th>
+                      <th>Time Stamp</th>
+                      <th>Quantity</th>
+                      <th>Quantity Unlinked</th>
+                      <th>USD Spot</th>
+                      <th>Cost Basis</th>
+                      <th>Remaining in USD @ USD Spot</th>
+                    </tr>
+                  </thead>  
+                </table>
+                <button type="button" id="buys_delete_button" class="btn btn-danger">Delete</button>
+                <button type="button" id="buys_convert_button" class="btn btn-warning">Convert to Lost</button>
+              </div>
+              <!-- /Card Body -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Buys Table End -->
+
+
+<!-- Sends Table  -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Sends</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_6" aria-expanded="true" aria-controls="collapseOne">
+                
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_6" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+                          
+              <!-- Card Body -->
+              <div class="card-body ">        
+                      
+                <table id="add_transactions_sends_datatable" class="table table-striped table-bordered" style="width:100%">
+                  <thead>
+                    <tr>
+                      <th>Source</th>
+                      <th>Asset</th>
+                      <th>Time Stamp</th>
+                      <th>Quantity</th>
+                      <th>Quantity Unlinked</th>
+                      <th>USD Spot</th>
+                      <th>Quantity in USD</th>
+                    </tr>
+                  </thead>  
+                </table>
+                <button type="button" id="send_convert_button" class="btn btn-warning">Convert to Sell</button>
+              
+              </div>
+              <!-- /Card Body -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Sends Table End -->
+
+
+<!-- Receives Table  -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Receives</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_7" aria-expanded="true" aria-controls="collapseOne">
+                
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_7" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+                          
+              <!-- Card Body -->
+              <div class="card-body ">         
+                      
+                <table id="add_transactions_receive_datatable" class="table table-striped table-bordered" style="width:100%">
+                  <thead>
+                    <tr>
+                      <th>Source</th>
+                      <th>Asset</th>
+                      <th>Time Stamp</th>
+                      <th>Quantity</th>
+                      <th>Quantity Unlinked</th>
+                      <th>USD Spot</th>
+                      <th>Quantity in USD</th>
+                    </tr>
+                  </thead>  
+                </table>
+
+                <button type="button" id="receive_convert_button" class="btn btn-warning">Convert to Buy(s)</button>
+              
+              </div>
+              <!-- /Card Body -->
+            
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Receive Table End -->
+           
+
+
+{% endblock content %}
+
+{% block javascripts %}
+  {{ super()}}
+{% endblock javascripts %}
+
+
+
