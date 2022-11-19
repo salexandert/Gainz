@@ -1,0 +1,150 @@
+{% extends "base_site.html" %}
+
+{% block title %} Auto Link {% endblock title %}
+
+{% block stylesheets %}
+  {{ super() }}
+{% endblock stylesheets %}
+
+{% block content %}
+
+<!-- Page Description and Instructions -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">      
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Step 5: Auto Link</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_1" aria-expanded="true" aria-controls="collapseOne">
+                How to use this page
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_1" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+              <div class="card-body">
+                Use this page to create links between buys and sells using different alogo's.
+
+                <br> 
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Page Description and Instructions -->
+  
+<!-- All Asset Stats Table -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Select an asset</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_2" aria-expanded="true" aria-controls="collapseOne">
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_2" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+              
+              <!-- Card Body -->
+              <div class="card-body ">
+                        
+                <table id="al_stats_datatable" class="table table-striped table-bordered" style="width:100%">
+                  <thead>
+                      <tr>
+                        <th>Asset</th>
+                        <th>Quantity Purchased</th>
+                        <th>Quantity Sold</th>
+                        <th>Quantity Sold Unlinked</th>
+                        <th>Quantity Purchased Unlinked</th>
+                        <th>Purchased in USD</th>
+                        <th>Sold in USD</th>
+                        <th>Gain or Loss</th>
+                      </tr>
+                    </thead>
+
+                  <tbody>
+                    {% for row in stats_table_data %}
+
+                    <tr>
+                      <td>{{ row['symbol'] }}</td>
+                      <td>{{ row['total_purchased_quantity'] }}</td>
+                      <td>{{ row['total_sold_quantity'] }}</td>
+                      <td>{{ row['total_sold_unlinked_quantity'] }}</td>
+                      <td>{{ row['total_purchased_unlinked_quantity'] }}</td>
+                      <td>{{ row['total_purchased_usd'] }}</td>
+                      <td>{{ row['total_sold_usd']  }}</td>
+                      <td>{{ row['total_profit_loss']  }}</td>
+                    </tr>
+                
+                    {% endfor %}
+              
+                  </tbody>
+                </table>
+              
+              </div>
+              <!-- /Card Body -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- All Asset Stats Table End -->
+            
+
+
+<!-- Auto Link Options HODL  -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="card-title">Auto Link Options</h5>
+      </div>
+
+              
+      <!-- Card Body -->
+      <div class="card-body ">
+                
+                
+        <p class="welcome-text" id='al_options'> Select a row from Stats Table to Populate
+
+        </p>
+        <p class="welcome-text">
+          <br> FIFO: First in First Out
+          <br> &nbsp &nbsp &nbsp &nbsp &nbsp - Start Using Oldest Buys First
+          <br> FILO: First in Last Out
+          <br>  &nbsp &nbsp &nbsp &nbsp &nbsp - Start Using Newest Buys First
+        </p>
+        
+        <button type="button" id="link_w_fifo" class="btn btn-success">FIFO</button>
+        <button type="button" id="link_w_filo" class="btn btn-success">FILO</button>
+
+      </div>
+      <!-- /Card Body -->
+
+
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Auto Link Options HODL -->
+
+
+
+
+{% endblock content %}
+
+{% block javascripts %}
+  {{ super()}}
+{% endblock javascripts %}
+
+
+

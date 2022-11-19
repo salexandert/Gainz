@@ -1,0 +1,282 @@
+{% extends "base_site.html" %}
+
+{% block title %} Model {% endblock title %}
+
+{% block stylesheets %}
+  {{ super() }}
+{% endblock stylesheets %}
+
+{% block content %}
+
+<!-- Page Description and Instructions -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">      
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Model and Insights</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_1" aria-expanded="true" aria-controls="collapseOne">
+                How to use this page
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_1" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+              <div class="card-body">
+                This page is used to give you insights into how much you paid for your crypto that you are currently hodling.
+                <br>
+                <br> You could still be hodling that crypto from way back when and not even know it! A potential sell might hurt much less knowing it's solidly in the green.
+                <br> Use this page to see potential cost basis options.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Page Description and Instructions -->
+            
+
+<!-- Stats Table -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Select an asset</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_2" aria-expanded="true" aria-controls="collapseOne">
+                
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_2" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+              
+              <!-- Card Body -->
+              <div class="card-body ">
+              
+                <table id="model_stats_datatable" class="table table-striped table-bordered" style="width:100%">
+                  <thead>
+                    <tr>
+                      <th>Asset</th>
+                      <th>Quantity Purchased</th>
+                      <th>Quantity Sold</th>
+                      <th>Quantity Sold Unlinked</th>
+                      <th>Quantity Purchased Unlinked</th>
+                      <th>Purchased in USD</th>
+                      <th>Sold in USD</th>
+                      <th>Gain or Loss</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {% for row in stats_table_data %}
+
+                    <tr>
+                      <td>{{ row['symbol'] }}</td>
+                      <td>{{ row['total_purchased_quantity'] }}</td>
+                      <td>{{ row['total_sold_quantity'] }}</td>
+                      <td>{{ row['total_sold_unlinked_quantity'] }}</td>
+                      <td>{{ row['total_purchased_unlinked_quantity'] }}</td>
+                      <td>{{ row['total_purchased_usd'] }}</td>
+                      <td>{{ row['total_sold_usd']  }}</td>
+                      <td>{{ row['total_profit_loss']  }}</td>
+                    </tr>
+                  
+                    {% endfor %}
+                
+                  </tbody>
+                </table>
+            
+              </div>
+              <!-- /Card Body -->
+            
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Stats Table End -->
+
+<!-- Buys -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Enter potential sell to see available options</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_3" aria-expanded="true" aria-controls="collapseOne">
+                
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_3" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+              
+              <!-- Card Body -->
+              <div class="card-body ">
+                
+                <!-- <div class='row'>
+                  <div class="checkbox">
+                    <label>
+                      <input id="model_checkbox_unlinked" type="checkbox" class="flat" checked='checked'> Unlinked Remaining
+                    </label>
+                  </div>
+                  <div class="checkbox">
+                    <label>
+                      <input id="model_checkbox_long_term_hodl" type="checkbox" class="flat" checked='checked'> Hodl 1 year +
+                    </label>
+                  </div>
+                </div> -->
+
+
+                  <div class="col-sm-2">
+                    <label class="form-label">Quantity:</label>
+                  </div>
+                    
+                  <div class="col-sm-2">
+                    <input id='model_quantity' class="form-control" type="text" name="number" number="true" />
+                  </div>
+                  
+                  <div class="col-sm-2">
+                    <br>
+                    <p>Or</p>
+                  </div>
+
+                  <div class="col-sm-2">
+                    <label class="form-label">Total in USD:</label>
+                  </div>
+
+                  <div class="col-sm-2">
+                    <div class="form-group">
+                      <input id='total_in_usd' class="form-control" type="text" name="number" number="true" />
+                    </div>
+                  </div>
+
+                
+                  <div class="col-sm-2">
+                    <br>
+                    <p>And</p>
+                  </div>
+                  
+
+                  <div class="col-sm-2">
+
+                    <label class="col-form-label">USD Spot:</label>
+                    <div class="form-group">
+                      <input id='model_usd_spot' class="form-control" type="text" name="number" number="true" />
+                    </div>
+                  </div>
+
+                
+                
+
+                <button id='model_submit' class="btn btn-success" disabled>Submit</button>
+                <br>
+                <br>
+
+                <div class="form-group row left align">
+                  <label class="control-label col-md-3 col-sm-3 ">Select an available batch</label>
+                  <div class="col-md-4 col-sm-4">
+                    <select id='model_batch_options' class="form-control"></select>
+                  </div>
+                </div>
+
+                <table id="model_batches_datatable" class="table" style="width:100%">
+                  <thead>
+                    <tr>
+                      <th>Source</th>
+                      <th>Asset</th>
+                      <th>Date Acquired</th>
+                      <th>Buy Quantity</th>
+                      <th>Buy Unlinked</th>
+                      <th>Potential Link Quantity</th>
+                      <th>Buy USD Spot</th>
+                      <th>Proceeds</th>
+                      <th>Cost Basis</th>
+                      <th>Gain or Loss</th>
+
+                    </tr>
+                  </thead>
+                
+                </table>
+
+                <p id="model_batch_text"> </p>
+                  
+              </div>
+              <!-- /Card Body -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Buys -->
+
+<!-- Buys Table  -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">All linkable buys</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_4" aria-expanded="true" aria-controls="collapseOne">
+                
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_4" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+                          
+              <!-- Card Body -->
+              <div class="card-body ">      
+                      
+                <table id="all_linkable_buys_datatable" class="table table-striped table-bordered" style="width:100%">
+                  <thead>
+                    <tr>
+                      <th>Source</th>
+                      <th>Asset</th>
+                      <th>Date Acquired</th>
+                      <th>Buy Quantity</th>
+                      <th>Buy Unlinked</th>
+                      <th>Potential Link Quantity</th>
+                      <th>Buy USD Spot</th>
+                      <th>Proceeds</th>
+                      <th>Cost Basis</th>
+                      <th>Gain or Loss</th>
+                    </tr>
+                  </thead>  
+                </table>
+
+              </div>
+              <!-- /Card Body -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Buys Table End -->
+
+
+
+           
+
+
+{% endblock content %}
+
+{% block javascripts %}
+  {{ super()}}
+{% endblock javascripts %}
+
+
+
