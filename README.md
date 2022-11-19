@@ -22,6 +22,8 @@ Please check out https://cryptogainz.store/ or email admin@cryptogainz.store for
 
 Video Walkthrough and Intro https://youtu.be/g_02xOu1F7M
 
+download the compiled version for Windows and Mac here https://drive.google.com/drive/folders/1YLyRRWitJ1pHVVMHnspB783Pq52DWUnC?usp=share_link
+
 Did this help you out? All Donations cherished https://cryptogainz.store/pages/donate or with Bitcoin bc1qm0sykhxhhqey9yg2t93mqp4jzgdl88ewa82q3s
 
 Gainz, does not provide Legal, Financial, or Tax Advice. Please consult with your certified advisor(s) to validate results.
