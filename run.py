@@ -27,9 +27,10 @@ Migrate(app, db)
 
 if __name__ == "__main__":
 
-    print(f"\n\nGainz App runs on a non-production (Flask) web server you can safely ignore the warning(s) below. \n\nTo access Gainz to go http://127.0.0.1:5000 in a web browser. Preferably Chrome\n")
-    print(f"Default credentials username: admin, password: admin\n")
-    print("Close this window when finished.\n")
+    print(f"\n\nGainz App runs on a non-production (Flask) web server you can safely ignore the warning(s) below.")
+    print("\nTo access Gainz to go http://127.0.0.1:5000 in a web browser. Preferably Chrome")
+    print(f"\nDefault credentials username: admin, password: admin")
+    print("\nClose this window when finished.\n")
     
     app.run(debug=True)
  
