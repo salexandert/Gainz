@@ -37,24 +37,8 @@
                      provided you bought 3 BTC, sold 1, HODL 1. This indicates that you sold, converted, gifted, or lost 1 BTC. 
                      You can manually enter what happened by adding a transaction or Gainz can convert sends into sells or lost to resolve.
                 <br>
-                <br><b>Received Crypto has no cost basis info</b>
-                <br> Say you upload your transactions from coinbase it says you bought 1 BTC, and sold 2 BTC. 
-                <br> Your cost basis for the 1 you bought from coinbase can be calculated with the information provided from coinbase. 
-                <br> What about that other 1 BTC? Where did they come from, when was it purchased, and for how much? 
-                <br>
+  
                 <br> Gainz helps build the story and the picture that is needed to properly calculate a true cost basis. 
-                <br>
-                <br><b>Sold/lost True-Up</b>
-                <br>Say you upload your transactions from coinbase it says you bought 3 BTC and sold 1 BTC, but you only have 1 BTC across all of your wallets(Your HODL).
-                <br>This indicates 1 BTC sold on other exchanges, traded for goods or services (sold), or lost.
-                <br>These coins need to be accounted for or you may use a cost basis that is no longer valid because it was sold on other exchanges, traded for goods or services (sold), or lost.
-                <br>
-                <br><b>Maths</b>
-                <br> Buys - Sells = Sold_or_Lost_or_HODL
-                <br> If HODL information provided:
-                <br> Sold_or_Lost_or_HODL - HODL = Sold_or_Lost
-                <br>
-                <br>The two auto options available are to convert sends into sells or convert buys into lost using the earliest sends/buys possible.
                 <br>
                 <br>Select an Asset to populate pre-check information.
                 <br>
@@ -68,6 +52,93 @@
   </div>
 </div>
 <!-- /Page Description and Instructions -->
+
+
+<!-- Step 4.1 -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Step 4.1: Are there receives that were acquired from other sources?</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_4_1" aria-expanded="true" aria-controls="collapseOne">
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_4_1" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+              
+              <!-- Card Body -->
+              <div class="card-body ">
+
+                <br> If so you may not have adaquate buy quantity to satisify sells. 
+                <br>
+                <br> Say you upload your transactions from coinbase it says you bought 1 BTC, received 1 BTC, and sold 2 BTC. 
+                <br> Your cost basis for the 1 you bought from coinbase can be calculated with the information provided from coinbase. 
+                <br> What about that other 1 BTC? Where did they come from, when was it purchased, and for how much? 
+                <br>
+                <br> We've used the following logic to <b>help</b> identify this issue. 
+                <br> Starting from your first sell is the total quantity of previous buys greater than or equal to total sell quantity?
+                <br>
+                <br> Select an asset to run this test. 
+                
+              </div>
+              <!-- /Card Body -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Step 4.1 -->
+
+<!-- Step 4.2 -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Step 4.2: Is the quantity of buys - (sold or lost) equal to current HODL?</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_4_2" aria-expanded="true" aria-controls="collapseOne">
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_4_2" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+              
+              <!-- Card Body -->
+              <div class="card-body ">
+
+                <br>Say you have 2 BTC across all of your wallets making your HODL 2 BTC.
+                <br> 
+                <br>You upload your transactions from coinbase and it says you bought 4 BTC and sold 1 BTC.
+                <br>4 BTC in buys - 1 BTC in sells = expected HODL of 3. This being 1 more than current HODL of 2 BTC indicates 1 BTC sold on other exchanges, traded for goods or services (sold), or lost.
+                <br>
+                <br> or
+                <br>
+                <br>You upload your transactions from coinbase and it says you bought 4 BTC and sold 3 BTC.
+                <br>4 BTC in buys - 3 BTC in sells = expected HODL of 1 BTC. This being 1 BTC less than your current HODL of 2 BTC indicates 1 BTC acquired from other sources. 
+                <br>
+                <br><b>Logic</b>
+                <br> Buys - Sells = expected_hodl
+                <br> if expected_hodl is greater than or less than HODL
+                <br>
+                <br>The two auto options available are to convert sends into sells or convert buys into lost using the earliest sends/buys possible.
+                <br>
+                
+              </div>
+              <!-- /Card Body -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Step 4.2 -->
   
      
 <!-- Stats Table -->
