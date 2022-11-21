@@ -275,13 +275,13 @@ def auto_link_pre_check():
     else:
         data['auto_suggestions'].append([f"4.1.1", f"HODL Provided {hodl}", "Complete"])
 
-        sold_or_Lost = bought - hodl
-        needs_classification_hodl = sold_or_Lost - sold
+        expected_hodl = bought - sold
+        hodl_difference = expected_hodl - hodl
 
-        if needs_classification_hodl > 0.001:
-            data['auto_suggestions'].append([f"4.1.2", f"Buys ({bought}) - HODL ({hodl}) = Sold or Lost ({sold_or_Lost }). Sold or Lost - Sells ({sold}) = Needs Classification ({needs_classification_hodl})", "Failed"])
+        if hodl_difference > 0 or hodl_difference < 0:
+            data['auto_suggestions'].append([f"4.1.2", f"Buys ({bought}) - sold ({sold}) = expected HODL ({expected_hodl }). expected HODL - Sells ({sold}) = difference ({hodl_difference})", "Failed"])
         else:
-            data['auto_suggestions'].append([f"4.1.2", f"Buys ({bought}) - HODL ({hodl}) = Sold or Lost ({sold_or_Lost }). Sold or Lost - Sells ({sold}) = Needs Classification (Less than 0.001)", "Passed"])
+            data['auto_suggestions'].append([f"4.1.2", f"Buys ({bought}) - sold ({sold}) = expected HODL ({expected_hodl }). expected HODL - Sells ({sold}) = difference ({hodl_difference})", "passed"])
 
 
     return jsonify(data)

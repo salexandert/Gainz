@@ -34,7 +34,6 @@ $(document).ready(function() {
         var buys = table.row( this ).data()[1]
         var sells = table.row( this ).data()[2]
         var sent = table.row( this ).data()[3]
-        var received = table.row( this ).data()[4]
         var hodl = table.row( this ).data()[9]
         
         var needs_classification = buys - sells
@@ -42,7 +41,6 @@ $(document).ready(function() {
         var hodl_text = $('#eh_options').text('')
         var convert_text = $('#convert_text').text('')
         var Sold_or_Lost = buys - hodl
-        var needs_classification_hodl = Sold_or_Lost - sells
         var expected_hodl = buys - sells
         var hodl_difference = expected_hodl - hodl
         
