@@ -4,7 +4,7 @@ $(document).ready(function() {
 
     $('#auto_actions_datatable').DataTable({
         "pageLength": 25,
-        "order": [[ 2, "desc" ]],
+        "order": [[ 1, "desc" ]],
         "columnDefs": [
             { "width": "5%", "targets": 0 },
             { "width": "20%", "targets": 2},
@@ -43,6 +43,8 @@ $(document).ready(function() {
         var convert_text = $('#convert_text').text('')
         var Sold_or_Lost = buys - hodl
         var needs_classification_hodl = Sold_or_Lost - sells
+        var expected_hodl = buys - sells
+        var hodl_difference = expected_hodl - hodl
         
         if (hodl == "N/A") {
         
@@ -62,17 +64,29 @@ $(document).ready(function() {
             $("#submit_hodl_button").text("Change HODL")
 
             hodl_text.append(asset + ' Selected')
-            hodl_text.append("<br><br>Buys: " + buys + " - HODL: " + hodl + " = Sold_or_Lost: " + Sold_or_Lost)
-            hodl_text.append("<br>Sold_or_Lost: " + Sold_or_Lost + " - Sells: " + sells + " = Needs_Classification: " + needs_classification_hodl)
+            hodl_text.append("<br><br>Buys " + buys + " - Sells " + sells + " = Expected HODL of " + expected_hodl)
+            hodl_text.append("<br><br>Expected HODL " + expected_hodl + " - HODL" + hodl + " = a difference of " + hodl_difference)
+            if (hodl_difference > 0) 
+                { 
+                    hodl_text.append("<br><br> Since the difference is positive it indicates you may have sold this amount on other exchanges, traded for goods or services (sold), or lost.")
+                    hodl_text.append("<br> If you know what transactions are missing its best to add them on the add and manage transactions page. ")
+                    hodl_text.append("<br> Otherwise you may use the options below to automatically convert the earliest sends into sells or buys into lost")
+                    hodl_text.append("<br> This also many be done manually on the add and manage transactions page")
+                    
+                    convert_text.append("We can account for " + hodl_difference + " by converting any combination of the below. <br><br>")
+                    convert_text.append(sent + " Sends to Sells <br>")
+                    // convert_text.append(received + " Received to Buys <br>")
+                    convert_text.append(buys + " Buys to Lost <br>")
+                } 
+            else {
+                    hodl_text.append("<br><br> Since the difference is negative it indicates you may have acquired this amount from other sources.")
+                    hodl_text.append("<br> If you know what transactions are missing its best to add them on the add and manage transactions page. ")
+                    hodl_text.append("<br> Otherwise you may convert the receives into buys. This needs to be done manually on the add and manage transactions page")
+
+                }
             
-            if (needs_classification_hodl <= .0019) {  hodl_text.append("<br><br> Pretty close to 0, might be best to leave it as-is.")}
-            hodl_text.append("<br><br>We can account for discrepancies by converting sends into sells, receives into buys, or buys into lost.")
-            hodl_text.append("<br>You can do this manually on the Add & Manage Transactions Page or automatically below using the earliest transactions first.")
             
-            convert_text.append("We can account for " + needs_classification_hodl + " by converting any combination of the below. <br><br>")
-            convert_text.append(sent + " Sends to Sells <br>")
-            // convert_text.append(received + " Received to Buys <br>")
-            convert_text.append(buys + " Buys to Lost <br>")
+
 
         }
 

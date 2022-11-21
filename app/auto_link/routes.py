@@ -129,14 +129,14 @@ def auto_link_pre_check():
     
     message = ""
     if bought >= sold:
-        id = f"ALP:1"
+        id = "4.2.1"
         description = "Auto-Link Pre-Check: More Buys than Sells"
         status = "Passed"
         auto_suggestions['pre-check'].append([id, description, status])
         message += description
         
         if is_greater is True:
-            id = f"ALP:2"
+            id = "4.2.2"
             description = (f"<br> Auto-Link Pre-Check: Individual sells can be covered by an earlier buy: At sell timestamp [{latest_sell_time_stamp}] Buy Quantity [{bought_to_date}] can no longer cover Sell Quantity [{sold_to_date}] "
              f"<br> You can track down the discrepency and add [{sold_to_date - bought_to_date}] in buys manually or by converting receives to buys before [{latest_sell_time_stamp}]."
              "<br> If you continue you will have sells not fully linked (unlinked quantity) to buys. Full proceeds on quantity unlinked of sell will be used for Gain/Loss.")
@@ -146,21 +146,21 @@ def auto_link_pre_check():
        
         else:
 
-            id = f"ALP:2"
+            id = "4.2.2"
             description = "<br> Auto-Link Pre-Check: Individual sells can be covered by an earlier buy"
             status = "Passed"
             auto_suggestions['pre-check'].append([id, description, status])
             message += description
 
             if auto_link_check_failed is True:
-                id = f"ALP:3"
+                id = "4.2.3"
                 description = "Auto-Link Pre-Check: Sell's will be fully linked using Auto Link"
                 status = "Failed"
                 for i in auto_link_failures:
                     message += f"<br> {i}"
             
             else:
-                id = f"ALP:3"
+                id = "4.2.3"
                 description = "Auto-Link Pre-Check: Sell's will be fully linked using Auto Link"
                 status = "Passed"
             
@@ -168,7 +168,7 @@ def auto_link_pre_check():
 
     
     else:
-        id = f"ALP:1"
+        id = f"4.2.1"
         description = "Auto-Link Pre-Check: More Buys than Sells"
         status = "Failed"
         message += description
@@ -271,17 +271,17 @@ def auto_link_pre_check():
             hodl = a.hodl
     
     if hodl == "N/A":
-        data['auto_suggestions'].append([f"H:1", f"HODL Provided {hodl}", "Not Complete"])
+        data['auto_suggestions'].append([f"4.1.1", f"HODL Provided {hodl}", "Not Complete"])
     else:
-        data['auto_suggestions'].append([f"H:1", f"HODL Provided {hodl}", "Complete"])
+        data['auto_suggestions'].append([f"4.1.1", f"HODL Provided {hodl}", "Complete"])
 
         sold_or_Lost = bought - hodl
         needs_classification_hodl = sold_or_Lost - sold
 
         if needs_classification_hodl > 0.001:
-            data['auto_suggestions'].append([f"H:2", f"Buys ({bought}) - HODL ({hodl}) = Sold or Lost ({sold_or_Lost }). Sold or Lost - Sells ({sold}) = Needs Classification ({needs_classification_hodl})", "Failed"])
+            data['auto_suggestions'].append([f"4.1.2", f"Buys ({bought}) - HODL ({hodl}) = Sold or Lost ({sold_or_Lost }). Sold or Lost - Sells ({sold}) = Needs Classification ({needs_classification_hodl})", "Failed"])
         else:
-            data['auto_suggestions'].append([f"H:2", f"Buys ({bought}) - HODL ({hodl}) = Sold or Lost ({sold_or_Lost }). Sold or Lost - Sells ({sold}) = Needs Classification (Less than 0.001)", "Passed"])
+            data['auto_suggestions'].append([f"4.1.2", f"Buys ({bought}) - HODL ({hodl}) = Sold or Lost ({sold_or_Lost }). Sold or Lost - Sells ({sold}) = Needs Classification (Less than 0.001)", "Passed"])
 
 
     return jsonify(data)
