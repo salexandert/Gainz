@@ -9,7 +9,6 @@ Reports can be exported in excel format for your reference and shareability.
 How Gainz Works:
 Gainz uses Universal Wallet for accounting. This means it does not matter where the crypto resides sells can be linked to buys even if there was no transfer between wallets. This greatly simplifies cost basis calculation bypassing the need to import all xpubs, addresses, and transactions mapping the movement of coins overtime. We only are interested in taxable events. By importing exchange csv’s and entering in known off exchange occurrences (like that time you used shapeshift to convert ETH to BTC) we can make a best effort cost basis calculation. What we need to know is outside of everything entered into Gainz did you buy, sell, convert, gift, lose your coins? Gainz uses the data entered, including HODL (if provided) to true up discrepancies. An example of a common discrepancy is based on data provided you bought 3 BTC, sold 1, HODL 1. This indicates that you sold, converted, gifted, or lost 1 BTC. You can manually enter what happened by adding a transaction or Gainz can convert sends into sells or lost to resolve
 
-
 To get started double click GainzApp.exe. This will open a command prompt that you can leave open while using GainzApp. 
 
 Open a web browser to http://127.0.0.1:5000/ to login with username: admin password: admin
@@ -23,6 +22,10 @@ Please check out https://cryptogainz.store/ or email admin@cryptogainz.store for
 Video Walkthrough and Intro https://youtu.be/g_02xOu1F7M
 
 download the compiled version for Windows and Mac here https://drive.google.com/drive/folders/1YLyRRWitJ1pHVVMHnspB783Pq52DWUnC?usp=share_link
+
+or compile it yourself with pyinstaller 
+
+"pyinstaller --add-data "app;app" --onefile --hidden-import flask_wtf --hidden-import bcrypt --hidden-import wtforms.fields.html5 --hidden-import utils --hidden-import cffi --icon="C:\{path repo}\gainz_logo.ico" run.py"
 
 Did this help you out? All Donations cherished https://cryptogainz.store/pages/donate or with Bitcoin bc1qm0sykhxhhqey9yg2t93mqp4jzgdl88ewa82q3s
 
