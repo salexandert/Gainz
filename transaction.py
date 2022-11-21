@@ -55,6 +55,7 @@ class Transaction:
 
         receive = None
         sell = None
+        buy = None
        
         if self.symbol == other.symbol:
 
@@ -81,7 +82,7 @@ class Transaction:
             if receive is not None:
                 link = Link(transactions=[receive, buy], quantity=link_quantity)
             
-            else:
+            elif buy is not None and sell is not None:
                 # print(self.trans_type, other.trans_type)
                 link = Link(transactions=[sell, buy], quantity=link_quantity)
 
@@ -103,8 +104,8 @@ class Transaction:
             print(f"{self.symbol} <-CANNOT LINK-> {other.symbol}")
 
         # Update Linked Transactions
-
-        buy.update_linked_transactions()
+        if buy is not None:
+            buy.update_linked_transactions()
 
         if sell is not None:
             sell.update_linked_transactions()
