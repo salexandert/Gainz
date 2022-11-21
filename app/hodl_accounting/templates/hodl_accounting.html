@@ -27,20 +27,15 @@
                 Use this page to find and resolve common discrepencies in your data.
                 <br>
                 <br><b>Gainz uses Universal Wallet for accounting.</b> <br>
-                 This means it does not matter where the crypto resides sells can be linked to buys even if there was no
-                  transfer between wallets. This greatly simplifies cost basis calculation bypassing the need to import all xpubs,
-                   addresses, and transactions mapping the movement of coins overtime. We only are interested in taxable events.
-                    By importing exchange csv’s and entering in known off exchange occurrences (like that time you used shapeshift to convert 
-                    ETH to BTC) we can make a best effort cost basis calculation. What we need to know is outside of everything 
-                    entered into Gainz did you buy, sell, convert, gift, lose your coins? Gainz uses the data entered,
-                     including HODL (if provided) to true up discrepancies. An example of a common discrepancy is based on data 
-                     provided you bought 3 BTC, sold 1, HODL 1. This indicates that you sold, converted, gifted, or lost 1 BTC. 
-                     You can manually enter what happened by adding a transaction or Gainz can convert sends into sells or lost to resolve.
+                 This means it does not matter where the crypto resides, sells can be linked to buys even if there was no
+                 transfer between wallets. This greatly simplifies cost basis calculation bypassing the need to import all xpubs,
+                 addresses, and transactions mapping the movement of coins overtime. We only are interested in taxable events.
+                 By importing exchange csv’s and entering in known off exchange occurrences (like that time you used shapeshift to convert 
+                 ETH to BTC) we can make a best effort cost basis calculation. We are attempting to determine transactions not 
+                 entered into Gainz. Did you buy, sell, convert, gift, lose your coins? Gainz uses the data entered,
+                 including HODL (if provided) to true up discrepancies.  
                 <br>
-  
-                <br> Gainz helps build the story and the picture that is needed to properly calculate a true cost basis. 
                 <br>
-                <br>Select an Asset to populate pre-check information.
                 <br>
                 <br>All conversion operations are saved for reference and exportation.
               </div>
@@ -60,7 +55,7 @@
     <div class="card">
       <div class="card-body">
         <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
-          <h4 class="card-title">Step 4.1: Are there receives that were acquired from other sources?</h4>
+          <h4 class="card-title">Step 4.1: Is the quantity of buys - (sold or lost) equal to current HODL?</h4>
           <div class="card card-plain">
             <div class="card-header" role="tab" id="headingOne">
               <a data-toggle="collapse" data-parent="#accordion" href="#collapse_4_1" aria-expanded="true" aria-controls="collapseOne">
@@ -71,17 +66,26 @@
               
               <!-- Card Body -->
               <div class="card-body ">
-
-                <br> If so you may not have adaquate buy quantity to satisify sells. 
+                
+                <br><b>*It's important to enter all of the transactions you know about. You can manually add transactions on the add & manage transactions page.*</b>
                 <br>
-                <br> Say you upload your transactions from coinbase it says you bought 1 BTC, received 1 BTC, and sold 2 BTC. 
-                <br> Your cost basis for the 1 you bought from coinbase can be calculated with the information provided from coinbase. 
-                <br> What about that other 1 BTC? Where did they come from, when was it purchased, and for how much? 
+                <br><b>Logic</b>
+                <br>Say you have 2 BTC across all of your wallets making your HODL 2 BTC.
+                <br> 
+                <br>You upload your transactions from coinbase and it says you bought 4 BTC and sold 1 BTC.
+                <br>4 BTC in buys - 1 BTC in sells = expected HODL of 3. 
+                <br>This being 1 more than your current HODL of 2 BTC indicating you may have 1 BTC sold on other exchanges, traded for goods or services (sold), or lost.
                 <br>
-                <br> We've used the following logic to <b>help</b> identify this issue. 
-                <br> Starting from your first sell is the total quantity of previous buys greater than or equal to total sell quantity?
+                <br> or
                 <br>
-                <br> Select an asset to run this test. 
+                <br>You upload your transactions from coinbase and it says you bought 4 BTC and sold 3 BTC.
+                <br>4 BTC in buys - 3 BTC in sells = expected HODL of 1 BTC. 
+                <br>This being 1 BTC less than your current HODL of 2 BTC indicating you may have 1 BTC acquired from other sources. 
+                <br>
+                
+                <br> 
+                <br>To get started select an asset and scroll down to info and actions to enter your current HODL.
+                <br>
                 
               </div>
               <!-- /Card Body -->
@@ -100,7 +104,7 @@
     <div class="card">
       <div class="card-body">
         <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
-          <h4 class="card-title">Step 4.2: Is the quantity of buys - (sold or lost) equal to current HODL?</h4>
+          <h4 class="card-title">Step 4.2: Did you acquired cryptocurrencies from sources not accounted for?</h4>
           <div class="card card-plain">
             <div class="card-header" role="tab" id="headingOne">
               <a data-toggle="collapse" data-parent="#accordion" href="#collapse_4_2" aria-expanded="true" aria-controls="collapseOne">
@@ -112,22 +116,17 @@
               <!-- Card Body -->
               <div class="card-body ">
 
-                <br>Say you have 2 BTC across all of your wallets making your HODL 2 BTC.
-                <br> 
-                <br>You upload your transactions from coinbase and it says you bought 4 BTC and sold 1 BTC.
-                <br>4 BTC in buys - 1 BTC in sells = expected HODL of 3. This being 1 more than current HODL of 2 BTC indicates 1 BTC sold on other exchanges, traded for goods or services (sold), or lost.
+                <br> Did you acquired cryptocurrencies from sources not accounted for? If so you may not have adaquate buy quantity to satisify sells. 
                 <br>
-                <br> or
+                <br> <br><b>Logic</b>
+                <br> Say you upload your transactions from coinbase it says you bought 1 BTC, received 1 BTC, and sold 2 BTC. 
+                <br> Your cost basis for the 1 you bought from coinbase can be calculated with the information provided from coinbase. 
+                <br> What about that other 1 BTC? Where did they come from, when was it purchased, and for how much? 
                 <br>
-                <br>You upload your transactions from coinbase and it says you bought 4 BTC and sold 3 BTC.
-                <br>4 BTC in buys - 3 BTC in sells = expected HODL of 1 BTC. This being 1 BTC less than your current HODL of 2 BTC indicates 1 BTC acquired from other sources. 
+                <br> We've used the following logic to <b>help</b> identify this issue. 
+                <br> Starting from your first sell is the total quantity of previous buys greater than or equal to total sell quantity?
                 <br>
-                <br><b>Logic</b>
-                <br> Buys - Sells = expected_hodl
-                <br> if expected_hodl is greater than or less than HODL
-                <br>
-                <br>The two auto options available are to convert sends into sells or convert buys into lost using the earliest sends/buys possible.
-                <br>
+                <br> Select an asset to run this test. 
                 
               </div>
               <!-- /Card Body -->
@@ -139,8 +138,8 @@
   </div>
 </div>
 <!-- Step 4.2 -->
-  
-     
+
+
 <!-- Stats Table -->
 <div class="row">
   <div class="col-md-12">
