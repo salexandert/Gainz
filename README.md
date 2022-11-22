@@ -22,6 +22,7 @@ Please check out https://cryptogainz.store/ or email admin@cryptogainz.store for
 Video Walkthrough and Intro https://youtu.be/g_02xOu1F7M
 
 download the compiled version for Windows and Mac here https://drive.google.com/drive/folders/1YLyRRWitJ1pHVVMHnspB783Pq52DWUnC?usp=share_link
+Compiled versions especially for MAC may be behind versions a bit. 
 
 or compile it yourself with pyinstaller 
 
