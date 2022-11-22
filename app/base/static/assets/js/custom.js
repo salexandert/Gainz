@@ -391,6 +391,7 @@ $(document).ready(function() {
                 'row_data': table.row( {selected:true}).data(),
                 'start_date': $("#start_date").datetimepicker().val(),
                 'end_date': $("#end_date").datetimepicker().val(),
+                'year': $('#stats_page_year_dropdown').find(":selected").val(),
                 'current_usd_spot': $(this).val()
                 }),  
 
