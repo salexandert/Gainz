@@ -234,6 +234,24 @@ $(document).ready(function() {
 
     } );
 
+    $("#min_gain_long").click(function(){
+        $.ajax({
+            type: "POST",
+            url: "/auto_link/auto_link_asset",
+            data: JSON.stringify({
+                'algo': 'min_gain_long',
+                'asset': $('#al_stats_datatable').DataTable().row( {selected:true} ).data()
+              }),  
+            dataType: "json",
+            contentType: 'application/json',
+            success: function (data) {
+                
+                location.reload()
+            },   
+        });
+
+    });
+
     $("#link_w_fifo").click(function(){
         $.ajax({
             type: "POST",
@@ -755,6 +773,23 @@ $(document).ready(function() {
         $.ajax({
             type: "POST",
             url: "/history/delete",
+            data: JSON.stringify({
+                'data': $('#history_datatable').DataTable().row( {selected:true} ).data(),
+                
+              }),  
+            dataType: "json",
+            contentType: 'application/json',
+            success: function (data) {
+                location.reload()
+            },   
+        });
+    });
+
+    $("#save_button").click(function(){
+
+        $.ajax({
+            type: "POST",
+            url: "/history/save",
             data: JSON.stringify({
                 'data': $('#history_datatable').DataTable().row( {selected:true} ).data(),
                 
