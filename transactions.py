@@ -347,7 +347,7 @@ class Transactions:
 
         
         elif algo == 'min_gain_long':
-            print('algo min gain long')
+            # print('algo min gain long')
             for key in buys.keys():
                 buys[key].sort(key=lambda x: x.time_stamp)
             for key in sells.keys():
@@ -387,7 +387,7 @@ class Transactions:
 
                     # Min Gain Long Batch
                     linkable_buys_long.sort(key=lambda sell: sell.usd_spot, reverse=True)
-                    print(f"items in linkable long {len(linkable_buys_long)}")
+                    # print(f"items in linkable long {len(linkable_buys_long)}")
                     target_quantity = potential_sale_quantity
                     for trans in linkable_buys_long:
                         
@@ -419,7 +419,7 @@ class Transactions:
                             sell_fully_linked_min_profit = True
                             break
                     
-                    print(f'items in min_gain_long_batch {len(min_gain_long_batch)}')
+                    # print(f'items in min_gain_long_batch {len(min_gain_long_batch)}')
                     for i in min_gain_long_batch:
                         link = sell.link_transaction(i[0], i[1])
                         links.append(link)
