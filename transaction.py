@@ -51,7 +51,7 @@ class Transaction:
 
         
     def __repr__(self):
-        return repr(f"{self.time_stamp} {self.quantity}")
+        return repr(f"{self.time_stamp} {self.quantity} {self.trans_type}")
 
     def __eq__(self, other):
         return self.quantity == other.quantity and self.time_stamp == other.time_stamp and self.trans_type == other.trans_type
@@ -73,6 +73,7 @@ class Transaction:
         receive = None
         sell = None
         buy = None
+        link = None
        
         if self.symbol == other.symbol:
 
@@ -110,10 +111,12 @@ class Transaction:
             if receive is not None and link not in receive.links:
                 receive.links.append(link)
 
-            if link not in buy.links:
-                buy.links.append(link)
+            if link is not None:
+                if link not in buy.links:
+                    buy.links.append(link)
 
             else:
+                print(f"Self: {self.trans_type}, Other: {other.trans_type}")
                 print(f"Link_quantity is still None!")
 
             

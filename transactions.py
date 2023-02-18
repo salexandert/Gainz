@@ -873,7 +873,7 @@ class Transactions:
                     # print(f'Sell Found {trans.name}')
                     sell_obj = trans
 
-                elif trans.name == buy:
+                elif trans.name == buy:                
                     # print(f'Buy Found {trans.name}')
                     buy_obj = trans
 
@@ -882,6 +882,7 @@ class Transactions:
                     break
             
             if sell_obj and buy_obj:
+                
                 # print(f" quantity of link on load {quantity}")
                 sell_obj.link_transaction(buy_obj, link_quantity=quantity)
 
