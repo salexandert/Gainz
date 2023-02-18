@@ -346,73 +346,153 @@ class Transactions:
                 sells[key].sort(key=lambda x: x.time_stamp)
 
         
-        # Start the Algo
-        keys = list(sells.keys())
-        keys.sort()
-        for key in keys:
+        elif algo == 'min_gain_long':
+            print('algo min gain long')
+            for key in buys.keys():
+                buys[key].sort(key=lambda x: x.time_stamp)
+            for key in sells.keys():
+                sells[key].sort(key=lambda x: x.time_stamp)
+                sells[key].sort(key=lambda x: x.unlinked_quantity)
+                # Start the Algo
+            
+            keys = list(sells.keys())
+            keys.sort()
+            for key in keys:
 
-            links = []
+                links = []
 
-            for sell in sells[key]:
- 
-                # check if sell has remaining unlinked quantity
-                if sell.unlinked_quantity > 0:
+                for sell in sells[key]:
+                    # break if sell has no remaining unlinked quantity
+                    if sell.unlinked_quantity <= .000001:
+                        continue
                     
-                    for buy in buys[key]:
+                    potential_sale_quantity = sell.unlinked_quantity
+                    min_gain_long_batch = []
+                    min_gain_long_batch_gain = 0.0
+                    min_gain_long_batch_quantity = 0.0
 
-                        link_quantity = None
+                    potential_sale_quantity = sell.unlinked_quantity
+                    potential_sale_usd_spot = sell.usd_spot
 
-                        # break if sell has no remaining unlinked quantity
-                        if sell.unlinked_quantity <= 0:
-                            break
 
-                        # Skip if buy has no remaining unlinked quantity
-                        if buy.unlinked_quantity <= 0:
-                            continue
-                                                
-                        # check if buy came before sell
-                        if buy.time_stamp >= sell.time_stamp:
-                            continue
+                    # Linkable Buys Long
+                    linkable_buys_long = [
+                    trans for trans in self.transactions
+                        if trans.trans_type == "buy"
+                        and trans.symbol == key
+                        and (sell.time_stamp > trans.time_stamp)
+                        and (sell.time_stamp - trans.time_stamp).days > 365
+                        and trans.unlinked_quantity > .0000001
+                    ]
 
-                        # Link 
-                        # if sell unlinked is greater than buy unlinked, link quantity equals buy unlinked
-                        if sell.unlinked_quantity >= buy.unlinked_quantity:
-                            link_quantity = buy.unlinked_quantity
+                    # Min Gain Long Batch
+                    linkable_buys_long.sort(key=lambda sell: sell.usd_spot, reverse=True)
+                    print(f"items in linkable long {len(linkable_buys_long)}")
+                    target_quantity = potential_sale_quantity
+                    for trans in linkable_buys_long:
                         
-                        # if sell unlinked is less than buy unlinked, link quantity equals sell unlinked
-                        elif sell.unlinked_quantity <= buy.unlinked_quantity: 
-                            link_quantity = sell.unlinked_quantity
+                        buy_unlinked_quantity = trans.unlinked_quantity
                         
+                        # Determine max link quantity
+                        if target_quantity <= buy_unlinked_quantity:
+                            link_quantity = target_quantity
                         
-                        # print(f"\nthe link quantity BEFORE being rounded down [{link_quantity}] len {len(str(link_quantity))}")
+                        elif target_quantity >= buy_unlinked_quantity:
+                            link_quantity = buy_unlinked_quantity
 
-                        # Set max length of link 
                         link_quantity = round_decimals_down(link_quantity)
+                        target_quantity -= link_quantity
 
-                        # print(f"the link quantity after being rounded down [{link_quantity}] len {len(str(link_quantity))}")
+                        cost_basis = link_quantity * float(trans.usd_spot)
+                        proceeds = link_quantity * potential_sale_usd_spot
+                        gain_or_loss = proceeds - cost_basis
 
-                        # Determine link profitability
-                        buy_price = link_quantity * buy.usd_spot
-                        sell_price = link_quantity * sell.usd_spot
-                        profit = sell_price - buy_price
-
-                        # if the link is less than val skip it
-                        if abs(profit) < 1.0:
-                            # print(f"Skipping link because profit/loss [{profit} is less than $1.0]")
+                        if abs(gain_or_loss) < 0.01:
                             continue
+
+                        min_gain_long_batch_gain += gain_or_loss
+                        min_gain_long_batch_quantity += link_quantity
+
+                        min_gain_long_batch.append([trans, link_quantity])
                         
-                        link = sell.link_transaction(buy, link_quantity)
+                        if target_quantity <= 0:
+                            sell_fully_linked_min_profit = True
+                            break
+                    
+                    print(f'items in min_gain_long_batch {len(min_gain_long_batch)}')
+                    for i in min_gain_long_batch:
+                        link = sell.link_transaction(i[0], i[1])
                         links.append(link)
 
-                    if (sell.unlinked_quantity * sell.usd_spot) > 5.0:
-                        # print(f"Sell Unlinkable when using [{algo}] symbol [{sell.symbol}] unlinkable_quantity [{sell.unlinked_quantity}]")
-                        failures.append({
-                            'asset': sell.symbol, 
-                            'unlinkable': sell.unlinked_quantity,
-                            'quantity': sell.quantity,
-                            'timestamp': sell.time_stamp,
-                            'algo': algo
-                        })
+
+
+        if algo != 'min_gain_long':
+            keys = list(sells.keys())
+            keys.sort()
+            for key in keys:
+
+                links = []
+
+                for sell in sells[key]:
+    
+                    # check if sell has remaining unlinked quantity
+                    if sell.unlinked_quantity > 0:
+                        
+                        for buy in buys[key]:
+
+                            link_quantity = None
+
+                            # break if sell has no remaining unlinked quantity
+                            if sell.unlinked_quantity <= 0:
+                                break
+
+                            # Skip if buy has no remaining unlinked quantity
+                            if buy.unlinked_quantity <= 0:
+                                continue
+                                                    
+                            # check if buy came before sell
+                            if buy.time_stamp >= sell.time_stamp:
+                                continue
+
+                            # Link 
+                            # if sell unlinked is greater than buy unlinked, link quantity equals buy unlinked
+                            if sell.unlinked_quantity >= buy.unlinked_quantity:
+                                link_quantity = buy.unlinked_quantity
+                            
+                            # if sell unlinked is less than buy unlinked, link quantity equals sell unlinked
+                            elif sell.unlinked_quantity <= buy.unlinked_quantity: 
+                                link_quantity = sell.unlinked_quantity
+                            
+                            
+                            # print(f"\nthe link quantity BEFORE being rounded down [{link_quantity}] len {len(str(link_quantity))}")
+
+                            # Set max length of link 
+                            link_quantity = round_decimals_down(link_quantity)
+
+                            # print(f"the link quantity after being rounded down [{link_quantity}] len {len(str(link_quantity))}")
+
+                            # Determine link profitability
+                            buy_price = link_quantity * buy.usd_spot
+                            sell_price = link_quantity * sell.usd_spot
+                            profit = sell_price - buy_price
+
+                            # if the link is less than val skip it
+                            if abs(profit) < 1.0:
+                                # print(f"Skipping link because profit/loss [{profit} is less than $1.0]")
+                                continue
+                            
+                            link = sell.link_transaction(buy, link_quantity)
+                            links.append(link)
+
+                        if (sell.unlinked_quantity * sell.usd_spot) > 5.0:
+                            # print(f"Sell Unlinkable when using [{algo}] symbol [{sell.symbol}] unlinkable_quantity [{sell.unlinked_quantity}]")
+                            failures.append({
+                                'asset': sell.symbol, 
+                                'unlinkable': sell.unlinked_quantity,
+                                'quantity': sell.quantity,
+                                'timestamp': sell.time_stamp,
+                                'algo': algo
+                            })
 
                                
         if pre_check:
@@ -769,7 +849,6 @@ class Transactions:
         # Read Previously saved data into pandas df - Assets
         asset_df = pd.read_excel(filename, sheet_name='Assets', converters = {'my_str_column': list})
 
-
         # Read Previously saved data into pandas df - Links
         links_df = pd.read_excel(filename, sheet_name='Links', converters = {'my_str_column': list})
 
@@ -871,11 +950,13 @@ class Transactions:
 
                 if trans.name == sell:
                     # print(f'Sell Found {trans.name}')
-                    sell_obj = trans
+                    if trans.trans_type == 'sell':
+                        sell_obj = trans
 
                 elif trans.name == buy:                
                     # print(f'Buy Found {trans.name}')
-                    buy_obj = trans
+                    if trans.trans_type == 'buy':
+                        buy_obj = trans
 
                 if buy_obj and sell_obj:
                     # print("Buy and Sell Found Breaking\n")

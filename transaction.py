@@ -51,7 +51,7 @@ class Transaction:
 
         
     def __repr__(self):
-        return repr(f"{self.time_stamp} {self.quantity} {self.trans_type}")
+        return repr(f"{self.time_stamp} {self.quantity}")
 
     def __eq__(self, other):
         return self.quantity == other.quantity and self.time_stamp == other.time_stamp and self.trans_type == other.trans_type

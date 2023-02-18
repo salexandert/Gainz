@@ -60,3 +60,19 @@ def delete():
     current_app.config['transactions'] = transactions
 
     return jsonify("Yess")
+
+@blueprint.route('/save',  methods=['POST'])
+@login_required
+def save():
+    
+    transactions = current_app.config['transactions']
+
+    transactions.save()
+
+    transactions = Transactions()
+
+    current_app.config['transactions'] = transactions
+
+    return jsonify("saved")
+
+    
