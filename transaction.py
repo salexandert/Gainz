@@ -31,7 +31,24 @@ class Transaction:
         self.symbol = symbol
         self.usd_spot = usd_spot
         self.source = source
-        self.fee = 0.0
+        self._fee = None
+
+    @property
+    def fee(self):
+        return self._fee
+    
+    @fee.setter
+    def fee(self, value):
+        if not isinstance(value, float):
+            if value == '':
+                value = 0.0
+            elif type(value) is str:
+                value = float(value)
+            else:
+                raise ValueError(f"fee value: {value}, Type: {type(value)} ] must be a float")
+        
+        self._fee = float(value)
+
         
     def __repr__(self):
         return repr(f"{self.time_stamp} {self.quantity}")
