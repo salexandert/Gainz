@@ -803,13 +803,13 @@ class Transactions:
         # Load Sells
         for index, row in sell_df.iterrows():
             trans_obj = Sell(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'], source=row['source'])
-            trans_obj.fee = row['fee']
+            trans_obj.fee = float(row['fee'])
             sells.append(trans_obj)
 
         # Load Buys
         for index, row in buy_df.iterrows():
             trans_obj = Buy(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'],  source=row['source'])
-            trans_obj.fee = row['fee']
+            trans_obj.fee = float(row['fee'])
             buys.append(trans_obj)
 
         # Load Sends
@@ -1630,7 +1630,7 @@ class Transactions:
             # Sells
             for index, row in sell_df.iterrows():
                 trans_obj = Sell(symbol=row['Asset'], quantity=row['Quantity Transacted'], time_stamp=row['Timestamp'], usd_spot=row['Spot Price at Transaction'], source=row['Source'])
-                trans_obj.fee = row['Fee'][2:]
+                trans_obj.fee = float(row['Fee'][2:])
                 duplicate_found = False
                 for trans in self.conversions:
                     if (
@@ -1652,6 +1652,10 @@ class Transactions:
                 trans_obj = Buy(symbol=row['Asset'], quantity=row['Quantity Transacted'], time_stamp=row['Timestamp'], usd_spot=row['Spot Price at Transaction'], source=row['Source'])
                 duplicate_found = False
                 trans_obj.fee = row['Fee'][2:]
+                if trans_obj.fee == '':
+                    trans_obj.fee = 0.0
+                trans_obj.fee = float(trans_obj.fee)
+                
                 for trans in self.conversions:
                     if (
                         trans.input_trans_type == trans_obj.trans_type
@@ -1726,7 +1730,7 @@ class Transactions:
                 duplicate_found = False
                 
                 trans_obj = Sell(symbol=row['Asset'], quantity=row['Quantity Transacted'], time_stamp=row['Timestamp'], usd_spot=row['Spot Price at Transaction'], source=row['Source'])
-                trans_obj.fee = row['Fee']
+                trans_obj.fee = float(row['Fee'])
 
                 for trans in self.conversions:
                     if (
@@ -1747,7 +1751,7 @@ class Transactions:
                 duplicate_found = False
                 
                 trans_obj = Buy(symbol=row['Asset'], quantity=row['Quantity Transacted'], time_stamp=row['Timestamp'], usd_spot=row['Spot Price at Transaction'], source=row['Source'])
-                trans_obj.fee = row['Fee']
+                trans_obj.fee = float(row['Fee'])
                 
                 for trans in self.conversions:
                     if (
