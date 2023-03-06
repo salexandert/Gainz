@@ -20,8 +20,8 @@ def index():
 
     # Get Years
     years = set()
-    for link in transactions.links:
-        years.add(link.sell.time_stamp.year)
+    for trans in transactions:
+        years.add(trans.time_stamp.year)
 
     years = sorted(years)
     years.insert(0, 'All Time')
