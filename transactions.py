@@ -368,14 +368,12 @@ class Transactions:
                     if sell.unlinked_quantity <= .000001:
                         continue
                     
-                    potential_sale_quantity = sell.unlinked_quantity
-
                     min_gain_long_batch = []
+                    potential_sale_quantity = sell.unlinked_quantity
+                    potential_sale_usd_spot = sell.usd_spot
                     min_gain_long_batch_gain = 0.0
                     min_gain_long_batch_quantity = 0.0
-
-                    potential_sale_usd_spot = sell.usd_spot
-
+                    
                     # Linkable Buys Long
                     linkable_buys_long = [
                     trans for trans in self.transactions
