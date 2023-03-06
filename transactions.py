@@ -353,7 +353,8 @@ class Transactions:
             for key in sells.keys():
                 sells[key].sort(key=lambda x: x.time_stamp)
                 sells[key].sort(key=lambda x: x.unlinked_quantity)
-                # Start the Algo
+                sells[key].sort(key=lambda x: x.usd_spot)
+                
             
             keys = list(sells.keys())
             keys.sort()
@@ -362,18 +363,18 @@ class Transactions:
                 links = []
 
                 for sell in sells[key]:
+                    
                     # break if sell has no remaining unlinked quantity
                     if sell.unlinked_quantity <= .000001:
                         continue
                     
                     potential_sale_quantity = sell.unlinked_quantity
+
                     min_gain_long_batch = []
                     min_gain_long_batch_gain = 0.0
                     min_gain_long_batch_quantity = 0.0
 
-                    potential_sale_quantity = sell.unlinked_quantity
                     potential_sale_usd_spot = sell.usd_spot
-
 
                     # Linkable Buys Long
                     linkable_buys_long = [
@@ -386,9 +387,12 @@ class Transactions:
                     ]
 
                     # Min Gain Long Batch
-                    linkable_buys_long.sort(key=lambda sell: sell.usd_spot, reverse=True)
                     # print(f"items in linkable long {len(linkable_buys_long)}")
+                    linkable_buys_long.sort(key=lambda trans: trans.usd_spot, reverse=True)
+                    
                     target_quantity = potential_sale_quantity
+                    
+                    # loop linkable buys to find link candidate 
                     for trans in linkable_buys_long:
                         
                         buy_unlinked_quantity = trans.unlinked_quantity
@@ -416,7 +420,6 @@ class Transactions:
                         min_gain_long_batch.append([trans, link_quantity])
                         
                         if target_quantity <= 0:
-                            sell_fully_linked_min_profit = True
                             break
                     
                     # print(f'items in min_gain_long_batch {len(min_gain_long_batch)}')
