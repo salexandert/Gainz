@@ -44,6 +44,8 @@ class Transaction:
                 value = 0.0
             elif type(value) is str:
                 value = float(value)
+            elif type(value) == None:
+                value = 0.0
             else:
                 raise ValueError(f"fee value: {value}, Type: {type(value)} ] must be a float")
         
