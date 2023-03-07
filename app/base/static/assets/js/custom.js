@@ -240,7 +240,8 @@ $(document).ready(function() {
             url: "/auto_link/auto_link_asset",
             data: JSON.stringify({
                 'algo': 'min_gain_long',
-                'asset': $('#al_stats_datatable').DataTable().row( {selected:true} ).data()
+                'asset': $('#al_stats_datatable').DataTable().row( {selected:true} ).data(),
+                'year': $('#auto_link_year_dropdown').find(":selected").val()
               }),  
             dataType: "json",
             contentType: 'application/json',

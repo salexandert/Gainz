@@ -302,7 +302,7 @@ class Transactions:
         
         return links
 
-    def auto_link(self, algo, asset=None, min_link=0.000001, pre_check=False):
+    def auto_link(self, algo, asset=None, min_link=0.000001, pre_check=False, year=None):
         
         sells = {}
         buys = {}
@@ -331,8 +331,28 @@ class Transactions:
                     sells[trans.symbol] = []
 
                 sells[trans.symbol].append(trans)
-        
-        
+
+            # Filter sales to year
+            if year is not None:
+                date_range = {
+                    'start_date': f"01/01/{year} 12:00 AM",
+                    'end_date': f"12/31/{year} 11:59 PM"
+                    }
+
+                start_date = datetime.datetime.strptime(date_range['start_date'], "%m/%d/%Y %H:%M %p")
+                end_date = datetime.datetime.strptime(date_range['end_date'], "%m/%d/%Y %H:%M %p")
+                                                                        
+                # Filter Transactions to date range
+                for key in sells.keys():
+                    filtered_transactions = []
+                    for trans in sells[key]:
+
+                        if trans.time_stamp >= start_date and trans.time_stamp <= end_date:              
+                            filtered_transactions.append(trans)
+
+                    sells[key] = filtered_transactions
+                
+        # sort for algo types
         if algo == 'fifo':
             for key in buys.keys():
                 buys[key].sort(key=lambda x: x.time_stamp)
@@ -345,25 +365,22 @@ class Transactions:
             for key in sells.keys():
                 sells[key].sort(key=lambda x: x.time_stamp)
 
-        
         elif algo == 'min_gain_long':
-            # print('algo min gain long')
             for key in buys.keys():
                 buys[key].sort(key=lambda x: x.time_stamp)
+            
             for key in sells.keys():
                 sells[key].sort(key=lambda x: x.time_stamp)
                 sells[key].sort(key=lambda x: x.unlinked_quantity)
                 sells[key].sort(key=lambda x: x.usd_spot)
                 
-            
             keys = list(sells.keys())
             keys.sort()
             for key in keys:
-
+                
                 links = []
-
                 for sell in sells[key]:
-                    
+                                        
                     # break if sell has no remaining unlinked quantity
                     if sell.unlinked_quantity <= .000001:
                         continue
@@ -424,7 +441,6 @@ class Transactions:
                     for i in min_gain_long_batch:
                         link = sell.link_transaction(i[0], i[1])
                         links.append(link)
-
 
 
         if algo != 'min_gain_long':

@@ -24,7 +24,15 @@ def auto_link():
     transactions = current_app.config['transactions']
     stats_table_data = get_stats_table_data(transactions)
 
-    return render_template('auto_link.html', stats_table_data=stats_table_data)
+    # Get Years
+    years = set()
+    for trans in transactions:
+        years.add(trans.time_stamp.year)
+
+    years = sorted(years)
+    years.insert(0, 'All Time')
+
+    return render_template('auto_link.html', stats_table_data=stats_table_data, years=years)
 
 
 @blueprint.route('/auto_link_asset', methods=['POST'])
@@ -39,20 +47,27 @@ def auto_link_asset():
     else:
         asset = None
 
+    year = request.json['year']
+
+    if year == 'All Time':
+        year = None
+    else:
+        year = year
+
+
+
     algo_type = request.json['algo']
 
-    transactions.auto_link(asset=asset, algo=algo_type)
-
     if algo_type == "fifo":
-        transactions.auto_link(asset=asset, algo=algo_type)
+        transactions.auto_link(asset=asset, algo=algo_type, year=year)
         transactions.save(description="Auto Linked with FIFO")
 
     elif algo_type == "filo":
-        transactions.auto_link(asset=asset, algo=algo_type)
+        transactions.auto_link(asset=asset, algo=algo_type, year=year)
         transactions.save(description="Auto Linked with FILO")
 
     elif algo_type == "min_gain_long":
-        transactions.auto_link(asset=asset, algo=algo_type)
+        transactions.auto_link(asset=asset, algo=algo_type, year=year)
         transactions.save(description="Auto Linked with Min Gain Long")
 
     return jsonify(f"Auto Link using {algo_type} Successful!")
