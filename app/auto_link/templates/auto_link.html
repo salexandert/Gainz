@@ -125,6 +125,21 @@
           <br> MIN GAIN LONG
           <br>  &nbsp &nbsp &nbsp &nbsp &nbsp - Use buys older than a year with lowest cost basis
         </p>
+
+        <div class="form-group row left align">
+          <label class="control-label col-md-3 col-sm-3 ">Optionally Select a year to autolink, otherwise link all</label>
+          <div class="col-md-4 col-sm-4">
+            <select value="" id='auto_link_year_dropdown' class="form-control">
+              
+              {% for year in years %}
+                
+                  <option> {{ year }} </option>
+              
+              {% endfor %}
+            
+            </select>
+          </div>
+        </div>  
         
         <button type="button" id="link_w_fifo" class="btn btn-success">FIFO</button>
         <button type="button" id="link_w_filo" class="btn btn-success">FILO</button>

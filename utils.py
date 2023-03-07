@@ -136,8 +136,10 @@ def get_stats_table_data(transactions):
                 hodl = a.hodl
                 # print(f"Asset Object symbol {a.symbol} Asset {asset} HODL {a.hodl}")
 
+        total_sold_unlinked_quantity = round_decimals_down(total_sold_unlinked_quantity)
         if total_sold_unlinked_quantity != 0 and total_sold_unlinked_quantity < 0.0009:
             total_sold_unlinked_quantity = "Less than .0009"
+
 
                                 
         stats_table_data.append({   
@@ -467,15 +469,15 @@ def get_stats_table_data_range(transactions, date_range=None):
                     hodl = a.hodl
                     # print(f"Asset Object symbol {a.symbol} Asset {asset} HODL {a.hodl}")
 
-
-            # if total_sold_unlinked_quantity != 0 and abs(total_sold_unlinked_quantity) < .0009:
-            #     total_sold_unlinked_quantity = "Less than .0009"
+            total_sold_unlinked_quantity = round_decimals_down(total_sold_unlinked_quantity)
+            if total_sold_unlinked_quantity != 0 and abs(total_sold_unlinked_quantity) < .0009:
+                total_sold_unlinked_quantity = "Less than .0009"
 
 
             stats_table_data.append({   
                     "symbol": f"{asset}",
                     "total_purchased_quantity": total_purchased_quantity,
-                    "total_purchased_unlinked_quantity": total_purchased_unlinked_quantity,
+                    "total_purchased_unlinked_quantity": round_decimals_down(total_purchased_unlinked_quantity),
                     "total_purchased_usd": "${:,.2f}".format(total_purchased_usd),
                     
                     "total_sold_quantity": total_sold_quantity, 
@@ -506,9 +508,7 @@ def get_all_trans_table_data_range(transactions, asset, date_range):
 
         start_date = date_range['start_date']
         end_date = date_range['end_date']
-        
-                                                                    
-                                                                        
+                                                             
         # Filter Transactions to date range
         filtered_transactions = []
         for trans in transactions:
@@ -544,7 +544,6 @@ def get_all_trans_table_data_range(transactions, asset, date_range):
 
 def get_transactions_date_range(transactions, date_range):
 
-    
     if date_range['start_date'] == '':
         first_time_stamps = transactions.first_transaction_date()
 
