@@ -165,16 +165,14 @@
                       <th>Received</th>
                       <th>Quantity Sold Unlinked</th>
                       <th>Quantity Purchased Unlinked</th>
-                      <th>Purchased in USD</th>
+
                       <th>Sold in USD</th>
                       <th>HODL</th> 
-                      
                     </tr>
                   </thead>
 
                   <tbody>
                     {% for row in stats_table_data %}
-
                     <tr>
                       <td>{{ row['symbol'] }}</td>
                       <td>{{ row['total_purchased_quantity'] }}</td>
@@ -183,12 +181,10 @@
                       <td>{{ row['total_received_quantity']}}</td>
                       <td>{{ row['total_sold_unlinked_quantity'] }}</td>
                       <td>{{ row['total_purchased_unlinked_quantity'] }}</td>
-                      <td>{{ row['total_purchased_usd'] }}</td>
+
                       <td>{{ row['total_sold_usd']  }}</td>
-                      <td>{{ row['hodl']  }}</td>
-                      
+                      <td>{{ row['hodl']  }}</td> 
                     </tr>
-                    
                     {% endfor %}
                   
                   </tbody>

@@ -332,7 +332,7 @@ class Transactions:
 
                 sells[trans.symbol].append(trans)
 
-            # Filter sales to year
+            # Filter sales to a specific year
             if year is not None:
                 date_range = {
                     'start_date': f"01/01/{year} 12:00 AM",
@@ -356,12 +356,14 @@ class Transactions:
         if algo == 'fifo':
             for key in buys.keys():
                 buys[key].sort(key=lambda x: x.time_stamp)
+            
             for key in sells.keys():
                 sells[key].sort(key=lambda x: x.time_stamp)
         
         elif algo == 'filo':
             for key in buys.keys():
                 buys[key].sort(key=lambda x: x.time_stamp, reverse=True)
+            
             for key in sells.keys():
                 sells[key].sort(key=lambda x: x.time_stamp)
 
@@ -373,7 +375,7 @@ class Transactions:
                 sells[key].sort(key=lambda x: x.time_stamp)
                 sells[key].sort(key=lambda x: x.unlinked_quantity)
                 sells[key].sort(key=lambda x: x.usd_spot)
-                
+
             keys = list(sells.keys())
             keys.sort()
             for key in keys:
@@ -422,10 +424,11 @@ class Transactions:
                         link_quantity = round_decimals_down(link_quantity)
                         target_quantity -= link_quantity
 
+                        # Skip if gain or loss less than .01
                         cost_basis = link_quantity * float(trans.usd_spot)
                         proceeds = link_quantity * potential_sale_usd_spot
                         gain_or_loss = proceeds - cost_basis
-
+                        
                         if abs(gain_or_loss) < 0.01:
                             continue
 
@@ -437,13 +440,78 @@ class Transactions:
                         if target_quantity <= 0:
                             break
                     
-                    # print(f'items in min_gain_long_batch {len(min_gain_long_batch)}')
                     for i in min_gain_long_batch:
                         link = sell.link_transaction(i[0], i[1])
                         links.append(link)
 
+        elif algo == 'min_gain':
+            for key in buys.keys():
+                buys[key].sort(key=lambda x: x.time_stamp)
+                buys[key].sort(key=lambda x: x.usd_spot)
+            
+            for key in sells.keys():
+                sells[key].sort(key=lambda x: x.time_stamp)
+                sells[key].sort(key=lambda x: x.unlinked_quantity)
+                sells[key].sort(key=lambda x: x.usd_spot, reverse=True)
 
-        if algo != 'min_gain_long':
+            keys = list(sells.keys())
+            keys.sort()
+            for key in keys:
+                links = []
+
+                for sell in sells[key]:
+                                        
+                    # break if sell has no remaining unlinked quantity
+                    if sell.unlinked_quantity <= .000001:
+                        continue
+
+                    min_gain_batch = []
+                    potential_sale_quantity = sell.unlinked_quantity
+                    target_quantity = potential_sale_quantity
+                    potential_sale_usd_spot = sell.usd_spot
+
+                    # All Linkable Buys 
+                    linkable_buys = [
+                            trans for trans in buys[key]
+                            if trans.trans_type == "buy"
+                            and trans.symbol == key
+                            and (sell.time_stamp > trans.time_stamp)
+                            and trans.unlinked_quantity > .0000001
+                    ]
+
+                    linkable_buys.sort(key=lambda trans: trans.usd_spot, reverse=True)
+
+                    for trans in linkable_buys:
+                        buy_unlinked_quantity = trans.unlinked_quantity
+                        
+                        # Determine max link quantity
+                        if target_quantity <= buy_unlinked_quantity:
+                            link_quantity = target_quantity
+                        
+                        elif target_quantity >= buy_unlinked_quantity:
+                            link_quantity = buy_unlinked_quantity
+
+                        link_quantity = round_decimals_down(link_quantity)
+                        target_quantity -= link_quantity
+
+                        #determine if we should skip link 
+                        cost_basis = link_quantity * float(trans.usd_spot)
+                        proceeds = link_quantity * potential_sale_usd_spot
+                        gain_or_loss = proceeds - cost_basis
+                        if abs(gain_or_loss) < 0.01:
+                            continue
+
+                        min_gain_batch.append([trans, round_decimals_down(link_quantity)])
+
+                        if target_quantity <= 0:
+                            break
+                    
+                    for i in min_gain_batch:
+                        link = sell.link_transaction(i[0], i[1])
+                        links.append(link)
+
+
+        if algo != 'min_gain_long' or algo != 'min_gain':
             keys = list(sells.keys())
             keys.sort()
             for key in keys:

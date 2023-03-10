@@ -34,7 +34,7 @@ $(document).ready(function() {
         var buys = table.row( this ).data()[1]
         var sells = table.row( this ).data()[2]
         var sent = table.row( this ).data()[3]
-        var hodl = table.row( this ).data()[9]
+        var hodl = table.row( this ).data()[8]
         
         var needs_classification = buys - sells
         var min_hodl = buys - sent
