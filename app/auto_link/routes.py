@@ -69,6 +69,10 @@ def auto_link_asset():
     elif algo_type == "min_gain_long":
         transactions.auto_link(asset=asset, algo=algo_type, year=year)
         transactions.save(description="Auto Linked with Min Gain Long")
+    
+    elif algo_type == "min_gain":
+        transactions.auto_link(asset=asset, algo=algo_type, year=year)
+        transactions.save(description="Auto Linked with Min Gain Long")
 
     return jsonify(f"Auto Link using {algo_type} Successful!")
 

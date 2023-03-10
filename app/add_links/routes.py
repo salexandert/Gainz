@@ -297,6 +297,7 @@ def linkable_data():
     
     for trans in linkable_buys:
         target_quantity = potential_sale_quantity
+        
         # Determine max link quantity
         if target_quantity <= trans.unlinked_quantity:
             link_quantity = target_quantity
