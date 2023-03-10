@@ -17,7 +17,7 @@ If you are importing transactions from a source other than Coinbase, Coinbase Pr
 Or 
 Manually one at a time on the Manage Transactions Page. 
 
-Please check out https://cryptogainz.store/ or email cryptogainzapp@gmail.com for questions, comments, or suggestions.
+Please check out https://cryptogainz.store/ or email cryptgainzapp@gmail.com for questions, comments, or suggestions.
 
 Video Walkthrough and Intro https://youtu.be/g_02xOu1F7M
 
