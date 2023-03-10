@@ -20,7 +20,6 @@ $(document).ready(function() {
     });
 
     var table = $('#eh_stats_datatable').DataTable({
-        "pageLength": 50,
         select: {
             style: 'single'
         },
@@ -108,8 +107,6 @@ $(document).ready(function() {
     $("#auto_action_button").click(function(){
 
         var table_data = $('#auto_actions_datatable').DataTable().rows( {selected:true} ).data()
-
-
 
         $.ajax({
             type: "POST",
