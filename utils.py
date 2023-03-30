@@ -4,7 +4,7 @@ from transaction import Transaction
 from dateutil.tz import tzutc
 import requests
 import datetime
-import os, sys
+import os
 import math
 
 os.environ['REQUESTS_CA_BUNDLE'] = "certifi/cacert.pem"
@@ -243,17 +243,7 @@ def get_linked_table_data(transactions, asset, date_range):
     # Get linked Table Data
     linked_table_data = []
     for link in links:
-        
-        ## No clue why this does not work!
-        # link_profit_loss = None 
-        # abs_profit_loss = abs(link.profit_loss)
-        # if abs_profit_loss <= .009:
-        #     print( f"abs profit Loss {abs_profit_loss}" )
-            
-        #     link_profit_loss = "$0.00"
-        # else:
-        #     link_profit_loss = "${:,.2f}".format(link.profit_loss),
-       
+               
         linked_table_data.append([
             link.quantity,
             "${:,.2f}".format(link.profit_loss),
@@ -267,7 +257,6 @@ def get_linked_table_data(transactions, asset, date_range):
             
         ])
 
-    # print(linked_table_data)
     
     return linked_table_data
 
