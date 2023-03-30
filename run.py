@@ -2,7 +2,8 @@ from flask_migrate import Migrate
 from configs.config import config_dict
 from app import create_app, db
 from transactions import Transactions
-import sys, os
+import sys
+import os
 
 
 get_config_mode = os.environ.get('GENTELELLA_CONFIG_MODE', 'Debug')
@@ -27,9 +28,9 @@ Migrate(app, db)
 
 if __name__ == "__main__":
 
-    print(f"\n\nGainz App runs on a non-production (Flask) web server you can safely ignore the warning(s) below.")
+    print("\n\nGainz App runs on a non-production (Flask) web server you can safely ignore the warning(s) below.")
     print("\nTo access Gainz to go http://127.0.0.1:5000 in a web browser. Preferably Chrome")
-    print(f"\nDefault credentials username: admin, password: admin")
+    print("\nDefault credentials username: admin, password: admin")
     print("\nClose this window when finished.\n")
     
     app.run(debug=True)
