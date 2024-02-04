@@ -256,7 +256,8 @@ $(document).ready(function() {
             url: "/auto_link/auto_link_asset",
             data: JSON.stringify({
                 'algo': 'fifo',
-                'asset': $('#al_stats_datatable').DataTable().row( {selected:true} ).data()
+                'asset': $('#al_stats_datatable').DataTable().row( {selected:true} ).data(),
+                'year': $('#auto_link_year_dropdown').find(":selected").val()
               }),  
             dataType: "json",
             contentType: 'application/json',
@@ -274,7 +275,8 @@ $(document).ready(function() {
             url: "/auto_link/auto_link_asset",
             data: JSON.stringify({
                 'algo': 'filo',
-                'asset': $('#al_stats_datatable').DataTable().row( {selected:true} ).data()
+                'asset': $('#al_stats_datatable').DataTable().row( {selected:true} ).data(),
+                'year': $('#auto_link_year_dropdown').find(":selected").val()
               }),  
             dataType: "json",
             contentType: 'application/json',

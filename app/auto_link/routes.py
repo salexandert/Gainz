@@ -40,7 +40,7 @@ def auto_link():
 def auto_link_asset():
     transactions = current_app.config['transactions']
         
-    # print(request.json)
+    print(request.json)
     
     if 'asset' in request.json:
         asset = request.json['asset'][0]
