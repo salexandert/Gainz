@@ -77,7 +77,9 @@ def selected_asset():
         ["Quantity Purchased Unlinked", asset_stats['total_purchased_unlinked_quantity']],
         ["Quantity Purchased in USD", asset_stats['total_purchased_usd']],
         ["Quantity Sold in USD", asset_stats['total_sold_usd']],
-        ["Profit / Loss in USD", asset_stats['total_profit_loss']],
+        ["Profit / Loss in USD Total", asset_stats['profit_loss_total']],
+        ["Profit / Loss in USD Short", asset_stats['profit_loss_short']],
+        ["Profit / Loss in USD Long", asset_stats['profit_loss_long']],
         ["Quantity Sent", asset_stats['total_sent_quantity']],
         ["Quantity Received", asset_stats['total_received_quantity']],
     ]
@@ -387,7 +389,7 @@ def date_range():
             row['total_purchased_unlinked_quantity'],
             row['total_purchased_usd'],
             row['total_sold_usd'],
-            row['total_profit_loss'],
+            row['profit_loss_total'],
             row['hodl']
         ])
 

@@ -43,7 +43,7 @@ def fetch_crypto_price(trans):
 
     else:
         print()
-        print(f"Did not receieve a valid response from Coinbase API")
+        print("Did not receieve a valid response from Coinbase API")
         print(symbol)
         print('Type: ', trans.trans_type)
         print('Quantity: ', trans.quantity)
@@ -380,12 +380,14 @@ def get_stats_table_data_range(transactions, date_range=None):
             total_sent_quantity = 0.0
             total_received_quantity = 0.0
 
-            profit_loss = 0.0
+            profit_loss_total = 0.0
+            profit_loss_short = 0.0
+            profit_loss_long = 0.0
 
             buy_prices = []
             sell_prices = []
                         
-            average_hodl_length = 0.0
+            # average_hodl_length = 0.0
 
             num_buys = 0
             num_sells = 0
@@ -398,7 +400,11 @@ def get_stats_table_data_range(transactions, date_range=None):
             for link in links:
                 if link.symbol == asset:
                     num_links += 1
-                    profit_loss += link.profit_loss
+                    profit_loss_total += link.profit_loss
+                    if link.hodl_duration.days > 730:
+                        profit_loss_long += link.profit_loss
+                    else:
+                        profit_loss_short += link.profit_loss
 
 
             for trans in filtered_transactions:
@@ -422,8 +428,9 @@ def get_stats_table_data_range(transactions, date_range=None):
                         total_sold_unlinked_quantity += trans.unlinked_quantity
                         total_sold_usd += trans.usd_total
 
-                        if trans.unlinked_quantity > 0:
-                            profit_loss += (trans.usd_spot * trans.unlinked_quantity)
+                        # Not sure why this is here, probably for a good reason?? what to do with unlinked?
+                        # if trans.unlinked_quantity > 0:
+                            # profit_loss += (trans.usd_spot * trans.unlinked_quantity)
 
                         sell_prices.append(trans.usd_total)
 
@@ -472,7 +479,10 @@ def get_stats_table_data_range(transactions, date_range=None):
                     "total_sold_quantity": total_sold_quantity, 
                     "total_sold_unlinked_quantity": total_sold_unlinked_quantity,
                     "total_sold_usd": "${:,.2f}".format(total_sold_usd),
-                    "total_profit_loss": "${:,.2f}".format(profit_loss),
+                    "profit_loss_total": "${:,.2f}".format(profit_loss_total),
+                    "profit_loss_short": "${:,.2f}".format(profit_loss_short),
+                    "profit_loss_long": "${:,.2f}".format(profit_loss_long),
+                    
                     "total_sent_quantity": total_sent_quantity,
                     "total_received_quantity": total_received_quantity,
 

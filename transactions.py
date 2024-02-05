@@ -376,6 +376,7 @@ class Transactions:
             keys = list(sells.keys())
             keys.sort()
             for key in keys:
+                quantity_linked = 0.0
                 
                 links = []
                 for sell in sells[key]:
@@ -440,8 +441,12 @@ class Transactions:
                     for i in min_gain_long_batch:
                         link = sell.link_transaction(i[0], i[1])
                         links.append(link)
+                        quantity_linked += link.quantity
+            print(f"added {quantity_linked}")   
 
         elif algo == 'min_gain':
+            quantity_linked = 0.0
+
             for key in buys.keys():
                 buys[key].sort(key=lambda x: x.time_stamp)
                 buys[key].sort(key=lambda x: x.usd_spot)
@@ -506,12 +511,15 @@ class Transactions:
                     for i in min_gain_batch:
                         link = sell.link_transaction(i[0], i[1])
                         links.append(link)
-
+                        quantity_linked += link.quantity
+            
+            print(f"Added {quantity_linked}")
 
         if algo != 'min_gain_long' or algo != 'min_gain':
             keys = list(sells.keys())
             keys.sort()
             for key in keys:
+                quantity_linked = 0.0
 
                 links = []
 
@@ -565,6 +573,7 @@ class Transactions:
                             
                             link = sell.link_transaction(buy, link_quantity)
                             links.append(link)
+                            quantity_linked += link.quantity
 
                         if (sell.unlinked_quantity * sell.usd_spot) > 5.0:
                             # print(f"Sell Unlinkable when using [{algo}] symbol [{sell.symbol}] unlinkable_quantity [{sell.unlinked_quantity}]")
@@ -575,7 +584,7 @@ class Transactions:
                                 'timestamp': sell.time_stamp,
                                 'algo': algo
                             })
-
+            print(f"added {quantity_linked}")
                                
         if pre_check:
             for trans in self.transactions:
@@ -1730,6 +1739,7 @@ class Transactions:
                 if 'csv' in filename:
                     if 'cash_app' in filename.lower():
                         trans_df = pd.read_csv(contents, on_bad_lines='skip')
+                        
                     elif 'coinbasetransactions' in filename.lower() or 'coinbase-transactions' in filename.lower():
                         trans_df = pd.read_csv(contents, on_bad_lines='skip', skip_blank_lines=False, header=7)
                     elif 'coinbase' in filename.lower() and 'pro' in filename.lower():
@@ -1778,7 +1788,10 @@ class Transactions:
 
             # print("Date Found in columns")
             trans_df.rename(columns={'Date': 'Timestamp', 'Asset Type': 'Asset', 'Asset Amount': 'Quantity Transacted', 'Asset Price': 'Spot Price at Transaction'}, inplace=True)
-
+            
+            # Only keep columns needed.
+            # trans_df = trans_df[['Fee', 'Transaction Type', 'Timestamp', 'Asset', "Quantity Transacted", "Spot Price at Transaction" ]]
+            
             trans_df['Timestamp'] = trans_df['Timestamp'].apply(dateutil.parser.parse, tzinfos=whois_timezone_info)
             trans_df['Timestamp'] = pd.to_datetime(trans_df['Timestamp'], infer_datetime_format=True, utc=True) 
             trans_df['Timestamp'] = trans_df['Timestamp'].dt.tz_localize(None)
@@ -2223,24 +2236,35 @@ class Transactions:
                     buys.append(trans_obj)
 
 
-        # Dedup Transactions
+        # Dedup and merge Transactions
         if self.transactions:
-            deduped_transactions = set()
+            starting = len(self.transactions)
+            
             imported_transactions =  buys + sells + sends + receives
+            
+            deduped_transactions = set()
 
             for trans in self.transactions:
                 deduped_transactions.add(trans)
 
             for trans in imported_transactions:
                 deduped_transactions.add(trans)
-                
+
             self.transactions = list(deduped_transactions)
-        
+            
+            ending = len(self.transactions)
+            added = ending - starting
+            imported = len(imported_transactions)
+            deduped = imported - added
+            print(f"Imported {imported}, Starting {starting}, ending {ending}, added {added}, deduped {deduped}")
+                                       
+
         else:
+            print("Overwriting self.transactions!")
             self.transactions = buys + sells + sends + receives
 
-        for asset in self.assets:
-            asset_obj = Asset(symbol=asset)
+        for a in self.assets:
+            asset_obj = Asset(symbol=a)
             assets.append(asset_obj)
         
         self.asset_objects = assets
