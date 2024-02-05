@@ -58,6 +58,8 @@ class Link:
         hodl_time =  self.sell.time_stamp - self.buy.time_stamp
 
         return hodl_time
+    
+    
 
     @property
     def proceeds(self):
