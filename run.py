@@ -6,17 +6,17 @@ import sys
 import os
 
 
-get_config_mode = os.environ.get('GENTELELLA_CONFIG_MODE', 'Debug')
+get_config_mode = os.environ.get("GENTELELLA_CONFIG_MODE", "Debug")
 
 try:
     config_mode = config_dict[get_config_mode.capitalize()]
 except KeyError:
-    sys.exit('Error: Invalid GENTELELLA_CONFIG_MODE environment variable entry.')
+    sys.exit("Error: Invalid GENTELELLA_CONFIG_MODE environment variable entry.")
 
 
 transactions = Transactions()
 app = create_app(config_mode)
-app.config['transactions'] = transactions
+app.config["transactions"] = transactions
 Migrate(app, db)
 
 
@@ -28,10 +28,13 @@ Migrate(app, db)
 
 if __name__ == "__main__":
 
-    print("\n\nGainz App runs on a non-production (Flask) web server you can safely ignore the warning(s) below.")
-    print("\nTo access Gainz to go http://127.0.0.1:5000 in a web browser. Preferably Chrome")
+    print(
+        "\n\nGainz App runs on a non-production (Flask) web server you can safely ignore the warning(s) below."
+    )
+    print(
+        "\nTo access Gainz to go http://127.0.0.1:5000 in a web browser. Preferably Chrome"
+    )
     print("\nDefault credentials username: admin, password: admin")
     print("\nClose this window when finished.\n")
-    
+
     app.run(debug=True)
- 
