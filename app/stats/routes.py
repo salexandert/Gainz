@@ -122,7 +122,7 @@ def selected_asset():
         sold_date = None
         proceeds = None 
         cost_basis = 0
-        source = None
+        # source = None
         gain_loss = 0
 
         if trans.trans_type != "sell":
