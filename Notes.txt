@@ -1,0 +1,37 @@
+Detailed stats page input tax rate optional.
+
+I need a log of detailed stats at every change. 
+
+Add Switches to exe for logging level and Filename. 
+
+add date to history page and make each entry clickable and populate a details stats box below it. 
+
+Need to fix auto_link, should take unlinked sold to zero.
+add and manage links some sells do not populate batches. 
+
+ADD AND MANAGE TRANSACTIONS TABLE MULTI ENABLE FOR ALL
+
+Place previous years save here. 
+
+add short vs long on stats page. 
+
+offload previous transactions? how would that work.
+
+compare raw cash app vs 2023 save + cashapp import stats for 2023
+
+stats popup after auto link. 
+or log on stats page. 
+
+Refresh to stats page on auto link and import. 
+
+Need validators of importing data. know totals and check. ex adding .55 in buys total should be += buys imported. 
+
+2023 Sold Unlinked & Quantity Sold = [.8253, 0.84236876, 0.84236876, .8253] Before Import. 
+Import amount is 3.5515
+3.5515 + .8253 = 4.3768
+After Import [3.5515, 3.5685, 3.5685, 3.56]  
+Difference [0, .017, .01, .01]
+Should be [4.3763, 4.3923]
+
+Quantity Sold Unlinked 2023 = 0.82537345  all time = 0.84236876 Difference = .017 which is greater than .009
+Quantity Sold Unlinked 2023 = 0.82537345  all time = 0.84236876 Difference = .017 which is greater than .009

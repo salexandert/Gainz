@@ -145,7 +145,7 @@ def add_links_selected_asset():
         ["Quantity Purchased Unlinked", asset_stats['total_purchased_unlinked_quantity']],
         ["Quantity Purchased in USD", asset_stats['total_purchased_usd']],
         ["Quantity Sold in USD", asset_stats['total_sold_usd']],
-        ["Profit / Loss in USD* (Valid when Quantity Sold Unlinked is 0)", asset_stats['total_profit_loss']],
+        ["Profit / Loss in USD* (Valid when Quantity Sold Unlinked is 0)", asset_stats['profit_loss_total']],
     ]
 
     # Get Linked Table Data
