@@ -745,10 +745,71 @@ $(document).ready(function() {
 // history page code
 $(document).ready(function() {
 
-    var table = $('#history_datatable').DataTable({
+    // init tables
+    $('#historypage_datatable').DataTable({
+        select: {
+            style: 'multiple'
+        },
+    });
+
+    $('#historypage_stats_datatable').DataTable({
         select: {
             style: 'single'
         },
+    });
+    
+    
+    $('#historypage_detailed_datatable').DataTable({
+        "pageLength": 50,
+        select: {
+            style: 'single'
+        },
+    });
+
+    $('#historypage_datatable tbody').on( 'click', 'tr', function () {
+        // console.log( table.row( this ).data() );
+        $.ajax({
+            type: "POST",
+            url: "/history/selected_save",
+            data: JSON.stringify({
+                'row_data': $('#historypage_datatable').DataTable().row( this ).data(),
+                }),  
+
+            contentType: 'application/json',
+            success: function (data) {
+
+                console.log(data)
+                var names = data['column_names']
+
+                // Check if the DataTable is initialized
+                if ($.fn.DataTable.isDataTable('#historypage_stats_datatable')) {
+                    // Get the DataTable instance
+                    var table = $('#historypage_stats_datatable').DataTable();
+
+                    // Loop over the list of names
+                    for (var i = 0; i < names.length; i++) {
+                        // Check if the column exists
+                        if (i < table.columns().count()) {
+                            // Update the column title
+                            table.column(i).header().innerHTML = names[i];
+                        } else {
+                            console.log('Column ' + i + ' does not exist');
+                        }
+                    }
+
+                    // Redraw the table to reflect the changes
+                    table.columns.adjust().draw();
+                } else {
+                    console.log('DataTable is not initialized');
+                }
+
+                $('#historypage_stats_datatable').DataTable().clear();
+                $('#historypage_stats_datatable').DataTable().rows.add(data['rows']).draw();
+                
+                    
+            },   
+        });
+
     });
 
     
