@@ -16,12 +16,51 @@ def index():
 
     return render_template('history.html', stats_table_data=stats_table_data, history=saves)
 
+@blueprint.route('/compare_selected',  methods=['POST'])
+@login_required
+def compare_selected():
+    
+    data = request.json
+    print("\n two rows")
+    print(data['row_data']['0'])
+    print(data['row_data']['1'])
+
+    filename1 = data['row_data']['0'][0]
+    filename2 = data['row_data']['1'][0]
+    transactions1 = Transactions()
+    transactions1.load(filename1)
+    transactions2 = Transactions()
+    transactions2.load(filename2)
+
+    data = {}
+
+    data['num_transactions'] = len(transactions1) - len(transactions2)
+
+    num_buys = 0
+    num_sells = 0
+    num_links = 0
+    total_purchased_quantity = 0.0
+    total_purchased_unlinked_quantity = 0.0
+    total_purchased_usd = 0.0
+    total_sold_quantity = 0.0
+    total_sold_unlinked_quantity = 0.0
+    total_sold_usd = 0.0
+    profit_loss_total = 0.0
+    profit_loss_short = 0.0
+    profit_loss_long = 0.0
+    
+
+    return jsonify(data)
+
+
 @blueprint.route('/selected_save',  methods=['POST'])
 @login_required
 def selected_save():
 
+    print(request.json['row_data'])
+
     filename = request.json['row_data'][0]
-    print(filename)
+    # print(filename)
     
     transactions = Transactions()
 

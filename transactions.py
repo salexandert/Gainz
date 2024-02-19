@@ -256,22 +256,40 @@ elif __file__:
 class Transactions:
 
     def __init__(self, view=None):
-        
+        self.revision_num = None
         self.saves = self.load_saves()
         self.index = 0
         self.conversions = []
         self.asset_objects = []
-
+        
         if view is not None:
             self.transactions = self.load(view)
             self.view = view
+        
         elif len(self.saves) > 0:
-            view = self.saves[-1]['value']
+            highest_rev = 0
+            view = None
+            revision_num = None
+
+            for save in self.saves:
+                if save['revision_num'] is None:
+                    revision_num = 0
+                else:
+                    if save['revision_num'] > highest_rev:
+                        highest_rev = save['revision_num']
+                        view = save['value']
+            
+            print(f"the highest rev is {highest_rev}")
+
+            if view is None:
+                view = self.saves[-1]['value']
+            
             self.transactions = self.load(view)
             self.view = view
         else:
             self.view = ""
             self.transactions = []
+            self.revision_num = 0
 
     def __len__(self):
         return len(self.transactions)
@@ -300,9 +318,23 @@ class Transactions:
         return links
 
     def auto_link(self, algo, asset=None, min_link=0.000001, pre_check=False, year=None):
+        """
+        Automatically links buy and sell transactions based on the specified algorithm.
+
+        Args:
+            algo (str): The algorithm to use for linking transactions. Possible values are 'fifo', 'filo', 'min_gain_long', and 'min_gain'.
+            asset (str, optional): The symbol of the asset to link. If provided, only transactions with the specified symbol will be considered for linking. Defaults to None.
+            min_link (float, optional): The minimum link quantity. Transactions with a link quantity less than this value will be skipped. Defaults to 0.000001.
+            pre_check (bool, optional): Whether to perform a pre-check before linking transactions. Defaults to False.
+            year (int, optional): The year to filter transactions. Only transactions within the specified year will be considered for linking. Defaults to None.
+
+        Returns:
+            None
+        """
         
         sells = {}
         buys = {}
+        min_unlinked = 0.0000001
 
         # failures is a list of dicts
         failures = []
@@ -356,166 +388,7 @@ class Transactions:
             
             for key in sells.keys():
                 sells[key].sort(key=lambda x: x.time_stamp)
-        
-        elif algo == 'filo':
-            for key in buys.keys():
-                buys[key].sort(key=lambda x: x.time_stamp, reverse=True)
-            
-            for key in sells.keys():
-                sells[key].sort(key=lambda x: x.time_stamp)
 
-        elif algo == 'min_gain_long':
-            for key in buys.keys():
-                buys[key].sort(key=lambda x: x.time_stamp)
-            
-            for key in sells.keys():
-                sells[key].sort(key=lambda x: x.time_stamp)
-                sells[key].sort(key=lambda x: x.unlinked_quantity)
-                sells[key].sort(key=lambda x: x.usd_spot)
-
-            keys = list(sells.keys())
-            keys.sort()
-            for key in keys:
-                quantity_linked = 0.0
-                
-                links = []
-                for sell in sells[key]:
-                                        
-                    # break if sell has no remaining unlinked quantity
-                    if sell.unlinked_quantity <= .000001:
-                        continue
-                    
-                    min_gain_long_batch = []
-                    potential_sale_quantity = sell.unlinked_quantity
-                    potential_sale_usd_spot = sell.usd_spot
-                    min_gain_long_batch_gain = 0.0
-                    min_gain_long_batch_quantity = 0.0
-                    
-                    # Linkable Buys Long
-                    linkable_buys_long = [
-                    trans for trans in self.transactions
-                        if trans.trans_type == "buy"
-                        and trans.symbol == key
-                        and (sell.time_stamp > trans.time_stamp)
-                        and (sell.time_stamp - trans.time_stamp).days > 365
-                        and trans.unlinked_quantity > .0000001
-                    ]
-
-                    # Min Gain Long Batch
-                    # print(f"items in linkable long {len(linkable_buys_long)}")
-                    linkable_buys_long.sort(key=lambda trans: trans.usd_spot, reverse=True)
-                    
-                    target_quantity = potential_sale_quantity
-                    
-                    # loop linkable buys to find link candidate 
-                    for trans in linkable_buys_long:
-                        
-                        buy_unlinked_quantity = trans.unlinked_quantity
-                        
-                        # Determine max link quantity
-                        if target_quantity <= buy_unlinked_quantity:
-                            link_quantity = target_quantity
-                        
-                        elif target_quantity >= buy_unlinked_quantity:
-                            link_quantity = buy_unlinked_quantity
-
-                        link_quantity = round_decimals_down(link_quantity)
-                        target_quantity -= link_quantity
-
-                        # Skip if gain or loss less than .01
-                        cost_basis = link_quantity * float(trans.usd_spot)
-                        proceeds = link_quantity * potential_sale_usd_spot
-                        gain_or_loss = proceeds - cost_basis
-                        
-                        if abs(gain_or_loss) < 0.01:
-                            continue
-
-                        min_gain_long_batch_gain += gain_or_loss
-                        min_gain_long_batch_quantity += link_quantity
-
-                        min_gain_long_batch.append([trans, link_quantity])
-                        
-                        if target_quantity <= 0:
-                            break
-                    
-                    for i in min_gain_long_batch:
-                        link = sell.link_transaction(i[0], i[1])
-                        links.append(link)
-                        quantity_linked += link.quantity
-            print(f"added {quantity_linked}")   
-
-        elif algo == 'min_gain':
-            quantity_linked = 0.0
-
-            for key in buys.keys():
-                buys[key].sort(key=lambda x: x.time_stamp)
-                buys[key].sort(key=lambda x: x.usd_spot)
-            
-            for key in sells.keys():
-                sells[key].sort(key=lambda x: x.time_stamp)
-                sells[key].sort(key=lambda x: x.unlinked_quantity)
-                sells[key].sort(key=lambda x: x.usd_spot, reverse=True)
-
-            keys = list(sells.keys())
-            keys.sort()
-            for key in keys:
-                links = []
-
-                for sell in sells[key]:
-                                        
-                    # break if sell has no remaining unlinked quantity
-                    if sell.unlinked_quantity <= .000001:
-                        continue
-
-                    min_gain_batch = []
-                    potential_sale_quantity = sell.unlinked_quantity
-                    target_quantity = potential_sale_quantity
-                    potential_sale_usd_spot = sell.usd_spot
-
-                    # All Linkable Buys 
-                    linkable_buys = [
-                            trans for trans in buys[key]
-                            if trans.trans_type == "buy"
-                            and trans.symbol == key
-                            and (sell.time_stamp > trans.time_stamp)
-                            and trans.unlinked_quantity > .0000001
-                    ]
-
-                    linkable_buys.sort(key=lambda trans: trans.usd_spot, reverse=True)
-
-                    for trans in linkable_buys:
-                        buy_unlinked_quantity = trans.unlinked_quantity
-                        
-                        # Determine max link quantity
-                        if target_quantity <= buy_unlinked_quantity:
-                            link_quantity = target_quantity
-                        
-                        elif target_quantity >= buy_unlinked_quantity:
-                            link_quantity = buy_unlinked_quantity
-
-                        link_quantity = round_decimals_down(link_quantity)
-                        target_quantity -= link_quantity
-
-                        #determine if we should skip link 
-                        cost_basis = link_quantity * float(trans.usd_spot)
-                        proceeds = link_quantity * potential_sale_usd_spot
-                        gain_or_loss = proceeds - cost_basis
-                        if abs(gain_or_loss) < 0.01:
-                            continue
-
-                        min_gain_batch.append([trans, round_decimals_down(link_quantity)])
-
-                        if target_quantity <= 0:
-                            break
-                    
-                    for i in min_gain_batch:
-                        link = sell.link_transaction(i[0], i[1])
-                        links.append(link)
-                        quantity_linked += link.quantity
-            
-            print(f"Added {quantity_linked}")
-
-        if algo != 'min_gain_long' or algo != 'min_gain':
             keys = list(sells.keys())
             keys.sort()
             for key in keys:
@@ -526,18 +399,18 @@ class Transactions:
                 for sell in sells[key]:
     
                     # check if sell has remaining unlinked quantity
-                    if sell.unlinked_quantity > 0:
+                    if sell.unlinked_quantity > min_unlinked:
                         
                         for buy in buys[key]:
 
                             link_quantity = None
 
                             # break if sell has no remaining unlinked quantity
-                            if sell.unlinked_quantity <= 0:
+                            if sell.unlinked_quantity <= min_unlinked:
                                 break
 
                             # Skip if buy has no remaining unlinked quantity
-                            if buy.unlinked_quantity <= 0:
+                            if buy.unlinked_quantity <= min_unlinked:
                                 continue
                                                     
                             # check if buy came before sell
@@ -575,7 +448,7 @@ class Transactions:
                             links.append(link)
                             quantity_linked += link.quantity
 
-                        if (sell.unlinked_quantity * sell.usd_spot) > 5.0:
+                        if (sell.unlinked_quantity * sell.usd_spot) > min_unlinked:
                             # print(f"Sell Unlinkable when using [{algo}] symbol [{sell.symbol}] unlinkable_quantity [{sell.unlinked_quantity}]")
                             failures.append({
                                 'asset': sell.symbol, 
@@ -584,6 +457,226 @@ class Transactions:
                                 'timestamp': sell.time_stamp,
                                 'algo': algo
                             })
+        
+        elif algo == 'filo':
+
+            for key in buys.keys():
+                buys[key].sort(key=lambda x: x.time_stamp, reverse=True)
+            
+            for key in sells.keys():
+                sells[key].sort(key=lambda x: x.time_stamp)
+
+            keys = list(sells.keys())
+            keys.sort()
+            
+            for key in keys:
+                quantity_linked = 0.0
+                links = []
+
+                for sell in sells[key]:
+                    # check if sell has remaining unlinked quantity
+                    if sell.unlinked_quantity > min_unlinked:
+                        for buy in buys[key]:
+                            link_quantity = None
+
+                            # break if sell has no remaining unlinked quantity
+                            if sell.unlinked_quantity <= min_unlinked:
+                                break
+
+                            # Skip if buy has no remaining unlinked quantity
+                            if buy.unlinked_quantity <= min_unlinked:
+                                continue
+
+                            # check if buy came before sell
+                            if buy.time_stamp >= sell.time_stamp:
+                                continue
+
+                            # Link 
+                            # if sell unlinked is greater than buy unlinked, link quantity equals buy unlinked
+                            if sell.unlinked_quantity >= buy.unlinked_quantity:
+                                link_quantity = buy.unlinked_quantity
+
+                            # if sell unlinked is less than buy unlinked, link quantity equals sell unlinked
+                            elif sell.unlinked_quantity <= buy.unlinked_quantity: 
+                                link_quantity = sell.unlinked_quantity
+
+                            # Set max length of link 
+                            link_quantity = round_decimals_down(link_quantity)
+
+                            # Determine link profitability
+                            buy_price = link_quantity * buy.usd_spot
+                            sell_price = link_quantity * sell.usd_spot
+                            profit = sell_price - buy_price
+
+                            # if the link is less than 1 dollar skip it
+                            if abs(profit) < 1.0:
+                                continue
+
+                            link = sell.link_transaction(buy, link_quantity)
+                            links.append(link)
+                            quantity_linked += link.quantity
+
+                        if (sell.unlinked_quantity * sell.usd_spot) > min_unlinked:
+                            print(f"Sell Unlinkable when using [{algo}] symbol [{sell.symbol}] unlinkable_quantity [{sell.unlinked_quantity}]")
+                            failures.append({
+                                'asset': sell.symbol, 
+                                'unlinkable': sell.unlinked_quantity,
+                                'quantity': sell.quantity,
+                                'timestamp': sell.time_stamp,
+                                'algo': algo
+                            })
+
+        elif algo == 'min_gain_long':
+            for key in buys.keys():
+                buys[key].sort(key=lambda x: x.time_stamp)
+            
+            for key in sells.keys():
+                sells[key].sort(key=lambda x: x.time_stamp)
+                sells[key].sort(key=lambda x: x.unlinked_quantity)
+                sells[key].sort(key=lambda x: x.usd_spot)
+
+            keys = list(sells.keys())
+            keys.sort()
+            for key in keys:
+                quantity_linked = 0.0
+                
+                links = []
+                for sell in sells[key]:
+                                        
+                    # break if sell has no remaining unlinked quantity
+                    if sell.unlinked_quantity <= min_unlinked:
+                        continue
+                    
+                    min_gain_long_batch = []
+                    potential_sale_quantity = sell.unlinked_quantity
+                    potential_sale_usd_spot = sell.usd_spot
+                    min_gain_long_batch_gain = 0.0
+                    min_gain_long_batch_quantity = 0.0
+                    
+                    # Linkable Buys Long
+                    linkable_buys_long = [
+                    trans for trans in self.transactions
+                        if trans.trans_type == "buy"
+                        and trans.symbol == key
+                        and (sell.time_stamp > trans.time_stamp)
+                        and (sell.time_stamp - trans.time_stamp).days > 365
+                        and trans.unlinked_quantity > min_unlinked
+                    ]
+
+                    # Min Gain Long Batch
+                    # print(f"items in linkable long {len(linkable_buys_long)}")
+                    linkable_buys_long.sort(key=lambda trans: trans.usd_spot, reverse=True)
+                    
+                    target_quantity = potential_sale_quantity
+                    
+                    # loop linkable buys to find link candidate 
+                    for trans in linkable_buys_long:
+                        
+                        buy_unlinked_quantity = trans.unlinked_quantity
+                        
+                        # Determine max link quantity
+                        if target_quantity <= buy_unlinked_quantity:
+                            link_quantity = target_quantity
+                        
+                        elif target_quantity >= buy_unlinked_quantity:
+                            link_quantity = buy_unlinked_quantity
+
+                        link_quantity = round_decimals_down(link_quantity)
+                        target_quantity -= link_quantity
+
+                        # Skip if gain or loss less than .01
+                        cost_basis = link_quantity * float(trans.usd_spot)
+                        proceeds = link_quantity * potential_sale_usd_spot
+                        gain_or_loss = proceeds - cost_basis
+                        
+                        if abs(gain_or_loss) < 0.01:
+                            continue
+
+                        min_gain_long_batch_gain += gain_or_loss
+                        min_gain_long_batch_quantity += link_quantity
+
+                        min_gain_long_batch.append([trans, link_quantity])
+                        
+                        if target_quantity <= min_unlinked:
+                            break
+                    
+                    for i in min_gain_long_batch:
+                        link = sell.link_transaction(i[0], i[1])
+                        links.append(link)
+                        quantity_linked += link.quantity
+            
+            print(f"added {quantity_linked}")   
+
+        elif algo == 'min_gain':
+            quantity_linked = 0.0
+
+            for key in buys.keys():
+                buys[key].sort(key=lambda x: x.time_stamp)
+                buys[key].sort(key=lambda x: x.usd_spot)
+            
+            for key in sells.keys():
+                sells[key].sort(key=lambda x: x.time_stamp)
+                sells[key].sort(key=lambda x: x.unlinked_quantity)
+                sells[key].sort(key=lambda x: x.usd_spot, reverse=True)
+
+            keys = list(sells.keys())
+            keys.sort()
+            for key in keys:
+                links = []
+
+                for sell in sells[key]:
+                                        
+                    # break if sell has no remaining unlinked quantity
+                    if sell.unlinked_quantity <= min_unlinked:
+                        continue
+
+                    min_gain_batch = []
+                    potential_sale_quantity = sell.unlinked_quantity
+                    target_quantity = potential_sale_quantity
+                    potential_sale_usd_spot = sell.usd_spot
+
+                    # All Linkable Buys 
+                    linkable_buys = [
+                            trans for trans in buys[key]
+                            if trans.trans_type == "buy"
+                            and trans.symbol == key
+                            and (sell.time_stamp > trans.time_stamp)
+                            and trans.unlinked_quantity > min_unlinked
+                    ]
+
+                    linkable_buys.sort(key=lambda trans: trans.usd_spot, reverse=True)
+
+                    for trans in linkable_buys:
+                        buy_unlinked_quantity = trans.unlinked_quantity
+                        
+                        # Determine max link quantity
+                        if target_quantity <= buy_unlinked_quantity:
+                            link_quantity = target_quantity
+                        
+                        elif target_quantity >= buy_unlinked_quantity:
+                            link_quantity = buy_unlinked_quantity
+
+                        link_quantity = round_decimals_down(link_quantity)
+                        target_quantity -= link_quantity
+
+                        #determine if we should skip link 
+                        cost_basis = link_quantity * float(trans.usd_spot)
+                        proceeds = link_quantity * potential_sale_usd_spot
+                        gain_or_loss = proceeds - cost_basis
+                        if abs(gain_or_loss) < 0.01:
+                            continue
+
+                        min_gain_batch.append([trans, round_decimals_down(link_quantity)])
+
+                        if target_quantity <= min_unlinked:
+                            break
+                    
+                    for i in min_gain_batch:
+                        link = sell.link_transaction(i[0], i[1])
+                        links.append(link)
+                        quantity_linked += link.quantity
+            
+            
             print(f"added {quantity_linked}")
                                
         if pre_check:
@@ -892,23 +985,26 @@ class Transactions:
     def load_saves(self):
 
         saves = []
-
+        revision_num = None
         match_object = "saved_"
+
         view_num = 1
         for root, dirs, files in os.walk(os.path.join(basedir, 'saves')):
             for f in files:
 
                 save_as_filename = os.path.join(basedir, 'saves', f)
 
-
                 if match_object in f and f.endswith('xlsx'):
                     workbook = load_workbook(filename=save_as_filename)
                     if 'Description' in workbook.sheetnames:
                         sheet = workbook['Description']
                         description = sheet.cell(column=1, row=1).value
+                        revision_num = sheet.cell(column=2, row=1).value
+
                     else:
                         description = ""
-                    saves.append({'label': save_as_filename, 'value': save_as_filename, 'description': description})
+                    
+                    saves.append({'label': save_as_filename, 'value': save_as_filename, 'description': description, 'revision_num': revision_num})
                     view_num += 1
 
         self.saves = saves
@@ -927,6 +1023,14 @@ class Transactions:
 
     # Load Previous Data returns view options
     def load(self, filename=None):
+
+        workbook = load_workbook(filename=filename)
+        if 'Description' in workbook.sheetnames:
+            sheet = workbook['Description']
+            description = sheet.cell(column=1, row=1).value
+            revision_num = sheet.cell(column=2, row=1).value
+            if revision_num is not None:
+                self.revision_num = revision_num
 
         # Read Previously saved data into pandas df - Transactions
         trans_df = pd.read_excel(filename, sheet_name='All Transactions', converters = {'my_str_column': list})
@@ -1120,6 +1224,10 @@ class Transactions:
         workbook = load_workbook(filename=save_as_filename)
         sheet = workbook.create_sheet('Description')
         sheet.cell(row=1, column=1, value=description)
+        revision_num = self.revision_num
+        if revision_num is None:
+            revision_num = 0
+        sheet.cell(row=1, column=2, value=revision_num + 1)
 
 
         # Trying creating links outside of pd
@@ -1168,7 +1276,7 @@ class Transactions:
         print(f"{description} Saving to {save_as_filename}")
 
         self.saves = self.load_saves()
-        self.view = self.saves[-1]['value']
+        self.view = save_as_filename
         
         return save_as_filename
 

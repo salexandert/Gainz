@@ -746,9 +746,9 @@ $(document).ready(function() {
 $(document).ready(function() {
 
     // init tables
-    $('#historypage_datatable').DataTable({
+    var table = $('#historypage_datatable').DataTable({
         select: {
-            style: 'multiple'
+            style: 'multi'
         },
     });
 
@@ -766,49 +766,74 @@ $(document).ready(function() {
         },
     });
 
-    $('#historypage_datatable tbody').on( 'click', 'tr', function () {
-        // console.log( table.row( this ).data() );
-        $.ajax({
-            type: "POST",
-            url: "/history/selected_save",
-            data: JSON.stringify({
-                'row_data': $('#historypage_datatable').DataTable().row( this ).data(),
-                }),  
 
-            contentType: 'application/json',
-            success: function (data) {
+    table.on('select', function(e, dt, type, indexes) {
+        
 
-                console.log(data)
-                var names = data['column_names']
+        //If two rows are selected
+        if ($('#historypage_datatable').DataTable().rows( {selected:true} ).count() == 2) {
+            console.log('two rows selected')
 
-                // Check if the DataTable is initialized
-                if ($.fn.DataTable.isDataTable('#historypage_stats_datatable')) {
-                    // Get the DataTable instance
-                    var table = $('#historypage_stats_datatable').DataTable();
-
-                    // Loop over the list of names
-                    for (var i = 0; i < names.length; i++) {
-                        // Check if the column exists
-                        if (i < table.columns().count()) {
-                            // Update the column title
-                            table.column(i).header().innerHTML = names[i];
-                        } else {
-                            console.log('Column ' + i + ' does not exist');
-                        }
-                    }
-
-                    // Redraw the table to reflect the changes
-                    table.columns.adjust().draw();
-                } else {
-                    console.log('DataTable is not initialized');
+            $.ajax({
+                type: "POST",
+                url: "/history/compare_selected",
+                data: JSON.stringify({
+                    'row_data': $('#historypage_datatable').DataTable().rows( {selected:true} ).data(),
+                    }),  
+    
+                contentType: 'application/json',
+                success: function (data) { 
+                    console.log(data)
+                    $('#historypage_stats_datatable').DataTable().clear();
                 }
 
-                $('#historypage_stats_datatable').DataTable().clear();
-                $('#historypage_stats_datatable').DataTable().rows.add(data['rows']).draw();
-                
+            });
+    
+        //If one row is selected
+        } else {
+            console.log('Single Row is selected')
+            $.ajax({
+                type: "POST",
+                url: "/history/selected_save",
+                data: JSON.stringify({
+                    'row_data': $('#historypage_datatable').DataTable().row( {selected:true} ).data(),
+                    }),  
+    
+                contentType: 'application/json',
+                success: function (data) {
+    
+                    console.log(data)
+                    var names = data['column_names']
+    
+                    // Check if the DataTable is initialized
+                    if ($.fn.DataTable.isDataTable('#historypage_stats_datatable')) {
+                        // Get the DataTable instance
+                        var table = $('#historypage_stats_datatable').DataTable();
+    
+                        // Loop over the list of names
+                        for (var i = 0; i < names.length; i++) {
+                            // Check if the column exists
+                            if (i < table.columns().count()) {
+                                // Update the column title
+                                table.column(i).header().innerHTML = names[i];
+                            } else {
+                                console.log('Column ' + i + ' does not exist');
+                            }
+                        }
+    
+                        // Redraw the table to reflect the changes
+                        table.columns.adjust().draw();
+                    } else {
+                        console.log('DataTable is not initialized');
+                    }
+    
+                    $('#historypage_stats_datatable').DataTable().clear();
+                    $('#historypage_stats_datatable').DataTable().rows.add(data['rows']).draw();
                     
-            },   
-        });
+                        
+                },   
+            });
+        }
 
     });
 
