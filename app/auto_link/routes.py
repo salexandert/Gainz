@@ -55,7 +55,6 @@ def auto_link_asset():
         year = year
 
 
-
     algo_type = request.json['algo']
 
     if algo_type == "fifo":
