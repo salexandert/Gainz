@@ -1,3 +1,6 @@
+# Before Whole new auto link
+
+
 from conversion import Conversion
 from transaction import Buy, Receive, Sell, Send, Receive
 import pandas as pd
