@@ -320,6 +320,45 @@ class Transactions:
         
         return links
 
+    def auto_link_for_min_gain(self, asset=None, min_link=0.000001):
+        """
+        Automatically links buy and sell transactions based with the intent to minimize capital gains. 
+        """
+        
+        sells = {}
+        buys = {}
+        min_unlinked = 0.0000001
+
+        # failures is a list of dicts
+        failures = []
+
+        # Sort into Buys a Sells
+        for trans in self.transactions:
+
+            # If asset is provided only auto-link symbol provided
+            if asset is not None:
+                if trans.symbol != asset:
+                    continue
+
+            if trans.trans_type == 'buy':
+
+                if trans.symbol not in buys.keys():
+                    buys[trans.symbol] = []
+
+                buys[trans.symbol].append(trans)
+
+            elif trans.trans_type == 'sell':
+                
+                if trans.symbol not in sells.keys():
+                    sells[trans.symbol] = []
+
+                sells[trans.symbol].append(trans)
+
+
+                
+        
+        
+
     def auto_link(self, algo, asset=None, min_link=0.000001, pre_check=False, year=None):
         """
         Automatically links buy and sell transactions based on the specified algorithm.
