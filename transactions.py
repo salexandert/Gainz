@@ -383,6 +383,7 @@ class Transactions:
                 
         # sort for algo types
         if algo == 'fifo':
+            # sort buys and sells by time_stamp
             for key in buys.keys():
                 buys[key].sort(key=lambda x: x.time_stamp)
             
@@ -391,16 +392,19 @@ class Transactions:
 
             keys = list(sells.keys())
             keys.sort()
+            # Loop all Asset_types (keys)
             for key in keys:
                 quantity_linked = 0.0
 
                 links = []
 
+                # loop sells to find link candidate
                 for sell in sells[key]:
     
                     # check if sell has remaining unlinked quantity
                     if sell.unlinked_quantity > min_unlinked:
                         
+                        #loop buys to find link candidate
                         for buy in buys[key]:
 
                             link_quantity = None
@@ -426,7 +430,6 @@ class Transactions:
                             elif sell.unlinked_quantity <= buy.unlinked_quantity: 
                                 link_quantity = sell.unlinked_quantity
                             
-                            
                             # print(f"\nthe link quantity BEFORE being rounded down [{link_quantity}] len {len(str(link_quantity))}")
 
                             # Set max length of link 
@@ -439,7 +442,7 @@ class Transactions:
                             sell_price = link_quantity * sell.usd_spot
                             profit = sell_price - buy_price
 
-                            # if the link is less than val skip it
+                            # if the link is less than $1.00 skip it
                             if abs(profit) < 1.0:
                                 # print(f"Skipping link because profit/loss [{profit} is less than $1.0]")
                                 continue
@@ -608,6 +611,7 @@ class Transactions:
             print(f"added {quantity_linked}")   
 
         elif algo == 'min_gain':
+            # need to link all short sells with zero or less gain. then link long sells by min gain. then link anything left over.
             quantity_linked = 0.0
 
             for key in buys.keys():
@@ -1787,7 +1791,7 @@ class Transactions:
                 ["Quantity Purchased Unlinked", asset_stats['total_purchased_unlinked_quantity']],
                 ["Quantity Purchased in USD", asset_stats['total_purchased_usd']],
                 ["Quantity Sold in USD", asset_stats['total_sold_usd']],
-                ["Profit / Loss in USD* (Valid when Quantity Sold Unlinked is 0)", asset_stats['total_profit_loss']],
+                ["Profit / Loss in USD* (Valid when Quantity Sold Unlinked is 0)", asset_stats['profit_loss_total']],
             ]
 
             row = 2
