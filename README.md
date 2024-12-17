@@ -17,8 +17,6 @@ If you are importing transactions from a source other than Coinbase, Coinbase Pr
 Or 
 Manually one at a time on the Manage Transactions Page. 
 
-Please check out https://cryptogainz.store/ or email cryptogainzapp@gmail.com for questions, comments, or suggestions.
-
 Video Walkthrough and Intro https://youtu.be/g_02xOu1F7M
 
 download the compiled version for Windows and Mac here https://drive.google.com/drive/folders/1YLyRRWitJ1pHVVMHnspB783Pq52DWUnC?usp=share_link
@@ -29,10 +27,7 @@ or compile it yourself with pyinstaller
 "pyinstaller --add-data "app;app" --onefile --hidden-import flask_wtf --hidden-import bcrypt --hidden-import wtforms.fields.html5 --hidden-import utils --hidden-import cffi --icon="C:\{path repo}\gainz_logo.ico" run.py"
 
 Did this help you out? All Donations are cherished 
-https://cryptogainz.store/pages/donate
-
 Bitcoin bc1qm0sykhxhhqey9yg2t93mqp4jzgdl88ewa82q3s
-
 CashApp $SAl3xander
 
 **Gainz, does not provide Legal, Financial, or Tax Advice. Please consult with your certified advisor(s) to validate results.**
