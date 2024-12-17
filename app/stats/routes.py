@@ -3,7 +3,7 @@ from flask import render_template, request, jsonify, current_app
 from flask_login import login_required, current_user
 from utils import *
 from flask_wtf import FlaskForm
-from wtforms.fields.html5 import DateTimeLocalField
+from wtforms.fields import DateTimeLocalField
 from utils import *
 from wtforms import SubmitField
 from time import strftime
