@@ -17,6 +17,12 @@ from utils import *
 
 import dateutil.parser
 
+from flask import Blueprint, request
+from werkzeug.utils import secure_filename
+from transactions import Transactions
+
+import_transactions_bp = Blueprint('import_transactions', __name__)
+
 class ManualTransaction(FlaskForm):
     '''
     Manual Transaction values
@@ -40,7 +46,6 @@ class CurrentHodl(FlaskForm):
 @blueprint.route('/', methods=['GET', 'POST'])
 @login_required
 def import_wizard():
-
     transactions = current_app.config['transactions']
     manual_trans = ManualTransaction()
     current_hodl = CurrentHodl()
@@ -50,21 +55,21 @@ def import_wizard():
 
     # if file is uploaded add new transactions 
     if request.method == 'POST':
-
         # Import from CSV File
         if 'file' in request.files:
             file = request.files['file']
-            transactions.import_transactions(file, filename=secure_filename(file.filename))
-    
+            filename = secure_filename(file.filename)
+            file_path = f'LOCAL_TAX_UPLOAD_REMOVED'
+            file.save(file_path)
+            transactions.import_transactions(file_path)
 
         # Current Hodl
         if current_hodl.validate_on_submit():
-           pass
+            pass
 
-    
     stats_table_data = get_stats_table_data(transactions)
     all_trans_table_data = get_all_trans_table_data(transactions)
-    
-    return render_template('import_transactions.html', manual_trans=manual_trans, current_hodl=current_hodl,transactions=all_trans_table_data, stats_table_data=stats_table_data)
+
+    return render_template('import_transactions.html', manual_trans=manual_trans, current_hodl=current_hodl, transactions=all_trans_table_data, stats_table_data=stats_table_data)
 
 

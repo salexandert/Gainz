@@ -19,6 +19,7 @@ from utils import *
 import math
 import time
 import threading
+import csv
 
 
 whois_timezone_info = {
@@ -1938,6 +1939,7 @@ class Transactions:
         save_as_filename = os.path.join(basedir, "saves", f"saved_{strftime('Y%Y-M%m-D%d_H%H-M%M-S%S')}.xlsx")
 
         # Import from CashApp csv
+
         if 'cash_app' in filename.lower():
 
             # print("Date Found in columns")
@@ -2091,7 +2093,7 @@ class Transactions:
                         and trans.usd_total == math.floor(trans_obj.usd_total * 10 ** 10) / 10 ** 10 
                     ):
 
-                        duplicate_found = True
+                        duplicate_found is True
 
                 if duplicate_found is False:
                     buys.append(trans_obj)
@@ -2493,6 +2495,30 @@ class Transactions:
 
         return last_time_stamps
 
+    def import_transactions(self, file_path):
+        with open(file_path, mode='r') as file:
+            csv_reader = csv.DictReader(file)
+            for row in csv_reader:
+                symbol = row['Asset Type']
+                quantity = float(row['Asset Amount']) if row['Asset Amount'] else 0.0
+                time_stamp = row['Date']
+                usd_spot_str = row['Asset Price']
+                usd_spot = float(usd_spot_str.replace('$', '').replace(',', '')) if usd_spot_str else 0.0
+                source = row['Notes']
+                trans_type = row['Transaction Type'].lower()
+
+                if trans_type == 'bitcoin buy':
+                    transaction = Buy(symbol=symbol, quantity=quantity, time_stamp=time_stamp, usd_spot=usd_spot, source=source)
+                elif trans_type == 'bitcoin sell':
+                    transaction = Sell(symbol=symbol, quantity=quantity, time_stamp=time_stamp, usd_spot=usd_spot, source=source)
+                elif trans_type == 'bitcoin withdrawal':
+                    transaction = Send(symbol=symbol, quantity=quantity, time_stamp=time_stamp, usd_spot=usd_spot, source=source)
+                elif trans_type == 'bitcoin receive':
+                    transaction = Receive(symbol=symbol, quantity=quantity, time_stamp=time_stamp, usd_spot=usd_spot, source=source)
+                else:
+                    continue
+
+                self.transactions.append(transaction)
 
 if __name__ == "__main__":
 
@@ -2608,14 +2634,16 @@ if __name__ == "__main__":
 
     print(f"\n\n bought {bought_quantity} \n sent {sent_quantity} \n received {received_quantity} \n sold {sold_quantity} \n sold unlinked {sold_unlinked} \n bought unlinked {bought_unlinked}")
 
-    
+    transactions.import_transactions('LOCAL_TAX_FILE_REMOVED')
 
 
 
 
 
-    
 
 
 
-  
+
+
+
+

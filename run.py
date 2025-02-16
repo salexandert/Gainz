@@ -32,7 +32,7 @@ if __name__ == "__main__":
         "\n\nGainz App runs on a non-production (Flask) web server you can safely ignore the warning(s) below."
     )
     print(
-        "\nTo access Gainz to go http://127.0.0.1:5000 in a web browser. Preferably Chrome"
+        "\nTo access Gainz go to http://127.0.0.1:5000 in a web browser. Preferably Chrome"
     )
     print("\nDefault credentials username: admin, password: admin")
     print("\nClose this window when finished.\n")

@@ -2,7 +2,7 @@ from link import Link
 import itertools
 import math
 
-def round_decimals_up(number:float, decimals:int=9):
+def round_decimals_up(number: float, decimals: int = 9):
     """
     Returns a value rounded up to a specific number of decimal places.
     """
@@ -21,15 +21,15 @@ class Transaction:
     
     def __init__(self, symbol: str, quantity: float, usd_spot: float, trans_type: str, time_stamp: str, source: str, linked_transactions=[]) -> None:
         self.id = next(Transaction.newid)
-        self.quantity = quantity
+        self.quantity = float(quantity) if not math.isnan(quantity) else 0.0
         self.name = f"{time_stamp} {self.quantity}"
         self.trans_type = trans_type
         self.time_stamp = time_stamp
         self.links = []
         self.linked_transactions = linked_transactions
         self.multi_link = False
-        self.symbol = symbol
-        self.usd_spot = usd_spot
+        self.symbol = symbol.upper() if isinstance(symbol, str) else str(symbol).upper()
+        self.usd_spot = float(usd_spot) if not math.isnan(usd_spot) else 0.0
         self.source = source
         self._fee = None
 
@@ -51,7 +51,6 @@ class Transaction:
         
         self._fee = float(value)
 
-        
     def __repr__(self):
         return repr(f"{self.time_stamp} {self.quantity}")
 
@@ -62,73 +61,54 @@ class Transaction:
         return hash((self.quantity, self.symbol, self.usd_spot, self.trans_type))
      
     def calc_multi_link(self):
-        if len(self.links) > 1:
-            return True
-        else:
-            return False
+        return len(self.links) > 1
 
     def set_multi_link(self):
         self.multi_link = self.calc_multi_link()
 
     def link_transaction(self, other, link_quantity):
-
         receive = None
         sell = None
         buy = None
         link = None
-       
+
+        # Reduced logging
+        # print(f"Linking {self} with {other} for quantity {link_quantity}")  # Debug statement
+
         if self.symbol == other.symbol:
-
             if self.trans_type.lower() == 'sell' and other.trans_type.lower() == 'buy':
-
                 buy = other
                 sell = self
-                
             elif self.trans_type.lower() == 'buy' and other.trans_type.lower() == 'sell':
-
                 buy = self
                 sell = other
-
             elif self.trans_type.lower() == 'receive' and other.trans_type.lower() == 'buy':
-
                 receive = self
                 buy = other
-
             elif self.trans_type.lower() == 'buy' and other.trans_type.lower() == 'receive':
-
                 receive = other
                 buy = self   
-            
+
             if receive is not None:
                 link = Link(transactions=[receive, buy], quantity=link_quantity)
-            
             elif buy is not None and sell is not None:
-                # print(self.trans_type, other.trans_type)
                 link = Link(transactions=[sell, buy], quantity=link_quantity)
-
 
             if sell is not None and link not in sell.links:
                 sell.links.append(link)
-
             if receive is not None and link not in receive.links:
                 receive.links.append(link)
-
-            if link is not None:
-                if link not in buy.links:
-                    buy.links.append(link)
-
+            if link is not None and link not in buy.links:
+                buy.links.append(link)
             else:
                 print(f"Self: {self.trans_type}, Other: {other.trans_type}")
                 print(f"Link_quantity is still None!")
-
-            
         else:
             print(f"{self.symbol} <-CANNOT LINK-> {other.symbol}")
 
         # Update Linked Transactions
         if buy is not None:
             buy.update_linked_transactions()
-
         if sell is not None:
             sell.update_linked_transactions()
 
@@ -140,21 +120,27 @@ class Transaction:
 
     @property
     def unlinked_quantity(self):
-        # self.update_linked_transactions()
-
-        unlinked_quantity = self.quantity        
+        unlinked_quantity = self.quantity
+        # Reduced logging
+        # print(f"Initial unlinked_quantity: {unlinked_quantity}")  # Debug statement
         
         for link in self.links:
-
             if (self.trans_type == 'buy') and (link.trans1.trans_type == 'receive' or link.trans2.trans_type == 'receive'):
                 continue
             
             unlinked_quantity -= link.quantity
+            # Reduced logging
+            # print(f"Updated unlinked_quantity: {unlinked_quantity} after subtracting link quantity: {link.quantity}")  # Debug statement
+
+        # Check for NaN and handle it
+        if math.isnan(unlinked_quantity):
+            # Reduced logging
+            # print("unlinked_quantity is NaN, setting to 0.0")  # Debug statement
+            unlinked_quantity = 0.0
                        
         return round_decimals_up(unlinked_quantity)
 
     def update_linked_transactions(self):
-
         linked_transactions = []
         trans = self
         for link in self.links:
@@ -162,42 +148,20 @@ class Transaction:
         
         self.linked_transactions = linked_transactions
 
-
 class Buy(Transaction):
     def __init__(self, symbol, quantity, time_stamp, usd_spot, source, trans_type='buy', linked_transactions=[]):
         super().__init__(symbol=symbol, quantity=quantity, usd_spot=usd_spot, source=source, time_stamp=time_stamp, trans_type=trans_type, linked_transactions=linked_transactions)
-
-        self.symbol = symbol.upper()
-        self.usd_spot = float(usd_spot)
-        
-        
-
-
 
 class Sell(Transaction):
     def __init__(self, symbol, quantity, time_stamp, usd_spot, source, trans_type='sell', linked_transactions=[]):
         super().__init__(symbol=symbol, usd_spot=usd_spot, source=source, quantity=quantity, time_stamp=time_stamp, trans_type=trans_type, linked_transactions=linked_transactions)
 
-        self.symbol = symbol.upper()
-        self.usd_spot = float(usd_spot)
-        
-        
-
-
 class Send(Transaction):
-    def __init__(self, symbol, quantity, time_stamp, source, usd_spot, trans_type='send', linked_transactions=[]):
-        super().__init__(symbol=symbol, usd_spot=usd_spot, quantity=quantity, time_stamp=time_stamp, source=source, trans_type=trans_type,  linked_transactions=linked_transactions)
-
-        self.symbol = symbol.upper()
-        self.usd_spot = float(usd_spot)
-        
-
+    def __init__(self, symbol, quantity, time_stamp, usd_spot, source, trans_type='send', linked_transactions=[]):
+        super().__init__(symbol=symbol, quantity=quantity, usd_spot=usd_spot, source=source, time_stamp=time_stamp, trans_type=trans_type, linked_transactions=linked_transactions)
 
 class Receive(Transaction):
     def __init__(self, symbol, quantity, time_stamp, source, usd_spot, trans_type='receive', linked_transactions=[]):
-        super().__init__(symbol=symbol, usd_spot=usd_spot, quantity=quantity, time_stamp=time_stamp, source=source, trans_type=trans_type,  linked_transactions=linked_transactions)
+        super().__init__(symbol=symbol, usd_spot=usd_spot, quantity=quantity, time_stamp=time_stamp, source=source, trans_type=trans_type, linked_transactions=linked_transactions)
 
-        self.symbol = symbol.upper()
-        self.usd_spot = float(usd_spot)
-        
-        
+
