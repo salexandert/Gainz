@@ -20,6 +20,7 @@ import math
 import time
 import threading
 import csv
+from dateutil import parser
 
 
 whois_timezone_info = {
@@ -588,7 +589,7 @@ class Transactions:
                 
                 links = []
                 for sell in sells[key]:
-                                        
+                                                
                     # break if sell has no remaining unlinked quantity
                     if sell.unlinked_quantity <= min_unlinked:
                         continue
@@ -672,7 +673,7 @@ class Transactions:
                 links = []
 
                 for sell in sells[key]:
-                                        
+                                                
                     # break if sell has no remaining unlinked quantity
                     if sell.unlinked_quantity <= min_unlinked:
                         continue
@@ -828,9 +829,9 @@ class Transactions:
 
             # what we want to calc
             sent = 0.0
-            sold = 0.0
-            bought = 0.0
             received = 0.0
+            bought = 0.0
+            sold = 0.0
             quantity_of_sends_converted_to_sells = 0.0
             inital_amount_to_convert = amount_to_convert
 
@@ -2091,7 +2092,7 @@ class Transactions:
                         and trans.quantity == trans_obj.quantity
                         and trans.usd_spot == trans_obj.usd_spot
                         and trans.usd_total == math.floor(trans_obj.usd_total * 10 ** 10) / 10 ** 10 
-                    ):
+                    ): 
 
                         duplicate_found is True
 
@@ -2227,7 +2228,7 @@ class Transactions:
 
                 i = 1
                 while (index + i <= trans_df.index[-1]) and str(trans_df.loc[index + i]['trade id']) == trade_id:
-                                        
+                                                        
                     # Row is buy with USD
                     if trans_df.loc[index + i]['amount/balance unit'] == 'USD' and trans_df.loc[index + i]['type'] == 'match' and trans_df.loc[index + i]['amount'] < 0:
                         amount_in_usd =  trans_df.loc[index + i]['amount']
@@ -2496,12 +2497,15 @@ class Transactions:
         return last_time_stamps
 
     def import_transactions(self, file_path):
-        with open(file_path, mode='r') as file:
+        with open(file_path, mode='r', encoding='utf-8', errors='replace') as file:
             csv_reader = csv.DictReader(file)
             for row in csv_reader:
                 symbol = row['Asset Type']
                 quantity = float(row['Asset Amount']) if row['Asset Amount'] else 0.0
-                time_stamp = row['Date']
+
+                # Convert string to datetime
+                time_stamp = parser.parse(row['Date'])
+
                 usd_spot_str = row['Asset Price']
                 usd_spot = float(usd_spot_str.replace('$', '').replace(',', '')) if usd_spot_str else 0.0
                 source = row['Notes']
