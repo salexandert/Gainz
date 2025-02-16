@@ -21,6 +21,7 @@ import time
 import threading
 import csv
 from dateutil import parser
+from functools import lru_cache
 
 
 whois_timezone_info = {
@@ -436,10 +437,8 @@ class Transactions:
 
             keys = list(sells.keys())
             keys.sort()
-            # Loop all Asset_types (keys)
             for key in keys:
                 quantity_linked = 0.0
-
                 links = []
 
                 # loop sells to find link candidate
@@ -646,92 +645,25 @@ class Transactions:
                         
                         if target_quantity <= min_unlinked:
                             break
-                    
+
                     for i in min_gain_long_batch:
                         link = sell.link_transaction(i[0], i[1])
                         links.append(link)
                         quantity_linked += link.quantity
-            
-            print(f"added {quantity_linked}")   
+
+                    print(f"added {quantity_linked}")   
 
         elif algo == 'min_gain':
-            # need to link all short sells with zero or less gain. then link long sells by min gain. then link anything left over.
+            # need to link all short sells with zero or less gain. then link long sells by min gain. then link anything left over.                    
             quantity_linked = 0.0
-
             for key in buys.keys():
                 buys[key].sort(key=lambda x: x.time_stamp)
-                buys[key].sort(key=lambda x: x.usd_spot)
+                buys[key].sort(key=lambda x: x.usd_spot)                               
             
             for key in sells.keys():
                 sells[key].sort(key=lambda x: x.time_stamp)
                 sells[key].sort(key=lambda x: x.unlinked_quantity)
                 sells[key].sort(key=lambda x: x.usd_spot, reverse=True)
-
-            keys = list(sells.keys())
-            keys.sort()
-            for key in keys:
-                links = []
-
-                for sell in sells[key]:
-                                                
-                    # break if sell has no remaining unlinked quantity
-                    if sell.unlinked_quantity <= min_unlinked:
-                        continue
-
-                    min_gain_batch = []
-                    potential_sale_quantity = sell.unlinked_quantity
-                    target_quantity = potential_sale_quantity
-                    potential_sale_usd_spot = sell.usd_spot
-
-                    # All Linkable Buys 
-                    linkable_buys = [
-                            trans for trans in buys[key]
-                            if trans.trans_type == "buy"
-                            and trans.symbol == key
-                            and (sell.time_stamp > trans.time_stamp)
-                            and trans.unlinked_quantity > min_unlinked
-                    ]
-
-                    linkable_buys.sort(key=lambda trans: trans.usd_spot, reverse=True)
-
-                    for trans in linkable_buys:
-                        buy_unlinked_quantity = trans.unlinked_quantity
-                        
-                        # Determine max link quantity
-                        if target_quantity <= buy_unlinked_quantity:
-                            link_quantity = target_quantity
-                        
-                        elif target_quantity >= buy_unlinked_quantity:
-                            link_quantity = buy_unlinked_quantity
-
-                        link_quantity = round_decimals_down(link_quantity)
-                        target_quantity -= link_quantity
-
-                        #determine if we should skip link 
-                        cost_basis = link_quantity * float(trans.usd_spot)
-                        proceeds = link_quantity * potential_sale_usd_spot
-                        gain_or_loss = proceeds - cost_basis
-                        if abs(gain_or_loss) < 0.01:
-                            continue
-
-                        min_gain_batch.append([trans, round_decimals_down(link_quantity)])
-
-                        if target_quantity <= min_unlinked:
-                            break
-                    
-                    for i in min_gain_batch:
-                        link = sell.link_transaction(i[0], i[1])
-                        links.append(link)
-                        quantity_linked += link.quantity
-            
-            
-            print(f"added {quantity_linked}")
-                               
-        if pre_check:
-            for trans in self.transactions:
-                if asset is not None:
-                    if trans.symbol != asset:
-                        continue
                 
                 for link in links:
                     for trans_link in trans.links:
@@ -739,9 +671,8 @@ class Transactions:
                             trans.links.remove(trans_link)
 
         
-        return failures
+        return failures           
                             
-
     def convert_buys_to_lost(self, asset, amount):
         # method used to deal with crypto not sold on exchange but no longer in possession
 
@@ -761,14 +692,12 @@ class Transactions:
                 if trans.trans_type == 'buy':
                     bought += trans.quantity
 
-
             for trans in self.transactions:
                 if trans.symbol != asset:
                     continue
                 
                 if amount > 0 and trans.quantity <= amount and trans.trans_type == 'buy':
                     # Convert buy to lost
-                  
                     conversion = Conversion(input_trans_type='buy', 
                                             output_trans_type='lost', 
                                             input_symbol=asset, 
@@ -788,15 +717,12 @@ class Transactions:
         for trans in self.transactions:
             trans.update_linked_transactions()
             trans.set_multi_link()
-
         
         # print(f" Num of transactions to delete {len(buys_to_delete)} ")
         # print(f" Num of transactions before delete {len(self.transactions)} ")
-        
-
+                                       
         for trans in buys_to_delete:
             self.transactions.remove(trans)
-
     
         # print(f" Num of transactions after delete {len(self.transactions)} ")
         
@@ -806,19 +732,14 @@ class Transactions:
         for trans in self.transactions:
             if trans.symbol != asset:
                 continue
-
+    
             if trans.trans_type == 'buy':
                 bought_after += trans.quantity
-
     
         print(f"AFTER CONVERSION bought {bought_after} {asset}")
-
-
-    
-
+            
     def convert_sends_to_sells(self, asset, amount_to_convert):
         # method used to deal with crypto not sold on exchange but no longer in possession
-        ##### Sort these
 
         if asset in self.assets:
             
@@ -834,7 +755,7 @@ class Transactions:
             sold = 0.0
             quantity_of_sends_converted_to_sells = 0.0
             inital_amount_to_convert = amount_to_convert
-
+  
             self.transactions.sort(key=lambda x: x.time_stamp)
 
             for trans in self.transactions:
@@ -844,7 +765,7 @@ class Transactions:
                 if trans.trans_type == "sell":
                     sold += trans.quantity
                     continue
-        
+
                 if trans.trans_type == "buy":
                     bought += trans.quantity
                     continue
@@ -857,24 +778,21 @@ class Transactions:
                 #     continue
 
                 if amount_to_convert > 0 and trans.quantity <= amount_to_convert and trans.trans_type == 'send':
-
                     if type(trans.usd_spot) != float:
                         print(f"skipping transaction {trans.name} because no usd_spot")
                         continue
-                    
+
                     # Check if converting send to sell can be covered by buys
                     # if_send_is_converted = sold + trans.quantity
                     # difference = bought - if_send_is_converted
-
+    
                     # if difference < 0:
                     #     if received < difference:
                     #         continue
-
+    
                     sell = Sell(symbol=trans.symbol, quantity=trans.quantity, time_stamp=trans.time_stamp, usd_spot=trans.usd_spot, linked_transactions=trans.linked_transactions, source="Gainz App Send to Sale")
 
                     self.transactions.append(sell)
-
-
                     auto_link_failures = self.auto_link(asset=asset, algo='fifo', pre_check=True)
                     auto_link_failures.extend(self.auto_link(asset=asset, algo='filo', pre_check=True))
                     
@@ -885,7 +803,6 @@ class Transactions:
 
                     # elif len(auto_link_failures) > 1:
                     #     print('More than 1 failures we done messed up!')
-
 
                     sold += sell.quantity
 
@@ -907,15 +824,14 @@ class Transactions:
                     
                     amount_to_convert -= trans.quantity
 
-
         for trans in self.transactions:
             trans.update_linked_transactions()
-            trans.set_multi_link()
+            trans.set_multi_link()        
         
         # print(f"\n\nSuccessfully Converted {quantity_of_sends_converted_to_sells} in Sends to Sells in {len(sends_to_delete)} transactions!!\n\n")
         # print(f" Num of transactions to delete {len(sends_to_delete)} ")
         # print(f" Num of transactions before delete {len(self.transactions)} ")
-        
+
         for trans in sends_to_delete:
             self.transactions.remove(trans)
 
@@ -942,8 +858,7 @@ class Transactions:
         # print(f"AFTER CONVERSION Sold {sold_after} {asset}")
         # print(f"AFTER CONVERSION Sent {sent_after} {asset}")
         # print(f"AFTER CONVERSION Unaccounted for {amount_to_convert} {asset}")
-
-
+                    
         return f"\nSuccessfully Converted {quantity_of_sends_converted_to_sells} in Sends to Sells in {len(sends_to_delete)} transactions!!\n"
 
 
@@ -958,27 +873,24 @@ class Transactions:
             # what we want to calc
             received = 0.0
             quantity_of_receives_converted_to_buys = 0.0
-
+ 
             for trans in self.transactions:
                 if trans.symbol != asset:
                     continue
 
                 if trans.trans_type == 'receive':
                     received += trans.quantity
-
-
+            
             for trans in self.transactions:
                 if trans.symbol != asset:
                     continue
-
+            
                 # if trans.trans_type == 'receive':
                     # print(f" Candidate Found for Receive to Buy!!! {trans.name} {trans.quantity} ")
                     # print(amount_to_convert)
                 
                 if amount_to_convert > 0 and amount_to_convert <= amount_to_convert and trans.trans_type == 'receive':
                     # Convert receive to buy
-
-                    
 
                     buy = Buy(symbol=trans.symbol, quantity=trans.quantity, time_stamp=trans.time_stamp, usd_spot=trans.usd_spot, linked_transactions=trans.linked_transactions, source="Gainz App Receive to Buy")
                   
@@ -990,7 +902,7 @@ class Transactions:
                                             input_usd_spot=trans.usd_spot, 
                                             input_usd_total=trans.usd_total, 
                                             reason="Current HODL Receive to buy")
-                    
+
                     self.conversions.append(conversion)
 
                     self.transactions.append(buy)
@@ -999,7 +911,6 @@ class Transactions:
 
                     quantity_of_receives_converted_to_buys += trans.quantity
 
-
         for trans in self.transactions:
             trans.update_linked_transactions()
             trans.set_multi_link()
@@ -1007,12 +918,10 @@ class Transactions:
         
         # print(f" Num of transactions to delete {len(receives_to_delete)} ")
         # print(f" Num of transactions before delete {len(self.transactions)} ")
-        
 
         for trans in receives_to_delete:
             self.transactions.remove(trans)
 
-    
         # print(f" Num of transactions after delete {len(self.transactions)} ")
         
         # what we want to calc a second time
@@ -1021,19 +930,19 @@ class Transactions:
         for trans in self.transactions:
             if trans.symbol != asset:
                 continue
-
+            
+            # what we want to calc
             if trans.trans_type == 'buy':
                 bought_after += trans.quantity
 
-    
         print(f"AFTER CONVERSION bought {bought_after} {asset}")
 
-
-
+    
     def load_saves(self):
 
         saves = []
         revision_num = None
+
         match_object = "saved_"
 
         view_num = 1
@@ -1041,17 +950,15 @@ class Transactions:
             for f in files:
 
                 save_as_filename = os.path.join(basedir, 'saves', f)
-
                 if match_object in f and f.endswith('xlsx'):
                     workbook = load_workbook(filename=save_as_filename)
                     if 'Description' in workbook.sheetnames:
                         sheet = workbook['Description']
                         description = sheet.cell(column=1, row=1).value
                         revision_num = sheet.cell(column=2, row=1).value
-
                     else:
                         description = ""
-                    
+
                     saves.append({'label': save_as_filename, 'value': save_as_filename, 'description': description, 'revision_num': revision_num})
                     view_num += 1
 
@@ -1059,11 +966,11 @@ class Transactions:
         
         return saves
 
-    @property    
+    @property
     def assets(self):
 
         assets = set()
-    
+
         for trans in self.transactions:
             assets.add(trans.symbol)
 
@@ -1080,11 +987,11 @@ class Transactions:
             if revision_num is not None:
                 self.revision_num = revision_num
 
-        # Read Previously saved data into pandas df - Transactions
+        # Read Previously saved data into pandas df - Transactions    
         trans_df = pd.read_excel(filename, sheet_name='All Transactions', converters = {'my_str_column': list})
         # trans_df['linked_transactions'] = trans_df['linked_transactions'].apply(lambda x: literal_eval(str(x)))
         trans_df.reset_index(inplace=True)
-        
+
         # Read Previously saved data into pandas df - Conversions
         conversion_df = pd.read_excel(filename, sheet_name='Conversions', converters = {'my_str_column': list})
         conversion_df.reset_index(inplace=True)
@@ -1111,7 +1018,7 @@ class Transactions:
         send_df.sort_values(by='time_stamp', inplace=True)
         receive_df.sort_values(by='time_stamp', inplace=True)
 
-        # Objects >
+        # Objects > 
         sells = []
         buys = []
         sends = []
@@ -1119,9 +1026,7 @@ class Transactions:
         conversions = []
         asset_objects = []
 
-
         # Load Transactions into Objects
-        
         # Load Sells
         for index, row in sell_df.iterrows():
             trans_obj = Sell(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'], source=row['source'])
@@ -1143,7 +1048,7 @@ class Transactions:
         for index, row in receive_df.iterrows():
             # buys.append(Buy(symbol='BTC', quantity=row['Quantity Transacted'], time_stamp=row['Timestamp'], usd_spot=row['Spot Price at Transaction']))
             receives.append(Receive(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'], source=row['source']))
-        
+
         # Load Conversions
         for index, row in conversion_df.iterrows():
             conversions.append(Conversion(
@@ -1155,7 +1060,7 @@ class Transactions:
                 input_usd_spot=row['usd_spot'],
                 input_usd_total=row['usd_total'],
                 reason=row['reason'],
-                source=row['source']               
+                source=row['source']
                 )
             )
 
@@ -1164,7 +1069,6 @@ class Transactions:
             asset_objects.append(Asset(symbol=row['symbol'], hodl=row['hodl']))
 
         self.asset_objects = asset_objects
-
         imported_transactions = buys + sells + sends + receives
 
         # Duplicates check
@@ -1172,7 +1076,7 @@ class Transactions:
         for trans in imported_transactions:
             transactions.add(trans)
 
-        # Multi-Link Indicator
+        # Multi-Link Indicators
         for trans in transactions:
             trans.update_linked_transactions()
             trans.set_multi_link()
@@ -1188,15 +1092,14 @@ class Transactions:
 
             buy_obj = None
             sell_obj = None
-            
-            for trans in self.transactions:
 
+            for trans in self.transactions:
                 if trans.name == sell:
                     # print(f'Sell Found {trans.name}')
                     if trans.trans_type == 'sell':
                         sell_obj = trans
 
-                elif trans.name == buy:                
+                elif trans.name == buy:
                     # print(f'Buy Found {trans.name}')
                     if trans.trans_type == 'buy':
                         buy_obj = trans
@@ -1213,16 +1116,14 @@ class Transactions:
 
         return list(transactions)
 
-
     def filter(self, symbols, options):
 
         trans_in_view = set()
-        
-        for trans in self.transactions:
 
+        for trans in self.transactions:
             # if symbol in view
             if trans.symbol in symbols:
-            
+                
                 # if has_link in options
                 if 'has_link' in options:
                     if len(trans.links) > 0:
@@ -1235,7 +1136,6 @@ class Transactions:
                 if 'no_link' in options:
                     if len(trans.links) == 0:
                         trans_in_view.add(trans)
-                        
 
         return list(trans_in_view)
 
@@ -1260,23 +1160,20 @@ class Transactions:
         # for link in self.links:
             # print(f"\nQuantity of link on Save {link.quantity} \n   buy quantity {link.buy.quantity} unlinked {link.buy.unlinked_quantity} \n   sell quantity {link.sell.quantity} unlinked {link.sell.unlinked_quantity}")
 
-        
         with pd.ExcelWriter(save_as_filename,  engine = 'xlsxwriter') as writer:
             # links_df.to_excel(writer, sheet_name="Links")
             # trans_df.to_excel(writer, sheet_name="All Transactions")
             conversion_df.to_excel(writer, sheet_name="Conversions")
             asset_df.to_excel(writer, sheet_name="Assets")
             
-
         # Saving workbook description
         workbook = load_workbook(filename=save_as_filename)
         sheet = workbook.create_sheet('Description')
         sheet.cell(row=1, column=1, value=description)
-        revision_num = self.revision_num
+        revision_num = self.revision_num        
         if revision_num is None:
             revision_num = 0
         sheet.cell(row=1, column=2, value=revision_num + 1)
-
 
         # Trying creating links outside of pd
         sheet = workbook.create_sheet('Links')
@@ -1294,8 +1191,7 @@ class Transactions:
             sheet.cell(row=index, column=4, value=str(l.sell))
             sheet.cell(row=index, column=5, value=l.symbol)
             index += 1
-
-
+                
         # Trying creating transactions outside of pd ( no changes noticed reverting)
         sheet = workbook.create_sheet('All Transactions')
         sheet.cell(row=1, column=1, value='symbol')
@@ -1305,7 +1201,6 @@ class Transactions:
         sheet.cell(row=1, column=5, value='source')
         sheet.cell(row=1, column=6, value='trans_type')
         sheet.cell(row=1, column=7, value='fee')
-
 
         index = 2
         for t in self.transactions:
@@ -1328,16 +1223,13 @@ class Transactions:
         
         return save_as_filename
 
-
     def delete(self, filename):
         os.rename(filename, f"{filename}.bak")
-
 
     def export_to_excel(self, asset=None, date_range=None, by_year=True):
 
         # Idea to programatically create Excel Links, Fancy ;-)
         # =HYPERLINK("[Export_Y2021-M03-D06_H19-M34.xlsx]Links!A20","Display Text")
-        
         save_as_filename = os.path.join(basedir, "Exports", f"Export_{strftime('Y%Y-M%m-D%d_H%H-M%M')}.xlsx")
         
         # Template to use
@@ -1349,7 +1241,6 @@ class Transactions:
         t8949_sheet = workbook['8949']
         sales_sheet = workbook['Sales']
 
-        
         # Get Years
         years = set()
         for link in self.links:
@@ -1358,7 +1249,6 @@ class Transactions:
         # Sales
         for year in years:
             print(f'exporting sales for {year}')
-
 
             sheetname = f'{year} Sales'
             ws = workbook.copy_worksheet(sales_sheet)
@@ -1376,13 +1266,11 @@ class Transactions:
                 source = None
                 gain_loss = 0
 
-
                 if trans.trans_type != "sell":
                     continue
 
                 if trans.time_stamp.year != year:
                     continue
-                
 
                 description = f"{trans.quantity} of {trans.symbol}"
                 
@@ -1397,23 +1285,19 @@ class Transactions:
                     
                     for link in trans.links:
 
-
                         gain_loss += link.profit_loss
                         if link.hodl_duration.days < 365:
                             all_long = False
                         else:
                             all_short = False
-                    
+                            
                     if all_long is False and all_short is False:
                         acquired += " Long and Short"
-
                     elif all_long is True:
                         acquired += " All Long"
-                    
                     elif all_short is True:
                         acquired += " All Short"
 
-                        
                 else:
                     gain_loss = trans.links[0].profit_loss
                     acquired = trans.links[0].buy.time_stamp
@@ -1434,9 +1318,7 @@ class Transactions:
 
                 ws[f"E{row}"] = cost_basis
                 ws[f"E{row}"].number_format = '"$"#,##0.00_-'
-
                 gain_loss = proceeds - cost_basis
-
                 ws[f"F{row}"] = gain_loss
                 ws[f"F{row}"].number_format = '"$"#,##0.00_-'
 
@@ -1461,7 +1343,7 @@ class Transactions:
 
                 if abs(link.profit_loss) <= 1:
                     continue
-                
+
                 if link.hodl_duration.days > 365:
                     continue
 
@@ -1480,7 +1362,6 @@ class Transactions:
 
             if row == 2:
                 workbook.remove(ws)
-
             else:
                 row += 2
 
@@ -1501,7 +1382,7 @@ class Transactions:
             years.add(link.sell.time_stamp.year)
 
         for year in years:
-            
+
             sheetname = f'{year} 8949 Long'
             ws = workbook.copy_worksheet(t8949_sheet)
             ws.title = sheetname
@@ -1533,7 +1414,6 @@ class Transactions:
 
             if row == 2:
                 workbook.remove(ws)
-
             else:
                 row += 2
 
@@ -1548,7 +1428,7 @@ class Transactions:
 
 
         for asset in self.assets:
-            
+
             # Conversions sheet
             sheetname = f'{asset} Conversions'
             conversions_sheet = workbook.copy_worksheet(c_sheet)
@@ -1557,7 +1437,7 @@ class Transactions:
             column_names = []
             for cell in conversions_sheet[3]:
                 column_names.append(cell.value)
-            
+
             in_trans_type_index = column_names.index("In Transaction Type") + 1
             out_trans_type_index = column_names.index("Out Transaction Type") + 1
             symbol_index = column_names.index("Symbol") + 1
@@ -1569,7 +1449,7 @@ class Transactions:
 
             row = 4
             for conversion in self.conversions:
-                
+
                 if conversion.symbol != asset:
                     continue
 
@@ -1591,7 +1471,6 @@ class Transactions:
 
             if row == 4:
                 workbook.remove(conversions_sheet)
-
 
             # Gainz Sheet
             column_names = []
@@ -1641,7 +1520,7 @@ class Transactions:
                     
                     if link.symbol != asset:
                         continue
-                        
+
                     if link.sell.time_stamp.year != year:
                         continue
 
@@ -1649,7 +1528,7 @@ class Transactions:
                         continue
 
                     profit_loss_total += float(link.profit_loss)
-                    
+
                     links_sheet.cell(row=row, column=link_symbol_index, value=link.sell.symbol)
                     links_sheet.cell(row=row, column=link_id_index, value=link.id)
                     links_sheet.cell(row=row, column=buy_id_index, value=link.buy.id)
@@ -1668,7 +1547,7 @@ class Transactions:
                     links_sheet.cell(row=row, column=buy_link_usd_index).number_format = '"$"#,##0.00_-'
 
                     links_sheet.cell(row=row, column=link_quantity_index, value=link.quantity)
-                    
+
                     links_sheet.cell(row=row, column=link_profit_loss_index, value=link.profit_loss)
                     links_sheet.cell(row=row, column=link_profit_loss_index).number_format = '"$"#,##0.00_);[Red]("$"#,##0.00)'
 
@@ -1678,13 +1557,12 @@ class Transactions:
                     links_sheet.cell(row=row, column=sell_date_index, value=link.sell.time_stamp)
                     links_sheet.cell(row=row, column=sell_quantity_index, value=link.sell.quantity)
                     links_sheet.cell(row=row, column=sell_unlinked_index, value=link.sell.unlinked_quantity)
-
                     links_sheet.cell(row=row, column=sell_usd_spot_index, value=link.sell.usd_spot)
                     links_sheet.cell(row=row, column=sell_usd_spot_index).number_format = '"$"#,##0.00_-'
 
                     links_sheet.cell(row=row, column=sell_usd_total_index, value=link.sell.usd_total)
                     links_sheet.cell(row=row, column=sell_usd_total_index).number_format = '"$"#,##0.00_-'
-                    
+
                     links_sheet.cell(row=row, column=sell_multi_link_index, value=link.sell.multi_link)
                     links_sheet.cell(row=row, column=buy_multi_link_index, value=link.buy.multi_link)
                     
@@ -1719,7 +1597,7 @@ class Transactions:
                     links_sheet.cell(row=row, column=link_quantity_index, value=trans.unlinked_quantity)
 
                     links_sheet.cell(row=row, column=link_profit_loss_index, value=(trans.unlinked_quantity * trans.usd_spot))
-                    links_sheet.cell(row=row, column=link_profit_loss_index).number_format = '"$"#,##0.00_);[Red]("$"#,##0.00)'
+                    links_sheet.cell(row=row, column=link_profit_loss_index).number_format = '"$"#,##0.00_);[Red]("$"#,##0.00)"'
                     
                     links_sheet.cell(row=row, column=sell_link_usd_index, value=trans.usd_total)
                     links_sheet.cell(row=row, column=sell_link_usd_index).number_format = '"$"#,##0.00_-'
@@ -1737,12 +1615,11 @@ class Transactions:
                     links_sheet.cell(row=row, column=buy_multi_link_index, value="N/A")
 
                     row += 1
-                    
 
                 row += 2
 
                 links_sheet.cell(row=row, column=link_profit_loss_index, value="Profit/Loss Total: ${:,.2f}".format(profit_loss_total)) 
-
+                
                 if row == 4:
                     workbook.remove(links_sheet)
 
@@ -1758,7 +1635,7 @@ class Transactions:
             id_index = column_names.index("Transaction ID") + 1
             symbol_index = column_names.index("Symbol") + 1
             trans_type_index = column_names.index("Transaction Type") + 1
-            time_stamp_index = column_names.index("Time Stamp") + 1 
+            time_stamp_index = column_names.index("Time Stamp") + 1
             quantity_index = column_names.index("Quantity") + 1
             links_index = column_names.index("Links") + 1
             unlinked_index = column_names.index("Unlinked") + 1
@@ -1778,13 +1655,11 @@ class Transactions:
                 all_trans_sheet.cell(row=row, column=time_stamp_index, value=trans.time_stamp)
                 all_trans_sheet.cell(row=row, column=quantity_index, value=trans.quantity)
                 all_trans_sheet.cell(row=row, column=unlinked_index, value=trans.unlinked_quantity)
-
                 all_trans_sheet.cell(row=row, column=usd_spot_index, value=trans.usd_spot)
                 all_trans_sheet.cell(row=row, column=usd_spot_index).number_format = '"$"#,##0.00_-'
 
                 all_trans_sheet.cell(row=row, column=usd_total_index, value=trans.usd_total)
                 all_trans_sheet.cell(row=row, column=usd_total_index).number_format = '"$"#,##0.00_-'
-
                 all_trans_sheet.cell(row=row, column=source_index, value=trans.source)
 
                 if len(trans.links) > 0:
@@ -1795,12 +1670,10 @@ class Transactions:
             if row == 2:
                 workbook.remove(all_trans_sheet)
 
-
             # Links Sheet
             sheetname = f'{asset} Stats'
             asset_stats_sheet = workbook.copy_worksheet(s_sheet)
             asset_stats_sheet.title = sheetname
-
 
             date_range = {
                 'start_date': '',
@@ -1846,7 +1719,6 @@ class Transactions:
                 asset_stats_sheet.cell(row=row, column=2).number_format = '"$"#,##0.00_-'
                 
                 row += 1
-
         
         workbook.remove(a_sheet)
         workbook.remove(c_sheet)
@@ -1855,12 +1727,10 @@ class Transactions:
         workbook.remove(t8949_sheet)
         workbook.remove(sales_sheet)
             
-            
         workbook.save(save_as_filename)
         print(f"Saving to {save_as_filename}")
 
         return save_as_filename
-
 
         
     def import_transaction(self, type, timestamp, quantity):
@@ -1875,10 +1745,9 @@ class Transactions:
 
         return trans
 
-
     def import_transactions(self, contents, filename):
 
-        # Objects 
+        # Objects
         sells = []
         buys = []
         sends = []
@@ -1895,7 +1764,6 @@ class Transactions:
                 if 'csv' in filename:
                     if 'cash_app' in filename.lower():
                         trans_df = pd.read_csv(contents, on_bad_lines='skip')
-                        
                     elif 'coinbasetransactions' in filename.lower() or 'coinbase-transactions' in filename.lower():
                         trans_df = pd.read_csv(contents, on_bad_lines='skip', skip_blank_lines=False, header=7)
                     elif 'coinbase' in filename.lower() and 'pro' in filename.lower():
@@ -1907,17 +1775,15 @@ class Transactions:
                 elif 'xls' in filename or 'xlsx' in filename:
                     # Assume that the user uploaded an excel file
                     trans_df = pd.read_excel(io.BytesIO(decoded))
-                
             except Exception as e:
                 print(e)
-        else:
+        else:    
             try:
                 if 'csv' in filename:
                     if 'cash_app' in filename.lower():
                         trans_df = pd.read_csv(contents, on_bad_lines='skip')
                     elif 'coinbasetransactions' in filename.lower() or 'coinbase-transactions' in filename.lower():
                         trans_df = pd.read_csv(contents, on_bad_lines='skip', skip_blank_lines=False, header=7)
-
                     elif 'coinbase' in filename.lower() and 'pro' in filename.lower():
                         trans_df = pd.read_csv(contents, on_bad_lines='skip')
                     elif 'kraken' in filename.lower():
@@ -1936,13 +1802,11 @@ class Transactions:
 
         # print(f"Base Dir in import transactions {basedir}")
         # pathlib.Path(os.path.join(basedir, "saves")).mkdir(parents=True, exist_ok=True) 
-
         save_as_filename = os.path.join(basedir, "saves", f"saved_{strftime('Y%Y-M%m-D%d_H%H-M%M-S%S')}.xlsx")
 
         # Import from CashApp csv
 
         if 'cash_app' in filename.lower():
-
             # print("Date Found in columns")
             trans_df.rename(columns={'Date': 'Timestamp', 'Asset Type': 'Asset', 'Asset Amount': 'Quantity Transacted', 'Asset Price': 'Spot Price at Transaction'}, inplace=True)
             
@@ -1982,12 +1846,10 @@ class Transactions:
 
             # Buys
             for index, row in buy_df.iterrows():
-
                 trans_obj = Buy(symbol=row['Asset'], quantity=row['Quantity Transacted'], time_stamp=row['Timestamp'], usd_spot=row['Spot Price at Transaction'], source=row['Source'])
                 duplicate_found = False
                 trans_obj.fee = row['Fee'][2:]
                 trans_obj.fee = trans_obj.fee
-                
                 for trans in self.conversions:
                     if (
                         trans.input_trans_type == trans_obj.trans_type
@@ -2038,7 +1900,7 @@ class Transactions:
                 if duplicate_found is False:
                     receives.append(trans_obj)
 
-
+            #import from coinbase csv
         #import from coinbase csv
         elif 'coinbase-transactions' in filename.lower() or 'coinbasetransactions' in filename.lower():
 
@@ -2060,7 +1922,7 @@ class Transactions:
             # Sells
             for index, row in sell_df.iterrows():
                 duplicate_found = False
-                
+
                 trans_obj = Sell(symbol=row['Asset'], quantity=row['Quantity Transacted'], time_stamp=row['Timestamp'], usd_spot=row['Spot Price at Transaction'], source=row['Source'])
                 trans_obj.fee = row['Fee']
 
@@ -2092,9 +1954,9 @@ class Transactions:
                         and trans.quantity == trans_obj.quantity
                         and trans.usd_spot == trans_obj.usd_spot
                         and trans.usd_total == math.floor(trans_obj.usd_total * 10 ** 10) / 10 ** 10 
-                    ): 
+                    ):
 
-                        duplicate_found is True
+                        duplicate_found = True
 
                 if duplicate_found is False:
                     buys.append(trans_obj)
@@ -2135,11 +1997,9 @@ class Transactions:
                 if duplicate_found is False:
                     receives.append(trans_obj)
 
-
             # Converts
             convert_df.reset_index(inplace=True)
             for index, row in convert_df.iterrows():
-
                 symbol=row['Asset']
                 quantity=row['Quantity Transacted']
                 time_stamp=row['Timestamp']
@@ -2151,7 +2011,7 @@ class Transactions:
                 usd_total = row['Total (inclusive of fees and/or spread)']
 
                 notes = row['Notes']
-
+                
                 buy_quantity = float(notes.split()[4])
                 buy_asset = notes.split()[5]
 
@@ -2167,7 +2027,7 @@ class Transactions:
             threads = list()
             trans_df.sort_values(by=['trade id'], inplace=True)
             trans_df.reset_index(inplace=True)
-            
+
             for index,row in trans_df.iterrows():
                 
                 quantity = None
@@ -2185,9 +2045,9 @@ class Transactions:
 
                 timestamp = dateutil.parser.parse(row['time'])
                 timestamp = timestamp.replace(tzinfo=None)
-                
+
                 symbol = row['amount/balance unit']
-                
+
                 # Received Crypto
                 if row['amount/balance unit'] != 'USD' and row['type'] == 'deposit':
                     trans_obj = Receive(symbol=symbol, quantity=abs(row['amount']), time_stamp=timestamp, usd_spot=0.0, source=filename)
@@ -2199,11 +2059,10 @@ class Transactions:
                     trans_obj = Receive(symbol=symbol, quantity=abs(row['amount']), time_stamp=timestamp, usd_spot=0.0, source=filename)
                     sends.append(trans_obj)
                     continue
-            
+
                 # Row is buy with USD
                 elif row['amount/balance unit'] == 'USD' and row['type'] == 'match' and float(row['amount']) < 0:
                     amount_in_usd = row['amount']
-
 
                 # Row is Sell for USD
                 elif row['amount/balance unit'] == 'USD' and row['type'] == 'match' and float(row['amount']) > 0:
@@ -2217,7 +2076,6 @@ class Transactions:
                     pair_one_symbol = symbol
                     pair_one_quantity = quantity
 
-                
                 # Row is Crypto Bought
                 elif row['amount/balance unit'] != 'USD' and row['type'] == 'match' and row['amount'] > 0:
                     symbol = row['amount/balance unit']
@@ -2228,16 +2086,14 @@ class Transactions:
 
                 i = 1
                 while (index + i <= trans_df.index[-1]) and str(trans_df.loc[index + i]['trade id']) == trade_id:
-                                                        
+                    
                     # Row is buy with USD
                     if trans_df.loc[index + i]['amount/balance unit'] == 'USD' and trans_df.loc[index + i]['type'] == 'match' and trans_df.loc[index + i]['amount'] < 0:
                         amount_in_usd =  trans_df.loc[index + i]['amount']
-
                         
                     # Row is Sell for USD
                     elif trans_df.loc[index + i]['amount/balance unit'] == 'USD' and trans_df.loc[index + i]['type'] == 'match' and trans_df.loc[index + i]['amount'] > 0:
                         amount_in_usd =  trans_df.loc[index + i]['amount']
-
                     
                     # Row is crypto sold
                     elif trans_df.loc[index + i]['amount/balance unit'] != 'USD' and  trans_df.loc[index + i]['type'] == 'match' and  trans_df.loc[index + i]['amount'] < 0:
@@ -2247,7 +2103,6 @@ class Transactions:
                         pair_two_is_crypto = True
                         pair_two_symbol = symbol
                         pair_two_quantity = quantity
-
 
                     # Row is Crypto Bought
                     elif trans_df.loc[index + i]['amount/balance unit'] != 'USD' and  trans_df.loc[index + i]['type'] == 'match' and  trans_df.loc[index + i]['amount'] > 0:
@@ -2267,21 +2122,18 @@ class Transactions:
                                 print(f"Sold {abs(pair_one_quantity)} {pair_one_symbol} for {abs(pair_two_quantity)} {pair_two_symbol} ")
                             else:
                                 print(f"Sold {abs(pair_two_quantity)} {pair_two_symbol} for {abs(pair_one_quantity)} {pair_one_symbol} ")
-                            
                         else:
                             # print(f"Found a buy or Sell")
                             time_stamp = dateutil.parser.parse(row['time'])
-                            
+
                             if amount_in_usd > 0:
                                 # print(f"Found a {symbol} Sell")
                                 sell = Sell(symbol=symbol, quantity=abs(quantity), time_stamp=time_stamp, usd_spot=0.0, source=filename)
                                 sells.append(sell)
-                                
                             else:
                                 # print(f"Found a {symbol} Buy")
                                 buy = Buy(symbol=symbol, quantity=abs(quantity), time_stamp=time_stamp, usd_spot=0.0, source=filename)
                                 buys.append(buy)
-                        
                         break
             
             # Get price from coinbase API
@@ -2317,6 +2169,7 @@ class Transactions:
                 kraken_symbol = row['pair']
                 first_symbol = kraken_symbol[:-4]
                 second_symbol = kraken_symbol[-4:]
+
                 if first_symbol.startswith('X'):
                     symbol = first_symbol[1:]
                     if symbol == 'XBT':
@@ -2332,7 +2185,6 @@ class Transactions:
                     symbol = first_symbol[1:]
                     if symbol == 'XBT':
                         symbol = 'BTC'
-
 
                 trans_obj = Sell(symbol=symbol, quantity=row['vol'], time_stamp=row['Timestamp'], usd_spot=row['price'], source=row['Source'])
                 duplicate_found = False
@@ -2352,12 +2204,12 @@ class Transactions:
 
             # Buys
             for index, row in buy_df.iterrows():
-                
+
                 # Get Symbols
                 kraken_symbol = row['pair']
                 first_symbol = kraken_symbol[:-4]
                 second_symbol = kraken_symbol[-4:]
-                
+
                 # print(first_symbol, ' ', second_symbol)
                 if first_symbol.startswith('X'):
                     symbol = first_symbol[1:]
@@ -2373,7 +2225,6 @@ class Transactions:
                     symbol = first_symbol[1:]
                     if symbol == 'XBT':
                         symbol = 'BTC'
-                
                 
                 trans_obj = Buy(symbol=symbol, quantity=row['vol'], time_stamp=row['Timestamp'], usd_spot=row['price'], source=row['Source'])
                 
@@ -2392,7 +2243,6 @@ class Transactions:
                 if duplicate_found is False:
                     buys.append(trans_obj)
 
-
         # Dedup and merge Transactions
         if self.transactions:
             starting = len(self.transactions)
@@ -2400,7 +2250,6 @@ class Transactions:
             imported_transactions =  buys + sells + sends + receives
             
             deduped_transactions = set()
-
             for trans in self.transactions:
                 deduped_transactions.add(trans)
 
@@ -2408,7 +2257,6 @@ class Transactions:
                 deduped_transactions.add(trans)
 
             self.transactions = list(deduped_transactions)
-            
             ending = len(self.transactions)
             added = ending - starting
             imported = len(imported_transactions)
@@ -2426,9 +2274,7 @@ class Transactions:
         
         self.asset_objects = assets
 
-
         self.save(description="Imported from CSV")
-
         print(f"\nImported Transactions Saving to {save_as_filename}\n")
 
         return save_as_filename
@@ -2465,7 +2311,7 @@ class Transactions:
 
     def last_transaction_date(self, asset=None):
         all_trans = {}
-        
+
         # Sort into Buys a Sells
         for trans in self.transactions:
 
@@ -2478,10 +2324,8 @@ class Transactions:
             if trans.symbol not in all_trans.keys():
                 all_trans[trans.symbol] = []
 
-
             all_trans[trans.symbol].append(trans)
 
-        
         # Sort By Time Stamp
         for key in all_trans.keys():
             all_trans[key].sort(key=lambda x: x.time_stamp)
@@ -2490,7 +2334,7 @@ class Transactions:
         last_time_stamps = {}
         for key in all_trans.keys():
             last_time_stamps[key] = all_trans[key][-1].time_stamp
-            
+
         # print(last_time_stamps)
         # print(f"Last Transaction Date for {key}: {all_trans[key][-1].time_stamp}")
 
@@ -2501,7 +2345,7 @@ class Transactions:
             csv_reader = csv.DictReader(file)
             for row in csv_reader:
                 symbol = row['Asset Type']
-                quantity = float(row['Asset Amount']) if row['Asset Amount'] else 0.0
+                quantity = float(row['Asset Amount']) if row['Asset Amount'] else 0.0        
 
                 # Convert string to datetime
                 time_stamp = parser.parse(row['Date'])
@@ -2525,11 +2369,8 @@ class Transactions:
                 self.transactions.append(transaction)
 
 if __name__ == "__main__":
-
     transactions = Transactions()
-
     asset = "BTC"
-
     buys = [trans for trans in transactions if trans.symbol == asset and trans.trans_type == "buy"]
     sells = [trans for trans in transactions if trans.symbol == asset and trans.trans_type == "sell"]
     sends = [trans for trans in transactions if trans.symbol == asset and trans.trans_type == "send"]
@@ -2561,9 +2402,7 @@ if __name__ == "__main__":
         sold_quantity += s.quantity
         sold_unlinked += s.unlinked_quantity
 
-
     print(f"\n bought {bought_quantity} \n sent {sent_quantity} \n received {received_quantity} \n sold {sold_quantity} \n sold unlinked {sold_unlinked} \n bought unlinked {bought_unlinked}")
-
 
     transactions.auto_link(asset=None, algo='fifo')
 
@@ -2576,6 +2415,7 @@ if __name__ == "__main__":
     sends.sort(key=lambda x: x.time_stamp)
     receives.sort(key=lambda x: x.time_stamp)
 
+    
     sent_quantity = 0.0
     received_quantity = 0.0
     bought_quantity = 0.0
@@ -2597,10 +2437,8 @@ if __name__ == "__main__":
         sold_quantity += s.quantity
         sold_unlinked += s.unlinked_quantity
 
-
     print(f"\n bought {bought_quantity} \n sent {sent_quantity} \n received {received_quantity} \n sold {sold_quantity} \n sold unlinked {sold_unlinked} \n bought unlinked {bought_unlinked}")
 
-    
     filename = transactions.save()
     transactions.load(filename=filename)
 
@@ -2613,7 +2451,7 @@ if __name__ == "__main__":
     sends.sort(key=lambda x: x.time_stamp)
     receives.sort(key=lambda x: x.time_stamp)
 
-    
+
     sent_quantity = 0.0
     received_quantity = 0.0
     bought_quantity = 0.0
@@ -2635,10 +2473,14 @@ if __name__ == "__main__":
         sold_quantity += s.quantity
         sold_unlinked += s.unlinked_quantity
 
-
     print(f"\n\n bought {bought_quantity} \n sent {sent_quantity} \n received {received_quantity} \n sold {sold_quantity} \n sold unlinked {sold_unlinked} \n bought unlinked {bought_unlinked}")
 
     transactions.import_transactions('LOCAL_TAX_FILE_REMOVED')
+
+@lru_cache(maxsize=1024)
+def calculate_gain(sell, buy):
+    return sell.usd_spot * sell.quantity - buy.usd_spot * buy.quantity
+
 
 
 
