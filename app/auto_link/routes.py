@@ -1,4 +1,3 @@
-
 from . import blueprint
 from flask import Flask, render_template, session, redirect, url_for, session, request, current_app
 from flask_wtf import FlaskForm
@@ -39,7 +38,7 @@ def auto_link():
 @login_required
 def auto_link_asset():
     transactions = current_app.config['transactions']
-        
+    
     print(request.json)
     
     if 'asset' in request.json:
@@ -52,8 +51,7 @@ def auto_link_asset():
     if year == 'All Time':
         year = None
     else:
-        year = year
-
+        year = int(year)  # Ensure year is an integer
 
     algo_type = request.json['algo']
 

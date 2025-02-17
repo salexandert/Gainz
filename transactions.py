@@ -414,15 +414,15 @@ class Transactions:
                     'end_date': f"12/31/{year} 11:59 PM"
                     }
 
-                start_date = datetime.datetime.strptime(date_range['start_date'], "%m/%d/%Y %H:%M %p")
-                end_date = datetime.datetime.strptime(date_range['end_date'], "%m/%d/%Y %H:%M %p")
+                start_date = datetime.datetime.strptime(date_range['start_date'], "%m/%d/%Y %H:%M %p").replace(tzinfo=None)
+                end_date = datetime.datetime.strptime(date_range['end_date'], "%m/%d/%Y %H:%M %p").replace(tzinfo=None)
                                                                         
                 # Filter Transactions to date range
                 for key in sells.keys():
                     filtered_transactions = []
                     for trans in sells[key]:
-
-                        if trans.time_stamp >= start_date and trans.time_stamp <= end_date:              
+                        trans_time_stamp = trans.time_stamp.replace(tzinfo=None)
+                        if trans_time_stamp >= start_date and trans_time_stamp <= end_date:              
                             filtered_transactions.append(trans)
 
                     sells[key] = filtered_transactions
@@ -431,10 +431,10 @@ class Transactions:
         if algo == 'fifo':
             # sort buys and sells by time_stamp
             for key in buys.keys():
-                buys[key].sort(key=lambda x: x.time_stamp)
+                buys[key].sort(key=lambda x: x.time_stamp.replace(tzinfo=None))
             
             for key in sells.keys():
-                sells[key].sort(key=lambda x: x.time_stamp)
+                sells[key].sort(key=lambda x: x.time_stamp.replace(tzinfo=None))
 
             keys = list(sells.keys())
             keys.sort()
@@ -462,7 +462,7 @@ class Transactions:
                                 continue
                                                     
                             # check if buy came before sell
-                            if buy.time_stamp >= sell.time_stamp:
+                            if buy.time_stamp.replace(tzinfo=None) >= sell.time_stamp.replace(tzinfo=None):
                                 continue
 
                             # Link 

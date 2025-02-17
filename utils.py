@@ -344,21 +344,31 @@ def get_stats_table_data_range(transactions, date_range=None):
 
         start_date = date_range['start_date']
         end_date = date_range['end_date']
+
+        # Ensure start_date and end_date are offset-naive
+        if start_date.tzinfo is not None:
+            start_date = start_date.replace(tzinfo=None)
+        if end_date.tzinfo is not None:
+            end_date = end_date.replace(tzinfo=None)
   
-                                                                                                                      
         # Filter Transactions to date range
         filtered_transactions = []
         for trans in transactions:
+            trans_time_stamp = trans.time_stamp
+            # Ensure trans_time_stamp is offset-naive
+            if trans_time_stamp.tzinfo is not None:
+                trans_time_stamp = trans_time_stamp.replace(tzinfo=None)
+
             if start_date and not end_date:
-                if trans.time_stamp >= start_date:
+                if trans_time_stamp >= start_date:
                     filtered_transactions.append(trans)
 
             elif not start_date and end_date:
-                if trans.time_stamp <= end_date:
+                if trans_time_stamp <= end_date:
                     filtered_transactions.append(trans)
 
             elif start_date and end_date:
-                if trans.time_stamp >= start_date and trans.time_stamp <= end_date:              
+                if trans_time_stamp >= start_date and trans_time_stamp <= end_date:              
                     filtered_transactions.append(trans)
 
         
