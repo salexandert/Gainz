@@ -29,7 +29,7 @@ def index():
     return render_template('stats_page.html', stats_table_data=stats_table_data, date_range=date_range, years=years)
 
 
-@blueprint.route('/selected_asset',  methods=['POST'])
+@blueprint.route('/selected_asset', methods=['POST'])
 @login_required
 def selected_asset():
     # Populate Links, Sells, Buys Tables based on selected asset from stats table
@@ -84,273 +84,37 @@ def selected_asset():
         ["Quantity Received", asset_stats['total_received_quantity']],
     ]
 
-    # # Get Linked Table Data
-    # linked_table_data = get_linked_table_data(transactions, asset, date_range)
+    # Get Linked Table Data
+    linked_table_data = get_linked_table_data(transactions, asset, date_range)
 
-    # Sells table 
-    start_date = date_range['start_date']
-    end_date = date_range['end_date']
-                                                                
-    # Filter Transactions to date range
-    filtered_transactions = []
-    for trans in transactions:
-        if trans.symbol != asset:
-            continue
+    # Get Sells Table Data 
+    sells_table_data = get_sells_trans_table_data_range(transactions, asset, date_range)
 
-        if start_date and not end_date:
-            if trans.time_stamp >= start_date:
-                filtered_transactions.append(trans)
-
-        elif not start_date and end_date:
-            if trans.time_stamp <= end_date:
-                filtered_transactions.append(trans)
-
-        elif start_date and end_date:
-            if trans.time_stamp >= start_date and trans.time_stamp <= end_date:              
-                filtered_transactions.append(trans)
-
-
-    # Get Sales Table 
-    sales_table_data = []
-    proceeds_total = 0
-    cost_basis_total = 0
-    gain_loss_total = 0
-    for trans in filtered_transactions:
-        
-        description = f"{trans.quantity} of {trans.symbol}"
-        acquired = None
-        sold_date = None
-        proceeds = None 
-        cost_basis = 0
-        # source = None
-        gain_loss = 0
-
-        if trans.trans_type != "sell":
-            continue
-        
-        if type(year) == int:
-            if trans.time_stamp.year != int(year):
+    sells_unlinked_remaining = []
+    if request.json['unlinked_remaining']:
+        for sell in sells_table_data:
+            if type(sell[4]) is str:
                 continue
-        
-        if len(trans.links) == 0:
-            continue
-        
-        elif len(trans.links) > 1:
-            acquired = "Multiple Dates"
-            all_short = True
-            all_long = True
-            
-            for link in trans.links:
 
-                gain_loss += link.profit_loss
-                if link.hodl_duration.days < 365:
-                    all_long = False
-                else:
-                    all_short = False
-            
-            if all_long is False and all_short is False:
-                acquired += " Long and Short"
+            if sell[4] > 0.000000009:
+                sells_unlinked_remaining.append(sell)
 
-            elif all_long is True:
-                acquired += " All Long"
-            
-            elif all_short is True:
-                acquired += " All Short"
-     
-        else:
-            gain_loss = trans.links[0].profit_loss
-            acquired = trans.links[0].buy.time_stamp
-    
-        for link in trans.links:
-            cost_basis += link.cost_basis + link.buy.fee
-    
-        proceeds = trans.usd_total - float(trans.fee)
-        gain_loss = proceeds - cost_basis
-        sold_date = trans.time_stamp
+        sells_table_data = sells_unlinked_remaining
 
-        proceeds_total  += proceeds
-        cost_basis_total += cost_basis
-        gain_loss_total += gain_loss
-        
-        sales_table_data.append([
-            description,
-            acquired,
-            sold_date,
-            "${:,.2f}".format(proceeds),           
-            "${:,.2f}".format(cost_basis),
-            "${:,.2f}".format(gain_loss),
-            trans.source])
-    
-    sales_table_data.insert(0, [
-        "Totals",
-        "",
-        "",
-        "${:,.2f}".format(proceeds_total),           
-        "${:,.2f}".format(cost_basis_total),
-        "${:,.2f}".format(gain_loss_total),
-        ""
-    ])
+    # Get Buys Table Data
+    buys_table_data = get_buys_trans_table_data_range(transactions, asset, date_range)
 
-    
-    # Get links
-    links = set([
-            link 
-            for trans in filtered_transactions
-            for link in trans.links
-            ])
-    
-    # Get 8949 Long
-    s8949_table_data = []
-    proceeds_total = 0
-    cost_basis_total = 0
-    gain_loss_total = 0
-    for link in links:
-        if link.hodl_duration.days <= 365:
-            continue
-
-
-        proceeds_total  += link.proceeds
-        cost_basis_total += link.cost_basis
-        gain_loss_total += link.profit_loss
-        s8949_table_data.append([
-            f"{link.quantity} of {link.symbol}",
-            link.buy.time_stamp,
-            link.sell.time_stamp,
-            "${:,.2f}".format(link.proceeds),           
-            "${:,.2f}".format(link.cost_basis),
-            "${:,.2f}".format(link.profit_loss),
-            link.buy.source
-            
-        ])
-    s8949_table_data.insert(0, [
-        "Totals",
-        "",
-        "",
-        "${:,.2f}".format(proceeds_total),           
-        "${:,.2f}".format(cost_basis_total),
-        "${:,.2f}".format(gain_loss_total),
-        ""
-    ])
-
-    # Get 8949 Short
-    l8949_table_data = []
-    proceeds_total = 0
-    cost_basis_total = 0
-    gain_loss_total = 0
-    for link in links:
-        if link.hodl_duration.days > 365:
-            continue
-
-        proceeds_total  += link.proceeds
-        cost_basis_total += link.cost_basis
-        gain_loss_total += link.profit_loss
-        l8949_table_data.append([
-            f"{link.quantity} of {link.symbol}",
-            link.buy.time_stamp,
-            link.sell.time_stamp,
-            "${:,.2f}".format(link.proceeds),           
-            "${:,.2f}".format(link.cost_basis),
-            "${:,.2f}".format(link.profit_loss),
-            link.buy.source
-            
-        ])
-    l8949_table_data.insert(0, [
-        "Totals",
-        "",
-        "",
-        "${:,.2f}".format(proceeds_total),           
-        "${:,.2f}".format(cost_basis_total),
-        "${:,.2f}".format(gain_loss_total),
-        ""
-    ])
-    
-
-
-    # Chart Data
-    start_date = date_range['start_date']
-    end_date = date_range['end_date']
-  
-                                                                                                                      
-    # Filter Transactions to date range
-    filtered_transactions = []
-    for trans in transactions:
-        if trans.symbol != asset:
-            continue
-
-        if start_date and not end_date:
-            if trans.time_stamp >= start_date:
-                filtered_transactions.append(trans)
-
-        elif not start_date and end_date:
-            if trans.time_stamp <= end_date:
-                filtered_transactions.append(trans)
-
-        elif start_date and end_date:
-            if trans.time_stamp >= start_date and trans.time_stamp <= end_date:              
-                filtered_transactions.append(trans)
-
-
-    unrealized_chart_data = []
-
-    to_date_quantity = 0.0
-    to_date_usd_total = 0.0
-    filtered_transactions.sort(key=lambda x: x.time_stamp)
-    for trans in filtered_transactions:
-
-        if trans.trans_type == 'buy':
-        
-            to_date_quantity += trans.quantity
-            to_date_usd_total += trans.usd_total
-            gain_loss = (to_date_quantity * trans.usd_spot) - to_date_usd_total
-            to_date_profit = (to_date_quantity * trans.usd_spot)
-
-            unrealized_chart_data.append({
-                'x': datetime.datetime.strftime(trans.time_stamp, "%Y-%m-%d %H:%M:%S"), 
-                'y': to_date_profit, 
-                'quantity': to_date_quantity, 
-                'usd_spot': "${:,.2f}".format(trans.usd_spot),
-                'cost_baisis': "${:,.2f}".format(to_date_usd_total),
-                'gain_loss': "${:,.2f}".format(gain_loss)
-                })
-
-        elif trans.trans_type == 'sell':
-
-            to_date_quantity -= trans.quantity
-            to_date_usd_total -= trans.usd_total
-            gain_loss = (to_date_quantity * trans.usd_spot) - to_date_usd_total
-            to_date_profit = (to_date_quantity * trans.usd_spot)
-
-            unrealized_chart_data.append({
-                'x': datetime.datetime.strftime(trans.time_stamp, "%Y-%m-%d %H:%M:%S"), 
-                'y': to_date_profit, 
-                'quantity': to_date_quantity, 
-                'usd_spot':  "${:,.2f}".format(trans.usd_spot),
-                'cost_baisis': "${:,.2f}".format(to_date_usd_total),
-                'gain_loss': "${:,.2f}".format(gain_loss)
-                })
-
-    if 'current_usd_spot' in request.json:
-        usd_spot = float(request.json['current_usd_spot'].replace(',', ''))
-        to_date_profit = (to_date_quantity * usd_spot)
-        gain_loss = (to_date_quantity * usd_spot) - to_date_usd_total
-        
-        unrealized_chart_data.append({
-                'x': strftime("%Y-%m-%d %H:%M:%S"), 
-                'y': to_date_profit, 
-                'quantity': to_date_quantity, 
-                'usd_spot':  "${:,.2f}".format(usd_spot),
-                'cost_baisis': "${:,.2f}".format(to_date_usd_total),
-                'gain_loss': "${:,.2f}".format(gain_loss)
-                })
+    # Get All Links Table Data
+    all_links_table_data = get_all_links_table_data(transactions, asset)
 
     data_dict = {}
 
+    data_dict['all_links'] = all_links_table_data
     data_dict['detailed_stats'] = detailed_stats
-    data_dict['s8949_table_data'] = s8949_table_data
-    data_dict['l8949_table_data'] = l8949_table_data
-    data_dict['sells_table_data'] = sales_table_data
-    data_dict['unrealized_chart_data'] = unrealized_chart_data
-
+    data_dict['linked'] = linked_table_data
+    data_dict['sells'] = sells_table_data
+    data_dict['buys'] = buys_table_data
+    
     return jsonify(data_dict)
 
 

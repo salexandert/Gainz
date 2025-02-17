@@ -1,4 +1,3 @@
-
 import datetime
 from transaction import Transaction
 from dateutil.tz import tzutc
@@ -6,9 +5,17 @@ import requests
 import datetime
 import os
 import math
+from dateutil import parser
+from dateutil.tz import gettz
 
 os.environ['REQUESTS_CA_BUNDLE'] = "certifi/cacert.pem"
 
+# Define the timezone information
+tzinfos = {
+    'PDT': gettz('America/Los_Angeles'),
+    'PST': gettz('America/Los_Angeles'),
+    # Add other timezones as needed
+}
 
 def fetch_crypto_price(trans):
 
@@ -243,7 +250,7 @@ def get_linked_table_data(transactions, asset, date_range):
     # Get linked Table Data
     linked_table_data = []
     for link in links:
-               
+        cost_basis = link.cost_basis + (link.buy.fee if link.buy.fee is not None else 0)
         linked_table_data.append([
             link.quantity,
             "${:,.2f}".format(link.profit_loss),
@@ -254,10 +261,8 @@ def get_linked_table_data(transactions, asset, date_range):
             link.sell.time_stamp,
             link.sell.quantity,
             "${:,.2f}".format(link.sell.usd_total),
-            
         ])
 
-    
     return linked_table_data
 
 
@@ -802,7 +807,7 @@ def get_trans_obj_from_table_data(transactions, symbol, trans_type, quantity, ti
             
             else:
                 trans2_time_stamp = trans.time_stamp.to_pydatetime()
-                time_stamp = time_stamp.replace(tzinfo=tzutc())
+                time_stamp = parser.parse(time_stamp, tzinfos=tzinfos)
                 trans2_time_stamp = trans2_time_stamp.replace(tzinfo=tzutc())
                 # trans2_time_stamp = trans2_time_stamp.replace(microsecond=0)
 

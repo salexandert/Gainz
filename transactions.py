@@ -21,6 +21,7 @@ import time
 import threading
 import csv
 from dateutil import parser
+from dateutil.tz import gettz
 from functools import lru_cache
 
 
@@ -2341,14 +2342,20 @@ class Transactions:
         return last_time_stamps
 
     def import_transactions(self, file_path):
+        tzinfos = {
+            'PDT': gettz('America/Los_Angeles'),
+            'PST': gettz('America/Los_Angeles'),
+            # Add other timezones as needed
+        }
+
         with open(file_path, mode='r', encoding='utf-8', errors='replace') as file:
             csv_reader = csv.DictReader(file)
             for row in csv_reader:
                 symbol = row['Asset Type']
                 quantity = float(row['Asset Amount']) if row['Asset Amount'] else 0.0        
 
-                # Convert string to datetime
-                time_stamp = parser.parse(row['Date'])
+                # Convert string to datetime with timezone info
+                time_stamp = parser.parse(row['Date'], tzinfos=tzinfos)
 
                 usd_spot_str = row['Asset Price']
                 usd_spot = float(usd_spot_str.replace('$', '').replace(',', '')) if usd_spot_str else 0.0
