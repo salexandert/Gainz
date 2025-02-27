@@ -5,14 +5,14 @@ from flask_login import login_required, current_user
 from wtforms import (SelectField,StringField,
                      SubmitField, DecimalField, DateField)
 
-from wtforms.fields.html5 import DateField
+from wtforms.fields import DateField
 from transaction import Buy, Sell
 import json
 from werkzeug.utils import secure_filename
 from flask import jsonify
 from conversion import Conversion
 
-from wtforms.fields.html5 import DateTimeLocalField
+from wtforms.fields import DateTimeLocalField
 from utils import *
 
 import dateutil.parser

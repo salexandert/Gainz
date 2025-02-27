@@ -35,13 +35,15 @@ def register_blueprints(app):
 
 def configure_database(app):
 
-    @app.before_first_request
+    @app.before_request
     def initialize_database():
-        db.create_all()
-        admin_username = app.config['ADMIN']['username']
-        user = User.query.filter_by(username=admin_username).first()
-        if user: user.delete_from_db()
-        User(**app.config['ADMIN']).add_to_db()
+        if not hasattr(app, 'db_initialized'):
+            db.create_all()
+            admin_username = app.config['ADMIN']['username']
+            user = User.query.filter_by(username=admin_username).first()
+            if user: user.delete_from_db()
+            User(**app.config['ADMIN']).add_to_db()
+            app.db_initialized = True
 
     @app.teardown_request
     def shutdown_session(exception=None):
