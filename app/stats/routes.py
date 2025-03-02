@@ -34,7 +34,8 @@ def index():
 def selected_asset():
     # Populate Links, Sells, Buys Tables based on selected asset from stats table
 
-    # print(request.json)
+    # Debug logging
+    current_app.logger.debug('Request JSON: %s', request.json)
 
     transactions = current_app.config['transactions']
     year = request.json['year']
@@ -51,8 +52,14 @@ def selected_asset():
 
     date_range = get_transactions_date_range(transactions, date_range)
 
+    # Debug logging
+    current_app.logger.debug('Date Range: %s', date_range)
+
     # get stats table data 
     stats_table_data = get_stats_table_data_range(transactions, date_range)
+
+    # Debug logging
+    current_app.logger.debug('Stats Table Data: %s', stats_table_data)
 
     # get stats for selected asset
     asset_stats = None
@@ -62,7 +69,8 @@ def selected_asset():
             break 
     asset = asset_stats['symbol']
 
-    # print(asset_stats)
+    # Debug logging
+    current_app.logger.debug('Asset Stats: %s', asset_stats)
 
     # Create detailed stats table data
     detailed_stats = [

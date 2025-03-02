@@ -23,6 +23,7 @@ import csv
 from dateutil import parser
 from dateutil.tz import gettz
 from functools import lru_cache
+import zipfile
 
 
 whois_timezone_info = {
@@ -511,7 +512,7 @@ class Transactions:
                 buys[key].sort(key=lambda x: x.time_stamp, reverse=True)
             
             for key in sells.keys():
-                sells[key].sort(key=lambda x: x.time_stamp)
+                sells[key].sort(key=lambda x: x.time_stamp.replace(tzinfo=None))
 
             keys = list(sells.keys())
             keys.sort()
@@ -535,7 +536,7 @@ class Transactions:
                                 continue
 
                             # check if buy came before sell
-                            if buy.time_stamp >= sell.time_stamp:
+                            if buy.time_stamp.replace(tzinfo=None) >= sell.time_stamp.replace(tzinfo=None):
                                 continue
 
                             # Link 
@@ -575,10 +576,10 @@ class Transactions:
 
         elif algo == 'min_gain_long':
             for key in buys.keys():
-                buys[key].sort(key=lambda x: x.time_stamp)
+                buys[key].sort(key=lambda x: x.time_stamp.replace(tzinfo=None))
             
             for key in sells.keys():
-                sells[key].sort(key=lambda x: x.time_stamp)
+                sells[key].sort(key=lambda x: x.time_stamp.replace(tzinfo=None))
                 sells[key].sort(key=lambda x: x.unlinked_quantity)
                 sells[key].sort(key=lambda x: x.usd_spot)
 
@@ -658,11 +659,11 @@ class Transactions:
             # need to link all short sells with zero or less gain. then link long sells by min gain. then link anything left over.                    
             quantity_linked = 0.0
             for key in buys.keys():
-                buys[key].sort(key=lambda x: x.time_stamp)
+                buys[key].sort(key=lambda x: x.time_stamp.replace(tzinfo=None))
                 buys[key].sort(key=lambda x: x.usd_spot)                               
             
             for key in sells.keys():
-                sells[key].sort(key=lambda x: x.time_stamp)
+                sells[key].sort(key=lambda x: x.time_stamp.replace(tzinfo=None))
                 sells[key].sort(key=lambda x: x.unlinked_quantity)
                 sells[key].sort(key=lambda x: x.usd_spot, reverse=True)
                 
@@ -757,7 +758,7 @@ class Transactions:
             quantity_of_sends_converted_to_sells = 0.0
             inital_amount_to_convert = amount_to_convert
   
-            self.transactions.sort(key=lambda x: x.time_stamp)
+            self.transactions.sort(key=lambda x: x.time_stamp.replace(tzinfo=None))
 
             for trans in self.transactions:
                 if trans.symbol != asset:
@@ -952,6 +953,10 @@ class Transactions:
 
                 save_as_filename = os.path.join(basedir, 'saves', f)
                 if match_object in f and f.endswith('xlsx'):
+                    # Check if the file is a valid zip file
+                    if not zipfile.is_zipfile(save_as_filename):
+                        print(f"File {save_as_filename} is not a zip file")
+                        continue
                     workbook = load_workbook(filename=save_as_filename)
                     if 'Description' in workbook.sheetnames:
                         sheet = workbook['Description']
@@ -979,6 +984,10 @@ class Transactions:
 
     # Load Previous Data returns view options
     def load(self, filename=None):
+
+        # Check if the file is a valid zip file
+        if not zipfile.is_zipfile(filename):
+            raise zipfile.BadZipFile(f"File {filename} is not a zip file")
 
         workbook = load_workbook(filename=filename)
         if 'Description' in workbook.sheetnames:
@@ -1147,26 +1156,21 @@ class Transactions:
         for trans in self.transactions:
             trans.update_linked_transactions()
             trans.set_multi_link()
+            # Ensure datetime objects have tzinfo set to None
+            trans.time_stamp = trans.time_stamp.replace(tzinfo=None)
+            for link in trans.links:
+                link.buy.time_stamp = link.buy.time_stamp.replace(tzinfo=None)
+                link.sell.time_stamp = link.sell.time_stamp.replace(tzinfo=None)
         
         trans_df = pd.DataFrame([vars(s) for s in self.transactions])
         conversion_df = pd.DataFrame([vars(s) for s in self.conversions])
         asset_df = pd.DataFrame([vars(s) for s in self.asset_objects])
 
-        # for link in self.links:
-        #     print(f"Link Quantity before save {link.quantity}")
-
-
-        # links_df = pd.DataFrame([vars(s) for s in self.links])
-
-        # for link in self.links:
-            # print(f"\nQuantity of link on Save {link.quantity} \n   buy quantity {link.buy.quantity} unlinked {link.buy.unlinked_quantity} \n   sell quantity {link.sell.quantity} unlinked {link.sell.unlinked_quantity}")
-
         with pd.ExcelWriter(save_as_filename,  engine = 'xlsxwriter') as writer:
-            # links_df.to_excel(writer, sheet_name="Links")
-            # trans_df.to_excel(writer, sheet_name="All Transactions")
+            trans_df.to_excel(writer, sheet_name="All Transactions")
             conversion_df.to_excel(writer, sheet_name="Conversions")
             asset_df.to_excel(writer, sheet_name="Assets")
-            
+        
         # Saving workbook description
         workbook = load_workbook(filename=save_as_filename)
         sheet = workbook.create_sheet('Description')
@@ -1213,7 +1217,6 @@ class Transactions:
             sheet.cell(row=index, column=6, value=t.trans_type)
             sheet.cell(row=index, column=7, value=t.fee)
             index += 1
-
 
         workbook.save(save_as_filename)
         workbook.close()
@@ -2298,12 +2301,12 @@ class Transactions:
 
         # Sort By Time Stamp
         for key in all_trans.keys():
-            all_trans[key].sort(key=lambda x: x.time_stamp)
+            all_trans[key].sort(key=lambda x: x.time_stamp.replace(tzinfo=None))
 
         # Extract first transaction Date
         first_time_stamps = {}
         for key in all_trans.keys():
-            first_time_stamps[key] = all_trans[key][0].time_stamp
+            first_time_stamps[key] = all_trans[key][0].time_stamp.replace(tzinfo=None)
             
             # print(first_time_stamps)
             # print(f"First Transaction Date for {key}: {all_trans[key][0].time_stamp}")
@@ -2329,12 +2332,12 @@ class Transactions:
 
         # Sort By Time Stamp
         for key in all_trans.keys():
-            all_trans[key].sort(key=lambda x: x.time_stamp)
+            all_trans[key].sort(key=lambda x: x.time_stamp.replace(tzinfo=None))
 
         # Extract Last transaction Date
         last_time_stamps = {}
         for key in all_trans.keys():
-            last_time_stamps[key] = all_trans[key][-1].time_stamp
+            last_time_stamps[key] = all_trans[key][-1].time_stamp.replace(tzinfo=None)
 
         # print(last_time_stamps)
         # print(f"Last Transaction Date for {key}: {all_trans[key][-1].time_stamp}")

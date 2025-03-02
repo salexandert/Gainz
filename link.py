@@ -1,4 +1,5 @@
 import itertools
+import math
 
 class Link:
 
@@ -12,7 +13,10 @@ class Link:
         self.trans1 = self.transactions[0]
         self.trans2 = self.transactions[1]
 
-        if self.trans1.unlinked_quantity < quantity or self.trans2.unlinked_quantity < quantity:
+        tolerance = 1e-9  # Tolerance for floating-point comparison
+
+        if (self.trans1.unlinked_quantity + tolerance < quantity or
+                self.trans2.unlinked_quantity + tolerance < quantity):
             raise ValueError(f"Quantity of link [{quantity}] is greater than\
                 \ntrans 1 Type [{self.trans1.trans_type}] [{self.trans1.symbol}] unlinked [{self.trans1.unlinked_quantity}]\
                 \nor trans 2 Type [{self.trans2.trans_type}] [{self.trans2.symbol}] unlinked quantity [{self.trans2.unlinked_quantity}]")
