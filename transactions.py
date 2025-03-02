@@ -1040,13 +1040,17 @@ class Transactions:
         # Load Sells
         for index, row in sell_df.iterrows():
             trans_obj = Sell(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'], source=row['source'])
-            trans_obj.fee = row['fee']
+            # Check if 'fee' column exists before accessing it
+            if 'fee' in row:
+                trans_obj.fee = row['fee']
             sells.append(trans_obj)
 
         # Load Buys
         for index, row in buy_df.iterrows():
             trans_obj = Buy(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'],  source=row['source'])
-            trans_obj.fee = row['fee']
+            # Check if 'fee' column exists before accessing it
+            if 'fee' in row:
+                trans_obj.fee = row['fee']
             buys.append(trans_obj)
 
         # Load Sends

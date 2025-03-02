@@ -99,7 +99,7 @@ def selected_asset():
     sells_table_data = get_sells_trans_table_data_range(transactions, asset, date_range)
 
     sells_unlinked_remaining = []
-    if request.json['unlinked_remaining']:
+    if 'unlinked_remaining' in request.json and request.json['unlinked_remaining']:
         for sell in sells_table_data:
             if type(sell[4]) is str:
                 continue
@@ -108,6 +108,9 @@ def selected_asset():
                 sells_unlinked_remaining.append(sell)
 
         sells_table_data = sells_unlinked_remaining
+    else:
+        # handle the case where 'unlinked_remaining' is not present or False
+        pass
 
     # Get Buys Table Data
     buys_table_data = get_buys_trans_table_data_range(transactions, asset, date_range)
