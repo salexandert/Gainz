@@ -226,16 +226,21 @@ def get_linked_table_data(transactions, asset, date_range):
             if trans.symbol != asset:
                 continue
 
+        # Ensure all datetime objects are offset-naive for comparison
+        start_date = start_date.replace(tzinfo=None) if start_date.tzinfo else start_date
+        end_date = end_date.replace(tzinfo=None) if end_date.tzinfo else end_date
+        trans_time_stamp = trans.time_stamp.replace(tzinfo=None) if trans.time_stamp.tzinfo else trans.time_stamp
+
         if start_date and not end_date:
-            if trans.time_stamp >= start_date:
+            if trans_time_stamp >= start_date:
                 filtered_transactions.append(trans)
 
         elif not start_date and end_date:
-            if trans.time_stamp <= end_date:
+            if trans_time_stamp <= end_date:
                 filtered_transactions.append(trans)
 
         elif start_date and end_date:
-            if trans.time_stamp >= start_date and trans.time_stamp <= end_date:              
+            if trans_time_stamp >= start_date and trans_time_stamp <= end_date:              
                 filtered_transactions.append(trans)
 
     # Get links
@@ -885,5 +890,9 @@ def round_decimals_down(number:float, decimals:int=8):
 
     factor = 10 ** decimals
     return math.floor(number * factor) / factor
+
+# This module will handle general utility functions.
+
+# Add utility functions here, e.g., for rounding decimals or handling time zones.
 
 

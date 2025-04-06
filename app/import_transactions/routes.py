@@ -20,6 +20,7 @@ import dateutil.parser
 from flask import Blueprint, request
 from werkzeug.utils import secure_filename
 from transactions import Transactions
+from parsers import import_transactions
 
 import_transactions_bp = Blueprint('import_transactions', __name__)
 
@@ -61,7 +62,7 @@ def import_wizard():
             filename = secure_filename(file.filename)
             file_path = f'LOCAL_TAX_UPLOAD_REMOVED'
             file.save(file_path)
-            transactions.import_transactions(file_path)
+            import_transactions(file_path, transactions)
 
         # Current Hodl
         if current_hodl.validate_on_submit():
