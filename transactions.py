@@ -332,6 +332,100 @@ class Transactions:
         self.view = save_as_filename
         
         return save_as_filename
+    
+    def export_to_excel(self):
+        """
+        Export transactions data to an Excel file specifically formatted for reporting.
+        This is different from save() method which is used for saving the application state.
+        
+        Returns:
+            str: Path to the exported Excel file
+        """
+        export_filename = os.path.join(basedir, "exports", f"Gainz_Export_{strftime('Y%Y-M%m-D%d_H%H-M%M-S%S')}.xlsx")
+        
+        # Create exports directory if it doesn't exist
+        os.makedirs(os.path.join(basedir, "exports"), exist_ok=True)
+        
+        # Prepare data for export
+        for trans in self.transactions:
+            trans.update_linked_transactions()
+            trans.set_multi_link()
+            # Make a copy of the timestamp without timezone info for Excel compatibility
+            if trans.time_stamp is not None:
+                trans.time_stamp = trans.time_stamp.replace(tzinfo=None)
+                
+        # Create DataFrames from transaction data
+        trans_df = pd.DataFrame([vars(s) for s in self.transactions])
+        conversion_df = pd.DataFrame([vars(s) for s in self.conversions])
+        asset_df = pd.DataFrame([vars(s) for s in self.asset_objects])
+        
+        # Start with main export sheets
+        with pd.ExcelWriter(export_filename, engine='xlsxwriter') as writer:
+            trans_df.to_excel(writer, sheet_name="All Transactions")
+            conversion_df.to_excel(writer, sheet_name="Conversions")
+            asset_df.to_excel(writer, sheet_name="Assets")
+              # Add a summary sheet
+            # Group by symbol and transaction type
+            if not trans_df.empty:
+                # Check if 'usd_total' column exists, otherwise calculate it from quantity * usd_spot
+                if 'usd_total' not in trans_df.columns:
+                    trans_df['usd_total'] = trans_df['quantity'] * trans_df['usd_spot']
+                
+                summary = trans_df.groupby(['symbol', 'trans_type']).agg({
+                    'quantity': 'sum',
+                    'usd_total': 'sum'
+                }).reset_index()
+                summary.to_excel(writer, sheet_name="Summary")
+                
+            # Create year-specific tax sheets (8949 format)
+            current_year = pd.Timestamp.now().year
+            for year in range(2017, current_year + 1):
+                # Filter to sells in this year
+                if not trans_df.empty:
+                    year_sells = trans_df[
+                        (trans_df['trans_type'] == 'sell') & 
+                        (pd.to_datetime(trans_df['time_stamp']).dt.year == year)
+                    ]
+                    
+                    if not year_sells.empty:
+                        # Create short-term and long-term sheets
+                        year_sells.to_excel(writer, sheet_name=f"8949_{year}")
+        
+        # Add more detail with openpyxl
+        workbook = load_workbook(filename=export_filename)
+        
+        # Add export information sheet
+        sheet = workbook.create_sheet('Export Info')
+        sheet.cell(row=1, column=1, value="Export Date")
+        sheet.cell(row=1, column=2, value=pd.Timestamp.now())
+        sheet.cell(row=2, column=1, value="Total Transactions")
+        sheet.cell(row=2, column=2, value=len(self.transactions))
+        sheet.cell(row=3, column=1, value="Total Conversions")
+        sheet.cell(row=3, column=2, value=len(self.conversions))
+        
+        # Add Links sheet for reference
+        sheet = workbook.create_sheet('Links')
+        sheet.cell(row=1, column=1, value='id')
+        sheet.cell(row=1, column=2, value='quantity')
+        sheet.cell(row=1, column=3, value='buy')
+        sheet.cell(row=1, column=4, value='sell')
+        sheet.cell(row=1, column=5, value='symbol')
+        
+        index = 2
+        for l in self.links:
+            sheet.cell(row=index, column=1, value=l.symbol)
+            sheet.cell(row=index, column=2, value=str(l.quantity))
+            sheet.cell(row=index, column=3, value=str(l.buy))
+            sheet.cell(row=index, column=4, value=str(l.sell))
+            sheet.cell(row=index, column=5, value=l.symbol)
+            index += 1
+        
+        # Save and close the workbook
+        workbook.save(export_filename)
+        workbook.close()
+        
+        print(f"Exported data to {export_filename}")
+        return export_filename
 
     def delete(self, filename):
         os.rename(filename, f"{filename}.bak")
@@ -363,15 +457,13 @@ class Transactions:
 
         # Sort By Time Stamp
         for key in all_trans.keys():
-            all_trans[key].sort(key=lambda x: x.time_stamp.replace(tzinfo=None))
-
-        # Extract first transaction Date
+            all_trans[key].sort(key=lambda x: x.time_stamp.replace(tzinfo=None))        # Extract first transaction Date
         first_time_stamps = {}
         for key in all_trans.keys():
             first_time_stamps[key] = all_trans[key][0].time_stamp.replace(tzinfo=None)
             
         return first_time_stamps
-
+        
     def last_transaction_date(self, asset=None):
         """
         Returns a dictionary with the last transaction date for each asset or a specific asset.
@@ -384,10 +476,9 @@ class Transactions:
             dict: A dictionary with asset symbols as keys and their last transaction dates as values.
         """
         all_trans = {}
-
-        # Sort into Buys a Sells
+        
         for trans in self.transactions:
-            # If asset is provided only filter for specified asset
+            # If asset is provided skip others
             if asset is not None:
                 if trans.symbol != asset:
                     continue
@@ -402,101 +493,78 @@ class Transactions:
         for key in all_trans.keys():
             all_trans[key].sort(key=lambda x: x.time_stamp.replace(tzinfo=None))
 
-        # Extract Last transaction Date
+        # Extract last transaction Date
         last_time_stamps = {}
         for key in all_trans.keys():
-            last_time_stamps[key] = all_trans[key][-1].time_stamp.replace(tzinfo=None)
-
+            if all_trans[key]:  # Check if the list is not empty
+                last_time_stamps[key] = all_trans[key][-1].time_stamp.replace(tzinfo=None)
+            
         return last_time_stamps
-
-    def auto_link(self, algo, asset=None, min_link=0.000001, pre_check=False, year=None):
+    
+    def auto_link(self, asset=None, algo='fifo', date_range=None, min_unlinked=0.000001):
         """
-        Automatically links buy and sell transactions based on the specified algorithm.
-
-        Args:
-            algo (str): The algorithm to use for linking transactions. Possible values are 'fifo', 'filo', 'min_gain_long', and 'min_gain'.
-            asset (str, optional): The symbol of the asset to link. If provided, only transactions with the specified symbol will be considered for linking. Defaults to None.
-            min_link (float, optional): The minimum link quantity. Transactions with a link quantity less than this value will be skipped. Defaults to 0.000001.
-            pre_check (bool, optional): Whether to perform a pre-check before linking transactions. Defaults to False.
-            year (int, optional): The year to filter transactions. Only transactions within the specified year will be considered for linking. Defaults to None.
-
-        Returns:
-            list: A list of dictionaries containing information about any failures that occurred during linking.
-        """
+        Automatically links buy and sell transactions based on specified algorithm.
         
-        sells = {}
+        Args:
+            asset (str, optional): The asset to link. If None, link all assets.
+            algo (str, optional): The algorithm to use ('fifo' or 'filo'). Defaults to 'fifo'.
+            date_range (dict, optional): Date range to filter transactions by.
+            min_unlinked (float, optional): Minimum unlinked quantity to consider. Defaults to 0.000001.
+            
+        Returns:
+            list: List of failures where sells couldn't be fully linked.
+        """
+        from dateutil import parser
+        
         buys = {}
-        min_unlinked = 0.0000001
-
-        # failures is a list of dicts
+        sells = {}
         failures = []
 
-        # Sort into Buys and Sells
+        # Get buys and sells by asset
         for trans in self.transactions:
-
-            # If asset is provided only auto-link symbol provided
-            if asset is not None:
-                if trans.symbol != asset:
-                    continue
-
-            if trans.trans_type == 'buy':
-                if trans.symbol not in buys.keys():
-                    buys[trans.symbol] = []
-
-                buys[trans.symbol].append(trans)
-
-            elif trans.trans_type == 'sell':
-                if trans.symbol not in sells.keys():
-                    sells[trans.symbol] = []
-
-                sells[trans.symbol].append(trans)
-
-            # Filter sales to a specific year
-            if year is not None and year != 'All Time':
-                date_range = {
-                    'start_date': f"01/01/{year} 12:00 AM",
-                    'end_date': f"12/31/{year} 11:59 PM"
-                    }
-
-                from dateutil import parser
+            if asset is not None and trans.symbol != asset:
+                continue
                 
-                try:
-                    # Try to import whois_timezone_info or use a default
-                    try:
-                        from parsers import tzinfos
-                    except ImportError:
-                        tzinfos = {
-                            'PDT': -7 * 3600,  # Pacific Daylight Time
-                            'PST': -8 * 3600,  # Pacific Standard Time
-                        }
+            if trans.symbol not in buys:
+                buys[trans.symbol] = []
+                sells[trans.symbol] = []
+                
+            if trans.trans_type == 'buy':
+                buys[trans.symbol].append(trans)
+            elif trans.trans_type == 'sell':
+                sells[trans.symbol].append(trans)
+        
+        # Filter by date range if provided
+        if date_range is not None:
+            try:
+                tzinfos = {"EST": -5 * 3600, "EDT": -4 * 3600}
+                start_date = parser.parse(date_range['start_date'], tzinfos=tzinfos)
+                end_date = parser.parse(date_range['end_date'], tzinfos=tzinfos)
+                
+                # Filter Transactions to date range
+                for key in sells.keys():
+                    filtered_transactions = []
+                    for trans in sells[key]:
+                        if isinstance(trans.time_stamp, str):
+                            trans_time_stamp = parser.parse(trans.time_stamp, tzinfos=tzinfos)
+                        else:
+                            trans_time_stamp = trans.time_stamp
                         
-                    start_date = parser.parse(date_range['start_date'], tzinfos=tzinfos)
-                    end_date = parser.parse(date_range['end_date'], tzinfos=tzinfos)
-                    
-                    # Filter Transactions to date range
-                    for key in sells.keys():
-                        filtered_transactions = []
-                        for trans in sells[key]:
-                            if isinstance(trans.time_stamp, str):
-                                trans_time_stamp = parser.parse(trans.time_stamp, tzinfos=tzinfos)
-                            else:
-                                trans_time_stamp = trans.time_stamp
+                        # Make all timestamps timezone-naive for comparison
+                        if hasattr(trans_time_stamp, 'tzinfo') and trans_time_stamp.tzinfo:
+                            trans_time_stamp = trans_time_stamp.replace(tzinfo=None)
+                        if hasattr(start_date, 'tzinfo') and start_date.tzinfo:
+                            start_date = start_date.replace(tzinfo=None)
+                        if hasattr(end_date, 'tzinfo') and end_date.tzinfo:
+                            end_date = end_date.replace(tzinfo=None)
                             
-                            # Make all timestamps timezone-naive for comparison
-                            if hasattr(trans_time_stamp, 'tzinfo') and trans_time_stamp.tzinfo:
-                                trans_time_stamp = trans_time_stamp.replace(tzinfo=None)
-                            if hasattr(start_date, 'tzinfo') and start_date.tzinfo:
-                                start_date = start_date.replace(tzinfo=None)
-                            if hasattr(end_date, 'tzinfo') and end_date.tzinfo:
-                                end_date = end_date.replace(tzinfo=None)
-                                
-                            if trans_time_stamp >= start_date and trans_time_stamp <= end_date:              
-                                filtered_transactions.append(trans)
+                        if trans_time_stamp >= start_date and trans_time_stamp <= end_date:              
+                            filtered_transactions.append(trans)
 
-                        sells[key] = filtered_transactions
-                        
-                except Exception as e:
-                    print(f"Error filtering by year: {e}")
+                    sells[key] = filtered_transactions
+                    
+            except Exception as e:
+                print(f"Error filtering by year: {e}")
         
         # sort for algo types
         if algo == 'fifo':
@@ -751,11 +819,12 @@ if __name__ == "__main__":
 
     for s in sells:
         sold_quantity += s.quantity
-        sold_unlinked += s.unlinked_quantity
+        sold_unlinked += s.unlinked_quantity    
+        print(f"\n\n bought {bought_quantity} \n sent {sent_quantity} \n received {received_quantity} \n sold {sold_quantity} \n sold unlinked {sold_unlinked} \n bought unlinked {bought_unlinked}")
 
-    print(f"\n\n bought {bought_quantity} \n sent {sent_quantity} \n received {received_quantity} \n sold {sold_quantity} \n sold unlinked {sold_unlinked} \n bought unlinked {bought_unlinked}")
-
-    transactions.import_transactions('LOCAL_TAX_FILE_REMOVED')
+    # Import transactions using the function from parsers.py
+    from parsers import import_transactions
+    import_transactions('LOCAL_TAX_FILE_REMOVED', transactions)
 
 @lru_cache(maxsize=1024)
 def calculate_gain(sell, buy):
