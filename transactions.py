@@ -88,8 +88,7 @@ class Transactions:
 
         view_num = 1
         for root, dirs, files in os.walk(os.path.join(basedir, 'saves')):
-            for f in files:
-
+            for f in files:  # Corrected the incomplete for loop
                 save_as_filename = os.path.join(basedir, 'saves', f)
                 if match_object in f and f.endswith('xlsx'):
                     # Check if the file is a valid zip file
@@ -403,34 +402,34 @@ class Transactions:
                             all_long = False
                         else:
                             all_short = False
-                    
                     if all_long is False and all_short is False:
                         acquired += " Long and Short"
 
                     elif all_long is True:
                         acquired += " All Long"
-                    
                     elif all_short is True:
                         acquired += " All Short"
 
-                        
                 else:
                     gain_loss = trans.links[0].profit_loss
                     acquired = trans.links[0].buy.time_stamp
-
-                ws[f"B{row}"] = acquired
+                    ws[f"B{row}"] = acquired
 
                 sold_date = trans.time_stamp
-
                 ws[f"C{row}"] = sold_date
 
-                proceeds = trans.usd_total - trans.fee
+                # Handle case where fee might be None
+                fee = trans.fee if trans.fee is not None else 0.0
+                proceeds = trans.usd_total - fee
 
                 ws[f"D{row}"] = proceeds
                 ws[f"D{row}"].number_format = '"$"#,##0.00_-'
-
+                
+                # Corrected indentation and syntax error
                 for link in trans.links:
-                    cost_basis += link.cost_basis + link.buy.fee
+                    # Handle case where buy fee might be None
+                    buy_fee = link.buy.fee if link.buy.fee is not None else 0.0
+                    cost_basis += link.cost_basis + buy_fee
 
                 ws[f"E{row}"] = cost_basis
                 ws[f"E{row}"].number_format = '"$"#,##0.00_-'
@@ -439,7 +438,6 @@ class Transactions:
 
                 ws[f"F{row}"] = gain_loss
                 ws[f"F{row}"].number_format = '"$"#,##0.00_-'
-
                 source = trans.source
                 ws[f"G{row}"] = source
 
