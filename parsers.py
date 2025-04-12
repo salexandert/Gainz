@@ -153,28 +153,40 @@ def import_transactions(file_path, transactions):
     Returns:
         tuple: (imported_count, skipped_count) Count of transactions imported and skipped due to duplicates.
     """
-    from decimal import Decimal, getcontext
-
-    # Set precision for comparing float values
+    from decimal import Decimal, getcontext    # Set precision for comparing float values
     getcontext().prec = 10
-      # Function to check if a transaction is duplicate
+    
+    # Function to check if a transaction is duplicate    
     def is_duplicate(new_trans, existing_transactions, tolerance=1e-6):
         """Check if a transaction already exists in the collection."""
         for trans in existing_transactions:
-            # Time difference less than 5 seconds (timestamps might have differences due to rounding/storage)
-            time_match = abs((new_trans.time_stamp.replace(tzinfo=None) - 
-                            trans.time_stamp.replace(tzinfo=None)).total_seconds()) < 5
+            # Calculate the time difference, but normalize within a day for timezone issues
+            time_diff_seconds = abs((new_trans.time_stamp.replace(tzinfo=None) - 
+                                  trans.time_stamp.replace(tzinfo=None)).total_seconds())
+            
+            # Check for same-day transactions (within 24h) or near-identical times (within 1 minute) for timezone conversions
+            time_match = time_diff_seconds < 60 or (time_diff_seconds % 86400) < 60
             
             # Required attributes match with more relaxed tolerance
             quantity_match = abs(trans.quantity - new_trans.quantity) < max(tolerance, tolerance * trans.quantity)
             usd_match = abs(trans.usd_spot - new_trans.usd_spot) < max(tolerance, tolerance * trans.usd_spot)
+              # For debugging - use logging instead of print statements
+            if (trans.symbol == new_trans.symbol and quantity_match and trans.trans_type == new_trans.trans_type):
+                # Get logger for parsers
+                import logging
+                logger = logging.getLogger('parsers')
+                logger.debug(f"Potential duplicate found: {trans.symbol} {trans.quantity} @ {trans.time_stamp} vs {new_trans.quantity} @ {new_trans.time_stamp}")
+                logger.debug(f"Time diff: {time_diff_seconds} seconds, time_match: {time_match}")
             
             if (trans.symbol == new_trans.symbol and
                 quantity_match and
                 usd_match and
                 trans.trans_type == new_trans.trans_type and
                 time_match):
-                print(f"Found duplicate: {new_trans.symbol} {new_trans.quantity} vs {trans.quantity}, diff={abs(trans.quantity - new_trans.quantity)}")
+                # Get logger for parsers
+                import logging
+                logger = logging.getLogger('parsers')
+                logger.info(f"Found duplicate: {new_trans.symbol} {new_trans.quantity} vs {trans.quantity}, diff={abs(trans.quantity - new_trans.quantity)}")
                 return True
         return False
 
@@ -240,10 +252,12 @@ def import_transactions(file_path, transactions):
                 else:
                     print(f"Warning: Unrecognized transaction type '{row['Transaction Type']}' - skipping record")
                     continue
-                
-                # Check for duplicates before adding
+                  # Check for duplicates before adding
                 if is_duplicate(temp_trans, transactions.transactions):
-                    print(f"Skipping duplicate transaction: {symbol} {quantity} {time_stamp}")
+                    # Use logger instead of print
+                    import logging
+                    logger = logging.getLogger('parsers')
+                    logger.info(f"Skipping duplicate transaction: {symbol} {quantity} {time_stamp}")
                     skipped_count += 1
                 else:
                     transactions.transactions.append(temp_trans)
@@ -255,16 +269,21 @@ def import_transactions(file_path, transactions):
             except Exception as e:
                 print(f"Error processing row: {e}")
                 continue
-        
-        # Save transactions if any were added
+          # Save transactions if any were added
         if transactions_added:
             description = f"Imported from {os.path.basename(file_path)}"
             transactions.save(description=description)
-            print(f"Transactions saved with description: {description}")
-            print(f"Imported {imported_count} new transactions, skipped {skipped_count} duplicates")
+            # Use logger instead of print
+            import logging
+            logger = logging.getLogger('parsers')
+            logger.info(f"Transactions saved with description: {description}")
+            logger.info(f"Imported {imported_count} new transactions, skipped {skipped_count} duplicates")
         else:
-            print("No transactions were added from the file.")
-            print(f"Skipped {skipped_count} duplicate transactions")
+            # Use logger instead of print
+            import logging
+            logger = logging.getLogger('parsers')
+            logger.info("No transactions were added from the file.")
+            logger.info(f"Skipped {skipped_count} duplicate transactions")
             
         return (imported_count, skipped_count)
             

@@ -20,10 +20,31 @@ app.config["transactions"] = transactions
 Migrate(app, db)
 
 
-# import logging
-# logging.basicConfig(filename='gainz.log', level=logging.DEBUG)
-# log = logging.getLogger('werkzeug')
-# log.setLevel(logging.ERROR)
+import logging
+from datetime import datetime
+
+# Create logs directory if it doesn't exist
+log_dir = 'logs'
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
+
+# Set up logging with timestamp in filename
+log_filename = f'logs/gainz_{datetime.now().strftime("%Y-%m-%d")}.log'
+logging.basicConfig(
+    filename=log_filename,
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# Reduce werkzeug (Flask's built-in server) logging level
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+
+# Configure parsers logging
+parsers_logger = logging.getLogger('parsers')
+parsers_logger.setLevel(logging.DEBUG)
+
+print(f"Logging to: {os.path.abspath(log_filename)}")
 
 
 if __name__ == "__main__":
