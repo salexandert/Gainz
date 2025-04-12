@@ -332,100 +332,535 @@ class Transactions:
         self.view = save_as_filename
         
         return save_as_filename
-    
-    def export_to_excel(self):
-        """
-        Export transactions data to an Excel file specifically formatted for reporting.
-        This is different from save() method which is used for saving the application state.
+ 
+    def export_to_excel(self, asset=None, date_range=None, by_year=True):
+
+        # Idea to programatically create Excel Links, Fancy ;-)
+        # =HYPERLINK("[Export_Y2021-M03-D06_H19-M34.xlsx]Links!A20","Display Text")
         
-        Returns:
-            str: Path to the exported Excel file
-        """
-        export_filename = os.path.join(basedir, "exports", f"Gainz_Export_{strftime('Y%Y-M%m-D%d_H%H-M%M-S%S')}.xlsx")
+        save_as_filename = os.path.join(basedir, "Exports", f"Export_{strftime('Y%Y-M%m-D%d_H%H-M%M')}.xlsx")
         
-        # Create exports directory if it doesn't exist
-        os.makedirs(os.path.join(basedir, "exports"), exist_ok=True)
+        # Template to use
+        workbook = load_workbook(filename= os.path.join(basedir, 'Gainz_Export_Template-DO_NOT_MODIFY.xlsx'))
+        c_sheet = workbook['Conversions']
+        l_sheet = workbook['Gains']
+        a_sheet = workbook['All Transactions']
+        s_sheet = workbook['Stats']
+        t8949_sheet = workbook['8949']
+        sales_sheet = workbook['Sales']
+
         
-        # Prepare data for export
-        for trans in self.transactions:
-            trans.update_linked_transactions()
-            trans.set_multi_link()
-            # Make a copy of the timestamp without timezone info for Excel compatibility
-            if trans.time_stamp is not None:
-                trans.time_stamp = trans.time_stamp.replace(tzinfo=None)
+        # Get Years
+        years = set()
+        for link in self.links:
+            years.add(link.sell.time_stamp.year)
+
+        # Sales
+        for year in years:
+            print(f'exporting sales for {year}')
+
+
+            sheetname = f'{year} Sales'
+            ws = workbook.copy_worksheet(sales_sheet)
+            ws.title = sheetname
+
+            row = 2
+            
+            for trans in self.transactions:
                 
-        # Create DataFrames from transaction data
-        trans_df = pd.DataFrame([vars(s) for s in self.transactions])
-        conversion_df = pd.DataFrame([vars(s) for s in self.conversions])
-        asset_df = pd.DataFrame([vars(s) for s in self.asset_objects])
-        
-        # Start with main export sheets
-        with pd.ExcelWriter(export_filename, engine='xlsxwriter') as writer:
-            trans_df.to_excel(writer, sheet_name="All Transactions")
-            conversion_df.to_excel(writer, sheet_name="Conversions")
-            asset_df.to_excel(writer, sheet_name="Assets")
-              # Add a summary sheet
-            # Group by symbol and transaction type
-            if not trans_df.empty:
-                # Check if 'usd_total' column exists, otherwise calculate it from quantity * usd_spot
-                if 'usd_total' not in trans_df.columns:
-                    trans_df['usd_total'] = trans_df['quantity'] * trans_df['usd_spot']
+                description = None
+                acquired = None
+                sold_date = None
+                proceeds = None 
+                cost_basis = 0
+                source = None
+                gain_loss = 0
+
+
+                if trans.trans_type != "sell":
+                    continue
+
+                if trans.time_stamp.year != year:
+                    continue
                 
-                summary = trans_df.groupby(['symbol', 'trans_type']).agg({
-                    'quantity': 'sum',
-                    'usd_total': 'sum'
-                }).reset_index()
-                summary.to_excel(writer, sheet_name="Summary")
+
+                description = f"{trans.quantity} of {trans.symbol}"
                 
-            # Create year-specific tax sheets (8949 format)
-            current_year = pd.Timestamp.now().year
-            for year in range(2017, current_year + 1):
-                # Filter to sells in this year
-                if not trans_df.empty:
-                    year_sells = trans_df[
-                        (trans_df['trans_type'] == 'sell') & 
-                        (pd.to_datetime(trans_df['time_stamp']).dt.year == year)
-                    ]
+                ws[f"A{row}"] = description
+
+                if len(trans.links) == 0:
+                    continue
+                elif len(trans.links) > 1:
+                    acquired = "Multiple Dates"
+                    all_short = True
+                    all_long = True
                     
-                    if not year_sells.empty:
-                        # Create short-term and long-term sheets
-                        year_sells.to_excel(writer, sheet_name=f"8949_{year}")
+                    for link in trans.links:
+
+
+                        gain_loss += link.profit_loss
+                        if link.hodl_duration.days < 365:
+                            all_long = False
+                        else:
+                            all_short = False
+                    
+                    if all_long is False and all_short is False:
+                        acquired += " Long and Short"
+
+                    elif all_long is True:
+                        acquired += " All Long"
+                    
+                    elif all_short is True:
+                        acquired += " All Short"
+
+                        
+                else:
+                    gain_loss = trans.links[0].profit_loss
+                    acquired = trans.links[0].buy.time_stamp
+
+                ws[f"B{row}"] = acquired
+
+                sold_date = trans.time_stamp
+
+                ws[f"C{row}"] = sold_date
+
+                proceeds = trans.usd_total - trans.fee
+
+                ws[f"D{row}"] = proceeds
+                ws[f"D{row}"].number_format = '"$"#,##0.00_-'
+
+                for link in trans.links:
+                    cost_basis += link.cost_basis + link.buy.fee
+
+                ws[f"E{row}"] = cost_basis
+                ws[f"E{row}"].number_format = '"$"#,##0.00_-'
+
+                gain_loss = proceeds - cost_basis
+
+                ws[f"F{row}"] = gain_loss
+                ws[f"F{row}"].number_format = '"$"#,##0.00_-'
+
+                source = trans.source
+                ws[f"G{row}"] = source
+
+                row += 1
+
+
+        # 8949 Short
+        for year in years:
+            
+            sheetname = f'{year} 8949 Short'
+            ws = workbook.copy_worksheet(t8949_sheet)
+            ws.title = sheetname
+            
+            row = 2
+            for link in self.links:
+
+                if link.sell.time_stamp.year != year:
+                    continue
+
+                if abs(link.profit_loss) <= 1:
+                    continue
+                
+                if link.hodl_duration.days > 365:
+                    continue
+
+                ws[f"A{row}"] = f"Crypto {link.symbol}"
+                ws[f"B{row}"] = link.buy.time_stamp
+                ws[f"C{row}"] = link.sell.time_stamp
+                ws[f"D{row}"] = link.link_sell_price
+                ws[f"D{row}"].number_format = '"$"#,##0.00_-'
+                ws[f"E{row}"] = link.link_buy_price
+                ws[f"E{row}"].number_format = '"$"#,##0.00_-'
+                ws[f"H{row}"] = link.profit_loss
+                ws[f"H{row}"].number_format = '"$"#,##0.00_-'
+                ws[f"I{row}"] = link.sell.source
+
+                row += 1
+
+            if row == 2:
+                workbook.remove(ws)
+
+            else:
+                row += 2
+
+                ws[f"C{row}"] = "Totals"
+
+                ws[f"D{row}"] = f"=SUM(D2:D{row -2})"
+                ws[f"D{row}"].number_format = '"$"#,##0.00_-'
+                ws[f"E{row}"] = f"=SUM(E2:E{row -2})"
+                ws[f"E{row}"].number_format = '"$"#,##0.00_-'
+                ws[f"H{row}"] = f"=SUM(H2:H{row -2})"
+                ws[f"H{row}"].number_format = '"$"#,##0.00_-'
+
+
+        # 8949 Long
+        years = set()
+        for link in self.links:
+
+            years.add(link.sell.time_stamp.year)
+
+        for year in years:
+            
+            sheetname = f'{year} 8949 Long'
+            ws = workbook.copy_worksheet(t8949_sheet)
+            ws.title = sheetname
+            
+            row = 2
+            for link in self.links:
+
+                if link.sell.time_stamp.year != year:
+                    continue
+
+                if abs(link.profit_loss) <= 1:
+                    continue
+                
+                if link.hodl_duration.days <= 365:
+                    continue
+
+                ws[f"A{row}"] = f"Crypto {link.symbol}"
+                ws[f"B{row}"] = link.buy.time_stamp
+                ws[f"C{row}"] = link.sell.time_stamp
+                ws[f"D{row}"] = link.link_sell_price
+                ws[f"D{row}"].number_format = '"$"#,##0.00_-'
+                ws[f"E{row}"] = link.link_buy_price
+                ws[f"E{row}"].number_format = '"$"#,##0.00_-'
+                ws[f"H{row}"] = link.profit_loss
+                ws[f"H{row}"].number_format = '"$"#,##0.00_-'
+                ws[f"I{row}"] = link.sell.source
+
+                row += 1
+
+            if row == 2:
+                workbook.remove(ws)
+
+            else:
+                row += 2
+
+                ws[f"C{row}"] = "Totals"
+
+                ws[f"D{row}"] = f"=SUM(D2:D{row -2})"
+                ws[f"D{row}"].number_format = '"$"#,##0.00_-'
+                ws[f"E{row}"] = f"=SUM(E2:E{row -2})"
+                ws[f"E{row}"].number_format = '"$"#,##0.00_-'
+                ws[f"H{row}"] = f"=SUM(H2:H{row -2})"
+                ws[f"H{row}"].number_format = '"$"#,##0.00_-'
+
+
+        for asset in self.assets:
+            
+            # Conversions sheet
+            sheetname = f'{asset} Conversions'
+            conversions_sheet = workbook.copy_worksheet(c_sheet)
+            conversions_sheet.title = sheetname
+
+            column_names = []
+            for cell in conversions_sheet[3]:
+                column_names.append(cell.value)
+            
+            in_trans_type_index = column_names.index("In Transaction Type") + 1
+            out_trans_type_index = column_names.index("Out Transaction Type") + 1
+            symbol_index = column_names.index("Symbol") + 1
+            time_stamp_index = column_names.index("Time Stamp") + 1
+            quantity_index = column_names.index("Quantity") + 1
+            usd_spot_index = column_names.index("USD Spot") + 1
+            usd_total_index = column_names.index("USD Total") + 1
+            reason_index = column_names.index("Reason") + 1
+
+            row = 4
+            for conversion in self.conversions:
+                
+                if conversion.symbol != asset:
+                    continue
+
+                conversions_sheet.cell(row=row, column=in_trans_type_index, value=conversion.input_trans_type)
+                conversions_sheet.cell(row=row, column=out_trans_type_index, value=conversion.output_trans_type)
+                conversions_sheet.cell(row=row, column=symbol_index, value=conversion.symbol)
+                conversions_sheet.cell(row=row, column=time_stamp_index, value=conversion.time_stamp)
+                conversions_sheet.cell(row=row, column=quantity_index, value=conversion.quantity)
+                
+                conversions_sheet.cell(row=row, column=usd_spot_index, value=conversion.usd_spot)
+                conversions_sheet.cell(row=row, column=usd_spot_index).number_format = '"$"#,##0.00_-'
+                
+                conversions_sheet.cell(row=row, column=usd_total_index, value=conversion.usd_total)
+                conversions_sheet.cell(row=row, column=usd_total_index).number_format = '"$"#,##0.00_-'
+                
+                conversions_sheet.cell(row=row, column=reason_index, value=conversion.reason)
+
+                row += 1
+
+            if row == 4:
+                workbook.remove(conversions_sheet)
+
+
+            # Gainz Sheet
+            column_names = []
+            for cell in l_sheet[1]:
+                column_names.append(cell.value)
+
+            sell_date_index = column_names.index("Sell Date") + 1
+            sell_id_index = column_names.index("Sell ID") + 1
+            sell_quantity_index = column_names.index("Sell Quantity") + 1
+            sell_unlinked_index = column_names.index("Sell Unlinked") + 1
+            sell_usd_total_index = column_names.index("Sell USD Total") + 1
+            sell_usd_spot_index = column_names.index("Sell Spot USD") + 1
+            sell_multi_link_index = column_names.index("Sell Multi-Link") + 1
+
+            buy_link_usd_index = column_names.index("Link Buy in USD") + 1
+            link_id_index = column_names.index("Link ID") + 1
+            link_symbol_index = column_names.index("Link Asset") + 1
+            link_quantity_index = column_names.index("Link Quantity") + 1
+            link_profit_loss_index = column_names.index("Link Profit Loss") + 1
+            sell_link_usd_index = column_names.index("Link Sell in USD") + 1
+            date_acquired_index = column_names.index("Date Acquired") + 1
+
+            buy_multi_link_index = column_names.index("Buy Multi-Link") + 1
+            buy_date_index = column_names.index("Buy Date") + 1
+            buy_id_index = column_names.index("Buy ID") + 1
+            buy_quantity_index = column_names.index("Buy Quantity") + 1
+            buy_unlinked_index = column_names.index("Buy Unlinked") + 1
+            buy_usd_total_index = column_names.index("Buy USD Total") + 1
+            buy_usd_spot_index = column_names.index("Buy Spot USD") + 1
+
+            years = set()
+            for link in self.links:
+                if link.symbol != asset:
+                    continue
+
+                years.add(link.sell.time_stamp.year)
+
+            for year in years:
+                
+                sheetname = f'{year} {asset} Gains'
+                links_sheet = workbook.copy_worksheet(l_sheet)
+                links_sheet.title = sheetname
+                        
+                row = 2
+                profit_loss_total = 0.0
+                for link in self.links:
+                    
+                    if link.symbol != asset:
+                        continue
+                        
+                    if link.sell.time_stamp.year != year:
+                        continue
+
+                    if link.quantity <= 0.00000001:
+                        continue
+
+                    profit_loss_total += float(link.profit_loss)
+                    
+                    links_sheet.cell(row=row, column=link_symbol_index, value=link.sell.symbol)
+                    links_sheet.cell(row=row, column=link_id_index, value=link.id)
+                    links_sheet.cell(row=row, column=buy_id_index, value=link.buy.id)
+                    links_sheet.cell(row=row, column=sell_id_index, value=link.sell.id)
+                    links_sheet.cell(row=row, column=buy_date_index, value=link.buy.time_stamp)
+                    links_sheet.cell(row=row, column=buy_quantity_index, value=link.buy.quantity)
+                    links_sheet.cell(row=row, column=buy_unlinked_index, value=link.buy.unlinked_quantity)
+                    
+                    links_sheet.cell(row=row, column=buy_usd_spot_index, value=link.buy.usd_spot)
+                    links_sheet.cell(row=row, column=buy_usd_spot_index).number_format = '"$"#,##0.00_-'
+
+                    links_sheet.cell(row=row, column=buy_usd_total_index, value=link.buy.usd_total)
+                    links_sheet.cell(row=row, column=buy_usd_total_index).number_format = '"$"#,##0.00_-'
+
+                    links_sheet.cell(row=row, column=buy_link_usd_index, value=link.link_buy_price)
+                    links_sheet.cell(row=row, column=buy_link_usd_index).number_format = '"$"#,##0.00_-'
+
+                    links_sheet.cell(row=row, column=link_quantity_index, value=link.quantity)
+                    
+                    links_sheet.cell(row=row, column=link_profit_loss_index, value=link.profit_loss)
+                    links_sheet.cell(row=row, column=link_profit_loss_index).number_format = '"$"#,##0.00_);[Red]("$"#,##0.00)'
+
+                    links_sheet.cell(row=row, column=sell_link_usd_index, value=link.link_sell_price)
+                    links_sheet.cell(row=row, column=sell_link_usd_index).number_format = '"$"#,##0.00_-'
+
+                    links_sheet.cell(row=row, column=sell_date_index, value=link.sell.time_stamp)
+                    links_sheet.cell(row=row, column=sell_quantity_index, value=link.sell.quantity)
+                    links_sheet.cell(row=row, column=sell_unlinked_index, value=link.sell.unlinked_quantity)
+
+                    links_sheet.cell(row=row, column=sell_usd_spot_index, value=link.sell.usd_spot)
+                    links_sheet.cell(row=row, column=sell_usd_spot_index).number_format = '"$"#,##0.00_-'
+
+                    links_sheet.cell(row=row, column=sell_usd_total_index, value=link.sell.usd_total)
+                    links_sheet.cell(row=row, column=sell_usd_total_index).number_format = '"$"#,##0.00_-'
+                    
+                    links_sheet.cell(row=row, column=sell_multi_link_index, value=link.sell.multi_link)
+                    links_sheet.cell(row=row, column=buy_multi_link_index, value=link.buy.multi_link)
+                    
+                    row += 1
+
+                for trans in self.transactions:
+                    
+                    if trans.symbol != asset:
+                        continue
+
+                    if trans.trans_type != 'sell':
+                        continue
+
+                    if trans.time_stamp.year != year:
+                        continue
+
+                    if trans.unlinked_quantity <= 0.00000001:
+                        continue
+
+                    profit_loss_total += float(trans.unlinked_quantity * trans.usd_spot)
+
+                    links_sheet.cell(row=row, column=link_symbol_index, value="N/A")
+                    links_sheet.cell(row=row, column=link_id_index, value="N/A")
+                    links_sheet.cell(row=row, column=buy_id_index, value="N/A")
+                    links_sheet.cell(row=row, column=sell_id_index, value=trans.id)
+                    links_sheet.cell(row=row, column=buy_date_index, value="N/A")
+                    links_sheet.cell(row=row, column=buy_quantity_index, value="N/A")
+                    links_sheet.cell(row=row, column=buy_unlinked_index, value="N/A")
+                    links_sheet.cell(row=row, column=buy_usd_spot_index, value="N/A")
+                    links_sheet.cell(row=row, column=buy_usd_total_index, value="N/A")
+                    links_sheet.cell(row=row, column=buy_link_usd_index, value="N/A")
+                    links_sheet.cell(row=row, column=link_quantity_index, value=trans.unlinked_quantity)
+
+                    links_sheet.cell(row=row, column=link_profit_loss_index, value=(trans.unlinked_quantity * trans.usd_spot))
+                    links_sheet.cell(row=row, column=link_profit_loss_index).number_format = '"$"#,##0.00_);[Red]("$"#,##0.00)'
+                    
+                    links_sheet.cell(row=row, column=sell_link_usd_index, value=trans.usd_total)
+                    links_sheet.cell(row=row, column=sell_link_usd_index).number_format = '"$"#,##0.00_-'
+
+                    links_sheet.cell(row=row, column=sell_date_index, value=trans.time_stamp)
+                    links_sheet.cell(row=row, column=sell_quantity_index, value=trans.quantity)
+                    links_sheet.cell(row=row, column=sell_unlinked_index, value=trans.unlinked_quantity)
+                    links_sheet.cell(row=row, column=sell_usd_spot_index, value=trans.usd_spot)
+                    links_sheet.cell(row=row, column=sell_usd_spot_index).number_format = '"$"#,##0.00_-'
+
+                    links_sheet.cell(row=row, column=sell_usd_total_index, value=trans.usd_total)
+                    links_sheet.cell(row=row, column=sell_usd_total_index).number_format = '"$"#,##0.00_-'
+
+                    links_sheet.cell(row=row, column=sell_multi_link_index, value="N/A")
+                    links_sheet.cell(row=row, column=buy_multi_link_index, value="N/A")
+
+                    row += 1
+                    
+
+                row += 2
+
+                links_sheet.cell(row=row, column=link_profit_loss_index, value="Profit/Loss Total: ${:,.2f}".format(profit_loss_total)) 
+
+                if row == 4:
+                    workbook.remove(links_sheet)
+
+            # All Transactions sheet
+            sheetname = f'{asset} Transactions'
+            all_trans_sheet = workbook.copy_worksheet(a_sheet)
+            all_trans_sheet.title = sheetname
+            
+            column_names = []
+            for cell in all_trans_sheet[1]:
+                column_names.append(cell.value)
+
+            id_index = column_names.index("Transaction ID") + 1
+            symbol_index = column_names.index("Symbol") + 1
+            trans_type_index = column_names.index("Transaction Type") + 1
+            time_stamp_index = column_names.index("Time Stamp") + 1 
+            quantity_index = column_names.index("Quantity") + 1
+            links_index = column_names.index("Links") + 1
+            unlinked_index = column_names.index("Unlinked") + 1
+            usd_spot_index = column_names.index("USD Spot") + 1
+            usd_total_index = column_names.index("USD Total") + 1
+            source_index = column_names.index("Source") + 1
+            
+            row = 2
+            for trans in self.transactions:
+
+                if trans.symbol != asset:
+                    continue
+
+                all_trans_sheet.cell(row=row, column=id_index, value=trans.id)
+                all_trans_sheet.cell(row=row, column=symbol_index, value=trans.symbol)
+                all_trans_sheet.cell(row=row, column=trans_type_index, value=trans.trans_type)
+                all_trans_sheet.cell(row=row, column=time_stamp_index, value=trans.time_stamp)
+                all_trans_sheet.cell(row=row, column=quantity_index, value=trans.quantity)
+                all_trans_sheet.cell(row=row, column=unlinked_index, value=trans.unlinked_quantity)
+
+                all_trans_sheet.cell(row=row, column=usd_spot_index, value=trans.usd_spot)
+                all_trans_sheet.cell(row=row, column=usd_spot_index).number_format = '"$"#,##0.00_-'
+
+                all_trans_sheet.cell(row=row, column=usd_total_index, value=trans.usd_total)
+                all_trans_sheet.cell(row=row, column=usd_total_index).number_format = '"$"#,##0.00_-'
+
+                all_trans_sheet.cell(row=row, column=source_index, value=trans.source)
+
+                if len(trans.links) > 0:
+                    all_trans_sheet.cell(row=row, column=links_index, value=str(trans.links))
+
+                row += 1
+
+            if row == 2:
+                workbook.remove(all_trans_sheet)
+
+
+            # Links Sheet
+            sheetname = f'{asset} Stats'
+            asset_stats_sheet = workbook.copy_worksheet(s_sheet)
+            asset_stats_sheet.title = sheetname
+
+
+            date_range = {
+                'start_date': '',
+                'end_date': ''
+            }
+
+            date_range = get_transactions_date_range(self, date_range)
+
+            # get stats table data 
+            stats_table_data = get_stats_table_data_range(self, date_range)
+
+            # get stats for selected asset
+            asset_stats = None
+            for a in stats_table_data:
+                if a['symbol'] == asset:
+                    asset_stats = a
+                    break
+                
+           
+            # print(asset_stats)
+
+            # Create detailed stats table data
+            detailed_stats = [
+                ["Quantity Purchased", asset_stats['total_purchased_quantity']],
+                ["Number of Buys", asset_stats["num_buys"]],
+                ["Number of Sells", asset_stats["num_sells"]],
+                ["Number of Links", asset_stats["num_links"]],
+                ["Average Buy Price", asset_stats["average_buy_price"]],
+                ["Average Sell Price", asset_stats["average_sell_price"]],
+                ["Quantity Sold", asset_stats['total_sold_quantity']],
+                ["Quantity Sold Unlinked", asset_stats['total_sold_unlinked_quantity']],
+                ["Quantity Purchased Unlinked", asset_stats['total_purchased_unlinked_quantity']],
+                ["Quantity Purchased in USD", asset_stats['total_purchased_usd']],
+                ["Quantity Sold in USD", asset_stats['total_sold_usd']],
+                ["Profit / Loss in USD* (Valid when Quantity Sold Unlinked is 0)", asset_stats['profit_loss_total']],
+            ]
+
+            row = 2
+            for i in detailed_stats:
+                asset_stats_sheet.cell(row=row, column=1, value=i[0])
+                asset_stats_sheet.cell(row=row, column=1).number_format = '"$"#,##0.00_-'
+                asset_stats_sheet.cell(row=row, column=2, value=i[1])
+                asset_stats_sheet.cell(row=row, column=2).number_format = '"$"#,##0.00_-'
+                
+                row += 1
+
         
-        # Add more detail with openpyxl
-        workbook = load_workbook(filename=export_filename)
-        
-        # Add export information sheet
-        sheet = workbook.create_sheet('Export Info')
-        sheet.cell(row=1, column=1, value="Export Date")
-        sheet.cell(row=1, column=2, value=pd.Timestamp.now())
-        sheet.cell(row=2, column=1, value="Total Transactions")
-        sheet.cell(row=2, column=2, value=len(self.transactions))
-        sheet.cell(row=3, column=1, value="Total Conversions")
-        sheet.cell(row=3, column=2, value=len(self.conversions))
-        
-        # Add Links sheet for reference
-        sheet = workbook.create_sheet('Links')
-        sheet.cell(row=1, column=1, value='id')
-        sheet.cell(row=1, column=2, value='quantity')
-        sheet.cell(row=1, column=3, value='buy')
-        sheet.cell(row=1, column=4, value='sell')
-        sheet.cell(row=1, column=5, value='symbol')
-        
-        index = 2
-        for l in self.links:
-            sheet.cell(row=index, column=1, value=l.symbol)
-            sheet.cell(row=index, column=2, value=str(l.quantity))
-            sheet.cell(row=index, column=3, value=str(l.buy))
-            sheet.cell(row=index, column=4, value=str(l.sell))
-            sheet.cell(row=index, column=5, value=l.symbol)
-            index += 1
-        
-        # Save and close the workbook
-        workbook.save(export_filename)
-        workbook.close()
-        
-        print(f"Exported data to {export_filename}")
-        return export_filename
+        workbook.remove(a_sheet)
+        workbook.remove(c_sheet)
+        workbook.remove(l_sheet)
+        workbook.remove(s_sheet)
+        workbook.remove(t8949_sheet)
+        workbook.remove(sales_sheet)
+            
+            
+        workbook.save(save_as_filename)
+        print(f"Saving to {save_as_filename}")
+
+        return save_as_filename
+
 
     def delete(self, filename):
         os.rename(filename, f"{filename}.bak")
