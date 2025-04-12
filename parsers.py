@@ -154,9 +154,11 @@ def import_transactions(file_path, transactions):
         tuple: (imported_count, skipped_count) Count of transactions imported and skipped due to duplicates.
     """
     from decimal import Decimal, getcontext    # Set precision for comparing float values
+    import logging
     getcontext().prec = 10
     
-    # Function to check if a transaction is duplicate      def is_duplicate(new_trans, existing_transactions, tolerance=1e-6):
+    # Function to check if a transaction is duplicate
+    def is_duplicate(new_trans, existing_transactions, tolerance=1e-6):
         """Check if a transaction already exists in the collection."""
         for trans in existing_transactions:
             # Skip if different symbols or transaction types
@@ -167,17 +169,20 @@ def import_transactions(file_path, transactions):
             time_diff_seconds = abs((new_trans.time_stamp.replace(tzinfo=None) - 
                                   trans.time_stamp.replace(tzinfo=None)).total_seconds())
             
-            # Check for same-day transactions (within 24h) or near-identical times (within 1 minute) for timezone conversions
-            # Use timestamp difference modulo 24 hours to detect timezone differences
+            # Check for specific timezone offsets (+/- 7 or 8 hours), which are common in PST/UTC conversions
+            pst_utc_diff = abs(abs(time_diff_seconds) - (7 * 3600)) < 60  # Within 1 minute of 7 hour difference
+            pdt_utc_diff = abs(abs(time_diff_seconds) - (8 * 3600)) < 60  # Within 1 minute of 8 hour difference
+              # Check for same-day transactions (within 24h) or near-identical times (within 5 minutes) for timezone conversions
             same_time_diff = time_diff_seconds < 300  # 5 minutes
             timezone_diff = abs(time_diff_seconds % 86400) < 300  # 5 minutes within same time of day
-            time_match = same_time_diff or timezone_diff
+            time_match = same_time_diff or timezone_diff or pst_utc_diff or pdt_utc_diff
             
             # Required attributes match with relaxed tolerance for quantity
             quantity_match = abs(trans.quantity - new_trans.quantity) < max(tolerance, tolerance * trans.quantity)
             # More relaxed tolerance for price (0.5% difference is acceptable for price variations)
             usd_match = abs(trans.usd_spot - new_trans.usd_spot) < max(0.005 * trans.usd_spot, tolerance * trans.usd_spot)
-              # For debugging - use logging instead of print statements
+            
+            # For debugging - use logging instead of print statements
             if (trans.symbol == new_trans.symbol and quantity_match and trans.trans_type == new_trans.trans_type):
                 # Get logger for parsers
                 import logging
@@ -253,13 +258,14 @@ def import_transactions(file_path, transactions):
                 elif any(keyword in trans_type for keyword in sell_keywords):
                     temp_trans = Sell(symbol=symbol, quantity=quantity, time_stamp=time_stamp, usd_spot=usd_spot, source=file_path)
                 elif any(keyword in trans_type for keyword in send_keywords):
-                    temp_trans = Send(symbol=symbol, quantity=quantity, time_stamp=time_stamp, usd_spot=usd_spot, source=file_path)
+                    temp_trans = Send(symbol=symbol, quantity=quantity, time_stamp=time_stamp, usd_spot=usd_spot, source=file_path)                
                 elif any(keyword in trans_type for keyword in receive_keywords):
                     temp_trans = Receive(symbol=symbol, quantity=quantity, time_stamp=time_stamp, usd_spot=usd_spot, source=file_path)
                 else:
                     print(f"Warning: Unrecognized transaction type '{row['Transaction Type']}' - skipping record")
                     continue
-                  # Check for duplicates before adding
+                
+                # Check for duplicates before adding
                 if is_duplicate(temp_trans, transactions.transactions):
                     # Use logger instead of print
                     import logging
