@@ -156,20 +156,27 @@ def import_transactions(file_path, transactions):
     from decimal import Decimal, getcontext    # Set precision for comparing float values
     getcontext().prec = 10
     
-    # Function to check if a transaction is duplicate    
-    def is_duplicate(new_trans, existing_transactions, tolerance=1e-6):
+    # Function to check if a transaction is duplicate      def is_duplicate(new_trans, existing_transactions, tolerance=1e-6):
         """Check if a transaction already exists in the collection."""
         for trans in existing_transactions:
+            # Skip if different symbols or transaction types
+            if trans.symbol != new_trans.symbol or trans.trans_type != new_trans.trans_type:
+                continue
+                
             # Calculate the time difference, but normalize within a day for timezone issues
             time_diff_seconds = abs((new_trans.time_stamp.replace(tzinfo=None) - 
                                   trans.time_stamp.replace(tzinfo=None)).total_seconds())
             
             # Check for same-day transactions (within 24h) or near-identical times (within 1 minute) for timezone conversions
-            time_match = time_diff_seconds < 60 or (time_diff_seconds % 86400) < 60
+            # Use timestamp difference modulo 24 hours to detect timezone differences
+            same_time_diff = time_diff_seconds < 300  # 5 minutes
+            timezone_diff = abs(time_diff_seconds % 86400) < 300  # 5 minutes within same time of day
+            time_match = same_time_diff or timezone_diff
             
-            # Required attributes match with more relaxed tolerance
+            # Required attributes match with relaxed tolerance for quantity
             quantity_match = abs(trans.quantity - new_trans.quantity) < max(tolerance, tolerance * trans.quantity)
-            usd_match = abs(trans.usd_spot - new_trans.usd_spot) < max(tolerance, tolerance * trans.usd_spot)
+            # More relaxed tolerance for price (0.5% difference is acceptable for price variations)
+            usd_match = abs(trans.usd_spot - new_trans.usd_spot) < max(0.005 * trans.usd_spot, tolerance * trans.usd_spot)
               # For debugging - use logging instead of print statements
             if (trans.symbol == new_trans.symbol and quantity_match and trans.trans_type == new_trans.trans_type):
                 # Get logger for parsers
