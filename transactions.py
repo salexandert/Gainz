@@ -231,106 +231,153 @@ class Transactions:
         self.conversions = conversions
 
         # Re-import Re-Create Links
+        print(f"Recreating links from {filename}...") # Add logging
+        links_created_count = 0
+        links_skipped_count = 0
         for index, row in links_df.iterrows():
-            buy = row['buy'].strip("'")
-            sell = row['sell'].strip("'")
-            quantity = row['quantity']
+            buy_repr = row['buy'].strip("'") # Reads the __repr__ string like '2021-01-15 10:00:00 0.5'
+            sell_repr = row['sell'].strip("'") # Reads the __repr__ string
+            quantity_str = row['quantity'] # Reads quantity from Excel
+
+            # Convert quantity string to float, handle potential errors
+            try:
+                # Ensure quantity_str is treated as string before float conversion
+                quantity = float(str(quantity_str))
+            except ValueError:
+                print(f"  Warning: Could not convert link quantity '{quantity_str}' to float for link between {buy_repr} and {sell_repr}. Skipping link.")
+                links_skipped_count += 1
+                continue
+            except TypeError:
+                 print(f"  Warning: Invalid type for link quantity '{quantity_str}' ({type(quantity_str)}). Skipping link.")
+                 links_skipped_count += 1
+                 continue
 
             buy_obj = None
             sell_obj = None
 
-            for trans in self.transactions:
-                if trans.name == sell:
+            # Find transaction objects by name (repr string)
+            # Using trans.name which is f"{time_stamp} {self.quantity}"
+            for trans in self.transactions: # self.transactions contains objects created earlier
+                # Use a direct string comparison for the name/repr
+                if trans.name == sell_repr:
                     if trans.trans_type == 'sell':
                         sell_obj = trans
-
-                elif trans.name == buy:
+                elif trans.name == buy_repr:
                     if trans.trans_type == 'buy':
                         buy_obj = trans
-
                 if buy_obj and sell_obj:
-                    break
-            
+                    break # Found both
+
             if sell_obj and buy_obj:
-                sell_obj.link_transaction(buy_obj, link_quantity=quantity)
+                try:
+                    # Ensure quantity is significantly positive before linking (use epsilon)
+                    if quantity <= 1e-9:
+                         print(f"  Warning: Skipping link with near-zero quantity ({quantity}) between {buy_repr} and {sell_repr}.")
+                         links_skipped_count += 1
+                         continue
 
-        return list(transactions)
+                    # Call link_transaction - this calls Link.__init__ internally
+                    sell_obj.link_transaction(buy_obj, link_quantity=quantity)
+                    links_created_count += 1
 
+                except ValueError as e:
+                     # Catch the specific error from Link.__init__ and provide more context
+                     print(f"\n--- ERROR Recreating Link from Saved File ---")
+                     print(f"  File: {filename}")
+                     print(f"  Link Index: {index}")
+                     print(f"  Link Quantity from file: {quantity_str} -> {quantity}")
+                     print(f"  Buy Trans Repr: {buy_repr}")
+                     print(f"  Sell Trans Repr: {sell_repr}")
+                     if buy_obj:
+                         print(f"  Buy Obj Found: ID={buy_obj.id}, Current Unlinked: {buy_obj.unlinked_quantity:.8f}, Total Qty: {buy_obj.quantity:.8f}")
+                     else:
+                         print(f"  Buy Obj NOT Found for repr: {buy_repr}")
+                     if sell_obj:
+                         print(f"  Sell Obj Found: ID={sell_obj.id}, Current Unlinked: {sell_obj.unlinked_quantity:.8f}, Total Qty: {sell_obj.quantity:.8f}")
+                     else:
+                         print(f"  Sell Obj NOT Found for repr: {sell_repr}")
+                     print(f"  Original Error: {e}")
+                     print(f"---------------------------------------------\n")
+                     links_skipped_count += 1
+                     # Decide whether to raise or just continue
+                     # raise e # Re-raise to stop execution as before
+                     print("Continuing load process despite error...") # Or just log and continue
+
+                except Exception as e:
+                     print(f"  Unexpected error recreating link between {buy_repr} and {sell_repr}: {e}")
+                     links_skipped_count += 1
+                     # Handle other potential errors during linking
+
+            else:
+                print(f"  Warning: Could not find matching buy/sell objects for link between {buy_repr} and {sell_repr}. Skipping link.")
+                links_skipped_count += 1
+
+        print(f"Finished recreating links: {links_created_count} created, {links_skipped_count} skipped/errors.") # Add summary logging
+        return list(transactions)    
+    
     def save(self, description=None):
         save_as_filename = os.path.join(basedir, "saves", f"saved_{strftime('Y%Y-M%m-D%d_H%H-M%M-S%S')}.xlsx")
         
+        # Make sure all transactions are properly updated before saving
         for trans in self.transactions:
             trans.update_linked_transactions()
             trans.set_multi_link()
-            trans.time_stamp = trans.time_stamp.replace(tzinfo=None)
+            # Remove timezone info to prevent Excel issues
+            if hasattr(trans.time_stamp, 'replace') and trans.time_stamp.tzinfo is not None:
+                trans.time_stamp = trans.time_stamp.replace(tzinfo=None)
+                
+            # Update link timestamps too
             for link in trans.links:
-                link.buy.time_stamp = link.buy.time_stamp.replace(tzinfo=None)
-                link.sell.time_stamp = link.sell.time_stamp.replace(tzinfo=None)
+                if hasattr(link.buy.time_stamp, 'replace') and link.buy.time_stamp.tzinfo is not None:
+                    link.buy.time_stamp = link.buy.time_stamp.replace(tzinfo=None)
+                if hasattr(link.sell.time_stamp, 'replace') and link.sell.time_stamp.tzinfo is not None:
+                    link.sell.time_stamp = link.sell.time_stamp.replace(tzinfo=None)
         
+        # Create DataFrames from transaction data
         trans_df = pd.DataFrame([vars(s) for s in self.transactions])
         conversion_df = pd.DataFrame([vars(s) for s in self.conversions])
         asset_df = pd.DataFrame([vars(s) for s in self.asset_objects])
+        
+        # Extract all links to ensure they're saved properly
+        links_data = []
+        for l in self.links:
+            links_data.append({
+                'id': l.symbol,
+                'quantity': str(l.quantity),
+                'buy': str(l.buy),
+                'sell': str(l.sell),
+                'symbol': l.symbol
+            })
+        links_df = pd.DataFrame(links_data)
 
-        with pd.ExcelWriter(save_as_filename,  engine = 'xlsxwriter') as writer:
+        # Write all data to Excel file with pandas for consistent formatting
+        with pd.ExcelWriter(save_as_filename, engine='xlsxwriter') as writer:
             trans_df.to_excel(writer, sheet_name="All Transactions")
             conversion_df.to_excel(writer, sheet_name="Conversions")
             asset_df.to_excel(writer, sheet_name="Assets")
+            
+            # Save links directly with pandas too
+            if links_data:
+                links_df.to_excel(writer, sheet_name="Links")
         
-        # Saving workbook description
+        # Open file to add description and update revision number
         workbook = load_workbook(filename=save_as_filename)
+        
+        # Add description sheet
         sheet = workbook.create_sheet('Description')
         sheet.cell(row=1, column=1, value=description)
         revision_num = self.revision_num        
         if revision_num is None:
             revision_num = 0
         sheet.cell(row=1, column=2, value=revision_num + 1)
-
-        # Trying creating links outside of pd
-        sheet = workbook.create_sheet('Links')
-        sheet.cell(row=1, column=1, value='id')
-        sheet.cell(row=1, column=2, value='quantity')
-        sheet.cell(row=1, column=3, value='buy')
-        sheet.cell(row=1, column=4, value='sell')
-        sheet.cell(row=1, column=5, value='symbol')
-
-        index = 2
-        for l in self.links:
-            sheet.cell(row=index, column=1, value=l.symbol)
-            sheet.cell(row=index, column=2, value=str(l.quantity))
-            sheet.cell(row=index, column=3, value=str(l.buy))
-            sheet.cell(row=index, column=4, value=str(l.sell))
-            sheet.cell(row=index, column=5, value=l.symbol)
-            index += 1
-                  # Use the All Transactions sheet that was already created by pandas, don't create a duplicate
-        # Note: pandas already created this sheet, so we just need to access it
-        if 'All Transactions' in workbook.sheetnames:
-            sheet = workbook['All Transactions']
-        else:
-            # Fallback in case the sheet doesn't exist
-            sheet = workbook.create_sheet('All Transactions')
-            sheet.cell(row=1, column=1, value='symbol')
-            sheet.cell(row=1, column=2, value='quantity')
-            sheet.cell(row=1, column=3, value='time_stamp')
-            sheet.cell(row=1, column=4, value='usd_spot')
-            sheet.cell(row=1, column=5, value='source')
-            sheet.cell(row=1, column=6, value='trans_type')
-            sheet.cell(row=1, column=7, value='fee')
-
-        index = 2
-        for t in self.transactions:
-            sheet.cell(row=index, column=1, value=t.symbol)
-            sheet.cell(row=index, column=2, value=str(t.quantity))
-            sheet.cell(row=index, column=3, value=t.time_stamp)
-            sheet.cell(row=index, column=4, value=t.usd_spot)
-            sheet.cell(row=index, column=5, value=t.source)
-            sheet.cell(row=index, column=6, value=t.trans_type)
-            sheet.cell(row=index, column=7, value=t.fee)
-            index += 1
-
+        
+        # Save and close
         workbook.save(save_as_filename)
         workbook.close()
-        print(f"{description} Saving to {save_as_filename}")
+        
+        print(f"{'[' + description + ']' if description else ''} Saving to {save_as_filename}")
 
+        # Update internal state
         self.saves = self.load_saves()
         self.view = save_as_filename
         
