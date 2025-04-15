@@ -301,16 +301,20 @@ class Transactions:
             sheet.cell(row=index, column=4, value=str(l.sell))
             sheet.cell(row=index, column=5, value=l.symbol)
             index += 1
-                
-        # Trying creating transactions outside of pd ( no changes noticed reverting)
-        sheet = workbook.create_sheet('All Transactions')
-        sheet.cell(row=1, column=1, value='symbol')
-        sheet.cell(row=1, column=2, value='quantity')
-        sheet.cell(row=1, column=3, value='time_stamp')
-        sheet.cell(row=1, column=4, value='usd_spot')
-        sheet.cell(row=1, column=5, value='source')
-        sheet.cell(row=1, column=6, value='trans_type')
-        sheet.cell(row=1, column=7, value='fee')
+                  # Use the All Transactions sheet that was already created by pandas, don't create a duplicate
+        # Note: pandas already created this sheet, so we just need to access it
+        if 'All Transactions' in workbook.sheetnames:
+            sheet = workbook['All Transactions']
+        else:
+            # Fallback in case the sheet doesn't exist
+            sheet = workbook.create_sheet('All Transactions')
+            sheet.cell(row=1, column=1, value='symbol')
+            sheet.cell(row=1, column=2, value='quantity')
+            sheet.cell(row=1, column=3, value='time_stamp')
+            sheet.cell(row=1, column=4, value='usd_spot')
+            sheet.cell(row=1, column=5, value='source')
+            sheet.cell(row=1, column=6, value='trans_type')
+            sheet.cell(row=1, column=7, value='fee')
 
         index = 2
         for t in self.transactions:

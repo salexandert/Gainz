@@ -404,6 +404,15 @@ def get_stats_table_data_range(transactions, date_range=None):
             profit_loss_short = 0.0
             profit_loss_long = 0.0
 
+            proceeds_long = 0.0
+            cost_basis_long = 0.0
+            gain_long = 0.0
+
+            proceeds_short = 0.0
+            cost_basis_short = 0.0
+            gain_short = 0.0
+
+
             buy_prices = []
             sell_prices = []
                         
@@ -423,8 +432,14 @@ def get_stats_table_data_range(transactions, date_range=None):
                     profit_loss_total += link.profit_loss
                     if link.hodl_duration.days > 730:
                         profit_loss_long += link.profit_loss
+                        proceeds_long += link.proceeds
+                        cost_basis_long += link.cost_basis
+                        gain_long += link.profit_loss
                     else:
                         profit_loss_short += link.profit_loss
+                        proceeds_short += link.proceeds
+                        cost_basis_short += link.cost_basis
+                        gain_short += link.profit_loss
 
 
             for trans in filtered_transactions:
@@ -502,6 +517,14 @@ def get_stats_table_data_range(transactions, date_range=None):
                     "profit_loss_total": "${:,.2f}".format(profit_loss_total),
                     "profit_loss_short": "${:,.2f}".format(profit_loss_short),
                     "profit_loss_long": "${:,.2f}".format(profit_loss_long),
+
+                    "proceeds_long": "${:,.2f}".format(proceeds_long),
+                    "cost_basis_long": "${:,.2f}".format(cost_basis_long),
+                    "gain_long": "${:,.2f}".format(gain_long),
+
+                    "proceeds_short": "${:,.2f}".format(proceeds_short),
+                    "cost_basis_short": "${:,.2f}".format(cost_basis_short),
+                    "gain_short": "${:,.2f}".format(gain_short),
                     
                     "total_sent_quantity": total_sent_quantity,
                     "total_received_quantity": total_received_quantity,
