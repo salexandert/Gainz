@@ -50,6 +50,16 @@ First-user walkthrough notes:
 - HODL entry works, but users need a suggested value or "use expected HODL from current imports" action for test/demo data.
 - Export readiness is helpful once the user reaches it. It should link directly back to the pages that resolve each blocker.
 
+Recommended next first-run features:
+
+1. Load Demo Data: one button that imports the bundled synthetic CSVs into a clean session.
+2. Link All Assets: one guided action that runs FIFO for every asset with unlinked sells and reports failures.
+3. Use Expected HODL: when a user is using demo data or explicitly chooses to trust imported buys/sells, prefill declared HODL from expected quantity.
+4. Readiness Blocker Links: each Export readiness blocker should point to Import, Auto Link, HODL & Accounting, or Stats with the relevant asset selected.
+5. Download/Open Output: after Export or Audit Packet generation, show the path inline and provide an obvious open-folder action in the desktop build.
+
+These should be treated as adoption features, not just polish. They shorten the time from "I opened Gainz" to "I understand what this product does."
+
 ## Priority 5: Audit Packet Integration
 
 - The audit packet should include a holdings-lot report, import warnings, selected save metadata, and reconciliation status.
@@ -58,3 +68,27 @@ First-user walkthrough notes:
 Status: in progress. Audit packets now include linked Form 8949 detail CSVs, Form 8949 totals, holdings reconciliation, current holdings lots, import warnings, the generated Excel report, copied source files, and packet manifests.
 
 The Export page now shows an Audit Readiness panel before packet generation. It summarizes Form 8949 row count/totals, unlinked sales, HODL gaps, mismatches, warnings, next action, and packet contents.
+
+## Discovery And Adoption Positioning
+
+The strongest public positioning is:
+
+> Gainz is a local-first crypto tax audit packet and reconciliation tool.
+
+Discovery should target concrete, anxious searches rather than broad crypto-tax keywords:
+
+- Coinbase cost basis missing.
+- Cash App Bitcoin tax CSV.
+- Crypto Form 8949 audit packet.
+- Local crypto tax software.
+- How to reconcile crypto CSVs.
+- How to prove crypto tax basis.
+
+Recommended public launch assets:
+
+- GitHub Releases with a Windows build and checksums.
+- A short demo video using `demo_data/`.
+- A sample audit packet generated only from synthetic data.
+- A landing page focused on local-first privacy and CPA review packets.
+- Import-specific guides for Cash App, Coinbase, Coinbase Convert, and Kraken/template workflows.
+- A clear donation/support path for users who benefit from the free local tool.

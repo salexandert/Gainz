@@ -4,6 +4,8 @@ Gainz is a local, offline crypto accounting workbench for people who want to rec
 
 It helps import transactions, link sells to buys, estimate cost basis, review unresolved sends/receives, and export Excel reports for documentation or CPA review.
 
+Gainz is best understood as a **local-first crypto tax audit packet tool**. It does not try to be a hosted tax service. It helps you turn messy exchange exports into traceable basis links, Form 8949-style rows, current holdings reconciliation, and a documentation packet you can review with a qualified tax professional.
+
 ## What Gainz Is
 
 - Offline-first: runs locally on your machine.
@@ -75,9 +77,34 @@ python run.py
 5. Export the Excel report.
 6. Generate an audit packet from the Export page.
 
+For a complete click-by-click guide, see [Using Gainz from import to audit packet](docs/user-walkthrough.md).
+
+## Try The Demo Data
+
+The `demo_data/` folder contains synthetic CSVs that are safe to use for testing:
+
+- `demo_data/cash_app_sample.csv`
+- `demo_data/coinbase_sample.csv`
+- `demo_data/coinbase_convert_sample.csv`
+
+A good demo run is:
+
+1. Start Gainz with `python launcher.py`.
+2. Open **Import Transactions**.
+3. Upload each demo CSV one file at a time.
+4. Open **Auto Link**, select each asset, and run **FIFO**.
+5. Open **HODL & Accounting** and declare current HODL for each demo asset.
+6. Open **Stats & Charts** to review reconciliation and current lots.
+7. Open **Export** and confirm **Audit Readiness** says `Ready`.
+8. Click **Generate Audit Packet**.
+
+The audit packet includes the Excel workbook, Form 8949 detail CSVs, Form 8949 totals, holdings reconciliation, current holdings lots, import warnings, copied source files when available, hashes, and a methodology memo.
+
 ## Documentation
 
+- [Using Gainz from import to audit packet](docs/user-walkthrough.md)
 - [How Gainz calculates basis](docs/how-gainz-calculates-basis.md)
+- [Product improvement notes](docs/product-improvement-notes.md)
 - [Release readiness checklist](docs/release-readiness.md)
 - [Donation setup](docs/donations.md)
 

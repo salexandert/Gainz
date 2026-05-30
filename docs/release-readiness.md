@@ -10,6 +10,8 @@ This checklist describes what should be true before Gainz is shared outside a tr
 - Flask secret key is generated locally or provided through `GAINZ_SECRET_KEY`.
 - README uses current positioning and no broken encoding.
 - Demo CSVs contain synthetic data only.
+- User walkthrough explains import, auto-link, HODL, Stats, Export, and audit packet review.
+- Public docs state that Gainz is local-first documentation support, not tax advice.
 - Tests cover core lot linking and parser behavior.
 
 ## Required Before Packaged Desktop Release
@@ -18,6 +20,7 @@ This checklist describes what should be true before Gainz is shared outside a tr
 - App data paths are outside the source tree or clearly ignored.
 - First-run credential file is easy to find.
 - Export and audit-packet actions show the output path.
+- First-run demo path is easy enough for a new user to reach a ready audit packet with synthetic data.
 - No private or developer-only scripts are included in release artifacts.
 - Donation/support links are configured through `GAINZ_SUPPORT_URL` and verified in the app, launcher, README, and GitHub funding metadata.
 
