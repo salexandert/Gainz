@@ -44,11 +44,9 @@ log.setLevel(logging.ERROR)
 parsers_logger = logging.getLogger('parsers')
 parsers_logger.setLevel(logging.DEBUG)
 
-print(f"Logging to: {os.path.abspath(log_filename)}")
-
-
 if __name__ == "__main__":
 
+    print(f"Logging to: {os.path.abspath(log_filename)}")
     print(
         "\n\nGainz App runs on a non-production (Flask) web server you can safely ignore the warning(s) below."
     )

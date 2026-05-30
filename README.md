@@ -37,13 +37,19 @@ See `demo_data/` for small sample files that are safe to use for testing.
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-python run.py
+python launcher.py
 ```
 
-Then open:
+The launcher opens a small desktop window that shows the local web interface link. Click **Open Gainz** or open:
 
 ```text
 http://127.0.0.1:5000/
+```
+
+For developer console output, you can still run:
+
+```powershell
+python run.py
 ```
 
 On first run, Gainz creates a local admin account. If `GAINZ_ADMIN_PASSWORD` is not set, a one-time generated password is written to:
@@ -77,6 +83,15 @@ python run.py
 ## Packaging
 
 The first supported distribution target should be a local desktop-style build, not a hosted SaaS product. A hosted version would require a much stronger security and compliance model because it would handle sensitive tax data.
+
+For a clickable Windows build, install PyInstaller in the build environment and run:
+
+```powershell
+pip install pyinstaller
+.\scripts\build_windows_exe.ps1
+```
+
+The resulting `dist\Gainz.exe` starts the local server in the background, shows a window confirming that Gainz is running, and provides a button to open the web interface.
 
 ## License
 
