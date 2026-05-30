@@ -79,6 +79,22 @@ python run.py
 
 - [How Gainz calculates basis](docs/how-gainz-calculates-basis.md)
 - [Release readiness checklist](docs/release-readiness.md)
+- [Donation setup](docs/donations.md)
+
+## Support Gainz
+
+Gainz is free to run locally. If it saves you time, helps you organize a tax review, or gives you a clearer audit packet, donations help keep the project moving without requiring a hosted service.
+
+- Donate: <https://cash.app/$SAl3xander>
+- Website: <https://cryptogainz.store>
+
+For custom builds or forks, set these environment variables before starting Gainz:
+
+```powershell
+$env:GAINZ_SUPPORT_URL="https://your-donation-link.example"
+$env:GAINZ_STORE_URL="https://your-project-site.example"
+python launcher.py
+```
 
 ## Packaging
 

@@ -13,6 +13,7 @@ from urllib.request import urlopen
 APP_NAME = "Gainz"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 5000
+DEFAULT_SUPPORT_URL = "https://cash.app/$SAl3xander"
 
 
 def app_base_dir():
@@ -40,6 +41,10 @@ def server_url(port):
     return f"http://{DEFAULT_HOST}:{port}"
 
 
+def support_url():
+    return os.environ.get("GAINZ_SUPPORT_URL", DEFAULT_SUPPORT_URL)
+
+
 def wait_for_server(url, timeout=20):
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -65,7 +70,7 @@ class GainzLauncher(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(APP_NAME)
-        self.geometry("520x300")
+        self.geometry("520x320")
         self.resizable(False, False)
         self.configure(padx=24, pady=22)
         self.protocol("WM_DELETE_WINDOW", self.close_app)
@@ -73,6 +78,7 @@ class GainzLauncher(tk.Tk):
         os.chdir(app_base_dir())
         self.port = find_available_port()
         self.url = server_url(self.port)
+        self.support_url = support_url()
         self.error_queue = queue.Queue()
 
         self.status = tk.StringVar(value="Starting Gainz...")
@@ -117,6 +123,7 @@ class GainzLauncher(tk.Tk):
         self.open_button.pack(side="left")
 
         ttk.Button(button_frame, text="Copy Link", command=self.copy_link).pack(side="left", padx=(8, 0))
+        ttk.Button(button_frame, text="Donate", command=self.open_support).pack(side="left", padx=(8, 0))
         ttk.Button(button_frame, text="Quit", command=self.close_app).pack(side="right")
 
     def start_server_thread(self):
@@ -150,6 +157,9 @@ class GainzLauncher(tk.Tk):
         self.clipboard_clear()
         self.clipboard_append(self.url)
         self.status.set("Link copied. Gainz is running.")
+
+    def open_support(self):
+        webbrowser.open(self.support_url)
 
     def close_app(self):
         self.destroy()

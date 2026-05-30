@@ -97,7 +97,9 @@ def apply_themes(app):
     def override_url_for():
         Is_admin = current_user.is_authenticated and current_user.username == app.config['ADMIN']['username']
         return dict(url_for = _generate_url_for_theme,
-                    Is_admin = Is_admin )
+                    Is_admin = Is_admin,
+                    store_url = app.config.get('STORE_URL'),
+                    support_url = app.config.get('SUPPORT_URL'))
 
     def _generate_url_for_theme(endpoint, **values):
         if endpoint.endswith('static'):

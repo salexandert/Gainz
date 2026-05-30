@@ -40,6 +40,11 @@ class Config(object):
     SECRET_KEY = _read_or_create_secret_key()
     SQLALCHEMY_DATABASE_URI = 'sqlite:///database.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    STORE_URL = os.environ.get('GAINZ_STORE_URL', 'https://cryptogainz.store')
+    SUPPORT_URL = os.environ.get(
+        'GAINZ_SUPPORT_URL',
+        'https://cash.app/$SAl3xander'
+    )
     INSTANCE_PATH = _local_instance_path()
     UPLOAD_FOLDER = os.environ.get(
         'GAINZ_UPLOAD_FOLDER',

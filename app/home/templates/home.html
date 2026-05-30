@@ -27,6 +27,20 @@
         <p>
           Gainz does not provide legal, financial, or tax advice. Validate outputs before filing.
         </p>
+        {% if support_url %}
+        <div class="gainz-support-panel">
+          <div>
+            <h6>Keep Gainz local-first</h6>
+            <p>
+              Gainz is free to run locally. Donations help fund parser fixes, audit-packet polish,
+              and packaging work without turning your tax history into hosted data.
+            </p>
+          </div>
+          <a class="btn btn-primary btn-round" href="{{ support_url }}" target="_blank" rel="noopener noreferrer">
+            Support Gainz
+          </a>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>

@@ -3,8 +3,12 @@
      <div class="row">
        <nav class="footer-nav">
          <ul>
-           <li><a href="http://www.CryptoGainz.store" target="_blank">Gainz Store</a></li>
-           <li><a href="https://cryptogainz.store/pages/donate" target="_blank">Donate</a></li>
+           {% if store_url %}
+           <li><a href="{{ store_url }}" target="_blank" rel="noopener noreferrer">Gainz Store</a></li>
+           {% endif %}
+           {% if support_url %}
+           <li><a href="{{ support_url }}" target="_blank" rel="noopener noreferrer">Donate</a></li>
+           {% endif %}
          </ul>
        </nav>
      </div>

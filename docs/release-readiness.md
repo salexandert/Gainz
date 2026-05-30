@@ -19,6 +19,7 @@ This checklist describes what should be true before Gainz is shared outside a tr
 - First-run credential file is easy to find.
 - Export and audit-packet actions show the output path.
 - No private or developer-only scripts are included in release artifacts.
+- Donation/support links are configured through `GAINZ_SUPPORT_URL` and verified in the app, launcher, README, and GitHub funding metadata.
 
 ## Required Before Hosted Release
 

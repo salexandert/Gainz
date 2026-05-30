@@ -201,3 +201,32 @@
 #eh_stats_datatable tbody tr {
     cursor: pointer;
 }
+
+.gainz-support-panel {
+    align-items: center;
+    background: #f8f9fa;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    display: flex;
+    gap: 16px;
+    justify-content: space-between;
+    margin-top: 18px;
+    padding: 16px;
+}
+
+.gainz-support-panel h6 {
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.gainz-support-panel p {
+    color: #4f5962;
+    margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+    .gainz-support-panel {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
