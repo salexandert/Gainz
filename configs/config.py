@@ -45,6 +45,10 @@ class Config(object):
         'GAINZ_SUPPORT_URL',
         'https://cash.app/$SAl3xander'
     )
+    BTC_RECEIVE_ADDRESS = os.environ.get(
+        'GAINZ_BTC_RECEIVE_ADDRESS',
+        'bc1q5ptf8aylwauthxr80x60k554c3xdv2lpe046t4'
+    )
     INSTANCE_PATH = _local_instance_path()
     UPLOAD_FOLDER = os.environ.get(
         'GAINZ_UPLOAD_FOLDER',

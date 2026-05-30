@@ -224,6 +224,30 @@
     margin-bottom: 0;
 }
 
+.gainz-btc-support {
+    color: #4f5962;
+    font-size: 12px;
+    margin-top: 10px;
+}
+
+.gainz-btc-support span {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+
+.gainz-btc-support code {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 6px;
+    color: #252422;
+    display: inline-block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    padding: 6px 8px;
+}
+
 @media (max-width: 768px) {
     .gainz-support-panel {
         align-items: flex-start;

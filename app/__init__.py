@@ -99,7 +99,8 @@ def apply_themes(app):
         return dict(url_for = _generate_url_for_theme,
                     Is_admin = Is_admin,
                     store_url = app.config.get('STORE_URL'),
-                    support_url = app.config.get('SUPPORT_URL'))
+                    support_url = app.config.get('SUPPORT_URL'),
+                    btc_receive_address = app.config.get('BTC_RECEIVE_ADDRESS'))
 
     def _generate_url_for_theme(endpoint, **values):
         if endpoint.endswith('static'):

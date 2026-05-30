@@ -39,6 +39,12 @@
           <a class="btn btn-primary btn-round" href="{{ support_url }}" target="_blank" rel="noopener noreferrer">
             Support Gainz
           </a>
+          {% if btc_receive_address %}
+          <div class="gainz-btc-support">
+            <span>BTC donations</span>
+            <code>{{ btc_receive_address }}</code>
+          </div>
+          {% endif %}
         </div>
         {% endif %}
       </div>

@@ -113,6 +113,7 @@ The audit packet includes the Excel workbook, Form 8949 detail CSVs, Form 8949 t
 Gainz is free to run locally. If it saves you time, helps you organize a tax review, or gives you a clearer audit packet, donations help keep the project moving without requiring a hosted service.
 
 - Donate: <https://cash.app/$SAl3xander>
+- BTC: `bc1q5ptf8aylwauthxr80x60k554c3xdv2lpe046t4`
 - Website: <https://cryptogainz.store>
 
 For custom builds or forks, set these environment variables before starting Gainz:
@@ -120,6 +121,7 @@ For custom builds or forks, set these environment variables before starting Gain
 ```powershell
 $env:GAINZ_SUPPORT_URL="https://your-donation-link.example"
 $env:GAINZ_STORE_URL="https://your-project-site.example"
+$env:GAINZ_BTC_RECEIVE_ADDRESS="your-btc-address"
 python launcher.py
 ```
 
