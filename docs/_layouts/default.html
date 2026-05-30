@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    {% assign page_title = page.title | default: site.title %}
+    {% assign page_description = page.description | default: site.description %}
+    <title>{{ page_title }}{% unless page_title contains site.title %} | {{ site.title }}{% endunless %}</title>
+    <meta name="description" content="{{ page_description | escape }}">
+    <link rel="canonical" href="{{ page.url | absolute_url }}">
+    <link rel="icon" href="{{ '/assets/gainz_logo.png' | relative_url }}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="{{ site.title }}">
+    <meta property="og:title" content="{{ page_title | escape }}">
+    <meta property="og:description" content="{{ page_description | escape }}">
+    <meta property="og:url" content="{{ page.url | absolute_url }}">
+    <meta property="og:image" content="{{ page.image | default: '/assets/gainz_logo.png' | absolute_url }}">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{{ page_title | escape }}">
+    <meta name="twitter:description" content="{{ page_description | escape }}">
+    <link rel="stylesheet" href="{{ '/assets/site.css' | relative_url }}">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "{{ page.schema_type | default: 'WebPage' }}",
+      "name": {{ page_title | jsonify }},
+      "description": {{ page_description | jsonify }},
+      "url": {{ page.url | absolute_url | jsonify }},
+      {% if page.schema_type == 'SoftwareApplication' %}
+      "applicationCategory": "FinanceApplication",
+      "operatingSystem": "Windows, macOS, Linux",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      {% endif %}
+      "publisher": {
+        "@type": "Organization",
+        "name": "Gainz",
+        "url": {{ site.url | jsonify }}
+      }
+    }
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <a class="brand" href="{{ '/' | relative_url }}" aria-label="Gainz home">
+        <img src="{{ '/assets/gainz_logo.png' | relative_url }}" alt="" width="40" height="40">
+        <span>Gainz</span>
+      </a>
+      <nav aria-label="Primary">
+        <a href="{{ '/guides/' | relative_url }}">Guides</a>
+        <a href="{{ '/guides/local-crypto-tax-software/' | relative_url }}">Why Local</a>
+        <a href="{{ '/how-gainz-calculates-basis/' | relative_url }}">Basis</a>
+        <a href="{{ '/user-walkthrough/' | relative_url }}">Walkthrough</a>
+        <a href="https://github.com/salexandert/Gainz">GitHub</a>
+      </nav>
+    </header>
+    <main id="main" class="page-shell">
+      {{ content }}
+    </main>
+    <footer class="site-footer">
+      <p>Gainz is documentation support for crypto tax review. It is not tax, legal, or financial advice.</p>
+      <p><a href="{{ '/donations/' | relative_url }}">Support Gainz</a></p>
+    </footer>
+  </body>
+</html>

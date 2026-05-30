@@ -112,7 +112,7 @@ Review:
 - Form 8949 long-term rows.
 - Unrealized current-lot chart.
 
-The current-lot estimate explains which remaining acquisition lots support current holdings. This is especially useful when you need to explain how today’s balance relates to past buys and sells.
+The current-lot estimate explains which remaining acquisition lots support current holdings. This is especially useful when you need to explain how today's balance relates to past buys and sells.
 
 ## 7. Review Audit Readiness
 
