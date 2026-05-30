@@ -1,6 +1,112 @@
 
 // HODL Accounting 
 $(document).ready(function() {
+    if ($('#eh_stats_datatable').length == 0) {
+        return;
+    }
+
+    function hodlParseQuantity(value) {
+        if (value === undefined || value === null || value === 'N/A') {
+            return null;
+        }
+
+        var parsed = Number(String(value).replace('$', '').replace(/,/g, '').trim());
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function hodlFormatQuantity(value) {
+        if (value === null || value === undefined || !Number.isFinite(value)) {
+            return '--';
+        }
+
+        return value.toFixed(8).replace(/0+$/, '').replace(/\.$/, '') || '0';
+    }
+
+    function hodlSetBadge(status) {
+        var badge = $('#hodl_status_badge');
+        var className = 'status-' + String(status || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        badge
+            .removeClass('status-matched status-needs-declared-hodl status-mismatch status-unlinked-sales')
+            .addClass(className)
+            .text(status);
+    }
+
+    function hodlSetSummary(summary) {
+        if (!summary) {
+            return;
+        }
+
+        $('#hodl_summary_asset_count').text(summary.asset_count);
+        $('#hodl_summary_need_hodl').text(summary.assets_needing_hodl);
+        $('#hodl_summary_matched').text(summary.assets_matched);
+        $('#hodl_summary_mismatch').text(summary.assets_with_mismatch);
+    }
+
+    function hodlRowsSet(rows) {
+        if (!rows) {
+            return;
+        }
+
+        table.clear();
+        table.rows.add(rows).draw();
+    }
+
+    function hodlSelectedAssetRow() {
+        return table.row({selected:true}).data();
+    }
+
+    function hodlRenderSelection(rowData) {
+        if (!rowData) {
+            $('#hodl_selected_asset').text('Select an asset above to begin.');
+            $('#hodl_expected_from_activity, #hodl_declared_current, #hodl_difference, #hodl_unlinked_sales').text('--');
+            $('#hodl_next_action').text('Pick an asset to see the next action.');
+            $('#hodl_quantity').attr('placeholder', 'Select an asset first').val('');
+            hodlSetBadge('Needs asset');
+            return;
+        }
+
+        var asset = rowData[0];
+        var buys = hodlParseQuantity(rowData[1]) || 0;
+        var sells = hodlParseQuantity(rowData[2]) || 0;
+        var soldUnlinked = hodlParseQuantity(rowData[3]) || 0;
+        var hodl = hodlParseQuantity(rowData[8]);
+        var expectedHodl = buys - sells;
+
+        $('#hodl_selected_asset').text(asset + ' selected');
+        $('#hodl_expected_from_activity').text(hodlFormatQuantity(expectedHodl));
+        $('#hodl_unlinked_sales').text(hodlFormatQuantity(soldUnlinked));
+        $('#hodl_quantity').attr('placeholder', 'Current holding for ' + asset);
+        $('#convert_text').text('Use these only when you know the accounting treatment. If you know the missing transaction, adding the real transaction is better than converting activity automatically.');
+
+        if (hodl === null) {
+            $('#hodl_declared_current').text('--');
+            $('#hodl_difference').text('--');
+            $('#hodl_quantity').val('');
+            $('#hodl_next_action').text('Enter the amount of ' + asset + ' you currently hold across all wallets and exchanges. This becomes the anchor for the rest of the reconciliation.');
+            hodlSetBadge('Needs declared HODL');
+            return;
+        }
+
+        var difference = expectedHodl - hodl;
+        $('#hodl_declared_current').text(hodlFormatQuantity(hodl));
+        $('#hodl_difference').text(hodlFormatQuantity(difference));
+        $('#hodl_quantity').val(hodlFormatQuantity(hodl));
+
+        if (Math.abs(difference) <= 0.00000001 && soldUnlinked <= 0.00000001) {
+            $('#hodl_next_action').text(asset + ' is matched against buys and sells. Continue to Stats & Charts to inspect current lots and audit packet readiness.');
+            hodlSetBadge('Matched');
+        } else if (soldUnlinked > 0.00000001) {
+            $('#hodl_next_action').text(asset + ' still has unlinked sales. Run Auto Link or manually review links before trusting tax totals.');
+            hodlSetBadge('Unlinked sales');
+        } else if (difference > 0) {
+            $('#hodl_next_action').text('Imported activity says you should hold more ' + asset + ' than you declared. Look for missing sells, disposals, losses, or transfers that should be taxable events.');
+            $('#convert_text').text('Gainz can help convert known sends or lost lots, but only use this after confirming the missing activity.');
+            hodlSetBadge('Mismatch');
+        } else {
+            $('#hodl_next_action').text('Declared HODL is higher than imported buys/sells explain. Look for missing buys, income, gifts, or transfers that need basis.');
+            hodlSetBadge('Mismatch');
+        }
+    }
 
     $('#auto_actions_datatable').DataTable({
         "pageLength": 25,
@@ -26,72 +132,15 @@ $(document).ready(function() {
     });
 
     $('#eh_stats_datatable tbody').on( 'click', 'tr', function () {
-        console.log( table.row( this ).data() );
-
-
-        var asset = table.row( this ).data()[0]
-        var buys = table.row( this ).data()[1]
-        var sells = table.row( this ).data()[2]
-        var sent = table.row( this ).data()[3]
-        var hodl = table.row( this ).data()[8]
-        
-        var needs_classification = buys - sells
-        var min_hodl = buys - sent
-        var hodl_text = $('#eh_options').text('')
-        var convert_text = $('#convert_text').text('')
-        var Sold_or_Lost = buys - hodl
-        var expected_hodl = buys - sells
-        var hodl_difference = expected_hodl - hodl
-        
-        if (hodl == "N/A") {
-        
-            hodl_text.append(asset + ' Selected')
-            hodl_text.append("<br>Buys: " + buys + " - Sells: " + sells + " = Needs_Classification: " + needs_classification)
-            
-            if (needs_classification < 0) { 
-                hodl_text.append("<br>Looks like you have more sells than buys. You can add buys manually or import additonal from CSV.")
-                
-             }
-
-            if (min_hodl >= 0) {
-                hodl_text.append("<br>If Converting Sends to Sells minimum HODL is " + min_hodl)
-            }
-
-        } else {
-            $("#submit_hodl_button").text("Change HODL")
-
-            hodl_text.append(asset + ' Selected')
-            hodl_text.append("<br><br>Buys " + buys + " - Sells " + sells + " = Expected HODL of " + expected_hodl)
-            hodl_text.append("<br><br>Expected HODL " + expected_hodl + " - HODL" + hodl + " = a difference of " + hodl_difference)
-            if (hodl_difference > 0) 
-                { 
-                    hodl_text.append("<br><br> Since the difference is positive it indicates you may have sold this amount on other exchanges, traded for goods or services (sold), or lost.")
-                    hodl_text.append("<br> If you know what transactions are missing its best to add them on the add and manage transactions page. ")
-                    hodl_text.append("<br> Otherwise you may use the options below to automatically convert the earliest sends into sells or buys into lost")
-                    hodl_text.append("<br> This also many be done manually on the add and manage transactions page")
-                    
-                    convert_text.append("We can account for " + hodl_difference + " by converting any combination of the below. <br><br>")
-                    convert_text.append(sent + " Sends to Sells <br>")
-                    // convert_text.append(received + " Received to Buys <br>")
-                    convert_text.append(buys + " Buys to Lost <br>")
-                } 
-            else {
-                    hodl_text.append("<br><br> Since the difference is negative it indicates you may have acquired this amount from other sources.")
-                    hodl_text.append("<br> If you know what transactions are missing its best to add them on the add and manage transactions page. ")
-                    hodl_text.append("<br> Otherwise you may convert the receives into buys. This needs to be done manually on the add and manage transactions page")
-
-                }
-            
-            
-
-
-        }
+        var rowData = table.row(this).data();
+        $('#hodl_save_message').hide().text('');
+        hodlRenderSelection(rowData);
 
         $.ajax({
             type: "POST",
             url: "/auto_link/auto_link_pre_check",
             data: JSON.stringify({
-                'row_data': table.row( this ).data()
+                'row_data': rowData
               }),  
             dataType: "json",
             contentType: 'application/json',
@@ -131,19 +180,54 @@ $(document).ready(function() {
 
 
     $("#submit_hodl_button").click(function(){
+        var rowData = hodlSelectedAssetRow();
+        var quantity = $('#hodl_quantity').val();
+        var saveButton = $(this);
+
+        if (!rowData) {
+            alert("Select an asset first.");
+            return;
+        }
+
+        if (!quantity) {
+            alert("Enter the current HODL quantity first.");
+            return;
+        }
+
+        $('#hodl_save_message').hide().text('');
+        saveButton.prop('disabled', true).text('Saving...');
 
         $.ajax({
             type: "POST",
             url: "/hodl_accounting/hodl_info",
             data: JSON.stringify({
-                'quantity': $('#hodl_quantity').val(),
-                'asset': $('#eh_stats_datatable').DataTable().row( {selected:true} ).data()
+                'quantity': quantity,
+                'asset': rowData
               }),  
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
-                location.reload()
-            },   
+                hodlRowsSet(data['stats_table_rows']);
+                hodlSetSummary(data['hodl_summary']);
+                var updatedRow = null;
+                var rows = table.rows().data();
+                for (var i = 0; i < rows.length; i++) {
+                    if (rows[i] && rows[i][0] == rowData[0]) {
+                        updatedRow = rows[i];
+                        break;
+                    }
+                }
+
+                hodlRenderSelection(updatedRow || rowData);
+                $('#hodl_quantity').focus().select();
+                $('#hodl_save_message').text(data['message'] || 'Declared HODL saved.').show();
+            },
+            error: function () {
+                alert("Declared HODL could not be saved. Please try again.");
+            },
+            complete: function () {
+                saveButton.prop('disabled', false).text('Save Declared HODL');
+            },
         });
     });
 

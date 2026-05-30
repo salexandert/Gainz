@@ -19,6 +19,33 @@ from utils import *
 import dateutil.parser
 
 
+def _hodl_stats_rows(stats_table_data):
+    return [
+        [
+            row['symbol'],
+            row['total_purchased_quantity'],
+            row['total_sold_quantity'],
+            row['total_sold_unlinked_quantity'],
+            row['total_purchased_unlinked_quantity'],
+            row['total_purchased_usd'],
+            row['total_sold_usd'],
+            row.get('total_profit_loss', row.get('profit_loss_total')),
+            row['hodl'],
+        ]
+        for row in stats_table_data
+    ]
+
+
+def _hodl_summary(transactions):
+    rows = get_multi_asset_holdings_reconciliation_table_data(transactions)
+    return {
+        "asset_count": len(rows),
+        "assets_needing_hodl": sum(1 for row in rows if row[1] == "N/A"),
+        "assets_matched": sum(1 for row in rows if row[6] == "Matched"),
+        "assets_with_mismatch": sum(1 for row in rows if row[6] == "Mismatch"),
+    }
+
+
 @blueprint.route('/', methods=['POST', 'GET'])
 @login_required
 def hodl_accounting():
@@ -39,7 +66,11 @@ def hodl_accounting():
         return jsonify("Converted Sends to Sells!")
 
     
-    return render_template('hodl_accounting.html', stats_table_data=stats_table_data)
+    return render_template(
+        'hodl_accounting.html',
+        stats_table_data=stats_table_data,
+        hodl_summary=_hodl_summary(transactions),
+    )
 
 
 
@@ -108,7 +139,13 @@ def hodl_info():
 
     transactions.save(description=f"Added HODL for {asset_symbol}")
 
-    return jsonify("HODL Accepted")
+    stats_table_data = get_stats_table_data(transactions)
+
+    return jsonify({
+        "message": f"Declared HODL for {asset_symbol} saved.",
+        "stats_table_rows": _hodl_stats_rows(stats_table_data),
+        "hodl_summary": _hodl_summary(transactions),
+    })
 
 
 

@@ -104,3 +104,100 @@
 #statspage_all_holdings_reconciliation_datatable tbody tr {
     cursor: pointer;
 }
+
+.hodl-progress-band {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    margin: 20px 0;
+}
+
+.hodl-progress-item,
+.hodl-metric {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+
+.hodl-progress-item span,
+.hodl-metric span {
+    color: #6c757d;
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.hodl-progress-item strong,
+.hodl-metric strong {
+    color: #252422;
+    display: inline-block;
+    font-size: 22px;
+    margin-top: 4px;
+}
+
+.hodl-walkthrough {
+    display: grid;
+    gap: 14px;
+}
+
+.hodl-step {
+    align-items: flex-start;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    display: grid;
+    gap: 14px;
+    grid-template-columns: 36px 1fr;
+    padding-top: 16px;
+}
+
+.hodl-step:first-child {
+    border-top: 0;
+    padding-top: 0;
+}
+
+.hodl-step h5,
+.hodl-resolution-panel h5 {
+    margin-bottom: 6px;
+}
+
+.hodl-step p,
+.hodl-resolution-panel p {
+    color: #4f5962;
+    margin-bottom: 10px;
+}
+
+.hodl-step-number {
+    align-items: center;
+    background: #51cbce;
+    border-radius: 50%;
+    color: #fff;
+    display: flex;
+    font-weight: 700;
+    height: 32px;
+    justify-content: center;
+    width: 32px;
+}
+
+.hodl-workbench-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    margin: 18px 0;
+}
+
+.hodl-resolution-panel {
+    background: #f8f9fa;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    margin-top: 18px;
+    padding: 16px;
+}
+
+.hodl-hidden-legacy {
+    display: none;
+}
+
+#eh_stats_datatable tbody tr {
+    cursor: pointer;
+}
