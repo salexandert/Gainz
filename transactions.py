@@ -9,6 +9,18 @@ from time import strftime
 
 # Define the base directory for the project
 basedir = os.path.dirname(__file__)
+FIAT_ASSET_SYMBOLS = {"USD"}
+
+
+def _optional_cell(row, column):
+    if column not in row:
+        return None
+
+    value = row[column]
+    if pd.isna(value):
+        return None
+
+    return value
 
 # Updated imports to reflect the new modular structure
 from parsers import *
@@ -24,28 +36,15 @@ class Transactions:
         self.index = 0
         self.conversions = []
         self.asset_objects = []
+        self.import_warnings = []
         
         if view is not None:
             self.transactions = self.load(view)
             self.view = view
         
         elif len(self.saves) > 0:
-            highest_rev = 0
-            view = None
-            revision_num = None
-
-            for save in self.saves:
-                if save['revision_num'] is None:
-                    revision_num = 0
-                else:
-                    if save['revision_num'] > highest_rev:
-                        highest_rev = save['revision_num']
-                        view = save['value']
-            
-            print(f"the highest rev is {highest_rev}")
-
-            if view is None:
-                view = self.saves[-1]['value']
+            view = self.saves[-1]['value']
+            print(f"loading latest save {view}")
             
             self.transactions = self.load(view)
             self.view = view
@@ -82,7 +81,6 @@ class Transactions:
 
     def load_saves(self):
         saves = []
-        revision_num = None
 
         match_object = "saved_"
 
@@ -91,6 +89,9 @@ class Transactions:
             for f in files:  # Corrected the incomplete for loop
                 save_as_filename = os.path.join(basedir, 'saves', f)
                 if match_object in f and f.endswith('xlsx'):
+                    description = ""
+                    revision_num = None
+
                     # Check if the file is a valid zip file
                     if not zipfile.is_zipfile(save_as_filename):
                         print(f"File {save_as_filename} is not a zip file")
@@ -103,9 +104,17 @@ class Transactions:
                     else:
                         description = ""
 
-                    saves.append({'label': save_as_filename, 'value': save_as_filename, 'description': description, 'revision_num': revision_num})
+                    workbook.close()
+                    saves.append({
+                        'label': save_as_filename,
+                        'value': save_as_filename,
+                        'description': description,
+                        'revision_num': revision_num,
+                        'modified_time': os.path.getmtime(save_as_filename),
+                    })
                     view_num += 1
 
+        saves.sort(key=lambda save: save['modified_time'])
         self.saves = saves
         
         return saves
@@ -115,9 +124,31 @@ class Transactions:
         assets = set()
 
         for trans in self.transactions:
-            assets.add(trans.symbol)
+            if trans.symbol not in FIAT_ASSET_SYMBOLS:
+                assets.add(trans.symbol)
 
         return assets
+
+    def get_hodl(self, asset):
+        asset = asset.upper()
+        for asset_object in self.asset_objects:
+            if asset_object.symbol == asset:
+                return asset_object.hodl
+
+        return None
+
+    def set_hodl(self, asset, hodl):
+        asset = asset.upper()
+        hodl = float(hodl)
+
+        for asset_object in self.asset_objects:
+            if asset_object.symbol == asset:
+                asset_object.hodl = hodl
+                return asset_object
+
+        asset_object = Asset(symbol=asset, hodl=hodl)
+        self.asset_objects.append(asset_object)
+        return asset_object
 
     def load(self, filename=None):
         # Check if the file is a valid zip file
@@ -132,6 +163,16 @@ class Transactions:
             if revision_num is not None:
                 self.revision_num = revision_num
 
+        if 'Import Warnings' in workbook.sheetnames:
+            warnings_sheet = workbook['Import Warnings']
+            self.import_warnings = [
+                row[0]
+                for row in warnings_sheet.iter_rows(min_row=2, values_only=True)
+                if row and row[0]
+            ]
+        else:
+            self.import_warnings = []
+
         # Read Previously saved data into pandas df - Transactions    
         trans_df = pd.read_excel(filename, sheet_name='All Transactions', converters = {'my_str_column': list})
         trans_df.reset_index(inplace=True)
@@ -144,7 +185,10 @@ class Transactions:
         asset_df = pd.read_excel(filename, sheet_name='Assets', converters = {'my_str_column': list})
 
         # Read Previously saved data into pandas df - Links
-        links_df = pd.read_excel(filename, sheet_name='Links', converters = {'my_str_column': list})
+        if 'Links' in workbook.sheetnames:
+            links_df = pd.read_excel(filename, sheet_name='Links', converters = {'my_str_column': list})
+        else:
+            links_df = pd.DataFrame()
 
         # Split Buys and Sells into separate df's
         sell_df = trans_df[(trans_df['trans_type'] == 'sell')].copy()
@@ -173,7 +217,7 @@ class Transactions:
         # Load Transactions into Objects
         # Load Sells
         for index, row in sell_df.iterrows():
-            trans_obj = Sell(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'], source=row['source'])
+            trans_obj = Sell(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'], source=row['source'], uid=_optional_cell(row, 'uid'))
             # Check if 'fee' column exists before accessing it
             if 'fee' in row:
                 trans_obj.fee = row['fee']
@@ -181,7 +225,7 @@ class Transactions:
 
         # Load Buys
         for index, row in buy_df.iterrows():
-            trans_obj = Buy(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'],  source=row['source'])
+            trans_obj = Buy(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'],  source=row['source'], uid=_optional_cell(row, 'uid'))
             # Check if 'fee' column exists before accessing it
             if 'fee' in row:
                 trans_obj.fee = row['fee']
@@ -189,11 +233,11 @@ class Transactions:
 
         # Load Sends
         for index, row in send_df.iterrows():
-            sends.append(Send(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'],  source=row['source']))
+            sends.append(Send(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'],  source=row['source'], uid=_optional_cell(row, 'uid')))
 
         # Load Receives
         for index, row in receive_df.iterrows():
-            receives.append(Receive(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'], source=row['source']))
+            receives.append(Receive(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'], source=row['source'], uid=_optional_cell(row, 'uid')))
 
         # Load Conversions
         for index, row in conversion_df.iterrows():
@@ -234,6 +278,11 @@ class Transactions:
         print(f"Recreating links from {filename}...") # Add logging
         links_created_count = 0
         links_skipped_count = 0
+        transactions_by_uid = {
+            str(trans.uid): trans
+            for trans in self.transactions
+            if getattr(trans, 'uid', None)
+        }
         for index, row in links_df.iterrows():
             buy_repr = row['buy'].strip("'") # Reads the __repr__ string like '2021-01-15 10:00:00 0.5'
             sell_repr = row['sell'].strip("'") # Reads the __repr__ string
@@ -254,19 +303,26 @@ class Transactions:
 
             buy_obj = None
             sell_obj = None
+            buy_uid = _optional_cell(row, 'buy_uid')
+            sell_uid = _optional_cell(row, 'sell_uid')
 
-            # Find transaction objects by name (repr string)
-            # Using trans.name which is f"{time_stamp} {self.quantity}"
-            for trans in self.transactions: # self.transactions contains objects created earlier
-                # Use a direct string comparison for the name/repr
-                if trans.name == sell_repr:
-                    if trans.trans_type == 'sell':
-                        sell_obj = trans
-                elif trans.name == buy_repr:
-                    if trans.trans_type == 'buy':
-                        buy_obj = trans
-                if buy_obj and sell_obj:
-                    break # Found both
+            if buy_uid and sell_uid:
+                buy_obj = transactions_by_uid.get(str(buy_uid))
+                sell_obj = transactions_by_uid.get(str(sell_uid))
+
+            if not buy_obj or not sell_obj:
+                # Find transaction objects by name (repr string) for older saved files.
+                # Using trans.name which is f"{time_stamp} {self.quantity}"
+                for trans in self.transactions: # self.transactions contains objects created earlier
+                    # Use a direct string comparison for the name/repr
+                    if trans.name == sell_repr:
+                        if trans.trans_type == 'sell':
+                            sell_obj = trans
+                    elif trans.name == buy_repr:
+                        if trans.trans_type == 'buy':
+                            buy_obj = trans
+                    if buy_obj and sell_obj:
+                        break # Found both
 
             if sell_obj and buy_obj:
                 try:
@@ -344,6 +400,8 @@ class Transactions:
             links_data.append({
                 'id': l.symbol,
                 'quantity': str(l.quantity),
+                'buy_uid': getattr(l.buy, 'uid', None),
+                'sell_uid': getattr(l.sell, 'uid', None),
                 'buy': str(l.buy),
                 'sell': str(l.sell),
                 'symbol': l.symbol
@@ -356,9 +414,7 @@ class Transactions:
             conversion_df.to_excel(writer, sheet_name="Conversions")
             asset_df.to_excel(writer, sheet_name="Assets")
             
-            # Save links directly with pandas too
-            if links_data:
-                links_df.to_excel(writer, sheet_name="Links")
+            links_df.to_excel(writer, sheet_name="Links")
         
         # Open file to add description and update revision number
         workbook = load_workbook(filename=save_as_filename)
@@ -370,6 +426,12 @@ class Transactions:
         if revision_num is None:
             revision_num = 0
         sheet.cell(row=1, column=2, value=revision_num + 1)
+
+        if getattr(self, 'import_warnings', None):
+            warnings_sheet = workbook.create_sheet('Import Warnings')
+            warnings_sheet.cell(row=1, column=1, value='Warning')
+            for row_num, warning in enumerate(self.import_warnings, start=2):
+                warnings_sheet.cell(row=row_num, column=1, value=warning)
         
         # Save and close
         workbook.save(save_as_filename)
@@ -383,12 +445,14 @@ class Transactions:
         
         return save_as_filename
  
-    def export_to_excel(self, asset=None, date_range=None, by_year=True):
+    def export_to_excel(self, asset=None, date_range=None, by_year=True, output_dir=None):
 
         # Idea to programatically create Excel Links, Fancy ;-)
         # =HYPERLINK("[Export_Y2021-M03-D06_H19-M34.xlsx]Links!A20","Display Text")
         
-        save_as_filename = os.path.join(basedir, "Exports", f"Export_{strftime('Y%Y-M%m-D%d_H%H-M%M')}.xlsx")
+        export_dir = output_dir or os.path.join(basedir, "exports")
+        os.makedirs(export_dir, exist_ok=True)
+        save_as_filename = os.path.join(export_dir, f"Export_{strftime('Y%Y-M%m-D%d_H%H-M%M')}.xlsx")
         
         # Template to use
         workbook = load_workbook(filename= os.path.join(basedir, 'Gainz_Export_Template-DO_NOT_MODIFY.xlsx'))
@@ -910,6 +974,134 @@ class Transactions:
 
         return save_as_filename
 
+    def _conversion_amount(self, asset, current_hodl=None, amount_to_convert=None):
+        if amount_to_convert is not None:
+            return max(float(amount_to_convert), 0.0)
+
+        if current_hodl is None:
+            return 0.0
+
+        bought = sum(trans.quantity for trans in self.transactions if trans.symbol == asset and trans.trans_type == 'buy')
+        sold = sum(trans.quantity for trans in self.transactions if trans.symbol == asset and trans.trans_type == 'sell')
+
+        return max((bought - sold) - float(current_hodl), 0.0)
+
+    def _reduce_transaction_quantity(self, trans, quantity):
+        remaining = round_decimals_down(trans.quantity - quantity, decimals=9)
+        if remaining <= 0.000000001:
+            self.transactions.remove(trans)
+            return
+
+        trans.quantity = remaining
+        trans.name = f"{trans.time_stamp} {trans.quantity}"
+
+    def _record_conversion(self, trans, quantity, output_trans_type, reason):
+        conversion = Conversion(
+            input_trans_type=trans.trans_type,
+            output_trans_type=output_trans_type,
+            input_symbol=trans.symbol,
+            input_quantity=quantity,
+            input_time_stamp=trans.time_stamp,
+            input_usd_spot=trans.usd_spot,
+            input_usd_total=quantity * trans.usd_spot,
+            reason=reason,
+            source=f"{trans.source} Converted in Gainz App",
+        )
+        self.conversions.append(conversion)
+
+    def convert_sends_to_sells(self, asset, current_hodl=None, amount_to_convert=None):
+        amount_remaining = self._conversion_amount(asset, current_hodl=current_hodl, amount_to_convert=amount_to_convert)
+        converted_quantity = 0.0
+        converted_count = 0
+
+        sends = [
+            trans for trans in self.transactions
+            if trans.symbol == asset and trans.trans_type == 'send'
+        ]
+        sends.sort(key=lambda x: x.time_stamp)
+
+        for send in sends:
+            if amount_remaining <= 0.000000001:
+                break
+
+            quantity = min(send.quantity, amount_remaining)
+            sell = Sell(
+                symbol=send.symbol,
+                quantity=quantity,
+                time_stamp=send.time_stamp,
+                usd_spot=send.usd_spot,
+                source="Gainz App Send to Sell",
+            )
+
+            self.transactions.append(sell)
+            self._record_conversion(send, quantity, 'sell', 'Converted Send to Sell')
+            self._reduce_transaction_quantity(send, quantity)
+
+            amount_remaining -= quantity
+            converted_quantity += quantity
+            converted_count += 1
+
+        return f"Converted {converted_quantity} {asset} from {converted_count} send transaction(s) to sell transaction(s)."
+
+    def convert_buys_to_lost(self, asset, amount):
+        amount_remaining = max(float(amount), 0.0)
+        converted_quantity = 0.0
+        converted_count = 0
+
+        buys = [
+            trans for trans in self.transactions
+            if trans.symbol == asset and trans.trans_type == 'buy' and trans.unlinked_quantity > 0.000000001
+        ]
+        buys.sort(key=lambda x: x.time_stamp, reverse=True)
+
+        for buy in buys:
+            if amount_remaining <= 0.000000001:
+                break
+
+            quantity = min(buy.unlinked_quantity, amount_remaining)
+            self._record_conversion(buy, quantity, 'lost', 'Converted Buy to Lost')
+            self._reduce_transaction_quantity(buy, quantity)
+
+            amount_remaining -= quantity
+            converted_quantity += quantity
+            converted_count += 1
+
+        return f"Converted {converted_quantity} {asset} from {converted_count} buy transaction(s) to lost."
+
+    def convert_receives_to_buys(self, asset, amount_to_convert):
+        amount_remaining = max(float(amount_to_convert), 0.0)
+        converted_quantity = 0.0
+        converted_count = 0
+
+        receives = [
+            trans for trans in self.transactions
+            if trans.symbol == asset and trans.trans_type == 'receive' and trans.unlinked_quantity > 0.000000001
+        ]
+        receives.sort(key=lambda x: x.time_stamp)
+
+        for receive in receives:
+            if amount_remaining <= 0.000000001:
+                break
+
+            quantity = min(receive.unlinked_quantity, amount_remaining)
+            buy = Buy(
+                symbol=receive.symbol,
+                quantity=quantity,
+                time_stamp=receive.time_stamp,
+                usd_spot=receive.usd_spot,
+                source="Gainz App Receive to Buy",
+            )
+
+            self.transactions.append(buy)
+            self._record_conversion(receive, quantity, 'buy', 'Converted Receive to Buy')
+            self._reduce_transaction_quantity(receive, quantity)
+
+            amount_remaining -= quantity
+            converted_quantity += quantity
+            converted_count += 1
+
+        return f"Converted {converted_quantity} {asset} from {converted_count} receive transaction(s) to buy transaction(s)."
+
 
     def delete(self, filename):
         os.rename(filename, f"{filename}.bak")
@@ -985,7 +1177,7 @@ class Transactions:
             
         return last_time_stamps
     
-    def auto_link(self, asset=None, algo='fifo', date_range=None, min_unlinked=0.000001):
+    def auto_link(self, asset=None, algo='fifo', date_range=None, min_unlinked=0.000001, year=None):
         """
         Automatically links buy and sell transactions based on specified algorithm.
         
@@ -994,6 +1186,7 @@ class Transactions:
             algo (str, optional): The algorithm to use ('fifo' or 'filo'). Defaults to 'fifo'.
             date_range (dict, optional): Date range to filter transactions by.
             min_unlinked (float, optional): Minimum unlinked quantity to consider. Defaults to 0.000001.
+            year (int, optional): Tax year to filter sells by. Ignored when date_range is provided.
             
         Returns:
             list: List of failures where sells couldn't be fully linked.
@@ -1003,6 +1196,12 @@ class Transactions:
         buys = {}
         sells = {}
         failures = []
+
+        if year is not None and date_range is None:
+            date_range = {
+                'start_date': f"01/01/{year} 12:00 AM",
+                'end_date': f"12/31/{year} 11:59 PM",
+            }
 
         # Get buys and sells by asset
         for trans in self.transactions:
@@ -1196,6 +1395,64 @@ class Transactions:
                                 'algo': algo
                             })
 
+        elif algo in ('min_gain', 'min_gain_long'):
+            for key in buys.keys():
+                buys[key].sort(key=lambda x: x.usd_spot, reverse=True)
+            
+            for key in sells.keys():
+                sells[key].sort(key=lambda x: x.time_stamp.replace(tzinfo=None) if hasattr(x.time_stamp, 'replace') else x.time_stamp)
+
+            from utils import round_decimals_down
+            
+            keys = list(sells.keys())
+            keys.sort()
+            
+            for key in keys:
+                for sell in sells[key]:
+                    if sell.unlinked_quantity > min_unlinked:
+                        for buy in buys[key]:
+                            link_quantity = None
+
+                            if sell.unlinked_quantity <= min_unlinked:
+                                break
+
+                            if buy.unlinked_quantity <= min_unlinked:
+                                continue
+
+                            buy_time = buy.time_stamp.replace(tzinfo=None) if hasattr(buy.time_stamp, 'replace') else buy.time_stamp
+                            sell_time = sell.time_stamp.replace(tzinfo=None) if hasattr(sell.time_stamp, 'replace') else sell.time_stamp
+                            
+                            if buy_time >= sell_time:
+                                continue
+
+                            if algo == 'min_gain_long' and (sell_time - buy_time).days <= 365:
+                                continue
+
+                            if sell.unlinked_quantity >= buy.unlinked_quantity:
+                                link_quantity = buy.unlinked_quantity
+                            elif sell.unlinked_quantity <= buy.unlinked_quantity: 
+                                link_quantity = sell.unlinked_quantity
+
+                            link_quantity = round_decimals_down(link_quantity)
+
+                            buy_price = link_quantity * buy.usd_spot
+                            sell_price = link_quantity * sell.usd_spot
+                            profit = sell_price - buy_price
+
+                            if abs(profit) < 1.0:
+                                continue
+
+                            sell.link_transaction(buy, link_quantity)
+
+                        if (sell.unlinked_quantity * sell.usd_spot) > min_unlinked:
+                            failures.append({
+                                'asset': sell.symbol, 
+                                'unlinkable': sell.unlinked_quantity,
+                                'quantity': sell.quantity,
+                                'timestamp': sell.time_stamp,
+                                'algo': algo
+                            })
+
         # Update transactions after linking
         for trans in self.transactions:
             trans.update_linked_transactions()
@@ -1305,10 +1562,6 @@ if __name__ == "__main__":
         sold_quantity += s.quantity
         sold_unlinked += s.unlinked_quantity    
         print(f"\n\n bought {bought_quantity} \n sent {sent_quantity} \n received {received_quantity} \n sold {sold_quantity} \n sold unlinked {sold_unlinked} \n bought unlinked {bought_unlinked}")
-
-    # Import transactions using the function from parsers.py
-    from parsers import import_transactions
-    import_transactions('LOCAL_TAX_FILE_REMOVED', transactions)
 
 @lru_cache(maxsize=1024)
 def calculate_gain(sell, buy):

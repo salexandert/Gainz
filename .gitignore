@@ -169,6 +169,15 @@ cython_debug/
 # App Data
 saves/
 Exports/
+exports/
 CSVs/
+*.csv
+!demo_data/*.csv
 App Test Data/
-
+uploads/
+logs/
+reconciliation/
+quarantine/
+audit_packet_*/
+audit_packets/
+*.sqlite

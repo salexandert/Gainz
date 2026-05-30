@@ -104,20 +104,7 @@ def hodl_info():
     hodl = float(request.json['quantity'])
 
     transactions = current_app.config['transactions']
-
-    for a in transactions.asset_objects:
-        # print(a.symbol, asset_symbol)
-        if a.symbol != asset_symbol:
-            continue 
-
-        a.hodl = hodl
-        # print(f"Setting HODL for {a.symbol} is {a.hodl}")
-
-    for a in transactions.asset_objects:
-        # print(f"Asset Object symbol {a.symbol} Asset {asset_symbol} HODL {a.hodl}")
-        if a.hodl is not None:
-            hodl = a.hodl
-            # print(f"Asset Object symbol {a.symbol} Asset {asset_symbol} HODL {a.hodl}")
+    transactions.set_hodl(asset_symbol, hodl)
 
     transactions.save(description=f"Added HODL for {asset_symbol}")
 

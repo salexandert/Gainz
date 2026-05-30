@@ -14,6 +14,7 @@ from conversion import Conversion
 
 from wtforms.fields import DateTimeLocalField
 from utils import *
+from app.services.auto_link_service import AutoLinkService
 
 
 
@@ -55,23 +56,9 @@ def auto_link_asset():
 
     algo_type = request.json['algo']
 
-    if algo_type == "fifo":
-        transactions.auto_link(asset=asset, algo=algo_type, year=year)
-        transactions.save(description="Auto Linked with FIFO")
+    message = AutoLinkService().auto_link(transactions, asset=asset, algo=algo_type, year=year)
 
-    elif algo_type == "filo":
-        transactions.auto_link(asset=asset, algo=algo_type, year=year)
-        transactions.save(description="Auto Linked with FILO")
-
-    elif algo_type == "min_gain_long":
-        transactions.auto_link(asset=asset, algo=algo_type, year=year)
-        transactions.save(description="Auto Linked with Min Gain Long")
-    
-    elif algo_type == "min_gain":
-        transactions.auto_link(asset=asset, algo=algo_type, year=year)
-        transactions.save(description="Auto Linked with Min Gain Long")
-
-    return jsonify(f"Auto Link using {algo_type} Successful!")
+    return jsonify(message)
 
 
 @blueprint.route('/auto_link_pre_check', methods=['POST'])

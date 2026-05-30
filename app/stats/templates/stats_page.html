@@ -52,7 +52,127 @@
   </div>
 </div>
 <!-- /Page Description and Instructions -->
+
+<div id="stats_summary_band" class="stats-summary-band">
+  <div class="stats-summary-item">
+    <span>Reconciliation</span>
+    <strong id="stats_summary_reconciliation" class="gainz-status-badge {{ stats_summary.reconciliation_class }}">{{ stats_summary.reconciliation }}</strong>
+  </div>
+  <div class="stats-summary-item">
+    <span>Assets needing HODL</span>
+    <strong id="stats_summary_assets_needing_hodl">{{ stats_summary.assets_needing_hodl }}</strong>
+  </div>
+  <div class="stats-summary-item">
+    <span>Assets with mismatches</span>
+    <strong id="stats_summary_assets_with_mismatches">{{ stats_summary.assets_with_mismatches }}</strong>
+  </div>
+  <div class="stats-summary-item">
+    <span>Import warnings</span>
+    <strong id="stats_summary_import_warnings">{{ stats_summary.import_warnings }}</strong>
+  </div>
+  <div class="stats-summary-item">
+    <span>Unlinked sales</span>
+    <strong id="stats_summary_unlinked_sales">{{ stats_summary.unlinked_sales }}</strong>
+  </div>
+</div>
+
+<div id="stats_reconciliation_warning" class="alert alert-warning" role="alert" {% if reconciliation_status.is_reconciled %}style="display: none;"{% endif %}>
+  <strong>Not reconciled yet.</strong>
+  <span id="stats_reconciliation_warning_text">{{ reconciliation_status.message }}</span>
+</div>
+
+<div id="stats_import_warnings" class="alert alert-info" role="alert" {% if not import_warnings %}style="display: none;"{% endif %}>
+  <strong>Import warnings.</strong>
+  <ul id="stats_import_warnings_list" class="mb-0">
+    {% for warning in import_warnings %}
+      <li>{{ warning }}</li>
+    {% endfor %}
+  </ul>
+</div>
   
+<!-- Holdings Reconciliation -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Current Holdings Reconciliation</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingPortfolioHoldings">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_portfolio_holdings_reconciliation" aria-expanded="true" aria-controls="collapse_portfolio_holdings_reconciliation">
+                All Assets
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_portfolio_holdings_reconciliation" class="collapse show" role="tabpanel" aria-labelledby="headingPortfolioHoldings">
+              <div class="card-body ">
+                <table id="statspage_all_holdings_reconciliation_datatable" class="table table-striped table-bordered" style="width:100%">
+                  <thead>
+                    <tr>
+                      <th>Asset</th>
+                      <th>Declared HODL</th>
+                      <th>Expected From Buys/Sells Only</th>
+                      <th>Imported Net After Transfers</th>
+                      <th>Available Lot Quantity</th>
+                      <th>Difference vs Declared</th>
+                      <th>Status</th>
+                      <th>Next Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in holdings_reconciliation_table_data %}
+                    <tr>
+                      <td>{{ row[0] }}</td>
+                      <td>{{ row[1] }}</td>
+                      <td>{{ row[2] }}</td>
+                      <td>{{ row[3] }}</td>
+                      <td>{{ row[4] }}</td>
+                      <td>{{ row[5] }}</td>
+                      <td>{{ row[6] }}</td>
+                      <td>{{ row[7] }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="form-group row">
+            <label class="control-label col-md-2 col-sm-3">Declared HODL</label>
+            <div class="col-md-4 col-sm-5">
+              <input id="stats_declared_hodl_quantity" class="form-control" type="number" step="any" placeholder="Select an asset first">
+            </div>
+            <div class="col-md-3 col-sm-4">
+              <button type="button" id="stats_save_hodl_button" class="btn btn-success">Save Declared HODL</button>
+            </div>
+          </div>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingSelectedHoldings">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_holdings_reconciliation" aria-expanded="true" aria-controls="collapse_holdings_reconciliation">
+                Selected Asset
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_holdings_reconciliation" class="collapse show" role="tabpanel" aria-labelledby="headingSelectedHoldings">
+              <div class="card-body ">
+                <table id="statspage_holdings_reconciliation_datatable" class="table table-striped table-bordered" style="width:100%">
+                  <thead>
+                    <tr>
+                      <th>Description</th>
+                      <th>Value</th>
+                    </tr>
+                  </thead>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Holdings Reconciliation End -->
+
             
 <!-- All Asset Stats Table -->
 <div class="row">
@@ -61,14 +181,13 @@
       <div class="card-body">
         <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
           <h4 class="card-title">Select an asset</h4>
-          <input id="statspage_hide_unsold" type="checkbox" class="flat"> Hide assets not sold (WIP)
           <div class="card card-plain">
-            <div class="card-header" role="tab" id="headingOne">
-              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_2" aria-expanded="true" aria-controls="collapseOne">
+            <div class="card-header" role="tab" id="headingStatsAssets">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_stats_assets" aria-expanded="true" aria-controls="collapse_stats_assets">
                 <i class="nc-icon nc-minimal-down"></i>
               </a>
             </div>
-            <div id="collapse_2" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+            <div id="collapse_stats_assets" class="collapse show" role="tabpanel" aria-labelledby="headingStatsAssets">
               
               <!-- Card Body -->
               <div class="card-body ">
@@ -97,7 +216,7 @@
                       <td>{{ row['total_purchased_unlinked_quantity'] }}</td>
                       <td>{{ row['total_purchased_usd'] }}</td>
                       <td>{{ row['total_sold_usd']  }}</td>
-                      <td>{{ row['total_profit_loss']  }}</td>
+                      <td>{{ row.get('profit_loss_total', row.get('total_profit_loss')) }}</td>
                       <td>{{ row['hodl'] }}</td>
                     </tr>
                     {% endfor %}
@@ -113,6 +232,33 @@
   </div>
 </div>
 <!-- All Asset Stats Table End -->
+
+<!-- Gainz Chart  -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card stats-chart-card">
+      <div class="card-body">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+          <div>
+            <h4 class="card-title">Unrealized Gain/Loss by Current Lot</h4>
+            <p id="gainz_chart_subtitle" class="card-category">Select an asset</p>
+          </div>
+          <div class="form-group mb-md-0 stats-spot-control">
+            <label class="col-form-label" for="stats_usd_spot">USD Spot</label>
+            <input id="stats_usd_spot" class="form-control" type="text" name="number" number="true" />
+          </div>
+        </div>
+        <div id="gainz_chart_empty_state" class="alert alert-info mt-3" role="alert">
+          Select an asset to view current-lot unrealized gain or loss.
+        </div>
+        <div class="stats-chart-frame">
+          <canvas id="gainzChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Gainz Chart  -->
 
 <!-- Detailed Stats  -->
 <div class="row">
@@ -150,6 +296,46 @@
 </div>
 <!--Detailed Stats End -->
 
+<!-- Current Holdings Lots -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Current Holdings Lots</h4>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="headingOne">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_holdings_lots" aria-expanded="true" aria-controls="collapseOne">
+                <i class="nc-icon nc-minimal-down"></i>
+              </a>
+            </div>
+            <div id="collapse_holdings_lots" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+              <div class="card-body ">
+                <table id="statspage_holdings_lots_datatable" class="table table-striped table-bordered" style="width:100%">
+                  <thead>
+                    <tr>
+                      <th>Asset</th>
+                      <th>Type</th>
+                      <th>Date Acquired</th>
+                      <th>Estimated Held Quantity</th>
+                      <th>Original Quantity</th>
+                      <th>USD Spot</th>
+                      <th>Estimated Basis</th>
+                      <th>Original Basis</th>
+                      <th>Source</th>
+                    </tr>
+                  </thead>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Current Holdings Lots End -->
+
 <!-- Sales Table -->
 <div class="row">
   <div class="col-md-12">
@@ -158,12 +344,12 @@
         <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
           <h4 class="card-title">Sales</h4>
           <div class="card card-plain">
-            <div class="card-header" role="tab" id="headingOne">
-              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_2" aria-expanded="true" aria-controls="collapseOne">
+            <div class="card-header" role="tab" id="headingSales">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_sales" aria-expanded="false" aria-controls="collapse_sales">
                 <i class="nc-icon nc-minimal-down"></i>
               </a>
             </div>
-            <div id="collapse_2" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+            <div id="collapse_sales" class="collapse" role="tabpanel" aria-labelledby="headingSales">
               
               <!-- Card Body -->
               <div class="card-body ">
@@ -202,12 +388,12 @@
         <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
           <h4 class="card-title">8949 Long</h4>
           <div class="card card-plain">
-            <div class="card-header" role="tab" id="headingOne">
-              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_2" aria-expanded="true" aria-controls="collapseOne">
+            <div class="card-header" role="tab" id="heading8949Long">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_8949_long" aria-expanded="false" aria-controls="collapse_8949_long">
                 <i class="nc-icon nc-minimal-down"></i>
               </a>
             </div>
-            <div id="collapse_2" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+            <div id="collapse_8949_long" class="collapse" role="tabpanel" aria-labelledby="heading8949Long">
               
               <!-- Card Body -->
               <div class="card-body ">
@@ -245,12 +431,12 @@
         <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
           <h4 class="card-title">8949 Short</h4>
           <div class="card card-plain">
-            <div class="card-header" role="tab" id="headingOne">
-              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_2" aria-expanded="true" aria-controls="collapseOne">
+            <div class="card-header" role="tab" id="heading8949Short">
+              <a data-toggle="collapse" data-parent="#accordion" href="#collapse_8949_short" aria-expanded="false" aria-controls="collapse_8949_short">
                 <i class="nc-icon nc-minimal-down"></i>
               </a>
             </div>
-            <div id="collapse_2" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+            <div id="collapse_8949_short" class="collapse" role="tabpanel" aria-labelledby="heading8949Short">
               
               <!-- Card Body -->
               <div class="card-body ">
@@ -278,37 +464,6 @@
   </div>
 </div>
 <!-- 8949 Short Table -->
-
-
-
-<!-- Gainz Chart  -->
-<div class="row">
-  <div class="col-md-12">
-    <div class="card">
-      <div class="card-body">
-          <div class="card card-plain">
-            <div class="card-header">
-              <h5 class="card-title">Gainz Chart</h5>
-              <p class="card-category">Unrealized Gains or Losses</p>
-              <div class="col-sm-2">
-                <label class="col-form-label">USD Spot:</label>
-                <div class="form-group">
-                  
-                  <input id='stats_usd_spot' class="form-control" type="text" name="number" number="true" />
-                
-                </div>
-              </div>
-            </div>
-            <div class="card-body">
-              <canvas id="gainzChart"></canvas>
-            </div>
-          </div>
-      </div>
-    </div>
-  </div>
-</div>
-<!-- /Gainz Chart  -->
-
 
 
 

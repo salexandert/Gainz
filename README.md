@@ -1,123 +1,83 @@
+# Gainz
 
----
+Gainz is a local, offline crypto accounting workbench for people who want to reconcile exchange CSVs without uploading financial history to a cloud tax service.
 
-# Gainz – Private, Offline Crypto Accounting
+It helps import transactions, link sells to buys, estimate cost basis, review unresolved sends/receives, and export Excel reports for documentation or CPA review.
 
-**Gainz** is a fully offline, privacy-first crypto accounting app. It helps you import your exchange transaction history and walk through common scenarios to gain insight into your holdings and estimate capital gains or losses.
+## What Gainz Is
 
-No internet connection is required—your data stays on your machine.
+- Offline-first: runs locally on your machine.
+- Privacy-oriented: imported files stay on your machine unless you choose to share exports.
+- Reconciliation-focused: designed to help explain messy crypto history, not just produce a final number.
+- Spreadsheet-friendly: exports Excel reports, Form 8949-style sheets, transaction history, and audit packets.
 
----
+## What Gainz Is Not
 
-## ✨ Key Features
+- Gainz is not tax, legal, or financial advice.
+- Gainz does not guarantee IRS-ready results without review.
+- Gainz is not a hosted service and should not be exposed directly to the public internet.
 
-* **Offline-first:** All data processing happens locally—no tracking, no cloud storage.
-* **CSV Import:** Load your transaction history from supported exchanges or a custom template.
-* **Simplified Accounting:** Uses a Universal Wallet approach—no need for full blockchain history or wallet xpubs.
-* **Cost Basis Calculation:** Gainz links buys and sells across wallets and exchanges, even if assets never moved between them.
-* **Discrepancy Detection:** Helps identify missing transactions (e.g. lost, gifted, converted) and offers suggestions to resolve them.
-* **Export Reports:** Output Excel-based reports for documentation and sharing.
+Always review outputs with a qualified tax professional before filing.
 
----
+## Supported Inputs
 
-## 🧠 How It Works
+Gainz currently includes parsers or workflows for:
 
-Gainz uses the **Universal Wallet Method** for accounting. This allows you to:
+- Cash App CSV exports
+- Coinbase CSV exports
+- Coinbase Pro / GDAX fills
+- Kraken/custom imports through the template workflow
+- Manual transaction entry
 
-* Track transactions regardless of the wallet or exchange.
-* Link sells to buys—even without blockchain transfer data.
-* Focus only on **taxable events**, not every coin movement.
+See `demo_data/` for small sample files that are safe to use for testing.
 
-For example, if your imported data shows you bought **3 BTC**, sold **1 BTC**, and still hold **1 BTC**, then Gainz flags a **discrepancy**—you likely gifted, lost, or converted the remaining 1 BTC. You can either:
+## Quick Start From Source
 
-* Manually add the missing transaction, or
-* Let Gainz auto-suggest a matching "sell" or "lost" record.
-
-You can also include **off-exchange events**, like converting ETH to BTC via ShapeShift, to improve accuracy.
-
----
-
-## 🚀 Getting Started
-
-1. **Launch the App**
-   Run `GainzApp.exe`. A command prompt window will open—leave it open while using Gainz.
-
-2. **Access in Browser**
-   Visit `http://127.0.0.1:5000/` in your web browser.
-   Login using:
-
-   * **Username:** `admin`
-   * **Password:** `admin`
-
-3. **Import Transactions**
-   Gainz supports CSV files from:
-
-   * Coinbase
-   * Coinbase Pro
-   * Kraken
-   * Cash App
-
-   For unsupported sources, use the included
-   **`Import_Transactions_Template.xlsx`**, or manually enter transactions via the **Manage Transactions** page.
-
----
-
-## 🎥 Video Walkthrough
-
-Watch the full introduction and walkthrough:
-👉 [https://youtu.be/g_02xOu1F7M](https://youtu.be/g_02xOu1F7M)
-
----
-
-## 🛠 Download & Installation
-
-### ✅ Compiled Versions (Windows & Mac)
-
-Download from Google Drive:
-[https://drive.google.com/drive/folders/1YLyRRWitJ1pHVVMHnspB783Pq52DWUnC?usp=share_link](https://drive.google.com/drive/folders/1YLyRRWitJ1pHVVMHnspB783Pq52DWUnC?usp=share_link)
-
-> *Note: Mac version may be a few versions behind.*
-
-### 🧪 Compile it Yourself
-
-To compile from source using `pyinstaller`, run:
-
-```bash
-pyinstaller --add-data "app;app" --onefile \
-  --hidden-import flask_wtf \
-  --hidden-import bcrypt \
-  --hidden-import wtforms.fields.html5 \
-  --hidden-import utils \
-  --hidden-import cffi \
-  --icon="C:{path repo}\gainz_logo.ico" \
-  run.py
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python run.py
 ```
 
----
+Then open:
 
-## 💸 Donations Welcome
+```text
+http://127.0.0.1:5000/
+```
 
-If Gainz helped you, consider supporting the project:
+On first run, Gainz creates a local admin account. If `GAINZ_ADMIN_PASSWORD` is not set, a one-time generated password is written to:
 
-* **Bitcoin:** `bc1qm0sykhxhhqey9yg2t93mqp4jzgdl88ewa82q3s`
-* **CashApp:** `$SAl3xander`
+```text
+instance/first_run_credentials.txt
+```
 
-Your support is deeply appreciated 🙏
+Set these environment variables to control first-run credentials:
 
----
+```powershell
+$env:GAINZ_ADMIN_USERNAME="admin"
+$env:GAINZ_ADMIN_PASSWORD="choose-a-local-password"
+python run.py
+```
 
-## ⚠️ Disclaimer
+## Common Workflow
 
-> **Gainz does not provide legal, financial, or tax advice.**
-> Please consult with certified professionals to validate all outputs before filing taxes or making financial decisions.
+1. Import transaction CSVs.
+2. Review imported buys, sells, sends, and receives.
+3. Run auto-linking for an asset and year.
+4. Resolve unlinked sells or unexplained holdings.
+5. Export the Excel report.
+6. Generate an audit packet from the Export page.
 
----
+## Documentation
 
-## ❤️ Thanks
+- [How Gainz calculates basis](docs/how-gainz-calculates-basis.md)
+- [Release readiness checklist](docs/release-readiness.md)
 
-Thank you for your interest and support.
-I hope Gainz is exactly what you were looking for!
+## Packaging
 
----
+The first supported distribution target should be a local desktop-style build, not a hosted SaaS product. A hosted version would require a much stronger security and compliance model because it would handle sensitive tax data.
 
+## License
 
+MIT. See [LICENSE](LICENSE).

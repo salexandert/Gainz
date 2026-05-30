@@ -5,6 +5,7 @@ import requests
 import datetime
 import os
 import math
+from decimal import Decimal, ROUND_FLOOR
 from dateutil import parser
 from dateutil.tz import gettz
 
@@ -16,6 +17,45 @@ tzinfos = {
     'PST': gettz('America/Los_Angeles'),
     # Add other timezones as needed
 }
+
+FIAT_ASSET_SYMBOLS = {"USD"}
+
+
+def format_quantity(quantity, decimals=8):
+    """Format crypto quantities without exposing floating-point noise."""
+    if isinstance(quantity, str):
+        return quantity
+
+    try:
+        value = Decimal(str(quantity))
+    except Exception:
+        return quantity
+
+    if value == 0:
+        return "0"
+
+    quantizer = Decimal("1").scaleb(-decimals)
+    value = value.quantize(quantizer)
+    text = format(value, "f").rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def parse_float_value(value):
+    if value is None or value == "":
+        return None
+
+    try:
+        return float(str(value).replace("$", "").replace(",", "").strip())
+    except ValueError:
+        return None
+
+
+def comparable_datetime(value):
+    if hasattr(value, "replace") and getattr(value, "tzinfo", None):
+        return value.replace(tzinfo=None)
+
+    return value
+
 
 def fetch_crypto_price(trans):
 
@@ -151,16 +191,16 @@ def get_stats_table_data(transactions):
                                 
         stats_table_data.append({   
                 "symbol": f"{asset}",
-                "total_purchased_quantity": total_purchased_quantity,
-                "total_purchased_unlinked_quantity": total_purchased_unlinked_quantity,
+                "total_purchased_quantity": format_quantity(total_purchased_quantity),
+                "total_purchased_unlinked_quantity": format_quantity(total_purchased_unlinked_quantity),
                 "total_purchased_usd": "${:,.2f}".format(total_purchased_usd),
-                "total_sold_quantity": total_sold_quantity, 
-                "total_sold_unlinked_quantity": total_sold_unlinked_quantity,
+                "total_sold_quantity": format_quantity(total_sold_quantity), 
+                "total_sold_unlinked_quantity": format_quantity(total_sold_unlinked_quantity),
                 "total_sold_usd": "${:,.2f}".format(total_sold_usd),
                 "total_profit_loss": "${:,.2f}".format(profit_loss),
-                "total_sent_quantity": total_sent_quantity,
-                "total_received_quantity": total_received_quantity,
-                "hodl": hodl
+                "total_sent_quantity": format_quantity(total_sent_quantity),
+                "total_received_quantity": format_quantity(total_received_quantity),
+                "hodl": format_quantity(hodl) if hodl != "N/A" else hodl
 
             })
     
@@ -477,13 +517,13 @@ def get_stats_table_data_range(transactions, date_range=None):
                         num_receives += 1
                         total_received_quantity += trans.quantity
             
-            if len(buy_prices) > 0:
+            if len(buy_prices) > 0 and total_purchased_quantity:
                 average_buy_price = total_purchased_usd / total_purchased_quantity
             
             else:
                 average_buy_price = 0.0
             
-            if len(sell_prices) > 0:
+            if len(sell_prices) > 0 and total_sold_quantity:
                 average_sell_price = total_sold_usd / total_sold_quantity
             
             else:
@@ -507,12 +547,12 @@ def get_stats_table_data_range(transactions, date_range=None):
 
             stats_table_data.append({   
                     "symbol": f"{asset}",
-                    "total_purchased_quantity": total_purchased_quantity,
-                    "total_purchased_unlinked_quantity": round_decimals_down(total_purchased_unlinked_quantity),
+                    "total_purchased_quantity": format_quantity(total_purchased_quantity),
+                    "total_purchased_unlinked_quantity": format_quantity(round_decimals_down(total_purchased_unlinked_quantity)),
                     "total_purchased_usd": "${:,.2f}".format(total_purchased_usd),
                     
-                    "total_sold_quantity": total_sold_quantity, 
-                    "total_sold_unlinked_quantity": total_sold_unlinked_quantity,
+                    "total_sold_quantity": format_quantity(total_sold_quantity), 
+                    "total_sold_unlinked_quantity": format_quantity(total_sold_unlinked_quantity),
                     "total_sold_usd": "${:,.2f}".format(total_sold_usd),
                     "profit_loss_total": "${:,.2f}".format(profit_loss_total),
                     "profit_loss_short": "${:,.2f}".format(profit_loss_short),
@@ -526,8 +566,8 @@ def get_stats_table_data_range(transactions, date_range=None):
                     "cost_basis_short": "${:,.2f}".format(cost_basis_short),
                     "gain_short": "${:,.2f}".format(gain_short),
                     
-                    "total_sent_quantity": total_sent_quantity,
-                    "total_received_quantity": total_received_quantity,
+                    "total_sent_quantity": format_quantity(total_sent_quantity),
+                    "total_received_quantity": format_quantity(total_received_quantity),
 
                     "num_buys": num_buys,
                     "num_sells": num_sells,
@@ -536,13 +576,260 @@ def get_stats_table_data_range(transactions, date_range=None):
 
                     "average_buy_price": "${:,.2f}".format(average_buy_price),
                     "average_sell_price": "${:,.2f}".format(average_sell_price),
-                    "hodl": hodl
+                    "hodl": format_quantity(hodl) if hodl != "N/A" else hodl,
+                    "has_sells_without_links": num_sells > 0 and num_links == 0,
+                    "has_unlinked_sells": total_sold_unlinked_quantity != 0,
                     
                 })
     
 
     return stats_table_data
    
+def get_current_holdings_lots(transactions, asset=None):
+    declared_hodl = transactions.get_hodl(asset) if asset and hasattr(transactions, "get_hodl") else None
+    allocation_remaining = declared_hodl
+    lots = []
+
+    for trans in transactions:
+        if asset and trans.symbol != asset:
+            continue
+
+        if trans.symbol not in transactions.assets:
+            continue
+
+        if trans.trans_type not in ("buy", "receive"):
+            continue
+
+        remaining_quantity = trans.unlinked_quantity
+        if remaining_quantity <= 0.000000001:
+            continue
+
+        lots.append((trans, remaining_quantity))
+
+    if declared_hodl is not None:
+        lots.sort(key=lambda lot: comparable_datetime(lot[0].time_stamp), reverse=True)
+    else:
+        lots.sort(key=lambda lot: comparable_datetime(lot[0].time_stamp))
+
+    table_data = []
+    for trans, remaining_quantity in lots:
+        estimated_held_quantity = remaining_quantity
+        if allocation_remaining is not None:
+            if allocation_remaining <= 0.000000001:
+                continue
+
+            estimated_held_quantity = min(remaining_quantity, allocation_remaining)
+            allocation_remaining -= estimated_held_quantity
+
+        cost_basis = estimated_held_quantity * trans.usd_spot
+        original_cost = trans.quantity * trans.usd_spot
+
+        table_data.append({
+            "asset": trans.symbol,
+            "type": trans.trans_type,
+            "acquired_at": trans.time_stamp,
+            "estimated_held_quantity": estimated_held_quantity,
+            "original_quantity": trans.quantity,
+            "usd_spot": trans.usd_spot,
+            "estimated_basis": cost_basis,
+            "original_basis": original_cost,
+            "source": trans.source,
+        })
+
+    table_data.sort(key=lambda row: (row["asset"], comparable_datetime(row["acquired_at"])))
+    return table_data
+
+
+def get_current_holdings_lot_table_data(transactions, asset=None):
+    table_data = []
+    for lot in get_current_holdings_lots(transactions, asset):
+        acquired_at = lot["acquired_at"]
+        if hasattr(acquired_at, "strftime"):
+            acquired_at = datetime.datetime.strftime(acquired_at, "%Y-%m-%d %H:%M:%S")
+
+        table_data.append([
+            lot["asset"],
+            lot["type"].capitalize(),
+            acquired_at,
+            format_quantity(lot["estimated_held_quantity"]),
+            format_quantity(lot["original_quantity"]),
+            "${:,.2f}".format(lot["usd_spot"]),
+            "${:,.2f}".format(lot["estimated_basis"]),
+            "${:,.2f}".format(lot["original_basis"]),
+            lot["source"],
+        ])
+
+    return table_data
+
+
+def get_default_asset_spot(transactions, asset):
+    latest_transaction = None
+
+    for trans in transactions:
+        if trans.symbol != asset or trans.usd_spot <= 0:
+            continue
+
+        if (
+            latest_transaction is None
+            or comparable_datetime(trans.time_stamp) > comparable_datetime(latest_transaction.time_stamp)
+        ):
+            latest_transaction = trans
+
+    return latest_transaction.usd_spot if latest_transaction else 0.0
+
+
+def get_unrealized_chart_data(transactions, asset, current_usd_spot=None):
+    current_spot = parse_float_value(current_usd_spot)
+    if current_spot is None or current_spot <= 0:
+        current_spot = get_default_asset_spot(transactions, asset)
+
+    chart_points = []
+    if current_spot <= 0:
+        return {
+            "current_usd_spot": current_spot,
+            "points": chart_points,
+        }
+
+    for lot in get_current_holdings_lots(transactions, asset):
+        quantity = lot["estimated_held_quantity"]
+        current_value = quantity * current_spot
+        cost_basis = lot["estimated_basis"]
+        gain_loss = current_value - cost_basis
+        acquired_at = lot["acquired_at"]
+        if hasattr(acquired_at, "strftime"):
+            acquired_at = datetime.datetime.strftime(acquired_at, "%Y-%m-%d %H:%M:%S")
+
+        chart_points.append({
+            "x": acquired_at,
+            "y": round(gain_loss, 2),
+            "quantity": format_quantity(quantity),
+            "usd_spot": "${:,.2f}".format(current_spot),
+            "cost_basis": "${:,.2f}".format(cost_basis),
+            "current_value": "${:,.2f}".format(current_value),
+            "gain_loss": "${:,.2f}".format(gain_loss),
+        })
+
+    return {
+        "current_usd_spot": current_spot,
+        "points": chart_points,
+    }
+
+
+def get_holdings_reconciliation(transactions, asset):
+    declared_hodl = transactions.get_hodl(asset) if hasattr(transactions, "get_hodl") else None
+    totals = {
+        "buy": 0.0,
+        "sell": 0.0,
+        "send": 0.0,
+        "receive": 0.0,
+    }
+
+    for trans in transactions:
+        if trans.symbol == asset and trans.trans_type in totals:
+            totals[trans.trans_type] += trans.quantity
+
+    expected_hodl = totals["buy"] - totals["sell"]
+    imported_net = totals["buy"] + totals["receive"] - totals["sell"] - totals["send"]
+    lot_quantity = 0.0
+
+    for trans in transactions:
+        if trans.symbol == asset and trans.trans_type in ("buy", "receive"):
+            lot_quantity += max(trans.unlinked_quantity, 0.0)
+
+    if declared_hodl is None:
+        difference = None
+        status = "Needs declared HODL"
+        next_action = "Enter the actual current holding for this asset."
+        allocation_method = "Showing unlinked buy/receive lots because no declared HODL is saved."
+    else:
+        difference = expected_hodl - declared_hodl
+        allocation_method = "FIFO remaining estimate: oldest disposals are assumed consumed first, so declared HODL is allocated to newest available lots."
+
+        if abs(difference) <= 0.00000001:
+            status = "Matched"
+            next_action = "Review lots and proceed to basis linking."
+        elif difference > 0:
+            status = "Mismatch"
+            next_action = "Classify missing disposals/losses or convert sends to sells until the difference is resolved."
+        else:
+            status = "Mismatch"
+            next_action = "Add missing acquisitions or convert receives to buys until the difference is resolved."
+
+    return {
+        "asset": asset,
+        "declared_hodl": declared_hodl,
+        "buy_quantity": totals["buy"],
+        "sell_quantity": totals["sell"],
+        "expected_hodl": expected_hodl,
+        "imported_net": imported_net,
+        "available_lot_quantity": lot_quantity,
+        "difference": difference,
+        "status": status,
+        "next_action": next_action,
+        "lot_allocation_method": allocation_method,
+    }
+
+
+def get_holdings_reconciliation_summary(transactions, asset):
+    reconciliation = get_holdings_reconciliation(transactions, asset)
+
+    return [
+        [
+            "Declared HODL",
+            format_quantity(reconciliation["declared_hodl"])
+            if reconciliation["declared_hodl"] is not None
+            else "N/A",
+        ],
+        ["Buy Quantity", format_quantity(reconciliation["buy_quantity"])],
+        ["Sell Quantity", format_quantity(reconciliation["sell_quantity"])],
+        ["Expected From Buys/Sells Only", format_quantity(reconciliation["expected_hodl"])],
+        ["Imported Net After Transfers", format_quantity(reconciliation["imported_net"])],
+        ["Available Buy/Receive Lot Quantity", format_quantity(reconciliation["available_lot_quantity"])],
+        [
+            "Difference vs Declared HODL",
+            format_quantity(reconciliation["difference"])
+            if reconciliation["difference"] is not None
+            else "N/A",
+        ],
+        ["Status", reconciliation["status"]],
+        ["Next Action", reconciliation["next_action"]],
+        ["Lot Allocation Method", reconciliation["lot_allocation_method"]],
+    ]
+
+
+def get_multi_asset_holdings_reconciliation_table_data(transactions):
+    assets = set(getattr(transactions, "assets", set()))
+    assets.update(
+        asset_object.symbol
+        for asset_object in getattr(transactions, "asset_objects", [])
+        if getattr(asset_object, "symbol", None)
+    )
+    assets = sorted(asset for asset in assets if asset not in FIAT_ASSET_SYMBOLS)
+
+    table_data = []
+    for asset in assets:
+        reconciliation = get_holdings_reconciliation(transactions, asset)
+        table_data.append([
+            asset,
+            (
+                format_quantity(reconciliation["declared_hodl"])
+                if reconciliation["declared_hodl"] is not None
+                else "N/A"
+            ),
+            format_quantity(reconciliation["expected_hodl"]),
+            format_quantity(reconciliation["imported_net"]),
+            format_quantity(reconciliation["available_lot_quantity"]),
+            (
+                format_quantity(reconciliation["difference"])
+                if reconciliation["difference"] is not None
+                else "N/A"
+            ),
+            reconciliation["status"],
+            reconciliation["next_action"],
+        ])
+
+    return table_data
+
 
 def get_all_trans_table_data_range(transactions, asset, date_range):
     
@@ -911,8 +1198,8 @@ def round_decimals_down(number:float, decimals:int=8):
     elif decimals == 0:
         return math.floor(number)
 
-    factor = 10 ** decimals
-    return math.floor(number * factor) / factor
+    quantizer = Decimal("1").scaleb(-decimals)
+    return float(Decimal(str(number)).quantize(quantizer, rounding=ROUND_FLOOR))
 
 # This module will handle general utility functions.
 

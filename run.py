@@ -55,7 +55,10 @@ if __name__ == "__main__":
     print(
         "\nTo access Gainz go to http://127.0.0.1:5000 in a web browser. Preferably Chrome"
     )
-    print("\nDefault credentials username: admin, password: admin")
+    print(
+        "\nIf this is your first run, credentials are in instance/first_run_credentials.txt "
+        "unless GAINZ_ADMIN_PASSWORD was provided."
+    )
     print("\nClose this window when finished.\n")
 
     app.run(debug=True)

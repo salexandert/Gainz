@@ -6,6 +6,8 @@ from .base.models import User
 from os import path
 import logging
 from transactions import Transactions
+import os
+import secrets
 
 
 def register_extensions(app):
@@ -41,8 +43,27 @@ def configure_database(app):
             db.create_all()
             admin_username = app.config['ADMIN']['username']
             user = User.query.filter_by(username=admin_username).first()
-            if user: user.delete_from_db()
-            User(**app.config['ADMIN']).add_to_db()
+            if user is None:
+                admin_config = dict(app.config['ADMIN'])
+                if not admin_config.get('password'):
+                    admin_config['password'] = secrets.token_urlsafe(18)
+                    os.makedirs(app.config['INSTANCE_PATH'], exist_ok=True)
+                    credentials_path = os.path.join(
+                        app.config['INSTANCE_PATH'],
+                        'first_run_credentials.txt'
+                    )
+                    with open(credentials_path, 'w', encoding='utf-8') as credentials_file:
+                        credentials_file.write(
+                            'Gainz first-run local credentials\n'
+                            f"Username: {admin_config['username']}\n"
+                            f"Password: {admin_config['password']}\n"
+                            '\nChange this password after logging in.\n'
+                        )
+                    app.logger.warning(
+                        'Generated first-run admin credentials at %s',
+                        credentials_path
+                    )
+                User(**admin_config).add_to_db()
             app.db_initialized = True
 
     @app.teardown_request

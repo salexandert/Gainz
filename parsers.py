@@ -3,6 +3,7 @@
 import pandas as pd
 import dateutil
 import os
+import re
 from openpyxl import load_workbook
 from dateutil import parser
 from dateutil.tz import gettz
@@ -14,6 +15,50 @@ tzinfos = {
     'PST': -8 * 3600,  # Pacific Standard Time
     # Add other timezones as needed
 }
+
+
+def parse_quantity_value(value):
+    if pd.isna(value):
+        return 0.0
+
+    match = re.search(r'-?\d+(?:\.\d+)?', str(value).replace(',', ''))
+    if not match:
+        return 0.0
+
+    return float(match.group(0))
+
+
+def parse_money_value(value):
+    if pd.isna(value):
+        return 0.0
+
+    text = str(value).replace('$', '').replace(',', '').strip()
+    if text in ('', 'nan'):
+        return 0.0
+
+    match = re.search(r'-?\d+(?:\.\d+)?', text)
+    if not match:
+        return 0.0
+
+    return float(match.group(0))
+
+
+def parse_coinbase_convert_note(note):
+    match = re.search(
+        r'Converted\s+([0-9,]+(?:\.\d+)?)\s+([A-Za-z0-9]+)\s+to\s+([0-9,]+(?:\.\d+)?)\s+([A-Za-z0-9]+)',
+        str(note),
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+
+    return {
+        'from_quantity': parse_quantity_value(match.group(1)),
+        'from_asset': match.group(2).upper(),
+        'to_quantity': parse_quantity_value(match.group(3)),
+        'to_asset': match.group(4).upper(),
+    }
+
 
 def detect_csv_format(file_path):
     """
@@ -54,6 +99,7 @@ def detect_csv_format(file_path):
         print(f"Error detecting CSV format: {e}")
         return 'unknown'
 
+
 def transform_cashapp_to_standard(df):
     """
     Transforms Cash App CSV format to the standard format expected by import_transactions.
@@ -79,10 +125,10 @@ def transform_cashapp_to_standard(df):
 
     # Process Asset Amount - ensure sell/send values are positive
     result_df['Asset Amount'] = df.apply(
-        lambda row: abs(float(row['Asset Amount'])) if pd.notna(row['Asset Amount']) and 
-                    (('sell' in str(row['Transaction Type']).lower()) or 
+        lambda row: abs(parse_quantity_value(row['Asset Amount'])) if pd.notna(row['Asset Amount']) and
+                    (('sell' in str(row['Transaction Type']).lower()) or
                      ('sent' in str(row['Transaction Type']).lower()))
-                    else row['Asset Amount'], 
+                    else parse_quantity_value(row['Asset Amount']),
         axis=1
     )
     
@@ -91,8 +137,9 @@ def transform_cashapp_to_standard(df):
     
     # Filter out rows with empty Asset Type (non-crypto transactions)
     result_df = result_df[result_df['Asset Type'].notna() & (result_df['Asset Type'] != '')]
-    
+
     return result_df
+
 
 def transform_coinbase_to_standard(df):
     """
@@ -104,41 +151,75 @@ def transform_coinbase_to_standard(df):
     Returns:
         DataFrame: Transformed dataframe with standardized column names
     """
-    result_df = pd.DataFrame()
-    
-    # Map Coinbase CSV columns to standard columns
-    result_df['Asset Type'] = df['Asset']
-    
-    # Process Transaction Type
-    result_df['Transaction Type'] = df['Transaction Type'].apply(
-        lambda x: 'Buy' if 'buy' in str(x).lower() else
-                 'Sell' if 'sell' in str(x).lower() else
-                 'Send' if 'send' in str(x).lower() or 'withdraw' in str(x).lower() else
-                 'Receive' if 'receive' in str(x).lower() or 'deposit' in str(x).lower() or 'reward' in str(x).lower() or 'staking' in str(x).lower() else x
-    )
-    
-    # Process Asset Amount - ensure sell/send values are positive
-    result_df['Asset Amount'] = df.apply(
-        lambda row: abs(float(row['Quantity Transacted'])) if pd.notna(row['Quantity Transacted']) and
-                   (('sell' in str(row['Transaction Type']).lower()) or 
-                    ('send' in str(row['Transaction Type']).lower()) or
-                    ('withdraw' in str(row['Transaction Type']).lower()) or
-                    float(str(row['Quantity Transacted']).replace(',', '')) < 0)
-                   else row['Quantity Transacted'],
-        axis=1
-    )
-    
-    result_df['Date'] = df['Timestamp']
-    
-    # Process Price at Transaction (remove $ and spaces)
-    result_df['Asset Price'] = df['Price at Transaction'].apply(
-        lambda x: str(x).replace('$', '').replace(' ', '') if pd.notna(x) else '0'
-    )
-    
-    # Filter out rows with empty Asset Type (non-crypto transactions)
-    result_df = result_df[result_df['Asset Type'].notna() & (result_df['Asset Type'] != '')]
-    
-    return result_df
+    rows = []
+
+    for _, row in df.iterrows():
+        asset = row.get('Asset')
+        trans_type = str(row.get('Transaction Type', ''))
+        trans_type_lower = trans_type.lower()
+        timestamp = row.get('Timestamp')
+        quantity = parse_quantity_value(row.get('Quantity Transacted'))
+        asset_price = parse_money_value(row.get('Price at Transaction'))
+
+        if 'convert' in trans_type_lower:
+            convert = parse_coinbase_convert_note(row.get('Notes'))
+            if convert:
+                conversion_total = (
+                    parse_money_value(row.get('Total (inclusive of fees and/or spread)'))
+                    or parse_money_value(row.get('Subtotal'))
+                    or (convert['from_quantity'] * asset_price)
+                )
+
+                sell_spot = conversion_total / convert['from_quantity'] if convert['from_quantity'] else asset_price
+                buy_spot = conversion_total / convert['to_quantity'] if convert['to_quantity'] else 0.0
+
+                rows.append({
+                    'Asset Type': convert['from_asset'],
+                    'Transaction Type': 'Sell',
+                    'Asset Amount': abs(convert['from_quantity']),
+                    'Date': timestamp,
+                    'Asset Price': sell_spot,
+                })
+                rows.append({
+                    'Asset Type': convert['to_asset'],
+                    'Transaction Type': 'Buy',
+                    'Asset Amount': abs(convert['to_quantity']),
+                    'Date': timestamp,
+                    'Asset Price': buy_spot,
+                })
+                continue
+
+        if 'buy' in trans_type_lower:
+            standard_type = 'Buy'
+        elif 'sell' in trans_type_lower:
+            standard_type = 'Sell'
+        elif 'send' in trans_type_lower or 'withdraw' in trans_type_lower:
+            standard_type = 'Send'
+        elif (
+            'receive' in trans_type_lower
+            or 'deposit' in trans_type_lower
+            or 'reward' in trans_type_lower
+            or 'staking' in trans_type_lower
+        ):
+            standard_type = 'Receive'
+        else:
+            standard_type = trans_type
+
+        if pd.isna(asset) or asset == '':
+            continue
+
+        if standard_type in ('Sell', 'Send') or quantity < 0:
+            quantity = abs(quantity)
+
+        rows.append({
+            'Asset Type': asset,
+            'Transaction Type': standard_type,
+            'Asset Amount': quantity,
+            'Date': timestamp,
+            'Asset Price': asset_price,
+        })
+
+    return pd.DataFrame(rows)
 
 def import_transactions(file_path, transactions):
     """
@@ -153,9 +234,8 @@ def import_transactions(file_path, transactions):
     Returns:
         tuple: (imported_count, skipped_count) Count of transactions imported and skipped due to duplicates.
     """
-    from decimal import Decimal, getcontext    # Set precision for comparing float values
+    from decimal import Decimal
     import logging
-    getcontext().prec = 10
     
     # Function to check if a transaction is duplicate
     def is_duplicate(new_trans, existing_transactions, tolerance=1e-6):
@@ -223,8 +303,9 @@ def import_transactions(file_path, transactions):
         transactions_added = False
         imported_count = 0
         skipped_count = 0
+        import_warnings = []
         
-        for _, row in trans_df.iterrows():
+        for row_number, (_, row) in enumerate(trans_df.iterrows(), start=2):
             try:
                 symbol = row['Asset Type']
                 quantity = float(row['Asset Amount'])
@@ -262,7 +343,12 @@ def import_transactions(file_path, transactions):
                 elif any(keyword in trans_type for keyword in receive_keywords):
                     temp_trans = Receive(symbol=symbol, quantity=quantity, time_stamp=time_stamp, usd_spot=usd_spot, source=file_path)
                 else:
-                    print(f"Warning: Unrecognized transaction type '{row['Transaction Type']}' - skipping record")
+                    warning = (
+                        f"Skipped row {row_number} from {os.path.basename(file_path)}: "
+                        f"unrecognized transaction type '{row['Transaction Type']}'"
+                    )
+                    print(f"Warning: {warning}")
+                    import_warnings.append(warning)
                     continue
                 
                 # Check for duplicates before adding
@@ -277,11 +363,25 @@ def import_transactions(file_path, transactions):
                     transactions_added = True
                     imported_count += 1
             except KeyError as ke:
-                print(f"Error processing row: Missing required column - {ke}")
+                warning = f"Skipped row {row_number} from {os.path.basename(file_path)}: missing required column {ke}"
+                print(f"Error processing row: {warning}")
+                import_warnings.append(warning)
                 continue
             except Exception as e:
-                print(f"Error processing row: {e}")
+                warning = f"Skipped row {row_number} from {os.path.basename(file_path)}: {e}"
+                print(f"Error processing row: {warning}")
+                import_warnings.append(warning)
                 continue
+
+        existing_warnings = getattr(transactions, 'import_warnings', [])
+        transactions.import_warnings = existing_warnings + import_warnings
+        transactions.last_import_result = {
+            "file_path": file_path,
+            "imported_count": imported_count,
+            "skipped_count": skipped_count,
+            "warnings": import_warnings,
+        }
+
           # Save transactions if any were added
         if transactions_added:
             description = f"Imported from {os.path.basename(file_path)}"
@@ -297,7 +397,7 @@ def import_transactions(file_path, transactions):
             logger = logging.getLogger('parsers')
             logger.info("No transactions were added from the file.")
             logger.info(f"Skipped {skipped_count} duplicate transactions")
-            
+
         return (imported_count, skipped_count)
             
     except Exception as e:

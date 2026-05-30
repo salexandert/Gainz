@@ -1,0 +1,252 @@
+import datetime
+import os
+import tempfile
+import unittest
+from pathlib import Path
+
+import transactions as transactions_module
+from openpyxl import Workbook
+from transaction import Buy, Receive, Sell, Send
+from transactions import Transactions
+from utils import (
+    get_current_holdings_lot_table_data,
+    get_multi_asset_holdings_reconciliation_table_data,
+    get_unrealized_chart_data,
+)
+
+
+def empty_transactions():
+    transactions = Transactions.__new__(Transactions)
+    transactions.revision_num = 0
+    transactions.saves = []
+    transactions.index = 0
+    transactions.conversions = []
+    transactions.asset_objects = []
+    transactions.view = ""
+    transactions.transactions = []
+    return transactions
+
+
+class TransactionsEngineTests(unittest.TestCase):
+    def test_default_load_uses_most_recent_save_not_highest_revision(self):
+        original_basedir = transactions_module.basedir
+        original_load = Transactions.load
+
+        def write_save(path, revision_num):
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet.title = "Description"
+            sheet.cell(row=1, column=1, value=path.stem)
+            sheet.cell(row=1, column=2, value=revision_num)
+            workbook.save(path)
+            workbook.close()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            saves_dir = temp_path / "saves"
+            saves_dir.mkdir()
+
+            older = saves_dir / "saved_older_high_revision.xlsx"
+            newer = saves_dir / "saved_newer_low_revision.xlsx"
+            write_save(older, 1000)
+            write_save(newer, 1)
+            os.utime(older, (100, 100))
+            os.utime(newer, (200, 200))
+
+            loaded_paths = []
+
+            def fake_load(self, filename):
+                loaded_paths.append(Path(filename).name)
+                return []
+
+            try:
+                transactions_module.basedir = str(temp_path)
+                Transactions.load = fake_load
+
+                transactions = Transactions()
+            finally:
+                transactions_module.basedir = original_basedir
+                Transactions.load = original_load
+
+        self.assertEqual("saved_newer_low_revision.xlsx", Path(transactions.view).name)
+        self.assertEqual(["saved_newer_low_revision.xlsx"], loaded_paths)
+
+    def test_assets_excludes_fiat_symbols_but_keeps_transactions(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Receive("USD", 100, datetime.datetime(2024, 1, 1), "cash", 1),
+            Buy("BTC", 1, datetime.datetime(2024, 1, 2), 100, "exchange"),
+        ]
+
+        self.assertEqual({"BTC"}, transactions.assets)
+        self.assertEqual(2, len(transactions.transactions))
+
+    def test_current_holdings_lots_show_remaining_basis_by_acquisition_date(self):
+        transactions = empty_transactions()
+        first_buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange")
+        second_buy = Buy("BTC", 2, datetime.datetime(2024, 2, 1), 200, "exchange")
+        sell = Sell("BTC", 0.4, datetime.datetime(2024, 3, 1), 300, "exchange")
+        sell.link_transaction(first_buy, 0.4)
+        transactions.transactions = [first_buy, second_buy, sell]
+
+        lots = get_current_holdings_lot_table_data(transactions, "BTC")
+
+        self.assertEqual(2, len(lots))
+        self.assertEqual("2024-01-01 00:00:00", lots[0][2])
+        self.assertEqual("0.6", lots[0][3])
+        self.assertEqual("$60.00", lots[0][6])
+        self.assertEqual("2024-02-01 00:00:00", lots[1][2])
+        self.assertEqual("2", lots[1][3])
+        self.assertEqual("$400.00", lots[1][6])
+
+    def test_current_holdings_lots_include_receives_and_ignore_fiat(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Receive("ETH", 3, datetime.datetime(2024, 1, 1), "wallet", 50),
+            Receive("USD", 100, datetime.datetime(2024, 1, 2), "cash", 1),
+        ]
+
+        lots = get_current_holdings_lot_table_data(transactions)
+
+        self.assertEqual(1, len(lots))
+        self.assertEqual("ETH", lots[0][0])
+        self.assertEqual("Receive", lots[0][1])
+        self.assertEqual("$150.00", lots[0][6])
+
+    def test_declared_hodl_allocates_current_holdings_to_newest_available_lots(self):
+        transactions = empty_transactions()
+        transactions.set_hodl("BTC", 0.5)
+        transactions.transactions = [
+            Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "old"),
+            Buy("BTC", 2, datetime.datetime(2024, 2, 1), 200, "new"),
+        ]
+
+        lots = get_current_holdings_lot_table_data(transactions, "BTC")
+
+        self.assertEqual(1, len(lots))
+        self.assertEqual("2024-02-01 00:00:00", lots[0][2])
+        self.assertEqual("0.5", lots[0][3])
+        self.assertEqual("$100.00", lots[0][6])
+
+    def test_unrealized_chart_data_uses_current_lots_and_usd_spot(self):
+        transactions = empty_transactions()
+        first_buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange")
+        second_buy = Buy("BTC", 2, datetime.datetime(2024, 2, 1), 200, "exchange")
+        sell = Sell("BTC", 0.4, datetime.datetime(2024, 3, 1), 300, "exchange")
+        sell.link_transaction(first_buy, 0.4)
+        transactions.transactions = [first_buy, second_buy, sell]
+
+        chart = get_unrealized_chart_data(transactions, "BTC", 300)
+
+        self.assertEqual(300, chart["current_usd_spot"])
+        self.assertEqual(2, len(chart["points"]))
+        self.assertEqual("2024-01-01 00:00:00", chart["points"][0]["x"])
+        self.assertEqual(120, chart["points"][0]["y"])
+        self.assertEqual("$60.00", chart["points"][0]["cost_basis"])
+        self.assertEqual("$180.00", chart["points"][0]["current_value"])
+        self.assertEqual(200, chart["points"][1]["y"])
+
+    def test_multi_asset_holdings_reconciliation_includes_all_crypto_assets(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange"),
+            Sell("BTC", 0.25, datetime.datetime(2024, 2, 1), 200, "exchange"),
+            Receive("ETH", 2, datetime.datetime(2024, 1, 1), "wallet", 50),
+            Receive("USD", 100, datetime.datetime(2024, 1, 2), "cash", 1),
+        ]
+        transactions.transactions[1].link_transaction(transactions.transactions[0], 0.25)
+        transactions.set_hodl("BTC", 0.75)
+
+        rows = get_multi_asset_holdings_reconciliation_table_data(transactions)
+
+        self.assertEqual(["BTC", "ETH"], [row[0] for row in rows])
+        self.assertEqual("0.75", rows[0][1])
+        self.assertEqual("0.75", rows[0][2])
+        self.assertEqual("0", rows[0][5])
+        self.assertEqual("Matched", rows[0][6])
+        self.assertEqual("N/A", rows[1][1])
+        self.assertEqual("Needs declared HODL", rows[1][6])
+
+    def test_set_hodl_creates_and_updates_asset_record(self):
+        transactions = empty_transactions()
+
+        transactions.set_hodl("btc", 0.5)
+        transactions.set_hodl("BTC", 0.75)
+
+        self.assertEqual(1, len(transactions.asset_objects))
+        self.assertEqual("BTC", transactions.asset_objects[0].symbol)
+        self.assertEqual(0.75, transactions.get_hodl("BTC"))
+
+    def test_fifo_auto_link_uses_earliest_buy(self):
+        transactions = empty_transactions()
+        first_buy = Buy("BTC", 1, datetime.datetime(2023, 1, 1), 100, "test")
+        second_buy = Buy("BTC", 1, datetime.datetime(2023, 2, 1), 200, "test")
+        sell = Sell("BTC", 1, datetime.datetime(2023, 3, 1), 300, "test")
+        transactions.transactions = [second_buy, sell, first_buy]
+
+        failures = transactions.auto_link(asset="BTC", algo="fifo")
+
+        self.assertEqual([], failures)
+        self.assertEqual(first_buy.uid, sell.links[0].buy.uid)
+        self.assertAlmostEqual(200, sell.links[0].profit_loss)
+
+    def test_min_gain_auto_link_uses_highest_cost_basis(self):
+        transactions = empty_transactions()
+        low_basis_buy = Buy("ETH", 1, datetime.datetime(2023, 1, 1), 100, "test")
+        high_basis_buy = Buy("ETH", 1, datetime.datetime(2023, 2, 1), 250, "test")
+        sell = Sell("ETH", 1, datetime.datetime(2023, 3, 1), 300, "test")
+        transactions.transactions = [low_basis_buy, sell, high_basis_buy]
+
+        failures = transactions.auto_link(asset="ETH", algo="min_gain")
+
+        self.assertEqual([], failures)
+        self.assertEqual(high_basis_buy.uid, sell.links[0].buy.uid)
+        self.assertAlmostEqual(50, sell.links[0].profit_loss)
+
+    def test_convert_sends_to_sells_creates_sell_and_conversion_record(self):
+        transactions = empty_transactions()
+        send = Send("SOL", 3, datetime.datetime(2024, 1, 1), 50, "wallet")
+        transactions.transactions = [send]
+
+        message = transactions.convert_sends_to_sells("SOL", amount_to_convert=2)
+
+        sells = [trans for trans in transactions if trans.trans_type == "sell"]
+        sends = [trans for trans in transactions if trans.trans_type == "send"]
+        self.assertIn("Converted 2.0 SOL", message)
+        self.assertEqual(1, len(sells))
+        self.assertEqual(1, len(sends))
+        self.assertAlmostEqual(2, sells[0].quantity)
+        self.assertAlmostEqual(1, sends[0].quantity)
+        self.assertEqual(1, len(transactions.conversions))
+
+    def test_convert_receives_to_buys_creates_buy_and_reduces_receive(self):
+        transactions = empty_transactions()
+        receive = Receive("ADA", 10, datetime.datetime(2024, 1, 1), "wallet", 0.50)
+        transactions.transactions = [receive]
+
+        transactions.convert_receives_to_buys("ADA", amount_to_convert=4)
+
+        buys = [trans for trans in transactions if trans.trans_type == "buy"]
+        receives = [trans for trans in transactions if trans.trans_type == "receive"]
+        self.assertEqual(1, len(buys))
+        self.assertEqual(1, len(receives))
+        self.assertAlmostEqual(4, buys[0].quantity)
+        self.assertAlmostEqual(6, receives[0].quantity)
+        self.assertEqual(1, len(transactions.conversions))
+
+    def test_convert_buys_to_lost_uses_only_unlinked_quantity(self):
+        transactions = empty_transactions()
+        buy = Buy("MATIC", 5, datetime.datetime(2024, 1, 1), 1, "test")
+        sell = Sell("MATIC", 2, datetime.datetime(2024, 2, 1), 2, "test")
+        sell.link_transaction(buy, 2)
+        transactions.transactions = [buy, sell]
+
+        transactions.convert_buys_to_lost("MATIC", amount=2)
+
+        self.assertAlmostEqual(3, buy.quantity)
+        self.assertAlmostEqual(1, buy.unlinked_quantity)
+        self.assertEqual(1, len(transactions.conversions))
+
+
+if __name__ == "__main__":
+    unittest.main()

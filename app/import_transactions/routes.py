@@ -8,7 +8,6 @@ from wtforms import (SelectField,StringField,
 from wtforms.fields import DateField
 from transaction import Buy, Sell
 import json
-from werkzeug.utils import secure_filename
 from flask import jsonify
 from conversion import Conversion
 
@@ -18,9 +17,8 @@ from utils import *
 import dateutil.parser
 
 from flask import Blueprint, request
-from werkzeug.utils import secure_filename
 from transactions import Transactions
-from parsers import import_transactions
+from app.services.import_service import ImportService
 
 import_transactions_bp = Blueprint('import_transactions', __name__)
 
@@ -59,10 +57,8 @@ def import_wizard():
         # Import from CSV File
         if 'file' in request.files:
             file = request.files['file']
-            filename = secure_filename(file.filename)
-            file_path = f'LOCAL_TAX_UPLOAD_REMOVED'
-            file.save(file_path)
-            import_transactions(file_path, transactions)
+            if file and file.filename:
+                ImportService(current_app.config['UPLOAD_FOLDER']).import_upload(file, transactions)
 
         # Current Hodl
         if current_hodl.validate_on_submit():

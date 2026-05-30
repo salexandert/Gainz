@@ -9,6 +9,89 @@ from wtforms import SubmitField
 from time import strftime
 
 
+def _stats_table_rows(stats_table_data):
+    return [
+        [
+            row['symbol'],
+            row['total_purchased_quantity'],
+            row['total_sold_quantity'],
+            row['total_sold_unlinked_quantity'],
+            row['total_purchased_unlinked_quantity'],
+            row['total_purchased_usd'],
+            row['total_sold_usd'],
+            row.get('profit_loss_total', row.get('total_profit_loss')),
+            row['hodl']
+        ]
+        for row in stats_table_data
+    ]
+
+
+def _stats_reconciliation_status(stats_table_data):
+    assets_needing_links = [
+        row['symbol']
+        for row in stats_table_data
+        if row.get('has_sells_without_links') or row.get('has_unlinked_sells')
+    ]
+
+    return {
+        "is_reconciled": len(assets_needing_links) == 0,
+        "assets_needing_links": assets_needing_links,
+        "message": (
+            "Not reconciled yet: sells exist without complete basis links. "
+            "Run Auto Link, load a reconciled save, or review links before using these totals for tax filing."
+            if assets_needing_links else ""
+        )
+    }
+
+
+def _stats_import_warnings(transactions):
+    return getattr(transactions, "import_warnings", [])
+
+
+def _has_unlinked_sales(stats_row):
+    return bool(
+        stats_row
+        and (stats_row.get('has_sells_without_links') or stats_row.get('has_unlinked_sells'))
+    )
+
+
+def _holdings_reconciliation_rows(raw_holdings_rows, stats_table_data):
+    stats_by_asset = {row['symbol']: row for row in stats_table_data}
+    table_rows = []
+
+    for row in raw_holdings_rows:
+        row = list(row)
+        asset = row[0]
+
+        if _has_unlinked_sales(stats_by_asset.get(asset)):
+            row[6] = "Unlinked sales"
+            row[7] = "Run Auto Link or review basis links before relying on this asset's tax totals."
+
+        table_rows.append(row)
+
+    return table_rows
+
+
+def _stats_summary(stats_table_data, raw_holdings_rows, import_warnings):
+    assets_needing_hodl = sum(1 for row in raw_holdings_rows if row[1] == "N/A")
+    assets_with_mismatches = sum(1 for row in raw_holdings_rows if row[6] == "Mismatch")
+    unlinked_sales = sum(1 for row in stats_table_data if _has_unlinked_sales(row))
+    import_warning_count = len(import_warnings or [])
+    is_ready = (
+        assets_needing_hodl == 0
+        and assets_with_mismatches == 0
+        and unlinked_sales == 0
+        and import_warning_count == 0
+    )
+
+    return {
+        "reconciliation": "Ready" if is_ready else "Not ready",
+        "reconciliation_class": "status-matched" if is_ready else "status-mismatch",
+        "assets_needing_hodl": assets_needing_hodl,
+        "assets_with_mismatches": assets_with_mismatches,
+        "import_warnings": import_warning_count,
+        "unlinked_sales": unlinked_sales,
+    }
 
 
 @blueprint.route('/',  methods=['GET', 'POST'])
@@ -16,7 +99,6 @@ from time import strftime
 def index():
     
     transactions = current_app.config['transactions']
-    stats_table_data = get_stats_table_data(transactions)    
 
     # Get Years
     years = set()
@@ -26,7 +108,24 @@ def index():
     years = sorted(years)
     years.insert(0, 'All Time')
     
-    return render_template('stats_page.html', stats_table_data=stats_table_data, date_range=date_range, years=years)
+    all_time_range = get_transactions_date_range(transactions, {'start_date': '', 'end_date': ''})
+    ranged_stats_table_data = get_stats_table_data_range(transactions, all_time_range)
+    raw_holdings_reconciliation = get_multi_asset_holdings_reconciliation_table_data(transactions)
+    import_warnings = _stats_import_warnings(transactions)
+
+    return render_template(
+        'stats_page.html',
+        stats_table_data=ranged_stats_table_data,
+        date_range=date_range,
+        years=years,
+        reconciliation_status=_stats_reconciliation_status(ranged_stats_table_data),
+        import_warnings=import_warnings,
+        stats_summary=_stats_summary(ranged_stats_table_data, raw_holdings_reconciliation, import_warnings),
+        holdings_reconciliation_table_data=_holdings_reconciliation_rows(
+            raw_holdings_reconciliation,
+            ranged_stats_table_data,
+        ),
+    )
 
 
 @blueprint.route('/selected_asset', methods=['POST'])
@@ -118,9 +217,18 @@ def selected_asset():
 
     # Get Buys Table Data
     buys_table_data = get_buys_trans_table_data_range(transactions, asset, date_range)
+    holdings_lot_table_data = get_current_holdings_lot_table_data(transactions, asset)
+    holdings_reconciliation_data = get_holdings_reconciliation_summary(transactions, asset)
+    chart_data = get_unrealized_chart_data(
+        transactions,
+        asset,
+        request.json.get('current_usd_spot'),
+    )
 
     # Get All Links Table Data
     all_links_table_data = get_all_links_table_data(transactions, asset)
+    long_8949_table_data = []
+    short_8949_table_data = []
 
     data_dict = {}
 
@@ -128,9 +236,51 @@ def selected_asset():
     data_dict['detailed_stats'] = detailed_stats
     data_dict['linked'] = linked_table_data
     data_dict['sells'] = sells_table_data
+    data_dict['sells_table_data'] = sells_table_data
     data_dict['buys'] = buys_table_data
+    data_dict['holdings_lot_table_data'] = holdings_lot_table_data
+    data_dict['holdings_reconciliation_data'] = holdings_reconciliation_data
+    raw_holdings_reconciliation = get_multi_asset_holdings_reconciliation_table_data(transactions)
+    import_warnings = _stats_import_warnings(transactions)
+    data_dict['holdings_reconciliation_table_data'] = _holdings_reconciliation_rows(
+        raw_holdings_reconciliation,
+        stats_table_data,
+    )
+    data_dict['unrealized_chart_data'] = chart_data["points"]
+    data_dict['chart_current_usd_spot'] = chart_data["current_usd_spot"]
+    data_dict['l8949_table_data'] = long_8949_table_data
+    data_dict['s8949_table_data'] = short_8949_table_data
+    data_dict['reconciliation_status'] = {
+        "is_reconciled": not (asset_stats.get('has_sells_without_links') or asset_stats.get('has_unlinked_sells')),
+        "message": (
+            f"Not reconciled yet: {asset} has sells without complete basis links."
+            if asset_stats.get('has_sells_without_links') or asset_stats.get('has_unlinked_sells')
+            else ""
+        )
+    }
+    data_dict['import_warnings'] = import_warnings
+    data_dict['stats_summary'] = _stats_summary(stats_table_data, raw_holdings_reconciliation, import_warnings)
     
     return jsonify(data_dict)
+
+
+@blueprint.route('/set_hodl', methods=['POST'])
+@login_required
+def set_hodl():
+    transactions = current_app.config['transactions']
+    asset = request.json['asset']
+    quantity = request.json['quantity']
+
+    if isinstance(asset, list):
+        asset = asset[0]
+
+    transactions.set_hodl(asset, quantity)
+    save_path = transactions.save(description=f"Declared HODL for {asset}")
+
+    return jsonify({
+        "message": f"Declared HODL for {asset} saved.",
+        "save_path": save_path,
+    })
 
 
 @blueprint.route('/date_range',  methods=['POST'])
@@ -157,23 +307,18 @@ def date_range():
     date_range = get_transactions_date_range(transactions, date_range)
         
     stats_table_data = get_stats_table_data_range(transactions, date_range)
-
-    stats_table_rows = []
-    for row in stats_table_data:
-        stats_table_rows.append([
-            row['symbol'],
-            row['total_purchased_quantity'],
-            row['total_sold_quantity'],
-            row['total_sold_unlinked_quantity'],
-            row['total_purchased_unlinked_quantity'],
-            row['total_purchased_usd'],
-            row['total_sold_usd'],
-            row['profit_loss_total'],
-            row['hodl']
-        ])
+    raw_holdings_reconciliation = get_multi_asset_holdings_reconciliation_table_data(transactions)
+    import_warnings = _stats_import_warnings(transactions)
 
     data = {}
-    data['stats_table_rows'] = stats_table_rows
+    data['stats_table_rows'] = _stats_table_rows(stats_table_data)
+    data['reconciliation_status'] = _stats_reconciliation_status(stats_table_data)
+    data['import_warnings'] = import_warnings
+    data['stats_summary'] = _stats_summary(stats_table_data, raw_holdings_reconciliation, import_warnings)
+    data['holdings_reconciliation_table_data'] = _holdings_reconciliation_rows(
+        raw_holdings_reconciliation,
+        stats_table_data,
+    )
 
     # convert dates back to string format
     date_range['start_date'] = datetime.datetime.strftime(date_range['start_date'], "%Y-%m-%d %H:%M")

@@ -314,6 +314,269 @@ $(document).ready(function() {
 // stats page code
 $(document).ready(function() {
 
+    function setStatsReconciliationWarning(status) {
+        if (status && status.message) {
+            $('#stats_reconciliation_warning_text').text(status.message);
+            $('#stats_reconciliation_warning').show();
+        } else {
+            $('#stats_reconciliation_warning').hide();
+        }
+    }
+
+    function setStatsImportWarnings(warnings) {
+        var warningList = $('#stats_import_warnings_list');
+        warningList.empty();
+
+        if (warnings && warnings.length > 0) {
+            warnings.forEach(function(warning) {
+                warningList.append($('<li>').text(warning));
+            });
+            $('#stats_import_warnings').show();
+        } else {
+            $('#stats_import_warnings').hide();
+        }
+    }
+
+    function statusClassName(status) {
+        var normalizedStatus = String(status || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        return 'status-' + normalizedStatus;
+    }
+
+    function statusBadgeHtml(status) {
+        if (!status) {
+            return '';
+        }
+
+        return '<span class="gainz-status-badge ' + statusClassName(status) + '">' + status + '</span>';
+    }
+
+    function setStatsSummary(summary) {
+        if (!summary) {
+            return;
+        }
+
+        $('#stats_summary_reconciliation')
+            .text(summary.reconciliation)
+            .removeClass('status-matched status-needs-declared-hodl status-mismatch status-unlinked-sales')
+            .addClass(summary.reconciliation_class || statusClassName(summary.reconciliation));
+        $('#stats_summary_assets_needing_hodl').text(summary.assets_needing_hodl);
+        $('#stats_summary_assets_with_mismatches').text(summary.assets_with_mismatches);
+        $('#stats_summary_import_warnings').text(summary.import_warnings);
+        $('#stats_summary_unlinked_sales').text(summary.unlinked_sales);
+    }
+
+    function setAllHoldingsReconciliation(rows) {
+        if (!$.fn.DataTable.isDataTable('#statspage_all_holdings_reconciliation_datatable')) {
+            return;
+        }
+
+        $('#statspage_all_holdings_reconciliation_datatable').DataTable().clear();
+        $('#statspage_all_holdings_reconciliation_datatable').DataTable().rows.add(rows || []).draw();
+    }
+
+    var formatter = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+    });
+
+    var myChart = null;
+    var selectedStatsRowData = null;
+
+    function chartCurrency(value) {
+        return formatter.format(Number(value || 0));
+    }
+
+    function resetGainzChart(message) {
+        if (myChart != null) {
+            myChart.destroy();
+            myChart = null;
+        }
+
+        $('#gainz_chart_subtitle').text('Select an asset');
+        $('#gainz_chart_empty_state').text(message || 'Select an asset to view current-lot unrealized gain or loss.').show();
+    }
+
+    function renderGainzChart(returnData, selectedAsset) {
+        var chartData = returnData['unrealized_chart_data'] || [];
+        var currentSpot = Number(returnData['chart_current_usd_spot'] || 0);
+        var canvas = document.getElementById("gainzChart");
+
+        if (myChart != null) {
+            myChart.destroy();
+            myChart = null;
+        }
+
+        if (currentSpot > 0) {
+            $('#stats_usd_spot').val(currentSpot.toFixed(2));
+            $('#gainz_chart_subtitle').text(selectedAsset + ' at ' + chartCurrency(currentSpot) + ' USD spot');
+        } else {
+            $('#gainz_chart_subtitle').text(selectedAsset);
+        }
+
+        if (!canvas || chartData.length == 0) {
+            $('#gainz_chart_empty_state').text('No current lots are available for this asset.').show();
+            return;
+        }
+
+        if (typeof Chart === 'undefined') {
+            $('#gainz_chart_empty_state').text('Chart library did not load.').show();
+            return;
+        }
+
+        $('#gainz_chart_empty_state').hide();
+
+        var ctx = canvas.getContext("2d");
+        var pointColors = chartData.map(function(point) {
+            return Number(point.y) >= 0 ? "#2dce89" : "#f5365c";
+        });
+
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: "Unrealized Gain/Loss",
+                    borderColor: "#1f8ef1",
+                    backgroundColor: "rgba(31, 142, 241, 0.08)",
+                    pointBackgroundColor: pointColors,
+                    pointBorderColor: pointColors,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    fill: true,
+                    borderWidth: 2,
+                    data: chartData
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                responsive: true,
+                elements: {
+                    line: {
+                        tension: 0.08
+                    }
+                },
+                legend: {
+                    display: false
+                },
+                tooltips: {
+                    callbacks: {
+                        label: function(tooltipItem, data) {
+                            var point = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
+                            return [
+                                "Gain/Loss: " + point.gain_loss,
+                                "Quantity: " + point.quantity,
+                                "USD Spot: " + point.usd_spot,
+                                "Cost Basis: " + point.cost_basis,
+                                "Current Value: " + point.current_value
+                            ];
+                        }
+                    }
+                },
+                scales: {
+                    xAxes: [{
+                        type: "time",
+                        distribution: "series",
+                        time: {
+                            unit: 'month',
+                            tooltipFormat: 'll'
+                        },
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Date Acquired'
+                        }
+                    }],
+                    yAxes: [{
+                        ticks: {
+                            beginAtZero: false,
+                            callback: function(value) {
+                                return chartCurrency(value);
+                            }
+                        },
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Unrealized Gain/Loss'
+                        },
+                        gridLines: {
+                            drawBorder: false,
+                            zeroLineColor: "rgba(0,0,0,0.25)",
+                            color: 'rgba(0,0,0,0.05)'
+                        }
+                    }]
+                }
+            }
+        });
+    }
+
+    function loadSelectedStatsAsset(rowData, currentUsdSpot) {
+        if (!rowData) {
+            resetGainzChart('Select an asset to view current-lot unrealized gain or loss.');
+            return;
+        }
+
+        selectedStatsRowData = rowData;
+
+        $.ajax({
+            type: "POST",
+            url: "/stats/selected_asset",
+            data: JSON.stringify({
+                'row_data': rowData,
+                'start_date': $("#start_date").length ? $("#start_date").datetimepicker().val() : '',
+                'end_date': $("#end_date").length ? $("#end_date").datetimepicker().val() : '',
+                'year': $('#stats_page_year_dropdown').find(":selected").val(),
+                'current_usd_spot': currentUsdSpot || ''
+            }),
+            contentType: 'application/json',
+            success: function (return_data) {
+                $('#statspage_detailed_datatable').DataTable().clear();
+                $('#statspage_detailed_datatable').DataTable().rows.add(return_data['detailed_stats'] || []).draw();
+
+                $('#statspage_sells_datatable').DataTable().clear();
+                $('#statspage_sells_datatable').DataTable().rows.add(return_data['sells_table_data'] || return_data['sells'] || []).draw();
+
+                $('#statspage_holdings_reconciliation_datatable').DataTable().clear();
+                $('#statspage_holdings_reconciliation_datatable').DataTable().rows.add(return_data['holdings_reconciliation_data'] || []).draw();
+
+                $('#statspage_holdings_lots_datatable').DataTable().clear();
+                $('#statspage_holdings_lots_datatable').DataTable().rows.add(return_data['holdings_lot_table_data'] || []).draw();
+
+                var declaredHodl = "N/A";
+                (return_data['holdings_reconciliation_data'] || []).forEach(function(row) {
+                    if (row[0] == 'Declared HODL') {
+                        declaredHodl = row[1];
+                    }
+                });
+
+                var selectedAsset = rowData[0];
+                $('#stats_declared_hodl_quantity').attr('placeholder', 'Current holding for ' + selectedAsset);
+                $('#stats_declared_hodl_quantity').val(declaredHodl == 'N/A' ? '' : declaredHodl);
+
+                $('#s8949_table').DataTable().clear();
+                $('#s8949_table').DataTable().rows.add(return_data['s8949_table_data'] || []).draw();
+
+                $('#l8949_table').DataTable().clear();
+                $('#l8949_table').DataTable().rows.add(return_data['l8949_table_data'] || []).draw();
+
+                setStatsReconciliationWarning(return_data['reconciliation_status']);
+                setStatsImportWarnings(return_data['import_warnings']);
+                setStatsSummary(return_data['stats_summary']);
+                setAllHoldingsReconciliation(return_data['holdings_reconciliation_table_data']);
+                $('#collapse_sales, #collapse_8949_long, #collapse_8949_short').collapse('show');
+                renderGainzChart(return_data, selectedAsset);
+            },
+        });
+    }
+
+    function getStatsRowForAsset(asset) {
+        var statsRows = table.rows().data();
+
+        for (var i = 0; i < statsRows.length; i++) {
+            if (statsRows[i] && statsRows[i][0] == asset) {
+                return statsRows[i];
+            }
+        }
+
+        return null;
+    }
+
 
     if ($(".datetimepicker").length != 0) {
         $('.datetimepicker').datetimepicker({
@@ -411,6 +674,18 @@ $(document).ready(function() {
             style: 'single'
         },
     });
+
+    $('#s8949_table').DataTable({
+        select: {
+            style: 'single'
+        },
+    });
+
+    $('#l8949_table').DataTable({
+        select: {
+            style: 'single'
+        },
+    });
     
 
     $('#statspage_buys_datatable').DataTable({
@@ -419,153 +694,60 @@ $(document).ready(function() {
         },
     });
 
-    $("#stats_usd_spot").on('change', function(){
-        
-        $.ajax({
-            type: "POST",
-            url: "/stats/selected_asset",
-            data: JSON.stringify({
-                'row_data': table.row( {selected:true}).data(),
-                'start_date': $("#start_date").datetimepicker().val(),
-                'end_date': $("#end_date").datetimepicker().val(),
-                'year': $('#stats_page_year_dropdown').find(":selected").val(),
-                'current_usd_spot': $(this).val()
-                }),  
-
-            contentType: 'application/json',
-            success: function (return_data) {
-
-                // console.log(return_data)
-                
-                $('#statspage_detailed_datatable').DataTable().clear();
-                $('#statspage_detailed_datatable').DataTable().rows.add(return_data['detailed_stats']).draw();
-                                
-                if (myChart!=null) {myChart.destroy();}
-
-                var ctx = document.getElementById("gainzChart").getContext("2d");
-
-                chartColor = "#FFFFFF";
-                gradientStroke = ctx.createLinearGradient(500, 0, 100, 0);
-                gradientStroke.addColorStop(0, '#80b6f4');
-                gradientStroke.addColorStop(1, chartColor);
-            
-                gradientFill = ctx.createLinearGradient(0, 170, 0, 50);
-                gradientFill.addColorStop(0, "rgba(128, 182, 244, 0)");
-                gradientFill.addColorStop(1, "rgba(249, 99, 59, 0.40)");
-
-                myChart = new Chart(ctx, {
-                  type: 'line',
-                  data: {
-                    datasets: [
-                        {
-                            label: "Value",
-                            borderColor: "#6bd098",
-                            fill: false,
-                            borderWidth: 3,
-                            data: return_data['unrealized_chart_data']
-                        },
-                    ]
-                },
-                  options: {
-                    elements: {
-                        line: {
-                            tension: 0.08
-                        }
-                    },
-                    tooltips: {
-                        callbacks: {
-                            label: function(tooltipItem, data) {
-                                var value = data.datasets[tooltipItem.datasetIndex].label || '';
-                                if (value) { value += ': '; }
-                                value += formatter.format(tooltipItem.yLabel)
-
-                                var quantity = "Quantity: " 
-                                quantity += data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index]['quantity']
-                                
-                                var usd_spot = "USD Spot: "
-                                usd_spot += data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index]['usd_spot']
-
-                                var cost_baisis = "Cost Baisis: "
-                                cost_baisis += data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index]['cost_baisis']
-
-                                var gain_loss = "Gain/Loss: "
-                                gain_loss += data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index]['gain_loss']
-                        
-                                return [value, quantity, usd_spot, cost_baisis, gain_loss];
-                            }
-                        }
-                      },
-
-
-                    responsive: true,
-                    title:      {
-                        display: false,
-                        text:    "Gainz Chart"
-                    },
-                    scales: {
-                        
-                        xAxes: [{
-                            type: "time",
-                            time: {
-                                unit: 'month',
-                                tooltipFormat: 'll'
-                            },
-                            scaleLabel: {
-                                display:     true,
-                                labelString: 'Date'
-                            },
-                            
-                        }],
-                        
-                        yAxes: [{
-                            ticks: {
-                                beginAtZero: false,
-                                callback: function(value, index, values) {
-                                  if(parseInt(value) >= 1000){
-                                    return '$' + value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-                                  } else {
-                                    return '$' + value;
-                                  }
-                                }
-                            },
-
-                            scaleLabel: {
-                                display:     true,
-                                labelString: 'Value (Quantity * USD Spot)'
-                            },
-
-                              gridLines: {
-                                drawBorder: false,
-                                zeroLineColor: "transparent",
-                                color: 'rgba(255,255,255,0.05)'
-                              }
-                        }]
+    $('#statspage_holdings_reconciliation_datatable').DataTable({
+        "pageLength": 25,
+        "searching": false,
+        "paging": false,
+        "info": false,
+        "ordering": false,
+        "columnDefs": [
+            {
+                "targets": 1,
+                "render": function(data, type, row) {
+                    if (type !== 'display' || !row || row[0] !== 'Status') {
+                        return data;
                     }
+
+                    return statusBadgeHtml(data);
                 }
-                });
-                    
-            },   
-        });
-
-        
-
+            }
+        ],
+        select: {
+            style: 'single'
+        },
     });
 
+    var holdingsReconciliationTable = $('#statspage_all_holdings_reconciliation_datatable').DataTable({
+        "pageLength": 25,
+        "order": [[ 0, "asc" ]],
+        "columnDefs": [
+            {
+                "targets": 6,
+                "render": function(data, type) {
+                    if (type !== 'display') {
+                        return data;
+                    }
 
-    var formatter = new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-      
-        // These options are needed to round to whole numbers if that's what you want.
-        //minimumFractionDigits: 0, // (this suffices for whole numbers, but will print 2500.10 as $2,500.1)
-        //maximumFractionDigits: 0, // (causes 2500.99 to be printed as $2,501)
-      });
+                    return statusBadgeHtml(data);
+                }
+            }
+        ],
+        select: {
+            style: 'single'
+        },
+    });
 
+    $('#statspage_holdings_lots_datatable').DataTable({
+        "pageLength": 25,
+        "order": [[ 2, "asc" ]],
+        select: {
+            style: 'single'
+        },
+    });
 
-    // Init Charts
-    var myChart=null;
-
-
+    $("#stats_usd_spot").on('change', function(){
+        loadSelectedStatsAsset(selectedStatsRowData || table.row({selected:true}).data(), $(this).val());
+    });
 
 
     $('#stats_page_year_dropdown').on('change', function() {
@@ -585,156 +767,71 @@ $(document).ready(function() {
     
                 $('#statspage_stats_datatable').DataTable().clear();
                 $('#statspage_stats_datatable').DataTable().rows.add(data['stats_table_rows']).draw();
-    
+                setStatsReconciliationWarning(data['reconciliation_status']);
+                setStatsImportWarnings(data['import_warnings']);
+                setAllHoldingsReconciliation(data['holdings_reconciliation_table_data']);
+                $('#statspage_detailed_datatable').DataTable().clear().draw();
+                $('#statspage_sells_datatable').DataTable().clear().draw();
+                $('#statspage_holdings_lots_datatable').DataTable().clear().draw();
+                $('#statspage_holdings_reconciliation_datatable').DataTable().clear().draw();
+                $('#s8949_table').DataTable().clear().draw();
+                $('#l8949_table').DataTable().clear().draw();
+                setStatsSummary(data['stats_summary']);
+                $('#collapse_sales, #collapse_8949_long, #collapse_8949_short').collapse('hide');
+                $('#stats_usd_spot').val('');
+                selectedStatsRowData = null;
+                resetGainzChart();
+
             },   
         });
     
     });
 
     $('#statspage_stats_datatable tbody').on( 'click', 'tr', function () {
-        // console.log( table.row( this ).data() );
+        loadSelectedStatsAsset(table.row(this).data(), $('#stats_usd_spot').val());
+    } );
+
+    $('#statspage_all_holdings_reconciliation_datatable tbody').on( 'click', 'tr', function () {
+        var reconciliationRow = holdingsReconciliationTable.row(this).data();
+
+        if (!reconciliationRow) {
+            return;
+        }
+
+        var statsRow = getStatsRowForAsset(reconciliationRow[0]);
+        if (statsRow) {
+            loadSelectedStatsAsset(statsRow, $('#stats_usd_spot').val());
+        }
+    } );
+
+    $("#stats_save_hodl_button").click(function(){
+        var rowData = selectedStatsRowData || table.row( {selected:true} ).data();
+        var quantity = $('#stats_declared_hodl_quantity').val();
+
+        if (!rowData) {
+            alert("Select an asset first.");
+            return;
+        }
+
+        if (!quantity) {
+            alert("Enter the current holding quantity first.");
+            return;
+        }
 
         $.ajax({
             type: "POST",
-            url: "/stats/selected_asset",
+            url: "/stats/set_hodl",
             data: JSON.stringify({
-                'row_data': table.row( this ).data(),
-                'start_date': $("#start_date").datetimepicker().val(),
-                'end_date': $("#end_date").datetimepicker().val(),
-                'year': $('#stats_page_year_dropdown').find(":selected").val(),
-                }),  
-
+                'asset': rowData[0],
+                'quantity': quantity,
+            }),
+            dataType: "json",
             contentType: 'application/json',
-            success: function (return_data) {
-
-                // console.log(return_data)
-                
-                $('#statspage_detailed_datatable').DataTable().clear();
-                $('#statspage_detailed_datatable').DataTable().rows.add(return_data['detailed_stats']).draw();
-
-                $('#statspage_sells_datatable').DataTable().clear();
-                $('#statspage_sells_datatable').DataTable().rows.add(return_data['sells_table_data']).draw();
-                
-                
-                $('#s8949_table').DataTable().clear();
-                $('#s8949_table').DataTable().rows.add(return_data['s8949_table_data']).draw();
-
-                $('#l8949_table').DataTable().clear();
-                $('#l8949_table').DataTable().rows.add(return_data['l8949_table_data']).draw();
-
-                // $('#statspage_buys_datatable').DataTable().clear();
-                // $('#statspage_buys_datatable').DataTable().rows.add(return_data['buys']).draw();
-
-                
-                if (myChart!=null) {myChart.destroy();}
-
-                var ctx = document.getElementById("gainzChart").getContext("2d");
-
-                chartColor = "#FFFFFF";
-                gradientStroke = ctx.createLinearGradient(500, 0, 100, 0);
-                gradientStroke.addColorStop(0, '#80b6f4');
-                gradientStroke.addColorStop(1, chartColor);
-            
-                gradientFill = ctx.createLinearGradient(0, 170, 0, 50);
-                gradientFill.addColorStop(0, "rgba(128, 182, 244, 0)");
-                gradientFill.addColorStop(1, "rgba(249, 99, 59, 0.40)");
-
-                myChart = new Chart(ctx, {
-                  type: 'line',
-                  data: {
-                    datasets: [
-                            {
-                                label: "Value",
-                                borderColor: "#6bd098",
-                                fill: false,
-                                borderWidth: 3,
-                                data: return_data['unrealized_chart_data']
-                            },
-                        ]
-                    },
-                  options: {
-                    elements: {
-                        line: {
-                            tension: 0.08
-                        }
-                    },
-                    tooltips: {
-                        callbacks: {
-                            label: function(tooltipItem, data) {
-                                var value = data.datasets[tooltipItem.datasetIndex].label || '';
-                                if (value) { value += ': '; }
-                                value += formatter.format(tooltipItem.yLabel)
-
-                                var quantity = "Quantity: " 
-                                quantity += data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index]['quantity']
-                                
-                                var usd_spot = "USD Spot: "
-                                usd_spot += data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index]['usd_spot']
-
-                                var cost_baisis = "Cost Baisis: "
-                                cost_baisis += data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index]['cost_baisis']
-
-                                var gain_loss = "Gain/Loss: "
-                                gain_loss += data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index]['gain_loss']
-                        
-                                return [value, quantity, usd_spot, cost_baisis, gain_loss];
-                            }
-                        }
-                      },
-
-
-                    responsive: true,
-                    title:      {
-                        display: false,
-                        text:    "Gainz Chart"
-                    },
-                    scales: {
-                        
-                        xAxes: [{
-                            type: "time",
-                            time: {
-                                unit: 'month',
-                                tooltipFormat: 'll'
-                            },
-                            scaleLabel: {
-                                display:     true,
-                                labelString: 'Date'
-                            },
-                            
-                        }],
-                        
-                        yAxes: [{
-                            ticks: {
-                                beginAtZero: false,
-                                callback: function(value, index, values) {
-                                  if(parseInt(value) >= 1000){
-                                    return '$' + value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-                                  } else {
-                                    return '$' + value;
-                                  }
-                                }
-                            },
-
-                            scaleLabel: {
-                                display:     true,
-                                labelString: 'Value (Quantity * USD Spot)'
-                            },
-
-                              gridLines: {
-                                drawBorder: false,
-                                zeroLineColor: "transparent",
-                                color: 'rgba(255,255,255,0.05)'
-                              }
-                        }]
-                    }
-                }
-                });
-
-
-                    
-            },   
+            success: function () {
+                location.reload();
+            },
         });
-    } );
+    });
 
 
 } );
@@ -955,6 +1052,19 @@ $(document).ready(function() {
             success: function (data) {
                 alert("Saving Export as " + data)
             },   
+        });
+    });
+
+    $("#audit_packet_button").click(function(){
+        $.ajax({
+            type: "POST",
+            url: "/export/audit_packet",
+            data: JSON.stringify({}),
+            dataType: "json",
+            contentType: 'application/json',
+            success: function (data) {
+                alert("Audit packet saved to " + data)
+            },
         });
     });
 
