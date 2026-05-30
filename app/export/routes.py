@@ -14,8 +14,13 @@ def index():
     
     transactions = current_app.config['transactions']
     stats_table_data = get_stats_table_data(transactions)
+    audit_readiness = get_audit_readiness_summary(transactions)
 
-    return render_template('export.html', stats_table_data=stats_table_data)
+    return render_template(
+        'export.html',
+        stats_table_data=stats_table_data,
+        audit_readiness=audit_readiness,
+    )
 
 
 @blueprint.route('/save',  methods=['POST'])

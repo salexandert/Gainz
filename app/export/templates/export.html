@@ -36,6 +36,86 @@
 </div>
 <!-- /Page Description and Instructions -->
 
+<!-- Audit Readiness -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between align-items-start">
+          <div>
+            <h4 class="card-title">Audit Readiness</h4>
+            <p class="card-category">Packet status before export</p>
+          </div>
+          <span class="gainz-status-badge {{ audit_readiness.status_class }}">{{ audit_readiness.status }}</span>
+        </div>
+
+        <div class="audit-readiness-grid">
+          <div class="audit-readiness-item">
+            <span>8949 Rows</span>
+            <strong>{{ audit_readiness.metrics.form_8949_rows }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>8949 Gain/Loss</span>
+            <strong>{{ audit_readiness.metrics.form_8949_gain_loss }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Unlinked Sales</span>
+            <strong>{{ audit_readiness.metrics.assets_with_unlinked_sales }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>HODL Needed</span>
+            <strong>{{ audit_readiness.metrics.assets_needing_hodl }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Mismatches</span>
+            <strong>{{ audit_readiness.metrics.assets_with_mismatches }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Warnings</span>
+            <strong>{{ audit_readiness.metrics.import_warnings }}</strong>
+          </div>
+        </div>
+
+        <div class="audit-next-action">
+          <strong>Next action:</strong> {{ audit_readiness.next_action }}
+        </div>
+
+        {% if audit_readiness.blockers %}
+        <div class="alert alert-warning" role="alert">
+          <strong>Resolve before relying on this packet:</strong>
+          <ul class="mb-0">
+            {% for blocker in audit_readiness.blockers %}
+            <li>{{ blocker }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        {% if audit_readiness.warnings %}
+        <div class="alert alert-info" role="alert">
+          <strong>Review:</strong>
+          <ul class="mb-0">
+            {% for warning in audit_readiness.warnings %}
+            <li>{{ warning }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        <div class="audit-packet-list">
+          <h6>Audit packet includes</h6>
+          <ul>
+            {% for item in audit_readiness.packet_includes %}
+            <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Audit Readiness -->
+
 
 <!-- All Asset Stats Table -->
 <div class="row">

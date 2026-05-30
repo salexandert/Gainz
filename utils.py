@@ -284,6 +284,123 @@ def get_sales_report_table_data(transactions, asset=None, date_range=None):
     ]
 
 
+def _stats_row_has_unlinked_sales(row):
+    return bool(
+        row.get("has_sells_without_links")
+        or row.get("has_unlinked_sells")
+        or (
+            row.get("num_sells", 0) > 0
+            and row.get("num_links", 0) == 0
+        )
+    )
+
+
+def get_audit_readiness_summary(transactions):
+    if len(getattr(transactions, "transactions", [])) == 0:
+        stats_rows = []
+    else:
+        date_range = get_transactions_date_range(transactions, {"start_date": "", "end_date": ""})
+        stats_rows = get_stats_table_data_range(transactions, date_range)
+    holdings_rows = get_multi_asset_holdings_reconciliation_table_data(transactions)
+    form_8949_totals = get_form_8949_totals(transactions)
+    import_warnings = getattr(transactions, "import_warnings", []) or []
+
+    assets_with_unlinked_sales = [
+        row["symbol"]
+        for row in stats_rows
+        if _stats_row_has_unlinked_sales(row)
+    ]
+    assets_needing_hodl = [
+        row[0]
+        for row in holdings_rows
+        if row[6] == "Needs declared HODL"
+    ]
+    assets_with_mismatches = [
+        row[0]
+        for row in holdings_rows
+        if row[6] == "Mismatch"
+    ]
+    blockers = []
+    warnings = []
+
+    if len(getattr(transactions, "transactions", [])) == 0:
+        blockers.append("Import transactions before generating an audit packet.")
+
+    if assets_with_unlinked_sales:
+        blockers.append(
+            "Complete basis links for: " + ", ".join(assets_with_unlinked_sales)
+        )
+
+    if assets_needing_hodl:
+        blockers.append(
+            "Declare current HODL for: " + ", ".join(assets_needing_hodl)
+        )
+
+    if assets_with_mismatches:
+        blockers.append(
+            "Resolve holdings mismatches for: " + ", ".join(assets_with_mismatches)
+        )
+
+    if import_warnings:
+        warnings.append(
+            f"Review {len(import_warnings)} import warning"
+            f"{'s' if len(import_warnings) != 1 else ''}."
+        )
+
+    if form_8949_totals["total"]["rows"] == 0 and any(row.get("num_sells", 0) > 0 for row in stats_rows):
+        blockers.append("Sells exist, but no linked Form 8949 rows are ready.")
+
+    is_ready = len(blockers) == 0 and len(warnings) == 0
+
+    if blockers:
+        status = "Not ready"
+        status_class = "status-mismatch"
+        next_action = blockers[0]
+    elif warnings:
+        status = "Review warnings"
+        status_class = "status-unlinked-sales"
+        next_action = warnings[0]
+    else:
+        status = "Ready"
+        status_class = "status-matched"
+        next_action = "Generate the audit packet and review the exported files."
+
+    return {
+        "status": status,
+        "status_class": status_class,
+        "is_ready": is_ready,
+        "next_action": next_action,
+        "blockers": blockers,
+        "warnings": warnings,
+        "import_warnings": import_warnings,
+        "metrics": {
+            "transactions": len(getattr(transactions, "transactions", [])),
+            "assets": len(getattr(transactions, "assets", set())),
+            "links": len(getattr(transactions, "links", set())),
+            "assets_needing_hodl": len(assets_needing_hodl),
+            "assets_with_mismatches": len(assets_with_mismatches),
+            "assets_with_unlinked_sales": len(assets_with_unlinked_sales),
+            "import_warnings": len(import_warnings),
+            "form_8949_rows": form_8949_totals["total"]["rows"],
+            "form_8949_proceeds": currency(form_8949_totals["total"]["proceeds"]),
+            "form_8949_cost_basis": currency(form_8949_totals["total"]["cost_basis"]),
+            "form_8949_gain_loss": currency(form_8949_totals["total"]["gain_loss"]),
+        },
+        "form_8949_totals": form_8949_totals,
+        "packet_includes": [
+            "Excel workbook with transactions, stats, links, sales, and 8949 sheets",
+            "Form 8949 short-term and long-term detail CSVs",
+            "Form 8949 totals CSV and JSON",
+            "Holdings reconciliation CSV",
+            "Current holdings lots CSV",
+            "Import warnings CSV",
+            "Copied source files when still available on disk",
+            "Evidence manifest, packet inventory, and SHA-256 hashes",
+            "Methodology memo",
+        ],
+    }
+
+
 def fetch_crypto_price(trans):
 
     symbol = f"{trans.symbol}-USD"

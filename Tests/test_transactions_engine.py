@@ -9,6 +9,7 @@ from openpyxl import Workbook
 from transaction import Buy, Receive, Sell, Send
 from transactions import Transactions
 from utils import (
+    get_audit_readiness_summary,
     get_current_holdings_lot_table_data,
     get_multi_asset_holdings_reconciliation_table_data,
     get_unrealized_chart_data,
@@ -176,6 +177,39 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual(1, len(transactions.asset_objects))
         self.assertEqual("BTC", transactions.asset_objects[0].symbol)
         self.assertEqual(0.75, transactions.get_hodl("BTC"))
+
+    def test_audit_readiness_flags_missing_links_and_hodl(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange"),
+            Sell("BTC", 1, datetime.datetime(2024, 2, 1), 200, "exchange"),
+        ]
+
+        readiness = get_audit_readiness_summary(transactions)
+
+        self.assertFalse(readiness["is_ready"])
+        self.assertEqual("Not ready", readiness["status"])
+        self.assertEqual(1, readiness["metrics"]["assets_with_unlinked_sales"])
+        self.assertEqual(1, readiness["metrics"]["assets_needing_hodl"])
+        self.assertEqual(0, readiness["metrics"]["form_8949_rows"])
+        self.assertTrue(any("Complete basis links" in blocker for blocker in readiness["blockers"]))
+
+    def test_audit_readiness_is_ready_when_links_and_hodl_match(self):
+        transactions = empty_transactions()
+        buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange")
+        sell = Sell("BTC", 0.25, datetime.datetime(2024, 6, 1), 300, "exchange")
+        sell.link_transaction(buy, 0.25)
+        transactions.transactions = [buy, sell]
+        transactions.set_hodl("BTC", 0.75)
+
+        readiness = get_audit_readiness_summary(transactions)
+
+        self.assertTrue(readiness["is_ready"])
+        self.assertEqual("Ready", readiness["status"])
+        self.assertEqual(1, readiness["metrics"]["form_8949_rows"])
+        self.assertEqual("$75.00", readiness["metrics"]["form_8949_proceeds"])
+        self.assertEqual("$25.00", readiness["metrics"]["form_8949_cost_basis"])
+        self.assertEqual("$50.00", readiness["metrics"]["form_8949_gain_loss"])
 
     def test_fifo_auto_link_uses_earliest_buy(self):
         transactions = empty_transactions()
