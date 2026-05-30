@@ -25,12 +25,12 @@
             </div>
             <div id="collapseOne" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
               <div class="card-body">
-                Drag and Drop exchange CSV's into the upload area below. Currently Coinbase and Cashapp formats are supported. 
-                <br> Coinbase Convert rows are imported as a source-asset sell and destination-asset buy using the Coinbase conversion total.
-                <br> Open CMD for progress on Coinbase Pro Imports as it may take a while to lookup prices from coinbase API. 
-                <br> keep coinbase, coinbase pro, kraken, in the filename respecitvly for identification. 
+                Drag and drop or click the upload area below to import an exchange CSV.
+                <br> Supported sample workflows include Cash App, Coinbase, Coinbase Convert rows, Coinbase Pro/GDAX fills, Kraken, and the template import.
+                <br> Coinbase Convert rows import as a source-asset sell and destination-asset buy using the Coinbase conversion total.
+                <br> File names help Gainz detect the format. Use names that include cash_app, coinbase, coinbase_pro, gdax, or kraken.
                 <br><br>
-                Upload one file at a time.
+                Upload one file at a time. After each upload, Gainz shows imported, skipped, and warning counts.
               </div>
             </div>
           </div>
@@ -47,6 +47,7 @@
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
+        <div id="import_upload_result" class="alert alert-info" role="alert" style="display: none;"></div>
         <form id="upload_csv_form" action="{{ url_for('import_transactions_blueprint.import_wizard')}}" class="dropzone"></form>
       </div>
     </div>

@@ -58,7 +58,8 @@ def import_wizard():
         if 'file' in request.files:
             file = request.files['file']
             if file and file.filename:
-                ImportService(current_app.config['UPLOAD_FOLDER']).import_upload(file, transactions)
+                result = ImportService(current_app.config['UPLOAD_FOLDER']).import_upload(file, transactions)
+                return jsonify(result)
 
         # Current Hodl
         if current_hodl.validate_on_submit():

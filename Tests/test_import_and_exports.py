@@ -97,6 +97,33 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual(100, sheet["E2"].value)
             self.assertEqual(200, sheet["H2"].value)
 
+    def test_export_handles_timezone_aware_imported_datetimes(self):
+        transactions = empty_transactions()
+        buy = Buy(
+            "ETH",
+            1,
+            datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc),
+            100,
+            "coinbase",
+        )
+        sell = Sell(
+            "ETH",
+            1,
+            datetime.datetime(2024, 6, 1, tzinfo=datetime.timezone.utc),
+            300,
+            "coinbase",
+        )
+        sell.link_transaction(buy, 1)
+        transactions.transactions = [buy, sell]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            export_path = transactions.export_to_excel(output_dir=temp_dir)
+            workbook = load_workbook(export_path, data_only=False)
+            sheet = workbook["2024 8949 Short"]
+
+            self.assertIsNone(sheet["B2"].value.tzinfo)
+            self.assertIsNone(sheet["C2"].value.tzinfo)
+
     def test_form_8949_rows_are_built_from_links_with_prorated_fees(self):
         transactions = empty_transactions()
         buy = Buy("BTC", 2, datetime.datetime(2024, 1, 1), 100, "buy-source")

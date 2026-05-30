@@ -42,6 +42,14 @@ Open correctness work:
 - Table labels should use consistent tax language: proceeds, cost basis, realized gain, remaining basis.
 - Large tables need default sorting that matches workflow, usually oldest acquisition first for lots and disposal date for sales.
 
+First-user walkthrough notes:
+
+- Import needed visible confirmation after each upload. Fixed with imported/skipped/warning counts.
+- The drag-and-drop upload should eventually offer an explicit file-picker button and a "try demo data" path.
+- Auto Link works, but the user has to know to select each asset and run a method. A guided "link all assets with FIFO" option would make demo and first-run use much easier.
+- HODL entry works, but users need a suggested value or "use expected HODL from current imports" action for test/demo data.
+- Export readiness is helpful once the user reaches it. It should link directly back to the pages that resolve each blocker.
+
 ## Priority 5: Audit Packet Integration
 
 - The audit packet should include a holdings-lot report, import warnings, selected save metadata, and reconciliation status.

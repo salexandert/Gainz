@@ -22,6 +22,13 @@ def _optional_cell(row, column):
 
     return value
 
+
+def _excel_datetime(value):
+    if hasattr(value, "replace") and getattr(value, "tzinfo", None):
+        return value.replace(tzinfo=None)
+
+    return value
+
 # Updated imports to reflect the new modular structure
 from parsers import *
 from filters import *
@@ -480,8 +487,8 @@ class Transactions:
                     continue
 
                 ws[f"A{row}"] = sale["description"]
-                ws[f"B{row}"] = sale["date_acquired"]
-                ws[f"C{row}"] = sale["date_sold"]
+                ws[f"B{row}"] = _excel_datetime(sale["date_acquired"])
+                ws[f"C{row}"] = _excel_datetime(sale["date_sold"])
                 ws[f"D{row}"] = sale["proceeds"]
                 ws[f"D{row}"].number_format = '"$"#,##0.00_-'
                 ws[f"E{row}"] = sale["cost_basis"]
@@ -506,8 +513,8 @@ class Transactions:
                         continue
 
                     ws[f"A{row}"] = form_row["description"]
-                    ws[f"B{row}"] = form_row["date_acquired"]
-                    ws[f"C{row}"] = form_row["date_sold"]
+                    ws[f"B{row}"] = _excel_datetime(form_row["date_acquired"])
+                    ws[f"C{row}"] = _excel_datetime(form_row["date_sold"])
                     ws[f"D{row}"] = form_row["proceeds"]
                     ws[f"D{row}"].number_format = '"$"#,##0.00_-'
                     ws[f"E{row}"] = form_row["cost_basis"]
@@ -559,7 +566,7 @@ class Transactions:
                 conversions_sheet.cell(row=row, column=in_trans_type_index, value=conversion.input_trans_type)
                 conversions_sheet.cell(row=row, column=out_trans_type_index, value=conversion.output_trans_type)
                 conversions_sheet.cell(row=row, column=symbol_index, value=conversion.symbol)
-                conversions_sheet.cell(row=row, column=time_stamp_index, value=conversion.time_stamp)
+                conversions_sheet.cell(row=row, column=time_stamp_index, value=_excel_datetime(conversion.time_stamp))
                 conversions_sheet.cell(row=row, column=quantity_index, value=conversion.quantity)
                 
                 conversions_sheet.cell(row=row, column=usd_spot_index, value=conversion.usd_spot)
@@ -637,7 +644,7 @@ class Transactions:
                     links_sheet.cell(row=row, column=link_id_index, value=link.id)
                     links_sheet.cell(row=row, column=buy_id_index, value=link.buy.id)
                     links_sheet.cell(row=row, column=sell_id_index, value=link.sell.id)
-                    links_sheet.cell(row=row, column=buy_date_index, value=link.buy.time_stamp)
+                    links_sheet.cell(row=row, column=buy_date_index, value=_excel_datetime(link.buy.time_stamp))
                     links_sheet.cell(row=row, column=buy_quantity_index, value=link.buy.quantity)
                     links_sheet.cell(row=row, column=buy_unlinked_index, value=link.buy.unlinked_quantity)
                     
@@ -658,7 +665,7 @@ class Transactions:
                     links_sheet.cell(row=row, column=sell_link_usd_index, value=link.link_sell_price)
                     links_sheet.cell(row=row, column=sell_link_usd_index).number_format = '"$"#,##0.00_-'
 
-                    links_sheet.cell(row=row, column=sell_date_index, value=link.sell.time_stamp)
+                    links_sheet.cell(row=row, column=sell_date_index, value=_excel_datetime(link.sell.time_stamp))
                     links_sheet.cell(row=row, column=sell_quantity_index, value=link.sell.quantity)
                     links_sheet.cell(row=row, column=sell_unlinked_index, value=link.sell.unlinked_quantity)
 
@@ -707,7 +714,7 @@ class Transactions:
                     links_sheet.cell(row=row, column=sell_link_usd_index, value=trans.usd_total)
                     links_sheet.cell(row=row, column=sell_link_usd_index).number_format = '"$"#,##0.00_-'
 
-                    links_sheet.cell(row=row, column=sell_date_index, value=trans.time_stamp)
+                    links_sheet.cell(row=row, column=sell_date_index, value=_excel_datetime(trans.time_stamp))
                     links_sheet.cell(row=row, column=sell_quantity_index, value=trans.quantity)
                     links_sheet.cell(row=row, column=sell_unlinked_index, value=trans.unlinked_quantity)
                     links_sheet.cell(row=row, column=sell_usd_spot_index, value=trans.usd_spot)
@@ -758,7 +765,7 @@ class Transactions:
                 all_trans_sheet.cell(row=row, column=id_index, value=trans.id)
                 all_trans_sheet.cell(row=row, column=symbol_index, value=trans.symbol)
                 all_trans_sheet.cell(row=row, column=trans_type_index, value=trans.trans_type)
-                all_trans_sheet.cell(row=row, column=time_stamp_index, value=trans.time_stamp)
+                all_trans_sheet.cell(row=row, column=time_stamp_index, value=_excel_datetime(trans.time_stamp))
                 all_trans_sheet.cell(row=row, column=quantity_index, value=trans.quantity)
                 all_trans_sheet.cell(row=row, column=unlinked_index, value=trans.unlinked_quantity)
 

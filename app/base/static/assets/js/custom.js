@@ -1,3 +1,51 @@
+if (window.Dropzone) {
+    Dropzone.options.uploadCsvForm = {
+        maxFilesize: 20,
+        acceptedFiles: ".csv,.xlsx",
+        init: function () {
+            this.on("success", function (file, response) {
+                var result = response || {};
+                if (typeof result === "string") {
+                    try {
+                        result = JSON.parse(result);
+                    } catch (e) {
+                        result = {};
+                    }
+                }
+
+                var warnings = result.warnings || [];
+                var message = "Imported " + (result.imported_count || 0) + " row(s)";
+                message += " from " + (file.name || "uploaded file") + ".";
+                message += " Skipped " + (result.skipped_count || 0) + " row(s).";
+
+                if (warnings.length > 0) {
+                    message += " Review " + warnings.length + " warning(s) on Stats & Charts.";
+                } else {
+                    message += " Next: import more files, then run Auto Link or open HODL & Accounting.";
+                }
+
+                $("#import_upload_result")
+                    .removeClass("alert-danger")
+                    .addClass("alert-info")
+                    .text(message)
+                    .show();
+            });
+
+            this.on("error", function (file, response) {
+                var message = "Import failed for " + (file.name || "uploaded file") + ".";
+                if (response) {
+                    message += " " + String(response);
+                }
+
+                $("#import_upload_result")
+                    .removeClass("alert-info")
+                    .addClass("alert-danger")
+                    .text(message)
+                    .show();
+            });
+        }
+    };
+}
 
 // HODL Accounting 
 $(document).ready(function() {
@@ -1087,6 +1135,7 @@ $(document).ready(function() {
 
 
     $("#export_button").click(function(){
+        $('#export_button_text').text('Creating Excel export...');
         $.ajax({
             type: "POST",
             url: "/export/save",
@@ -1096,12 +1145,17 @@ $(document).ready(function() {
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
+                $('#export_button_text').text("Export saved to " + data);
                 alert("Saving Export as " + data)
-            },   
+            },
+            error: function (xhr) {
+                $('#export_button_text').text("Export failed. Check the app log for details.");
+            },
         });
     });
 
     $("#audit_packet_button").click(function(){
+        $('#export_button_text').text('Generating audit packet...');
         $.ajax({
             type: "POST",
             url: "/export/audit_packet",
@@ -1109,7 +1163,11 @@ $(document).ready(function() {
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
+                $('#export_button_text').text("Audit packet saved to " + data);
                 alert("Audit packet saved to " + data)
+            },
+            error: function (xhr) {
+                $('#export_button_text').text("Audit packet failed. Check the readiness blockers and app log, then try again.");
             },
         });
     });
