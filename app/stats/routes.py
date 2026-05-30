@@ -278,43 +278,6 @@ def selected_asset():
     return jsonify(data_dict)
 
 
-@blueprint.route('/set_hodl', methods=['POST'])
-@login_required
-def set_hodl():
-    transactions = current_app.config['transactions']
-    asset = request.json['asset']
-    quantity = request.json['quantity']
-    year = request.json.get('year', 'All Time')
-    current_usd_spot = request.json.get('current_usd_spot')
-
-    if isinstance(asset, list):
-        asset = asset[0]
-
-    transactions.set_hodl(asset, quantity)
-    save_path = transactions.save(description=f"Declared HODL for {asset}")
-    date_range = _date_range_for_year(transactions, year)
-    stats_table_data = get_stats_table_data_range(transactions, date_range)
-    raw_holdings_reconciliation = get_multi_asset_holdings_reconciliation_table_data(transactions)
-    import_warnings = _stats_import_warnings(transactions)
-    chart_data = get_unrealized_chart_data(transactions, asset, current_usd_spot)
-
-    return jsonify({
-        "message": f"Declared HODL for {asset} saved.",
-        "save_path": save_path,
-        "asset": asset,
-        "stats_table_rows": _stats_table_rows(stats_table_data),
-        "stats_summary": _stats_summary(stats_table_data, raw_holdings_reconciliation, import_warnings),
-        "holdings_reconciliation_table_data": _holdings_reconciliation_rows(
-            raw_holdings_reconciliation,
-            stats_table_data,
-        ),
-        "holdings_reconciliation_data": get_holdings_reconciliation_summary(transactions, asset),
-        "holdings_lot_table_data": get_current_holdings_lot_table_data(transactions, asset),
-        "unrealized_chart_data": chart_data["points"],
-        "chart_current_usd_spot": chart_data["current_usd_spot"],
-    })
-
-
 @blueprint.route('/date_range',  methods=['POST'])
 @login_required
 def date_range():
