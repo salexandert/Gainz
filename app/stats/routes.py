@@ -48,6 +48,21 @@ def _stats_import_warnings(transactions):
     return getattr(transactions, "import_warnings", [])
 
 
+def _date_range_for_year(transactions, year):
+    if year == 'All Time':
+        date_range = {
+            'start_date': '',
+            'end_date': ''
+        }
+    else:
+        date_range = {
+            'start_date': f"01/01/{year} 12:00 AM",
+            'end_date': f"12/31/{year} 11:59 PM"
+        }
+
+    return get_transactions_date_range(transactions, date_range)
+
+
 def _has_unlinked_sales(stats_row):
     return bool(
         stats_row
@@ -137,19 +152,18 @@ def selected_asset():
     current_app.logger.debug('Request JSON: %s', request.json)
 
     transactions = current_app.config['transactions']
-    year = request.json['year']
-    if year == 'All Time':
-        date_range = {
-            'start_date': '',
-            'end_date': ''
-        }
-    else:
-        date_range = {
-            'start_date': f"01/01/{year} 12:00 AM",
-            'end_date': f"12/31/{year} 11:59 PM"
-        }
+    year = request.json.get('year')
 
-    date_range = get_transactions_date_range(transactions, date_range)
+    if year:
+        date_range = _date_range_for_year(transactions, year)
+    else:
+        date_range = get_transactions_date_range(
+            transactions,
+            {
+                'start_date': request.json.get('start_date', ''),
+                'end_date': request.json.get('end_date', ''),
+            },
+        )
 
     # Debug logging
     current_app.logger.debug('Date Range: %s', date_range)
@@ -270,16 +284,34 @@ def set_hodl():
     transactions = current_app.config['transactions']
     asset = request.json['asset']
     quantity = request.json['quantity']
+    year = request.json.get('year', 'All Time')
+    current_usd_spot = request.json.get('current_usd_spot')
 
     if isinstance(asset, list):
         asset = asset[0]
 
     transactions.set_hodl(asset, quantity)
     save_path = transactions.save(description=f"Declared HODL for {asset}")
+    date_range = _date_range_for_year(transactions, year)
+    stats_table_data = get_stats_table_data_range(transactions, date_range)
+    raw_holdings_reconciliation = get_multi_asset_holdings_reconciliation_table_data(transactions)
+    import_warnings = _stats_import_warnings(transactions)
+    chart_data = get_unrealized_chart_data(transactions, asset, current_usd_spot)
 
     return jsonify({
         "message": f"Declared HODL for {asset} saved.",
         "save_path": save_path,
+        "asset": asset,
+        "stats_table_rows": _stats_table_rows(stats_table_data),
+        "stats_summary": _stats_summary(stats_table_data, raw_holdings_reconciliation, import_warnings),
+        "holdings_reconciliation_table_data": _holdings_reconciliation_rows(
+            raw_holdings_reconciliation,
+            stats_table_data,
+        ),
+        "holdings_reconciliation_data": get_holdings_reconciliation_summary(transactions, asset),
+        "holdings_lot_table_data": get_current_holdings_lot_table_data(transactions, asset),
+        "unrealized_chart_data": chart_data["points"],
+        "chart_current_usd_spot": chart_data["current_usd_spot"],
     })
 
 
@@ -291,20 +323,18 @@ def date_range():
 
     transactions = current_app.config['transactions']
 
-    year = request.json['year']
+    year = request.json.get('year')
 
-    if year == 'All Time':
-        date_range = {
-            'start_date': '',
-            'end_date': ''
-        }
+    if year:
+        date_range = _date_range_for_year(transactions, year)
     else:
-        date_range = {
-            'start_date': f"01/01/{year} 12:00 AM",
-            'end_date': f"12/31/{year} 11:59 PM"
-        }
-    
-    date_range = get_transactions_date_range(transactions, date_range)
+        date_range = get_transactions_date_range(
+            transactions,
+            {
+                'start_date': request.json.get('start_date', ''),
+                'end_date': request.json.get('end_date', ''),
+            },
+        )
         
     stats_table_data = get_stats_table_data_range(transactions, date_range)
     raw_holdings_reconciliation = get_multi_asset_holdings_reconciliation_table_data(transactions)

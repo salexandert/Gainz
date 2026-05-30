@@ -374,6 +374,14 @@ $(document).ready(function() {
         $('#statspage_all_holdings_reconciliation_datatable').DataTable().rows.add(rows || []).draw();
     }
 
+    function showHodlSaveMessage(message) {
+        $('#stats_hodl_save_message').text(message).show();
+    }
+
+    function hideHodlSaveMessage() {
+        $('#stats_hodl_save_message').hide().text('');
+    }
+
     var formatter = new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD',
@@ -788,6 +796,7 @@ $(document).ready(function() {
     });
 
     $('#statspage_stats_datatable tbody').on( 'click', 'tr', function () {
+        hideHodlSaveMessage();
         loadSelectedStatsAsset(table.row(this).data(), $('#stats_usd_spot').val());
     } );
 
@@ -800,6 +809,7 @@ $(document).ready(function() {
 
         var statsRow = getStatsRowForAsset(reconciliationRow[0]);
         if (statsRow) {
+            hideHodlSaveMessage();
             loadSelectedStatsAsset(statsRow, $('#stats_usd_spot').val());
         }
     } );
@@ -807,6 +817,7 @@ $(document).ready(function() {
     $("#stats_save_hodl_button").click(function(){
         var rowData = selectedStatsRowData || table.row( {selected:true} ).data();
         var quantity = $('#stats_declared_hodl_quantity').val();
+        var saveButton = $(this);
 
         if (!rowData) {
             alert("Select an asset first.");
@@ -818,17 +829,51 @@ $(document).ready(function() {
             return;
         }
 
+        hideHodlSaveMessage();
+        saveButton.prop('disabled', true).text('Saving...');
+
         $.ajax({
             type: "POST",
             url: "/stats/set_hodl",
             data: JSON.stringify({
                 'asset': rowData[0],
                 'quantity': quantity,
+                'year': $('#stats_page_year_dropdown').find(":selected").val(),
+                'current_usd_spot': $('#stats_usd_spot').val() || '',
             }),
             dataType: "json",
             contentType: 'application/json',
-            success: function () {
-                location.reload();
+            success: function (data) {
+                var selectedAsset = data['asset'] || rowData[0];
+
+                if (data['stats_table_rows']) {
+                    $('#statspage_stats_datatable').DataTable().clear();
+                    $('#statspage_stats_datatable').DataTable().rows.add(data['stats_table_rows']).draw();
+                    selectedStatsRowData = getStatsRowForAsset(selectedAsset) || rowData;
+                }
+
+                setStatsSummary(data['stats_summary']);
+                setAllHoldingsReconciliation(data['holdings_reconciliation_table_data']);
+
+                $('#statspage_holdings_reconciliation_datatable').DataTable().clear();
+                $('#statspage_holdings_reconciliation_datatable').DataTable().rows.add(data['holdings_reconciliation_data'] || []).draw();
+
+                $('#statspage_holdings_lots_datatable').DataTable().clear();
+                $('#statspage_holdings_lots_datatable').DataTable().rows.add(data['holdings_lot_table_data'] || []).draw();
+
+                renderGainzChart(data, selectedAsset);
+                $('#stats_declared_hodl_quantity')
+                    .attr('placeholder', 'Current holding for ' + selectedAsset)
+                    .val(quantity)
+                    .focus()
+                    .select();
+                showHodlSaveMessage((data['message'] || 'Declared HODL saved.') + ' Select another asset row to continue.');
+            },
+            error: function () {
+                alert("Declared HODL could not be saved. Please try again.");
+            },
+            complete: function () {
+                saveButton.prop('disabled', false).text('Save Declared HODL');
             },
         });
     });
