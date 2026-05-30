@@ -213,7 +213,7 @@ def selected_asset():
     linked_table_data = get_linked_table_data(transactions, asset, date_range)
 
     # Get Sells Table Data 
-    sells_table_data = get_sells_trans_table_data_range(transactions, asset, date_range)
+    sells_table_data = get_sales_report_table_data(transactions, asset, date_range)
 
     sells_unlinked_remaining = []
     if 'unlinked_remaining' in request.json and request.json['unlinked_remaining']:
@@ -241,8 +241,8 @@ def selected_asset():
 
     # Get All Links Table Data
     all_links_table_data = get_all_links_table_data(transactions, asset)
-    long_8949_table_data = []
-    short_8949_table_data = []
+    long_8949_table_data = get_form_8949_table_data(transactions, asset, date_range, term="long")
+    short_8949_table_data = get_form_8949_table_data(transactions, asset, date_range, term="short")
 
     data_dict = {}
 

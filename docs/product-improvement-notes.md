@@ -28,7 +28,6 @@ Current behavior:
 Open correctness work:
 
 - Let users choose or document the lot allocation method more explicitly.
-- Include the reconciliation summary and estimated lots in the audit packet.
 - Connect unresolved differences to suggested conversion/add-missing-transaction actions.
 
 ## Priority 3: Improve Import Confidence
@@ -47,3 +46,5 @@ Open correctness work:
 
 - The audit packet should include a holdings-lot report, import warnings, selected save metadata, and reconciliation status.
 - It should distinguish raw imported ledger evidence from tax-ready forms.
+
+Status: in progress. Audit packets now include linked Form 8949 detail CSVs, Form 8949 totals, holdings reconciliation, current holdings lots, import warnings, the generated Excel report, copied source files, and packet manifests.

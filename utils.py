@@ -19,6 +19,18 @@ tzinfos = {
 }
 
 FIAT_ASSET_SYMBOLS = {"USD"}
+FORM_8949_COLUMNS = [
+    "description",
+    "date_acquired",
+    "date_sold",
+    "proceeds",
+    "cost_basis",
+    "gain_loss",
+    "source",
+    "asset",
+    "quantity",
+    "term",
+]
 
 
 def format_quantity(quantity, decimals=8):
@@ -55,6 +67,221 @@ def comparable_datetime(value):
         return value.replace(tzinfo=None)
 
     return value
+
+
+def currency(value):
+    return "${:,.2f}".format(value)
+
+
+def _format_report_datetime(value):
+    if hasattr(value, "strftime"):
+        return datetime.datetime.strftime(value, "%Y-%m-%d %H:%M:%S")
+
+    return value
+
+
+def _date_in_range(value, date_range):
+    if not date_range:
+        return True
+
+    start_date = date_range.get("start_date")
+    end_date = date_range.get("end_date")
+    value = comparable_datetime(value)
+
+    if start_date:
+        start_date = comparable_datetime(start_date)
+        if value < start_date:
+            return False
+
+    if end_date:
+        end_date = comparable_datetime(end_date)
+        if value > end_date:
+            return False
+
+    return True
+
+
+def _transaction_fee(transaction):
+    fee = getattr(transaction, "fee", None)
+    return float(fee) if fee is not None else 0.0
+
+
+def _prorated_fee(transaction, quantity):
+    if not getattr(transaction, "quantity", 0):
+        return 0.0
+
+    return _transaction_fee(transaction) * (float(quantity) / float(transaction.quantity))
+
+
+def is_long_term_link(link):
+    return link.hodl_duration.days > 365
+
+
+def get_taxable_links(transactions, asset=None, date_range=None):
+    taxable_links = []
+
+    for link in getattr(transactions, "links", []):
+        if not hasattr(link, "sell") or not hasattr(link, "buy"):
+            continue
+
+        if asset and link.symbol != asset:
+            continue
+
+        if not _date_in_range(link.sell.time_stamp, date_range):
+            continue
+
+        taxable_links.append(link)
+
+    return sorted(
+        taxable_links,
+        key=lambda link: (
+            comparable_datetime(link.sell.time_stamp),
+            comparable_datetime(link.buy.time_stamp),
+            link.symbol,
+            link.id,
+        ),
+    )
+
+
+def get_form_8949_report_rows(transactions, asset=None, date_range=None, term=None):
+    rows = []
+
+    for link in get_taxable_links(transactions, asset=asset, date_range=date_range):
+        link_term = "long" if is_long_term_link(link) else "short"
+        if term and link_term != term:
+            continue
+
+        sell_fee = _prorated_fee(link.sell, link.quantity)
+        buy_fee = _prorated_fee(link.buy, link.quantity)
+        proceeds = link.proceeds - sell_fee
+        cost_basis = link.cost_basis + buy_fee
+        gain_loss = proceeds - cost_basis
+
+        rows.append({
+            "description": f"Crypto {link.symbol}",
+            "date_acquired": link.buy.time_stamp,
+            "date_sold": link.sell.time_stamp,
+            "proceeds": proceeds,
+            "cost_basis": cost_basis,
+            "gain_loss": gain_loss,
+            "source": link.sell.source,
+            "asset": link.symbol,
+            "quantity": link.quantity,
+            "term": link_term,
+            "link_id": link.id,
+            "buy_uid": getattr(link.buy, "uid", ""),
+            "sell_uid": getattr(link.sell, "uid", ""),
+            "year": link.sell.time_stamp.year,
+        })
+
+    return rows
+
+
+def get_form_8949_totals(transactions, asset=None, date_range=None):
+    totals = {
+        "short": {"rows": 0, "proceeds": 0.0, "cost_basis": 0.0, "gain_loss": 0.0},
+        "long": {"rows": 0, "proceeds": 0.0, "cost_basis": 0.0, "gain_loss": 0.0},
+        "total": {"rows": 0, "proceeds": 0.0, "cost_basis": 0.0, "gain_loss": 0.0},
+    }
+
+    for row in get_form_8949_report_rows(transactions, asset=asset, date_range=date_range):
+        for bucket in (row["term"], "total"):
+            totals[bucket]["rows"] += 1
+            totals[bucket]["proceeds"] += row["proceeds"]
+            totals[bucket]["cost_basis"] += row["cost_basis"]
+            totals[bucket]["gain_loss"] += row["gain_loss"]
+
+    return totals
+
+
+def get_form_8949_table_data(transactions, asset=None, date_range=None, term=None):
+    return [
+        [
+            row["description"],
+            _format_report_datetime(row["date_acquired"]),
+            _format_report_datetime(row["date_sold"]),
+            currency(row["proceeds"]),
+            currency(row["cost_basis"]),
+            currency(row["gain_loss"]),
+            row["source"],
+        ]
+        for row in get_form_8949_report_rows(
+            transactions,
+            asset=asset,
+            date_range=date_range,
+            term=term,
+        )
+    ]
+
+
+def get_sales_report_rows(transactions, asset=None, date_range=None):
+    links_by_sell = {}
+
+    for link in get_taxable_links(transactions, asset=asset, date_range=date_range):
+        links_by_sell.setdefault(link.sell.uid, {"sell": link.sell, "links": []})
+        links_by_sell[link.sell.uid]["links"].append(link)
+
+    rows = []
+    for group in sorted(
+        links_by_sell.values(),
+        key=lambda group: comparable_datetime(group["sell"].time_stamp),
+    ):
+        sell = group["sell"]
+        links = sorted(group["links"], key=lambda link: comparable_datetime(link.buy.time_stamp))
+        linked_quantity = sum(link.quantity for link in links)
+        proceeds = 0.0
+        cost_basis = 0.0
+        long_count = 0
+        short_count = 0
+
+        for link in links:
+            proceeds += link.proceeds - _prorated_fee(link.sell, link.quantity)
+            cost_basis += link.cost_basis + _prorated_fee(link.buy, link.quantity)
+            if is_long_term_link(link):
+                long_count += 1
+            else:
+                short_count += 1
+
+        if len(links) == 1:
+            acquired = links[0].buy.time_stamp
+        elif long_count and short_count:
+            acquired = "Multiple Dates Long and Short"
+        elif long_count:
+            acquired = "Multiple Dates All Long"
+        else:
+            acquired = "Multiple Dates All Short"
+
+        rows.append({
+            "description": f"{format_quantity(linked_quantity)} of {sell.symbol}",
+            "date_acquired": acquired,
+            "date_sold": sell.time_stamp,
+            "proceeds": proceeds,
+            "cost_basis": cost_basis,
+            "gain_loss": proceeds - cost_basis,
+            "source": sell.source,
+            "asset": sell.symbol,
+            "linked_quantity": linked_quantity,
+            "sell_quantity": sell.quantity,
+            "unlinked_quantity": sell.unlinked_quantity,
+            "year": sell.time_stamp.year,
+        })
+
+    return rows
+
+
+def get_sales_report_table_data(transactions, asset=None, date_range=None):
+    return [
+        [
+            row["description"],
+            _format_report_datetime(row["date_acquired"]),
+            _format_report_datetime(row["date_sold"]),
+            currency(row["proceeds"]),
+            currency(row["cost_basis"]),
+            currency(row["gain_loss"]),
+            row["source"],
+        ]
+        for row in get_sales_report_rows(transactions, asset=asset, date_range=date_range)
+    ]
 
 
 def fetch_crypto_price(trans):
@@ -466,20 +693,19 @@ def get_stats_table_data_range(transactions, date_range=None):
             num_links = 0
             
 
-            for link in links:
-                if link.symbol == asset:
-                    num_links += 1
-                    profit_loss_total += link.profit_loss
-                    if link.hodl_duration.days > 730:
-                        profit_loss_long += link.profit_loss
-                        proceeds_long += link.proceeds
-                        cost_basis_long += link.cost_basis
-                        gain_long += link.profit_loss
-                    else:
-                        profit_loss_short += link.profit_loss
-                        proceeds_short += link.proceeds
-                        cost_basis_short += link.cost_basis
-                        gain_short += link.profit_loss
+            for row in get_form_8949_report_rows(transactions, asset=asset, date_range=date_range):
+                num_links += 1
+                profit_loss_total += row["gain_loss"]
+                if row["term"] == "long":
+                    profit_loss_long += row["gain_loss"]
+                    proceeds_long += row["proceeds"]
+                    cost_basis_long += row["cost_basis"]
+                    gain_long += row["gain_loss"]
+                else:
+                    profit_loss_short += row["gain_loss"]
+                    proceeds_short += row["proceeds"]
+                    cost_basis_short += row["cost_basis"]
+                    gain_short += row["gain_loss"]
 
 
             for trans in filtered_transactions:

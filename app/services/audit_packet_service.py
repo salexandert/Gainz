@@ -7,6 +7,14 @@ from datetime import datetime
 from pathlib import Path
 
 from app.services.export_service import ExportService
+from utils import (
+    FORM_8949_COLUMNS,
+    format_quantity,
+    get_current_holdings_lots,
+    get_form_8949_report_rows,
+    get_form_8949_totals,
+    get_multi_asset_holdings_reconciliation_table_data,
+)
 
 
 class AuditPacketService:
@@ -75,9 +83,12 @@ class AuditPacketService:
             )
 
         self._write_methodology(packet_dir, transactions)
+        self._write_tax_reports(packet_dir, transactions)
+        self._write_holdings_reports(packet_dir, transactions)
+        self._write_import_warnings(packet_dir, transactions)
         self._write_manifest(packet_dir, manifest_rows)
         self._write_inventory(packet_dir)
-        self._write_summary(packet_dir, manifest_rows)
+        self._write_summary(packet_dir, manifest_rows, transactions)
 
         return str(packet_dir)
 
@@ -137,6 +148,112 @@ class AuditPacketService:
             writer.writeheader()
             writer.writerows(rows)
 
+    def _write_tax_reports(self, packet_dir, transactions):
+        all_rows = get_form_8949_report_rows(transactions)
+        for term in ("short", "long"):
+            self._write_form_8949_detail(
+                packet_dir / "01_reports" / f"form_8949_{term}_term.csv",
+                [row for row in all_rows if row["term"] == term],
+            )
+
+        totals = get_form_8949_totals(transactions)
+        with open(packet_dir / "01_reports" / "form_8949_totals.csv", "w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(
+                file,
+                fieldnames=["term", "rows", "proceeds", "cost_basis", "gain_loss"],
+            )
+            writer.writeheader()
+            for term in ("short", "long", "total"):
+                row = totals[term]
+                writer.writerow({
+                    "term": term,
+                    "rows": row["rows"],
+                    "proceeds": f"{row['proceeds']:.2f}",
+                    "cost_basis": f"{row['cost_basis']:.2f}",
+                    "gain_loss": f"{row['gain_loss']:.2f}",
+                })
+
+        (packet_dir / "03_manifests" / "form_8949_totals.json").write_text(
+            json.dumps(totals, indent=2),
+            encoding="utf-8",
+        )
+
+    def _write_form_8949_detail(self, path, rows):
+        fieldnames = FORM_8949_COLUMNS + ["link_id", "buy_uid", "sell_uid"]
+        with open(path, "w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({
+                    "description": row["description"],
+                    "date_acquired": self._format_datetime(row["date_acquired"]),
+                    "date_sold": self._format_datetime(row["date_sold"]),
+                    "proceeds": f"{row['proceeds']:.2f}",
+                    "cost_basis": f"{row['cost_basis']:.2f}",
+                    "gain_loss": f"{row['gain_loss']:.2f}",
+                    "source": row["source"],
+                    "asset": row["asset"],
+                    "quantity": format_quantity(row["quantity"]),
+                    "term": row["term"],
+                    "link_id": row["link_id"],
+                    "buy_uid": row["buy_uid"],
+                    "sell_uid": row["sell_uid"],
+                })
+
+    def _write_holdings_reports(self, packet_dir, transactions):
+        reconciliation_rows = get_multi_asset_holdings_reconciliation_table_data(transactions)
+        with open(packet_dir / "01_reports" / "holdings_reconciliation.csv", "w", newline="", encoding="utf-8") as file:
+            writer = csv.writer(file)
+            writer.writerow([
+                "asset",
+                "declared_hodl",
+                "expected_from_buys_sells_only",
+                "imported_net_after_transfers",
+                "available_lot_quantity",
+                "difference_vs_declared",
+                "status",
+                "next_action",
+            ])
+            writer.writerows(reconciliation_rows)
+
+        with open(packet_dir / "01_reports" / "current_holdings_lots.csv", "w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(
+                file,
+                fieldnames=[
+                    "asset",
+                    "type",
+                    "acquired_at",
+                    "estimated_held_quantity",
+                    "original_quantity",
+                    "usd_spot",
+                    "estimated_basis",
+                    "original_basis",
+                    "source",
+                ],
+            )
+            writer.writeheader()
+            for asset in [row[0] for row in reconciliation_rows]:
+                for lot in get_current_holdings_lots(transactions, asset):
+                    writer.writerow({
+                        "asset": lot["asset"],
+                        "type": lot["type"],
+                        "acquired_at": self._format_datetime(lot["acquired_at"]),
+                        "estimated_held_quantity": format_quantity(lot["estimated_held_quantity"]),
+                        "original_quantity": format_quantity(lot["original_quantity"]),
+                        "usd_spot": f"{lot['usd_spot']:.2f}",
+                        "estimated_basis": f"{lot['estimated_basis']:.2f}",
+                        "original_basis": f"{lot['original_basis']:.2f}",
+                        "source": lot["source"],
+                    })
+
+    def _write_import_warnings(self, packet_dir, transactions):
+        warnings = getattr(transactions, "import_warnings", []) or []
+        with open(packet_dir / "01_reports" / "import_warnings.csv", "w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=["warning"])
+            writer.writeheader()
+            for warning in warnings:
+                writer.writerow({"warning": warning})
+
     def _write_inventory(self, packet_dir):
         rows = []
         for path in sorted(packet_dir.rglob("*")):
@@ -158,15 +275,19 @@ class AuditPacketService:
             for row in rows:
                 file.write(f"{row['sha256']}  {row['packet_relative_path'].replace(os.sep, '/')}\n")
 
-    def _write_summary(self, packet_dir, manifest_rows):
+    def _write_summary(self, packet_dir, manifest_rows, transactions):
         copied_sources = len([row for row in manifest_rows if row["status"] == "COPIED"])
         missing_sources = len([row for row in manifest_rows if row["status"] == "MISSING"])
+        form_8949_totals = get_form_8949_totals(transactions)
         summary = {
             "created_at": datetime.now().isoformat(timespec="seconds"),
             "packet_path": str(packet_dir),
             "copied_source_files": copied_sources,
             "missing_source_files": missing_sources,
             "manifest_entries": len(manifest_rows),
+            "form_8949_totals": form_8949_totals,
+            "holdings_reconciliation_rows": len(get_multi_asset_holdings_reconciliation_table_data(transactions)),
+            "import_warning_count": len(getattr(transactions, "import_warnings", []) or []),
         }
         (packet_dir / "03_manifests" / "audit_packet_summary.json").write_text(
             json.dumps(summary, indent=2),
@@ -193,3 +314,9 @@ class AuditPacketService:
             for chunk in iter(lambda: file.read(1024 * 1024), b""):
                 digest.update(chunk)
         return digest.hexdigest()
+
+    def _format_datetime(self, value):
+        if hasattr(value, "isoformat"):
+            return value.isoformat(sep=" ", timespec="seconds")
+
+        return value

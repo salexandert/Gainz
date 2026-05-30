@@ -464,200 +464,70 @@ class Transactions:
         sales_sheet = workbook['Sales']
 
         
-        # Get Years
-        years = set()
-        for link in self.links:
-            years.add(link.sell.time_stamp.year)
+        sales_rows = get_sales_report_rows(self)
+        years = sorted({row["year"] for row in sales_rows})
 
         # Sales
         for year in years:
             print(f'exporting sales for {year}')
 
-
-            sheetname = f'{year} Sales'
             ws = workbook.copy_worksheet(sales_sheet)
-            ws.title = sheetname
+            ws.title = f'{year} Sales'
 
             row = 2
-            
-            for trans in self.transactions:
-                
-                description = None
-                acquired = None
-                sold_date = None
-                proceeds = None 
-                cost_basis = 0
-                source = None
-                gain_loss = 0
-
-
-                if trans.trans_type != "sell":
+            for sale in sales_rows:
+                if sale["year"] != year:
                     continue
 
-                if trans.time_stamp.year != year:
-                    continue
-                
-
-                description = f"{trans.quantity} of {trans.symbol}"
-                
-                ws[f"A{row}"] = description
-
-                if len(trans.links) == 0:
-                    continue
-                elif len(trans.links) > 1:
-                    acquired = "Multiple Dates"
-                    all_short = True
-                    all_long = True
-                    
-                    for link in trans.links:
-
-
-                        gain_loss += link.profit_loss
-                        if link.hodl_duration.days < 365:
-                            all_long = False
-                        else:
-                            all_short = False
-                    if all_long is False and all_short is False:
-                        acquired += " Long and Short"
-
-                    elif all_long is True:
-                        acquired += " All Long"
-                    elif all_short is True:
-                        acquired += " All Short"
-
-                else:
-                    gain_loss = trans.links[0].profit_loss
-                    acquired = trans.links[0].buy.time_stamp
-                    ws[f"B{row}"] = acquired
-
-                sold_date = trans.time_stamp
-                ws[f"C{row}"] = sold_date
-
-                # Handle case where fee might be None
-                fee = trans.fee if trans.fee is not None else 0.0
-                proceeds = trans.usd_total - fee
-
-                ws[f"D{row}"] = proceeds
+                ws[f"A{row}"] = sale["description"]
+                ws[f"B{row}"] = sale["date_acquired"]
+                ws[f"C{row}"] = sale["date_sold"]
+                ws[f"D{row}"] = sale["proceeds"]
                 ws[f"D{row}"].number_format = '"$"#,##0.00_-'
-                
-                # Corrected indentation and syntax error
-                for link in trans.links:
-                    # Handle case where buy fee might be None
-                    buy_fee = link.buy.fee if link.buy.fee is not None else 0.0
-                    cost_basis += link.cost_basis + buy_fee
-
-                ws[f"E{row}"] = cost_basis
+                ws[f"E{row}"] = sale["cost_basis"]
                 ws[f"E{row}"].number_format = '"$"#,##0.00_-'
-
-                gain_loss = proceeds - cost_basis
-
-                ws[f"F{row}"] = gain_loss
+                ws[f"F{row}"] = sale["gain_loss"]
                 ws[f"F{row}"].number_format = '"$"#,##0.00_-'
-                source = trans.source
-                ws[f"G{row}"] = source
-
+                ws[f"G{row}"] = sale["source"]
                 row += 1
 
+        form_rows = get_form_8949_report_rows(self)
+        form_years = sorted({row["year"] for row in form_rows})
 
-        # 8949 Short
-        for year in years:
-            
-            sheetname = f'{year} 8949 Short'
-            ws = workbook.copy_worksheet(t8949_sheet)
-            ws.title = sheetname
-            
-            row = 2
-            for link in self.links:
+        for term in ("short", "long"):
+            term_label = term.capitalize()
+            for year in form_years:
+                ws = workbook.copy_worksheet(t8949_sheet)
+                ws.title = f'{year} 8949 {term_label}'
 
-                if link.sell.time_stamp.year != year:
-                    continue
+                row = 2
+                for form_row in form_rows:
+                    if form_row["year"] != year or form_row["term"] != term:
+                        continue
 
-                if abs(link.profit_loss) <= 1:
-                    continue
-                
-                if link.hodl_duration.days > 365:
-                    continue
+                    ws[f"A{row}"] = form_row["description"]
+                    ws[f"B{row}"] = form_row["date_acquired"]
+                    ws[f"C{row}"] = form_row["date_sold"]
+                    ws[f"D{row}"] = form_row["proceeds"]
+                    ws[f"D{row}"].number_format = '"$"#,##0.00_-'
+                    ws[f"E{row}"] = form_row["cost_basis"]
+                    ws[f"E{row}"].number_format = '"$"#,##0.00_-'
+                    ws[f"H{row}"] = form_row["gain_loss"]
+                    ws[f"H{row}"].number_format = '"$"#,##0.00_-'
+                    ws[f"I{row}"] = form_row["source"]
+                    row += 1
 
-                ws[f"A{row}"] = f"Crypto {link.symbol}"
-                ws[f"B{row}"] = link.buy.time_stamp
-                ws[f"C{row}"] = link.sell.time_stamp
-                ws[f"D{row}"] = link.link_sell_price
-                ws[f"D{row}"].number_format = '"$"#,##0.00_-'
-                ws[f"E{row}"] = link.link_buy_price
-                ws[f"E{row}"].number_format = '"$"#,##0.00_-'
-                ws[f"H{row}"] = link.profit_loss
-                ws[f"H{row}"].number_format = '"$"#,##0.00_-'
-                ws[f"I{row}"] = link.sell.source
-
-                row += 1
-
-            if row == 2:
-                workbook.remove(ws)
-
-            else:
-                row += 2
-
-                ws[f"C{row}"] = "Totals"
-
-                ws[f"D{row}"] = f"=SUM(D2:D{row -2})"
-                ws[f"D{row}"].number_format = '"$"#,##0.00_-'
-                ws[f"E{row}"] = f"=SUM(E2:E{row -2})"
-                ws[f"E{row}"].number_format = '"$"#,##0.00_-'
-                ws[f"H{row}"] = f"=SUM(H2:H{row -2})"
-                ws[f"H{row}"].number_format = '"$"#,##0.00_-'
-
-
-        # 8949 Long
-        years = set()
-        for link in self.links:
-
-            years.add(link.sell.time_stamp.year)
-
-        for year in years:
-            
-            sheetname = f'{year} 8949 Long'
-            ws = workbook.copy_worksheet(t8949_sheet)
-            ws.title = sheetname
-            
-            row = 2
-            for link in self.links:
-
-                if link.sell.time_stamp.year != year:
-                    continue
-
-                if abs(link.profit_loss) <= 1:
-                    continue
-                
-                if link.hodl_duration.days <= 365:
-                    continue
-
-                ws[f"A{row}"] = f"Crypto {link.symbol}"
-                ws[f"B{row}"] = link.buy.time_stamp
-                ws[f"C{row}"] = link.sell.time_stamp
-                ws[f"D{row}"] = link.link_sell_price
-                ws[f"D{row}"].number_format = '"$"#,##0.00_-'
-                ws[f"E{row}"] = link.link_buy_price
-                ws[f"E{row}"].number_format = '"$"#,##0.00_-'
-                ws[f"H{row}"] = link.profit_loss
-                ws[f"H{row}"].number_format = '"$"#,##0.00_-'
-                ws[f"I{row}"] = link.sell.source
-
-                row += 1
-
-            if row == 2:
-                workbook.remove(ws)
-
-            else:
-                row += 2
-
-                ws[f"C{row}"] = "Totals"
-
-                ws[f"D{row}"] = f"=SUM(D2:D{row -2})"
-                ws[f"D{row}"].number_format = '"$"#,##0.00_-'
-                ws[f"E{row}"] = f"=SUM(E2:E{row -2})"
-                ws[f"E{row}"].number_format = '"$"#,##0.00_-'
-                ws[f"H{row}"] = f"=SUM(H2:H{row -2})"
-                ws[f"H{row}"].number_format = '"$"#,##0.00_-'
+                if row == 2:
+                    workbook.remove(ws)
+                else:
+                    row += 2
+                    ws[f"C{row}"] = "Totals"
+                    ws[f"D{row}"] = f"=SUM(D2:D{row -2})"
+                    ws[f"D{row}"].number_format = '"$"#,##0.00_-'
+                    ws[f"E{row}"] = f"=SUM(E2:E{row -2})"
+                    ws[f"E{row}"].number_format = '"$"#,##0.00_-'
+                    ws[f"H{row}"] = f"=SUM(H2:H{row -2})"
+                    ws[f"H{row}"].number_format = '"$"#,##0.00_-'
 
 
         for asset in self.assets:

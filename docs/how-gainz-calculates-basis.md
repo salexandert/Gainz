@@ -36,7 +36,7 @@ linked basis    = linked quantity * buy spot price
 gain/loss       = linked proceeds - linked basis
 ```
 
-Fees are included where imported and supported by the transaction model.
+Form 8949 rows are generated from those links. For partial links, Gainz prorates buy-side fees into cost basis and sell-side fees against proceeds using the linked quantity divided by the source transaction quantity.
 
 If a sell cannot be fully linked to earlier basis, Gainz reports the unlinked quantity. Unlinked sells are a warning condition, not a final answer.
 
@@ -60,6 +60,10 @@ If a receive is really an acquisition, it may need to be converted to a buy with
 An audit packet is a documentation bundle. Gainz can generate one with:
 
 - Exported Excel report.
+- Linked Form 8949 detail and totals.
+- Holdings reconciliation.
+- Current holdings lots.
+- Import warnings.
 - Source transaction files that are still available on disk.
 - Manifest and SHA-256 hashes.
 - A short methodology note.
