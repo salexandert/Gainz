@@ -2044,121 +2044,140 @@ $(document).ready(function() {
 // Model Page
 $(document).ready(function() {
 
-    $('#model_stats_datatable').DataTable({
+    var modelStatsTable = $('#model_stats_datatable').DataTable({
         select: {
             style: 'single'
         },
     });
 
-    $('#all_linkable_buys_datatable').DataTable({
+    var allModelLotsTable = $('#all_linkable_buys_datatable').DataTable({
         select: {
             style: 'single'
         },
     });
 
-    var batch_data = {}
+    var modelBatchTable = $('#model_batches_datatable').DataTable({
+        "pageLength": 25,
+        select: {
+            style: 'single'
+        },
+    });
+
+    var batch_data = {};
+    var selectedModelRow = null;
+
+    function modelSetWarnings(warnings) {
+        var warningBox = $('#model_warnings');
+        warningBox.empty();
+
+        if (warnings && warnings.length > 0) {
+            warnings.forEach(function(warning) {
+                warningBox.append($('<div>').text(warning));
+            });
+            warningBox.show();
+        } else {
+            warningBox.hide();
+        }
+    }
+
+    function modelRenderBatch(batchKey) {
+        if (!batch_data || !batch_data.batches_by_key) {
+            return;
+        }
+
+        var batch = batch_data.batches_by_key[batchKey];
+        if (!batch) {
+            modelBatchTable.clear().draw();
+            return;
+        }
+
+        var summary = batch.summary || {};
+        $('#model_summary_method').text(batch.label || 'FIFO');
+        $('#model_summary_quantity').text(summary.quantity_display || '--');
+        $('#model_summary_proceeds').text(summary.proceeds_display || '--');
+        $('#model_summary_cost_basis').text(summary.cost_basis_display || '--');
+        $('#model_summary_gain_loss').text(summary.gain_loss_display || '--');
+        $('#model_summary_long').text((summary.long_quantity_display || '0') + ' / ' + (summary.long_gain_loss_display || '$0.00'));
+        $('#model_summary_short').text((summary.short_quantity_display || '0') + ' / ' + (summary.short_gain_loss_display || '$0.00'));
+
+        modelBatchTable.clear();
+        modelBatchTable.rows.add(batch.rows || []).draw();
+        $('#model_result_panel').show();
+    }
 
     $('#model_stats_datatable tbody').on( 'click', 'tr', function () {
+        selectedModelRow = modelStatsTable.row(this).data();
         $('#model_submit').prop('disabled', false);
+        if (selectedModelRow) {
+            $('#model_selected_asset').text(selectedModelRow[0] + ' selected');
+        }
     });
 
     $('#model_submit').on('click', function () {
+        if (!selectedModelRow) {
+            alert('Select an asset first.');
+            return;
+        }
+
+        var button = $(this);
+        button.prop('disabled', true).text('Modeling...');
 
         $.ajax({
             type: "POST",
             url: "/model/selected_asset",
             data: JSON.stringify({
-                'row_data': $('#model_stats_datatable').DataTable().row( {selected:true} ).data(),
+                'row_data': selectedModelRow,
                 'usd_spot': $('#model_usd_spot').val(),
                 'quantity': $('#model_quantity').val(),
                 'total_in_usd': $('#total_in_usd').val()
                 }),
-
+            dataType: "json",
             contentType: 'application/json',
             success: function (data) {
+                batch_data = data;
 
-                console.log(data)
+                $('#model_batch_options').children().remove();
+                (data.batch_options || []).forEach(function(option) {
+                    var label = option.label;
+                    if (option.key == data.default_batch_key) {
+                        label = label + ' (Default)';
+                    }
+                    $('#model_batch_options').append(
+                        $('<option>').val(option.key).text(label)
+                    );
+                });
 
-                batch_data = data
+                $('#model_quantity').val(data.potential_sale_quantity_display || data.potential_sale_quantity);
+                $('#total_in_usd').val(data.total_in_usd);
+                allModelLotsTable.clear();
+                allModelLotsTable.rows.add(data.all_linkable_buys_datatable || []).draw();
+                modelSetWarnings(data.warnings);
 
-                $('#model_batch_options').children().remove()
-
-                if (data['min_links_batch'].length > 0) {$('#model_batch_options').append('<option>Min Links</option>')}
-                if (data['min_gain_batch'].length > 0) {$('#model_batch_options').append('<option>Min Gain</option>')}
-                if (data['min_gain_long_batch'].length > 0) {$('#model_batch_options').append('<option>Min Gain Long</option>')}
-                if (data['min_gain_short_batch'].length > 0) {$('#model_batch_options').append('<option>Min Gain Short</option>')}
-
-                if (data['max_gain_batch'].length > 0) {$('#model_batch_options').append('<option>Max Gain</option>')}
-                if (data['max_gain_long_batch'].length > 0) {$('#model_batch_options').append('<option>Max Gain Long</option>')}
-                if (data['max_gain_short_batch'].length > 0) {$('#model_batch_options').append('<option>Max Gain Short</option>')}
-
-                if (data['max_gain_long_batch'].length > 0) { $('#model_batch_options').val('Max Gain Long').change() }
-                else if (data['max_gain_batch'].length > 0) { $('#model_batch_options').val('Max Gain').change() }
-                else if (data['min_links_batch'].length > 0) {  $('#model_batch_options').val('Min Links').change()  }
-                else { $('#model_batch_options').val('') }
-
-
-                $('#linked_datatable').DataTable().clear();
-                $('#linked_datatable').DataTable().rows.add(batch_data['linked']).draw();
-
-                $('#linked_datatable').DataTable().clear();
-                $('#linked_datatable').DataTable().rows.add(batch_data['linked']).draw();
-
-                $('#model_quantity').val(data['potential_sale_quantity'])
-
-                $('#total_in_usd').val(data['total_in_usd'])
-
-
+                if (data.default_batch_key) {
+                    $('#model_batch_options').val(data.default_batch_key);
+                    modelRenderBatch(data.default_batch_key);
+                } else {
+                    modelBatchTable.clear().draw();
+                    $('#model_result_panel').hide();
+                    modelSetWarnings(['No current lots are available to model this sale.']);
+                }
+            },
+            error: function (xhr) {
+                var message = 'Model sale could not run. Check the asset, sale amount, and USD spot.';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    message = xhr.responseJSON.error;
+                }
+                modelSetWarnings([message]);
+            },
+            complete: function () {
+                button.prop('disabled', false).text('Model FIFO Sale');
             },
         });
     } );
 
 
     $('#model_batch_options').on('change', function() {
-        // alert( $(this).find(":selected").val() );
-
-        if ($(this).find(":selected").val() == 'Min Links') {
-
-            $('#model_batches_datatable').DataTable().clear();
-            $('#model_batches_datatable').DataTable().rows.add(batch_data['min_links_batch']).draw();
-            $('#model_batch_text').html(batch_data['min_links_batch_text']);
-
-        } else if ($(this).find(":selected").val() == 'Min Gain') {
-
-            $('#model_batches_datatable').DataTable().clear();
-            $('#model_batches_datatable').DataTable().rows.add(batch_data['min_gain_batch']).draw();
-            $('#model_batch_text').html(batch_data['min_gain_batch_text']);
-
-        } else if ($(this).find(":selected").val() == 'Min Gain Long') {
-
-            $('#model_batches_datatable').DataTable().clear();
-            $('#model_batches_datatable').DataTable().rows.add(batch_data['min_gain_long_batch']).draw();
-            $('#model_batch_text').html(batch_data['min_gain_long_batch_text']);
-
-        } else if ($(this).find(":selected").val() == 'Min Gain Short') {
-
-            $('#model_batches_datatable').DataTable().clear();
-            $('#model_batches_datatable').DataTable().rows.add(batch_data['min_gain_short_batch']).draw();
-            $('#model_batch_text').html(batch_data['min_gain_short_batch_text']);
-
-        } else if ($(this).find(":selected").val() == 'Max Gain') {
-
-            $('#model_batches_datatable').DataTable().clear();
-            $('#model_batches_datatable').DataTable().rows.add(batch_data['max_gain_batch']).draw();
-            $('#model_batch_text').html(batch_data['max_gain_batch_text']);
-
-        } else if ($(this).find(":selected").val() == 'Max Gain Long') {
-
-            $('#model_batches_datatable').DataTable().clear();
-            $('#model_batches_datatable').DataTable().rows.add(batch_data['max_gain_long_batch']).draw();
-            $('#model_batch_text').html(batch_data['max_gain_long_batch_text']);
-
-        } else if ($(this).find(":selected").val() == 'Max Gain Short') {
-
-            $('#model_batches_datatable').DataTable().clear();
-            $('#model_batches_datatable').DataTable().rows.add(batch_data['max_gain_short_batch']).draw();
-            $('#model_batch_text').html(batch_data['max_gain_short_batch_text']);
-        }
+        modelRenderBatch($(this).find(":selected").val());
 
      });
 

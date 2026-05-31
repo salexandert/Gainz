@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 import transactions as transactions_module
+from app.model.routes import _model_sale_payload
 from app.stats.routes import _auto_fix_safe_issues
 from openpyxl import Workbook
 from transaction import Buy, Receive, Sell, Send
@@ -257,6 +258,45 @@ class TransactionsEngineTests(unittest.TestCase):
             ["Auto-fixed safe Stats issues with FIFO basis links"],
             transactions.saved_descriptions,
         )
+
+    def test_model_sell_defaults_to_fifo(self):
+        transactions = empty_transactions()
+        old_buy = Buy("BTC", 1, datetime.datetime(2020, 1, 1), 100, "old")
+        new_buy = Buy("BTC", 1, datetime.datetime(2021, 1, 1), 250, "new")
+        transactions.transactions = [new_buy, old_buy]
+
+        payload = _model_sale_payload(
+            transactions,
+            "BTC",
+            sale_usd_spot=300,
+            total_in_usd=300,
+        )
+        fifo = payload["batches_by_key"]["fifo"]
+
+        self.assertEqual("fifo", payload["default_batch_key"])
+        self.assertEqual("old", fifo["rows"][0][0])
+        self.assertEqual("$100.00", fifo["summary"]["cost_basis_display"])
+        self.assertEqual("$200.00", fifo["summary"]["gain_loss_display"])
+
+    def test_model_sell_uses_declared_current_holdings_lots(self):
+        transactions = empty_transactions()
+        old_buy = Buy("BTC", 1, datetime.datetime(2020, 1, 1), 100, "old")
+        new_buy = Buy("BTC", 1, datetime.datetime(2021, 1, 1), 250, "new")
+        transactions.transactions = [old_buy, new_buy]
+        transactions.set_holdings("BTC", 0.5)
+
+        payload = _model_sale_payload(
+            transactions,
+            "BTC",
+            sale_usd_spot=300,
+            quantity=0.5,
+        )
+        fifo = payload["batches_by_key"]["fifo"]
+
+        self.assertEqual("new", fifo["rows"][0][0])
+        self.assertEqual("0.5", fifo["summary"]["quantity_display"])
+        self.assertEqual("$125.00", fifo["summary"]["cost_basis_display"])
+        self.assertEqual("$25.00", fifo["summary"]["gain_loss_display"])
 
     def test_min_gain_auto_link_uses_highest_cost_basis(self):
         transactions = empty_transactions()

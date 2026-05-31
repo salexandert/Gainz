@@ -55,6 +55,39 @@
     padding: 12px 14px;
 }
 
+.model-summary-band {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    margin: 18px 0;
+}
+
+.model-summary-item {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+
+.model-summary-item span {
+    color: #6c757d;
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.model-summary-item strong {
+    color: #252422;
+    display: inline-block;
+    font-size: 20px;
+    margin-top: 4px;
+}
+
+.model-advanced-strategy {
+    margin-bottom: 16px;
+}
+
 .stats-summary-item span {
     color: #6c757d;
     display: block;
