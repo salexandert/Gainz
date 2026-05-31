@@ -235,6 +235,52 @@
     cursor: pointer;
 }
 
+.gainz-home-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 18px 0;
+}
+
+.gainz-home-flow {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    margin: 18px 0;
+}
+
+.gainz-home-flow div {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    padding: 14px;
+}
+
+.gainz-home-flow span {
+    align-items: center;
+    background: #51cbce;
+    border-radius: 999px;
+    color: #fff;
+    display: inline-flex;
+    font-size: 13px;
+    font-weight: 700;
+    height: 28px;
+    justify-content: center;
+    margin-bottom: 10px;
+    width: 28px;
+}
+
+.gainz-home-flow strong {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.gainz-home-flow p {
+    color: #4f5962;
+    margin-bottom: 0;
+}
+
 .gainz-support-panel {
     align-items: center;
     background: #f8f9fa;
