@@ -62,7 +62,7 @@ You can also include **off-exchange events**, like converting ETH to BTC via Sha
 
 ---
 
-## 🛠 Download & Installation
+## 🛠 Download & Run
 
 ### ✅ Compiled Versions (Windows & Mac)
 
@@ -71,7 +71,7 @@ Download from Google Drive:
 
 > *Note: Mac version may be a few versions behind.*
 
-### 🧪 Compile it Yourself
+### 🧪 Or compile it Yourself
 
 To compile from source using `pyinstaller`, run:
 
