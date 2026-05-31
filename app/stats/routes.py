@@ -80,7 +80,7 @@ def _holdings_reconciliation_rows(raw_holdings_rows, stats_table_data):
 
         if _has_unlinked_sales(stats_by_asset.get(asset)):
             row[6] = "Unlinked sales"
-            row[7] = "Run Auto Link or review basis links before relying on this asset's tax totals."
+            row[7] = "Use Auto-Fix Safe Issues or review basis links before relying on this asset's tax totals."
 
         table_rows.append(row)
 
@@ -109,6 +109,97 @@ def _stats_summary(stats_table_data, raw_holdings_rows, import_warnings):
     }
 
 
+def _selected_year(year_value):
+    if not year_value or year_value == 'All Time':
+        return None
+
+    return int(year_value)
+
+
+def _stats_response_payload(transactions, year_value='All Time'):
+    selected_year = _selected_year(year_value)
+    if selected_year:
+        date_range = _date_range_for_year(transactions, selected_year)
+    else:
+        date_range = get_transactions_date_range(transactions, {'start_date': '', 'end_date': ''})
+
+    stats_table_data = get_stats_table_data_range(transactions, date_range)
+    raw_holdings_reconciliation = get_multi_asset_holdings_reconciliation_table_data(transactions)
+    import_warnings = _stats_import_warnings(transactions)
+
+    return {
+        'stats_table_rows': _stats_table_rows(stats_table_data),
+        'reconciliation_status': _stats_reconciliation_status(stats_table_data),
+        'import_warnings': import_warnings,
+        'stats_summary': _stats_summary(stats_table_data, raw_holdings_reconciliation, import_warnings),
+        'holdings_reconciliation_table_data': _holdings_reconciliation_rows(
+            raw_holdings_reconciliation,
+            stats_table_data,
+        ),
+    }
+
+
+def _auto_fix_safe_issues(transactions, year_value='All Time'):
+    selected_year = _selected_year(year_value)
+
+    if selected_year:
+        date_range = _date_range_for_year(transactions, selected_year)
+    else:
+        date_range = get_transactions_date_range(transactions, {'start_date': '', 'end_date': ''})
+
+    before_link_count = len(transactions.links)
+    stats_table_data = get_stats_table_data_range(transactions, date_range)
+    assets_needing_links = [
+        row['symbol']
+        for row in stats_table_data
+        if _has_unlinked_sales(row)
+    ]
+
+    failures = []
+    for asset in assets_needing_links:
+        failures.extend(transactions.auto_link(asset=asset, algo='fifo', year=selected_year))
+
+    links_created = len(transactions.links) - before_link_count
+    if links_created > 0:
+        transactions.save(description="Auto-fixed safe Stats issues with FIFO basis links")
+
+    payload = _stats_response_payload(transactions, year_value)
+    review_required = [
+        row[0]
+        for row in payload['holdings_reconciliation_table_data']
+        if row[6] in ("Mismatch", "Needs declared holdings")
+    ]
+
+    if links_created > 0:
+        message = f"Auto-linked {links_created} FIFO basis link(s) across {len(assets_needing_links)} asset(s)."
+    elif assets_needing_links:
+        message = "No new FIFO links could be created. Review basis lots or missing acquisitions for the listed assets."
+    else:
+        message = "No safe automatic fixes are currently available."
+
+    if review_required:
+        message = f"{message} {len(review_required)} asset(s) still need declared holdings or reclassification review."
+
+    payload.update({
+        'message': message,
+        'links_created': links_created,
+        'fixed_assets': assets_needing_links,
+        'review_required_assets': review_required,
+        'failures': [
+            {
+                'asset': failure.get('asset'),
+                'unlinkable': failure.get('unlinkable'),
+                'quantity': failure.get('quantity'),
+                'timestamp': str(failure.get('timestamp')),
+                'algo': failure.get('algo'),
+            }
+            for failure in failures
+        ],
+    })
+
+    return payload
+
+
 @blueprint.route('/',  methods=['GET', 'POST'])
 @login_required
 def index():
@@ -131,7 +222,7 @@ def index():
     return render_template(
         'stats_page.html',
         stats_table_data=ranged_stats_table_data,
-        date_range=date_range,
+        date_range=all_time_range,
         years=years,
         reconciliation_status=_stats_reconciliation_status(ranged_stats_table_data),
         import_warnings=import_warnings,
@@ -320,6 +411,14 @@ def date_range():
     data['date_range'] = date_range
 
     return jsonify(data)
+
+
+@blueprint.route('/auto_fix_safe', methods=['POST'])
+@login_required
+def auto_fix_safe():
+    transactions = current_app.config['transactions']
+    year_value = request.json.get('year', 'All Time') if request.json else 'All Time'
+    return jsonify(_auto_fix_safe_issues(transactions, year_value))
 
 
 

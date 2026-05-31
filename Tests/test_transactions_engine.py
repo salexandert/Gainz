@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 import transactions as transactions_module
+from app.stats.routes import _auto_fix_safe_issues
 from openpyxl import Workbook
 from transaction import Buy, Receive, Sell, Send
 from transactions import Transactions
@@ -23,8 +24,15 @@ def empty_transactions():
     transactions.index = 0
     transactions.conversions = []
     transactions.asset_objects = []
+    transactions.import_warnings = []
     transactions.view = ""
     transactions.transactions = []
+    transactions.saved_descriptions = []
+
+    def fake_save(description=None):
+        transactions.saved_descriptions.append(description)
+
+    transactions.save = fake_save
     return transactions
 
 
@@ -223,6 +231,32 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual([], failures)
         self.assertEqual(first_buy.uid, sell.links[0].buy.uid)
         self.assertAlmostEqual(200, sell.links[0].profit_loss)
+
+    def test_stats_safe_auto_fix_links_unlinked_sales_only(self):
+        transactions = empty_transactions()
+        buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "test")
+        sell = Sell("BTC", 1, datetime.datetime(2024, 2, 1), 300, "test")
+        mismatch_buy = Buy("SOL", 2, datetime.datetime(2024, 1, 1), 10, "test")
+        transactions.transactions = [buy, sell, mismatch_buy]
+        transactions.set_holdings("BTC", 0)
+        transactions.set_holdings("SOL", 0)
+
+        payload = _auto_fix_safe_issues(transactions)
+        statuses = {
+            row[0]: row[6]
+            for row in payload["holdings_reconciliation_table_data"]
+        }
+
+        self.assertEqual(1, payload["links_created"])
+        self.assertEqual(["BTC"], payload["fixed_assets"])
+        self.assertEqual("Matched", statuses["BTC"])
+        self.assertEqual("Mismatch", statuses["SOL"])
+        self.assertIn("SOL", payload["review_required_assets"])
+        self.assertIn("Auto-linked 1 FIFO basis link", payload["message"])
+        self.assertEqual(
+            ["Auto-fixed safe Stats issues with FIFO basis links"],
+            transactions.saved_descriptions,
+        )
 
     def test_min_gain_auto_link_uses_highest_cost_basis(self):
         transactions = empty_transactions()

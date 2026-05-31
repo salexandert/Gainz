@@ -81,6 +81,17 @@
   <span id="stats_reconciliation_warning_text">{{ reconciliation_status.message }}</span>
 </div>
 
+<div id="stats_auto_fix_panel" class="alert alert-info" role="alert" {% if stats_summary.unlinked_sales == 0 %}style="display: none;"{% endif %}>
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+    <div>
+      <strong>Safe auto-fix available.</strong>
+      Gainz can run FIFO Auto Link for assets with unlinked sales. Holdings mismatches still need review before activity is reclassified.
+      <span id="stats_auto_fix_result" class="d-block mt-1"></span>
+    </div>
+    <button id="stats_auto_fix_safe_button" type="button" class="btn btn-sm btn-primary mt-2 mt-md-0">Auto-Fix Safe Issues</button>
+  </div>
+</div>
+
 <div id="stats_import_warnings" class="alert alert-info" role="alert" {% if not import_warnings %}style="display: none;"{% endif %}>
   <strong>Import warnings.</strong>
   <ul id="stats_import_warnings_list" class="mb-0">

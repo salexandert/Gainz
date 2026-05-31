@@ -683,6 +683,15 @@ $(document).ready(function() {
         $('#stats_summary_assets_with_mismatches').text(summary.assets_with_mismatches);
         $('#stats_summary_import_warnings').text(summary.import_warnings);
         $('#stats_summary_unlinked_sales').text(summary.unlinked_sales);
+        setStatsAutoFixPanel(summary);
+    }
+
+    function setStatsAutoFixPanel(summary) {
+        if (summary && Number(summary.unlinked_sales || 0) > 0) {
+            $('#stats_auto_fix_panel').show();
+        } else {
+            $('#stats_auto_fix_panel').hide();
+        }
     }
 
     function setAllHoldingsReconciliation(rows) {
@@ -1046,6 +1055,49 @@ $(document).ready(function() {
         select: {
             style: 'single'
         },
+    });
+
+    $("#stats_auto_fix_safe_button").click(function(){
+        var button = $(this);
+        var selectedAsset = selectedStatsRowData ? selectedStatsRowData[0] : null;
+
+        $('#stats_auto_fix_result').removeClass('text-danger').text('');
+        button.prop('disabled', true).text('Auto-Fixing...');
+
+        $.ajax({
+            type: "POST",
+            url: "/stats/auto_fix_safe",
+            data: JSON.stringify({
+                'year': $('#stats_page_year_dropdown').find(":selected").val()
+            }),
+            dataType: "json",
+            contentType: 'application/json',
+            success: function (data) {
+                table.clear();
+                table.rows.add(data['stats_table_rows'] || []).draw();
+                setStatsReconciliationWarning(data['reconciliation_status']);
+                setStatsImportWarnings(data['import_warnings']);
+                setStatsSummary(data['stats_summary']);
+                setAllHoldingsReconciliation(data['holdings_reconciliation_table_data']);
+                $('#stats_auto_fix_result').text(data['message'] || 'Safe auto-fix complete.');
+                $('#stats_auto_fix_panel').show();
+
+                if (selectedAsset) {
+                    var refreshedSelectedRow = getStatsRowForAsset(selectedAsset);
+                    if (refreshedSelectedRow) {
+                        loadSelectedStatsAsset(refreshedSelectedRow, $('#stats_usd_spot').val());
+                    }
+                }
+            },
+            error: function () {
+                $('#stats_auto_fix_result')
+                    .addClass('text-danger')
+                    .text('Safe auto-fix could not run. Please try Auto Link or review the data manually.');
+            },
+            complete: function () {
+                button.prop('disabled', false).text('Auto-Fix Safe Issues');
+            },
+        });
     });
 
     $('#statspage_holdings_lots_datatable').DataTable({
