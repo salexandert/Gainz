@@ -11,7 +11,7 @@ This checklist describes what should be true before Gainz is shared outside a tr
 - README uses current positioning and no broken encoding.
 - Public download page points to the latest GitHub Release package and checksum.
 - Demo CSVs contain synthetic data only.
-- User walkthrough explains import, auto-link, HODL, Stats, Export, and audit packet review.
+- User walkthrough explains import, auto-link, holdings, Stats, Export, and audit packet review.
 - Public docs state that Gainz is local-first documentation support, not tax advice.
 - Tests cover core lot linking and parser behavior.
 

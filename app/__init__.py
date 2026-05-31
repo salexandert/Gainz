@@ -17,19 +17,19 @@ def register_extensions(app):
 
 def register_blueprints(app):
     for module_name in (
-        'add_links', 
+        'add_links',
         'add_transactions',
-        'auto_link', 
-        'base', 
-        'export',  
-        'history', 
-        'hodl_accounting', 
-        'home', 
+        'auto_link',
+        'base',
+        'export',
+        'history',
+        'holdings_accounting',
+        'home',
         'import_transactions',
         'model',
         'setting',
         'stats',
-  
+
         ):
         module = import_module('app.{}.routes'.format(module_name))
         app.register_blueprint(module.blueprint)
@@ -119,7 +119,7 @@ def create_app(config, selenium=False):
     app.config.from_object(config)
     if selenium:
         app.config['LOGIN_DISABLED'] = True
-    
+
     register_extensions(app)
     register_blueprints(app)
     configure_database(app)

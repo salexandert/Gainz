@@ -17,13 +17,13 @@ Status: in progress. Stats now shows unreconciled warnings, import warnings, and
 - Receives should stay visible because they may represent missing basis or externally acquired assets.
 - Fiat movements should remain in the ledger but not appear as crypto assets.
 
-Status: in progress. Stats now includes declared HODL entry, current holdings reconciliation, and an estimated current-lot table after selecting an asset.
+Status: in progress. Stats now includes declared holdings entry, current holdings reconciliation, and an estimated current-lot table after selecting an asset.
 
 Current behavior:
 
-- If no HODL is declared, Gainz shows available unlinked buy/receive lots.
-- If HODL is declared, Gainz allocates that holding to newest available lots under a FIFO remaining estimate.
-- The reconciliation summary compares declared HODL against buys minus sells and also shows imported net flow as a transfer diagnostic.
+- If no holdings are declared, Gainz shows available unlinked buy/receive lots.
+- If holdings are declared, Gainz allocates that holding to newest available lots under a FIFO remaining estimate.
+- The reconciliation summary compares declared holdings against buys minus sells and also shows imported net flow as a transfer diagnostic.
 
 Open correctness work:
 
@@ -47,15 +47,15 @@ First-user walkthrough notes:
 - Import needed visible confirmation after each upload. Fixed with imported/skipped/warning counts.
 - The drag-and-drop upload should eventually offer an explicit file-picker button and a "try demo data" path.
 - Auto Link works, but the user has to know to select each asset and run a method. A guided "link all assets with FIFO" option would make demo and first-run use much easier.
-- HODL entry works, but users need a suggested value or "use expected HODL from current imports" action for test/demo data.
+- Holdings entry works, but users need a suggested value or "use expected holdings from current imports" action for test/demo data.
 - Export readiness is helpful once the user reaches it. It should link directly back to the pages that resolve each blocker.
 
 Recommended next first-run features:
 
 1. Load Demo Data: one button that imports the bundled synthetic CSVs into a clean session.
 2. Link All Assets: one guided action that runs FIFO for every asset with unlinked sells and reports failures.
-3. Use Expected HODL: when a user is using demo data or explicitly chooses to trust imported buys/sells, prefill declared HODL from expected quantity.
-4. Readiness Blocker Links: each Export readiness blocker should point to Import, Auto Link, HODL & Accounting, or Stats with the relevant asset selected.
+3. Use Expected Holdings: when a user is using demo data or explicitly chooses to trust imported buys/sells, prefill declared holdings from expected quantity.
+4. Readiness Blocker Links: each Export readiness blocker should point to Import, Auto Link, Holdings & Accounting, or Stats with the relevant asset selected.
 5. Download/Open Output: after Export or Audit Packet generation, show the path inline and provide an obvious open-folder action in the desktop build.
 
 These should be treated as adoption features, not just polish. They shorten the time from "I opened Gainz" to "I understand what this product does."
@@ -67,7 +67,7 @@ These should be treated as adoption features, not just polish. They shorten the 
 
 Status: in progress. Audit packets now include linked Form 8949 detail CSVs, Form 8949 totals, holdings reconciliation, current holdings lots, import warnings, the generated Excel report, copied source files, and packet manifests.
 
-The Export page now shows an Audit Readiness panel before packet generation. It summarizes Form 8949 row count/totals, unlinked sales, HODL gaps, mismatches, warnings, next action, and packet contents.
+The Export page now shows an Audit Readiness panel before packet generation. It summarizes Form 8949 row count/totals, unlinked sales, holdings gaps, mismatches, warnings, next action, and packet contents.
 
 ## Discovery And Adoption Positioning
 

@@ -154,7 +154,7 @@ class ImportAndExportTests(unittest.TestCase):
         sell = Sell("BTC", 1, datetime.datetime(2024, 6, 1), 300, "demo_data/cash_app_sample.csv")
         sell.link_transaction(buy, 1)
         transactions.transactions = [buy, sell]
-        transactions.set_hodl("BTC", 0)
+        transactions.set_holdings("BTC", 0)
         transactions.import_warnings = ["Example warning"]
 
         with tempfile.TemporaryDirectory() as temp_dir:

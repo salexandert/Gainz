@@ -35,10 +35,10 @@ class ManualTransaction(FlaskForm):
     submit = SubmitField('Submit')
 
 
-class CurrentHodl(FlaskForm):
+class CurrentHoldings(FlaskForm):
     symbol = StringField('Crypto Symbol')
     quantity = DecimalField('Quantity', rounding=None)
-    
+
     submit = SubmitField('Submit')
 
 
@@ -47,12 +47,12 @@ class CurrentHodl(FlaskForm):
 def import_wizard():
     transactions = current_app.config['transactions']
     manual_trans = ManualTransaction()
-    current_hodl = CurrentHodl()
+    current_holdings = CurrentHoldings()
 
-    if 'current_hodl' not in session:
-        session['current_hodl'] = []
+    if 'current_holdings' not in session:
+        session['current_holdings'] = []
 
-    # if file is uploaded add new transactions 
+    # if file is uploaded add new transactions
     if request.method == 'POST':
         # Import from CSV File
         if 'file' in request.files:
@@ -61,13 +61,13 @@ def import_wizard():
                 result = ImportService(current_app.config['UPLOAD_FOLDER']).import_upload(file, transactions)
                 return jsonify(result)
 
-        # Current Hodl
-        if current_hodl.validate_on_submit():
+        # Current holdings
+        if current_holdings.validate_on_submit():
             pass
 
     stats_table_data = get_stats_table_data(transactions)
     all_trans_table_data = get_all_trans_table_data(transactions)
 
-    return render_template('import_transactions.html', manual_trans=manual_trans, current_hodl=current_hodl, transactions=all_trans_table_data, stats_table_data=stats_table_data)
+    return render_template('import_transactions.html', manual_trans=manual_trans, current_holdings=current_holdings, transactions=all_trans_table_data, stats_table_data=stats_table_data)
 
 

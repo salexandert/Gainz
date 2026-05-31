@@ -34,7 +34,7 @@ Before generating a packet, check:
 
 - Unlinked sales are zero or intentionally explained.
 - Import warnings have been reviewed.
-- Declared HODL is entered for relevant assets.
+- Declared holdings are entered for relevant assets.
 - Holdings mismatches are resolved or documented.
 - Source files are preserved when possible.
 

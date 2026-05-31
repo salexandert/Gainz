@@ -18,7 +18,7 @@ Crypto tax files can reveal exchange accounts, wallet movements, balances, gains
 
 ## What Local Software Still Needs
 
-Local-first does not remove the need for careful review. You still need to check parser warnings, incomplete source history, missing basis, transfers, declared HODL, and Form 8949 totals.
+Local-first does not remove the need for careful review. You still need to check parser warnings, incomplete source history, missing basis, transfers, declared holdings, and Form 8949 totals.
 
 The benefit is control. You can hand a prepared packet to a qualified tax professional without first moving raw tax history through another hosted system.
 

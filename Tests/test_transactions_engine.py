@@ -114,9 +114,9 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual("Receive", lots[0][1])
         self.assertEqual("$150.00", lots[0][6])
 
-    def test_declared_hodl_allocates_current_holdings_to_newest_available_lots(self):
+    def test_declared_holdings_allocates_current_holdings_to_newest_available_lots(self):
         transactions = empty_transactions()
-        transactions.set_hodl("BTC", 0.5)
+        transactions.set_holdings("BTC", 0.5)
         transactions.transactions = [
             Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "old"),
             Buy("BTC", 2, datetime.datetime(2024, 2, 1), 200, "new"),
@@ -156,7 +156,7 @@ class TransactionsEngineTests(unittest.TestCase):
             Receive("USD", 100, datetime.datetime(2024, 1, 2), "cash", 1),
         ]
         transactions.transactions[1].link_transaction(transactions.transactions[0], 0.25)
-        transactions.set_hodl("BTC", 0.75)
+        transactions.set_holdings("BTC", 0.75)
 
         rows = get_multi_asset_holdings_reconciliation_table_data(transactions)
 
@@ -166,19 +166,19 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual("0", rows[0][5])
         self.assertEqual("Matched", rows[0][6])
         self.assertEqual("N/A", rows[1][1])
-        self.assertEqual("Needs declared HODL", rows[1][6])
+        self.assertEqual("Needs declared holdings", rows[1][6])
 
-    def test_set_hodl_creates_and_updates_asset_record(self):
+    def test_set_holdings_creates_and_updates_asset_record(self):
         transactions = empty_transactions()
 
-        transactions.set_hodl("btc", 0.5)
-        transactions.set_hodl("BTC", 0.75)
+        transactions.set_holdings("btc", 0.5)
+        transactions.set_holdings("BTC", 0.75)
 
         self.assertEqual(1, len(transactions.asset_objects))
         self.assertEqual("BTC", transactions.asset_objects[0].symbol)
-        self.assertEqual(0.75, transactions.get_hodl("BTC"))
+        self.assertEqual(0.75, transactions.get_holdings("BTC"))
 
-    def test_audit_readiness_flags_missing_links_and_hodl(self):
+    def test_audit_readiness_flags_missing_links_and_holdings(self):
         transactions = empty_transactions()
         transactions.transactions = [
             Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange"),
@@ -190,17 +190,17 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertFalse(readiness["is_ready"])
         self.assertEqual("Not ready", readiness["status"])
         self.assertEqual(1, readiness["metrics"]["assets_with_unlinked_sales"])
-        self.assertEqual(1, readiness["metrics"]["assets_needing_hodl"])
+        self.assertEqual(1, readiness["metrics"]["assets_needing_holdings"])
         self.assertEqual(0, readiness["metrics"]["form_8949_rows"])
         self.assertTrue(any("Complete basis links" in blocker for blocker in readiness["blockers"]))
 
-    def test_audit_readiness_is_ready_when_links_and_hodl_match(self):
+    def test_audit_readiness_is_ready_when_links_and_holdings_match(self):
         transactions = empty_transactions()
         buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange")
         sell = Sell("BTC", 0.25, datetime.datetime(2024, 6, 1), 300, "exchange")
         sell.link_transaction(buy, 0.25)
         transactions.transactions = [buy, sell]
-        transactions.set_hodl("BTC", 0.75)
+        transactions.set_holdings("BTC", 0.75)
 
         readiness = get_audit_readiness_summary(transactions)
 

@@ -206,7 +206,7 @@ class AuditPacketService:
             writer = csv.writer(file)
             writer.writerow([
                 "asset",
-                "declared_hodl",
+                "declared_holdings",
                 "expected_from_buys_sells_only",
                 "imported_net_after_transfers",
                 "available_lot_quantity",

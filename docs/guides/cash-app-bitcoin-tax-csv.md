@@ -33,7 +33,7 @@ Sells need basis links before the result is tax-ready. Sends and receives are tr
 3. Upload the Cash App CSV.
 4. Open **Stats & Charts** and check import warnings.
 5. Open **Auto Link**, select BTC, and run FIFO or the method you intend to review.
-6. Open **HODL & Accounting** and declare current BTC holdings.
+6. Open **Holdings & Accounting** and declare current BTC holdings.
 7. Generate an audit packet from **Export**.
 
 ## What To Review Before Filing

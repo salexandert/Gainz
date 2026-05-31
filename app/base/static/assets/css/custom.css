@@ -86,7 +86,7 @@
     color: #1c7f55 !important;
 }
 
-.status-needs-declared-hodl {
+.status-needs-declared-holdings {
     background: rgba(251, 99, 64, 0.14);
     color: #b84322 !important;
 }
@@ -105,23 +105,23 @@
     cursor: pointer;
 }
 
-.hodl-progress-band {
+.holdings-progress-band {
     display: grid;
     gap: 12px;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     margin: 20px 0;
 }
 
-.hodl-progress-item,
-.hodl-metric {
+.holdings-progress-item,
+.holdings-metric {
     background: #fff;
     border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 8px;
     padding: 12px 14px;
 }
 
-.hodl-progress-item span,
-.hodl-metric span {
+.holdings-progress-item span,
+.holdings-metric span {
     color: #6c757d;
     display: block;
     font-size: 12px;
@@ -129,20 +129,20 @@
     text-transform: uppercase;
 }
 
-.hodl-progress-item strong,
-.hodl-metric strong {
+.holdings-progress-item strong,
+.holdings-metric strong {
     color: #252422;
     display: inline-block;
     font-size: 22px;
     margin-top: 4px;
 }
 
-.hodl-walkthrough {
+.holdings-walkthrough {
     display: grid;
     gap: 14px;
 }
 
-.hodl-step {
+.holdings-step {
     align-items: flex-start;
     border-top: 1px solid rgba(0, 0, 0, 0.08);
     display: grid;
@@ -151,23 +151,23 @@
     padding-top: 16px;
 }
 
-.hodl-step:first-child {
+.holdings-step:first-child {
     border-top: 0;
     padding-top: 0;
 }
 
-.hodl-step h5,
-.hodl-resolution-panel h5 {
+.holdings-step h5,
+.holdings-resolution-panel h5 {
     margin-bottom: 6px;
 }
 
-.hodl-step p,
-.hodl-resolution-panel p {
+.holdings-step p,
+.holdings-resolution-panel p {
     color: #4f5962;
     margin-bottom: 10px;
 }
 
-.hodl-step-number {
+.holdings-step-number {
     align-items: center;
     background: #51cbce;
     border-radius: 50%;
@@ -179,14 +179,14 @@
     width: 32px;
 }
 
-.hodl-workbench-grid {
+.holdings-workbench-grid {
     display: grid;
     gap: 12px;
     grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
     margin: 18px 0;
 }
 
-.hodl-resolution-panel {
+.holdings-resolution-panel {
     background: #f8f9fa;
     border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 8px;
@@ -194,7 +194,7 @@
     padding: 16px;
 }
 
-.hodl-hidden-legacy {
+.holdings-hidden-legacy {
     display: none;
 }
 

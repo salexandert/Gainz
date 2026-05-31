@@ -1,6 +1,6 @@
 {% extends "base_site.html" %}
 
-{% block title %} HODL & Accounting {% endblock title %}
+{% block title %} Holdings & Accounting {% endblock title %}
 
 {% block stylesheets %}
   {{ super() }}
@@ -12,31 +12,31 @@
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
-        <h4 class="card-title">HODL & Accounting Walkthrough</h4>
+        <h4 class="card-title">Holdings & Accounting Walkthrough</h4>
         <p class="card-category">Use this page to declare what you currently hold, compare that against imported activity, and decide what data is still missing.</p>
 
-        <div class="hodl-progress-band">
-          <div class="hodl-progress-item">
+        <div class="holdings-progress-band">
+          <div class="holdings-progress-item">
             <span>Assets</span>
-            <strong id="hodl_summary_asset_count">{{ hodl_summary.asset_count }}</strong>
+            <strong id="holdings_summary_asset_count">{{ holdings_summary.asset_count }}</strong>
           </div>
-          <div class="hodl-progress-item">
-            <span>Need HODL</span>
-            <strong id="hodl_summary_need_hodl">{{ hodl_summary.assets_needing_hodl }}</strong>
+          <div class="holdings-progress-item">
+            <span>Need Holdings</span>
+            <strong id="holdings_summary_need_holdings">{{ holdings_summary.assets_needing_holdings }}</strong>
           </div>
-          <div class="hodl-progress-item">
+          <div class="holdings-progress-item">
             <span>Matched</span>
-            <strong id="hodl_summary_matched">{{ hodl_summary.assets_matched }}</strong>
+            <strong id="holdings_summary_matched">{{ holdings_summary.assets_matched }}</strong>
           </div>
-          <div class="hodl-progress-item">
+          <div class="holdings-progress-item">
             <span>Mismatches</span>
-            <strong id="hodl_summary_mismatch">{{ hodl_summary.assets_with_mismatch }}</strong>
+            <strong id="holdings_summary_mismatch">{{ holdings_summary.assets_with_mismatch }}</strong>
           </div>
         </div>
 
-        <div class="hodl-walkthrough">
-          <div class="hodl-step">
-            <div class="hodl-step-number">1</div>
+        <div class="holdings-walkthrough">
+          <div class="holdings-step">
+            <div class="holdings-step-number">1</div>
             <div>
               <h5>Import what you know</h5>
               <p>Start with exchange CSVs and any manual transactions you already know about. Transfers do not need perfect wallet mapping; Gainz uses one universal wallet for basis.</p>
@@ -44,29 +44,29 @@
               <a class="btn btn-sm btn-outline-secondary" href="/add_transactions">Add manual transactions</a>
             </div>
           </div>
-          <div class="hodl-step">
-            <div class="hodl-step-number">2</div>
+          <div class="holdings-step">
+            <div class="holdings-step-number">2</div>
             <div>
               <h5>Declare current holdings</h5>
               <p>Select each asset below and enter the amount you actually hold today across exchanges, wallets, and custody accounts.</p>
             </div>
           </div>
-          <div class="hodl-step">
-            <div class="hodl-step-number">3</div>
+          <div class="holdings-step">
+            <div class="holdings-step-number">3</div>
             <div>
               <h5>Compare the two stories</h5>
-              <p><strong>Expected from buys/sells only</strong> asks: if imports were complete, how much should remain? Your declared HODL tells Gainz whether something is missing.</p>
+              <p><strong>Expected from buys/sells only</strong> asks: if imports were complete, how much should remain? Your declared holdings tell Gainz whether something is missing.</p>
             </div>
           </div>
-          <div class="hodl-step">
-            <div class="hodl-step-number">4</div>
+          <div class="holdings-step">
+            <div class="holdings-step-number">4</div>
             <div>
               <h5>Resolve gaps deliberately</h5>
               <p>If expected holdings are too high, look for missing sells, disposals, losses, or transfers that should become taxable events. If expected holdings are too low, look for missing buys, income, gifts, or transfers that need basis.</p>
             </div>
           </div>
-          <div class="hodl-step">
-            <div class="hodl-step-number">5</div>
+          <div class="holdings-step">
+            <div class="holdings-step-number">5</div>
             <div>
               <h5>Verify on Stats</h5>
               <p>Once assets are declared and mismatches are handled, review Current Holdings Reconciliation, current lots, unlinked sales, and audit packet readiness.</p>
@@ -84,7 +84,7 @@
     <div class="card">
       <div class="card-body">
         <h4 class="card-title">Step 2: Select an Asset</h4>
-        <p class="card-category">Choose an asset, then use the workbench below to declare HODL and interpret the difference.</p>
+        <p class="card-category">Choose an asset, then use the workbench below to declare holdings and interpret the difference.</p>
         <table id="eh_stats_datatable" class="table table-striped table-bordered" style="width:100%">
           <thead>
             <tr>
@@ -96,7 +96,7 @@
               <th>Purchased in USD</th>
               <th>Sold in USD</th>
               <th>Realized Profit</th>
-              <th>Declared HODL</th>
+              <th>Declared Holdings</th>
             </tr>
           </thead>
           <tbody>
@@ -110,7 +110,7 @@
               <td>{{ row['total_purchased_usd'] }}</td>
               <td>{{ row['total_sold_usd'] }}</td>
               <td>{{ row.get('total_profit_loss', row.get('profit_loss_total')) }}</td>
-              <td>{{ row['hodl'] }}</td>
+              <td>{{ row['holdings'] }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -127,46 +127,46 @@
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start">
           <div>
             <h4 class="card-title">Step 3: Selected Asset Workbench</h4>
-            <p id="hodl_selected_asset" class="card-category">Select an asset above to begin.</p>
+            <p id="holdings_selected_asset" class="card-category">Select an asset above to begin.</p>
           </div>
-          <div id="hodl_status_badge" class="gainz-status-badge status-needs-declared-hodl">Needs asset</div>
+          <div id="holdings_status_badge" class="gainz-status-badge status-needs-declared-holdings">Needs asset</div>
         </div>
 
-        <div class="hodl-workbench-grid">
-          <div class="hodl-metric">
+        <div class="holdings-workbench-grid">
+          <div class="holdings-metric">
             <span>Expected From Buys/Sells Only</span>
-            <strong id="hodl_expected_from_activity">--</strong>
+            <strong id="holdings_expected_from_activity">--</strong>
           </div>
-          <div class="hodl-metric">
-            <span>Declared HODL</span>
-            <strong id="hodl_declared_current">--</strong>
+          <div class="holdings-metric">
+            <span>Declared Holdings</span>
+            <strong id="holdings_declared_current">--</strong>
           </div>
-          <div class="hodl-metric">
+          <div class="holdings-metric">
             <span>Difference</span>
-            <strong id="hodl_difference">--</strong>
+            <strong id="holdings_difference">--</strong>
           </div>
-          <div class="hodl-metric">
+          <div class="holdings-metric">
             <span>Unlinked Sales</span>
-            <strong id="hodl_unlinked_sales">--</strong>
+            <strong id="holdings_unlinked_sales">--</strong>
           </div>
         </div>
 
-        <div id="hodl_save_message" class="alert alert-success" role="alert" style="display: none;"></div>
-        <div id="hodl_next_action" class="alert alert-info" role="alert">
+        <div id="holdings_save_message" class="alert alert-success" role="alert" style="display: none;"></div>
+        <div id="holdings_next_action" class="alert alert-info" role="alert">
           Pick an asset to see the next action.
         </div>
 
         <div class="form-group row">
-          <label class="control-label col-md-2 col-sm-3" for="hodl_quantity">Current HODL</label>
+          <label class="control-label col-md-2 col-sm-3" for="holdings_quantity">Current Holdings</label>
           <div class="col-md-4 col-sm-5">
-            <input type="number" step="any" id="hodl_quantity" class="form-control" placeholder="Select an asset first">
+            <input type="number" step="any" id="holdings_quantity" class="form-control" placeholder="Select an asset first">
           </div>
           <div class="col-md-3 col-sm-4">
-            <button type="button" id="submit_hodl_button" class="btn btn-success">Save Declared HODL</button>
+            <button type="button" id="submit_holdings_button" class="btn btn-success">Save Declared Holdings</button>
           </div>
         </div>
 
-        <div class="hodl-resolution-panel">
+        <div class="holdings-resolution-panel">
           <h5>Optional Resolution Tools</h5>
           <p id="convert_text">Use these only when you know the accounting treatment. If you know the missing transaction, adding the real transaction is better than converting activity automatically.</p>
           <div class="form-group row">
@@ -181,7 +181,7 @@
           </div>
         </div>
 
-        <div id="eh_options" class="hodl-hidden-legacy">Select a row from Stats Table to Populate</div>
+        <div id="eh_options" class="holdings-hidden-legacy">Select a row from Stats Table to Populate</div>
       </div>
     </div>
   </div>

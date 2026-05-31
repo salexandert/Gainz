@@ -20,7 +20,7 @@ def _stats_table_rows(stats_table_data):
             row['total_purchased_usd'],
             row['total_sold_usd'],
             row.get('profit_loss_total', row.get('total_profit_loss')),
-            row['hodl']
+            row['holdings']
         ]
         for row in stats_table_data
     ]
@@ -88,12 +88,12 @@ def _holdings_reconciliation_rows(raw_holdings_rows, stats_table_data):
 
 
 def _stats_summary(stats_table_data, raw_holdings_rows, import_warnings):
-    assets_needing_hodl = sum(1 for row in raw_holdings_rows if row[1] == "N/A")
+    assets_needing_holdings = sum(1 for row in raw_holdings_rows if row[1] == "N/A")
     assets_with_mismatches = sum(1 for row in raw_holdings_rows if row[6] == "Mismatch")
     unlinked_sales = sum(1 for row in stats_table_data if _has_unlinked_sales(row))
     import_warning_count = len(import_warnings or [])
     is_ready = (
-        assets_needing_hodl == 0
+        assets_needing_holdings == 0
         and assets_with_mismatches == 0
         and unlinked_sales == 0
         and import_warning_count == 0
@@ -102,7 +102,7 @@ def _stats_summary(stats_table_data, raw_holdings_rows, import_warnings):
     return {
         "reconciliation": "Ready" if is_ready else "Not ready",
         "reconciliation_class": "status-matched" if is_ready else "status-mismatch",
-        "assets_needing_hodl": assets_needing_hodl,
+        "assets_needing_holdings": assets_needing_holdings,
         "assets_with_mismatches": assets_with_mismatches,
         "import_warnings": import_warning_count,
         "unlinked_sales": unlinked_sales,
@@ -112,7 +112,7 @@ def _stats_summary(stats_table_data, raw_holdings_rows, import_warnings):
 @blueprint.route('/',  methods=['GET', 'POST'])
 @login_required
 def index():
-    
+
     transactions = current_app.config['transactions']
 
     # Get Years
@@ -122,7 +122,7 @@ def index():
 
     years = sorted(years)
     years.insert(0, 'All Time')
-    
+
     all_time_range = get_transactions_date_range(transactions, {'start_date': '', 'end_date': ''})
     ranged_stats_table_data = get_stats_table_data_range(transactions, all_time_range)
     raw_holdings_reconciliation = get_multi_asset_holdings_reconciliation_table_data(transactions)
@@ -168,7 +168,7 @@ def selected_asset():
     # Debug logging
     current_app.logger.debug('Date Range: %s', date_range)
 
-    # get stats table data 
+    # get stats table data
     stats_table_data = get_stats_table_data_range(transactions, date_range)
 
     # Debug logging
@@ -179,7 +179,7 @@ def selected_asset():
     for asset in stats_table_data:
         if asset['symbol'] == request.json['row_data'][0]:
             asset_stats = asset
-            break 
+            break
     asset = asset_stats['symbol']
 
     # Debug logging
@@ -212,7 +212,7 @@ def selected_asset():
     # Get Linked Table Data
     linked_table_data = get_linked_table_data(transactions, asset, date_range)
 
-    # Get Sells Table Data 
+    # Get Sells Table Data
     sells_table_data = get_sales_report_table_data(transactions, asset, date_range)
 
     sells_unlinked_remaining = []
@@ -274,7 +274,7 @@ def selected_asset():
     }
     data_dict['import_warnings'] = import_warnings
     data_dict['stats_summary'] = _stats_summary(stats_table_data, raw_holdings_reconciliation, import_warnings)
-    
+
     return jsonify(data_dict)
 
 
@@ -298,7 +298,7 @@ def date_range():
                 'end_date': request.json.get('end_date', ''),
             },
         )
-        
+
     stats_table_data = get_stats_table_data_range(transactions, date_range)
     raw_holdings_reconciliation = get_multi_asset_holdings_reconciliation_table_data(transactions)
     import_warnings = _stats_import_warnings(transactions)
@@ -316,7 +316,7 @@ def date_range():
     # convert dates back to string format
     date_range['start_date'] = datetime.datetime.strftime(date_range['start_date'], "%Y-%m-%d %H:%M")
     date_range['end_date'] = datetime.datetime.strftime(date_range['end_date'], "%Y-%m-%d %H:%M")
-    
+
     data['date_range'] = date_range
 
     return jsonify(data)
@@ -326,7 +326,7 @@ def date_range():
 @blueprint.route('/linkable_data', methods=['POST'])
 @login_required
 def linkable_data():
-    
+
     # print(request.json)
     transactions = current_app.config['transactions']
 
@@ -346,6 +346,6 @@ def linkable_data():
     data_dict = {}
     data_dict['linked'] = linked_table_data
     data_dict['linkable'] = linkable_table_data
-    
+
 
     return jsonify(data_dict)

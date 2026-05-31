@@ -21,7 +21,7 @@ Open **Stats & Charts** and check:
 
 - Import warnings.
 - Unlinked sales.
-- Assets needing declared HODL.
+- Assets needing declared holdings.
 - Assets with holdings mismatches.
 
 An imported table is not automatically tax-ready. Tax-ready results require basis links for taxable sells and review of transfer gaps.
@@ -34,7 +34,7 @@ After linking, the Form 8949-style rows and audit packet totals are generated fr
 
 ## Current Holdings Reconciliation
 
-Coinbase data may not include every wallet movement or external acquisition. Gainz compares declared HODL against imported buys, sells, sends, and receives so you can spot missing data before relying on the packet.
+Coinbase data may not include every wallet movement or external acquisition. Gainz compares declared holdings against imported buys, sells, sends, and receives so you can spot missing data before relying on the packet.
 
 Gainz is not tax, legal, or financial advice. Use it to prepare documentation for review.
 

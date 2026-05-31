@@ -31,7 +31,7 @@ $latestZip = Join-Path $distDir "Gainz-Windows.zip"
     --hidden-import app.base.routes `
     --hidden-import app.export.routes `
     --hidden-import app.history.routes `
-    --hidden-import app.hodl_accounting.routes `
+    --hidden-import app.holdings_accounting.routes `
     --hidden-import app.home.routes `
     --hidden-import app.import_transactions.routes `
     --hidden-import app.model.routes `

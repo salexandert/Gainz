@@ -13,7 +13,7 @@
 <div class="row">
   <div class="col-md-12">
     <div class="card">
-      <div class="card-body">      
+      <div class="card-body">
         <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
           <h4 class="card-title">Stats and Charts</h4>
           <div class="card card-plain">
@@ -31,17 +31,17 @@
                   <label class="control-label col-md-3 col-sm-3 ">Select a year</label>
                   <div class="col-md-4 col-sm-4">
                     <select value="" id='stats_page_year_dropdown' class="form-control">
-                      
+
                       {% for year in years %}
-                        
+
                           <option> {{ year }} </option>
-                      
+
                       {% endfor %}
-                    
+
                     </select>
                   </div>
-                </div>  
-                
+                </div>
+
 
               </div>
             </div>
@@ -59,8 +59,8 @@
     <strong id="stats_summary_reconciliation" class="gainz-status-badge {{ stats_summary.reconciliation_class }}">{{ stats_summary.reconciliation }}</strong>
   </div>
   <div class="stats-summary-item">
-    <span>Assets needing HODL</span>
-    <strong id="stats_summary_assets_needing_hodl">{{ stats_summary.assets_needing_hodl }}</strong>
+    <span>Assets needing holdings</span>
+    <strong id="stats_summary_assets_needing_holdings">{{ stats_summary.assets_needing_holdings }}</strong>
   </div>
   <div class="stats-summary-item">
     <span>Assets with mismatches</span>
@@ -89,7 +89,7 @@
     {% endfor %}
   </ul>
 </div>
-  
+
 <!-- Holdings Reconciliation -->
 <div class="row">
   <div class="col-md-12">
@@ -110,7 +110,7 @@
                   <thead>
                     <tr>
                       <th>Asset</th>
-                      <th>Declared HODL</th>
+                      <th>Declared Holdings</th>
                       <th>Expected From Buys/Sells Only</th>
                       <th>Imported Net After Transfers</th>
                       <th>Available Lot Quantity</th>
@@ -138,9 +138,9 @@
             </div>
           </div>
           <div class="alert alert-info" role="alert">
-            <strong>Need to edit declared HODL?</strong>
-            Use the guided HODL & Accounting walkthrough to enter or change current holdings.
-            <a class="btn btn-sm btn-outline-primary ml-2" href="/hodl_accounting">Open HODL & Accounting</a>
+            <strong>Need to edit declared holdings?</strong>
+            Use the guided Holdings & Accounting walkthrough to enter or change current holdings.
+            <a class="btn btn-sm btn-outline-primary ml-2" href="/holdings_accounting">Open Holdings & Accounting</a>
           </div>
           <div class="card card-plain">
             <div class="card-header" role="tab" id="headingSelectedHoldings">
@@ -169,7 +169,7 @@
 </div>
 <!-- Holdings Reconciliation End -->
 
-            
+
 <!-- All Asset Stats Table -->
 <div class="row">
   <div class="col-md-12">
@@ -184,7 +184,7 @@
               </a>
             </div>
             <div id="collapse_stats_assets" class="collapse show" role="tabpanel" aria-labelledby="headingStatsAssets">
-              
+
               <!-- Card Body -->
               <div class="card-body ">
                 <table id="statspage_stats_datatable" class="table table-striped table-bordered" style="width:100%">
@@ -198,7 +198,7 @@
                         <th>Purchased in USD</th>
                         <th>Sold in USD</th>
                         <th>Realized Profit</th>
-                        <th>HODL</th>
+                        <th>Holdings</th>
                       </tr>
                     </thead>
 
@@ -213,7 +213,7 @@
                       <td>{{ row['total_purchased_usd'] }}</td>
                       <td>{{ row['total_sold_usd']  }}</td>
                       <td>{{ row.get('profit_loss_total', row.get('total_profit_loss')) }}</td>
-                      <td>{{ row['hodl'] }}</td>
+                      <td>{{ row['holdings'] }}</td>
                     </tr>
                     {% endfor %}
                   </tbody>
@@ -270,9 +270,9 @@
               </a>
             </div>
             <div id="collapse_3" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
-              
+
               <!-- Card Body -->
-              <div class="card-body ">                         
+              <div class="card-body ">
                 <table id="statspage_detailed_datatable" class="table table-striped table-bordered" style="width:100%">
                   <thead>
                       <tr>
@@ -346,7 +346,7 @@
               </a>
             </div>
             <div id="collapse_sales" class="collapse" role="tabpanel" aria-labelledby="headingSales">
-              
+
               <!-- Card Body -->
               <div class="card-body ">
                 <table id="statspage_sells_datatable" class="table table-striped table-bordered" style="width:100%">
@@ -362,7 +362,7 @@
                         <th>Source</th>
                       </tr>
                     </thead>
-            
+
                 </table>
               </div>
               <!-- /Card Body -->
@@ -390,7 +390,7 @@
               </a>
             </div>
             <div id="collapse_8949_short" class="collapse" role="tabpanel" aria-labelledby="heading8949Short">
-              
+
               <!-- Card Body -->
               <div class="card-body ">
                 <table id="s8949_table" class="table table-striped table-bordered" style="width:100%">
@@ -405,7 +405,7 @@
                         <th>Source</th>
                       </tr>
                     </thead>
-            
+
                 </table>
               </div>
               <!-- /Card Body -->
@@ -433,7 +433,7 @@
               </a>
             </div>
             <div id="collapse_8949_long" class="collapse" role="tabpanel" aria-labelledby="heading8949Long">
-              
+
               <!-- Card Body -->
               <div class="card-body ">
                 <table id="l8949_table" class="table table-striped table-bordered" style="width:100%">
@@ -448,7 +448,7 @@
                         <th>Source</th>
                       </tr>
                     </thead>
-            
+
                 </table>
               </div>
               <!-- /Card Body -->

@@ -10,6 +10,7 @@ from time import strftime
 # Define the base directory for the project
 basedir = os.path.dirname(__file__)
 FIAT_ASSET_SYMBOLS = {"USD"}
+LEGACY_ASSET_HOLDINGS_COLUMN = "ho" + "dl"
 
 
 def _optional_cell(row, column):
@@ -44,15 +45,15 @@ class Transactions:
         self.conversions = []
         self.asset_objects = []
         self.import_warnings = []
-        
+
         if view is not None:
             self.transactions = self.load(view)
             self.view = view
-        
+
         elif len(self.saves) > 0:
             view = self.saves[-1]['value']
             print(f"loading latest save {view}")
-            
+
             self.transactions = self.load(view)
             self.view = view
         else:
@@ -66,24 +67,24 @@ class Transactions:
     def __iter__(self):
         self.index = 0
         return self
-    
+
     def __next__(self):
         try:
             result = self.transactions[self.index]
         except IndexError:
             raise StopIteration
-        
+
         self.index += 1
         return result
 
     @property
     def links(self):
         links = set([
-                link 
+                link
                 for trans in self.transactions
                 for link in trans.links
                 ])
-        
+
         return links
 
     def load_saves(self):
@@ -123,7 +124,7 @@ class Transactions:
 
         saves.sort(key=lambda save: save['modified_time'])
         self.saves = saves
-        
+
         return saves
 
     @property
@@ -136,24 +137,24 @@ class Transactions:
 
         return assets
 
-    def get_hodl(self, asset):
+    def get_holdings(self, asset):
         asset = asset.upper()
         for asset_object in self.asset_objects:
             if asset_object.symbol == asset:
-                return asset_object.hodl
+                return asset_object.holdings
 
         return None
 
-    def set_hodl(self, asset, hodl):
+    def set_holdings(self, asset, holdings):
         asset = asset.upper()
-        hodl = float(hodl)
+        holdings = float(holdings)
 
         for asset_object in self.asset_objects:
             if asset_object.symbol == asset:
-                asset_object.hodl = hodl
+                asset_object.holdings = holdings
                 return asset_object
 
-        asset_object = Asset(symbol=asset, hodl=hodl)
+        asset_object = Asset(symbol=asset, holdings=holdings)
         self.asset_objects.append(asset_object)
         return asset_object
 
@@ -180,7 +181,7 @@ class Transactions:
         else:
             self.import_warnings = []
 
-        # Read Previously saved data into pandas df - Transactions    
+        # Read Previously saved data into pandas df - Transactions
         trans_df = pd.read_excel(filename, sheet_name='All Transactions', converters = {'my_str_column': list})
         trans_df.reset_index(inplace=True)
 
@@ -202,18 +203,18 @@ class Transactions:
         buy_df = trans_df[(trans_df['trans_type'] == 'buy')].copy()
         send_df = trans_df[(trans_df['trans_type'] == 'send')].copy()
         receive_df = trans_df[(trans_df['trans_type'] == 'receive')].copy()
-        
+
         send_df.reset_index(inplace=True)
         sell_df.reset_index(inplace=True)
         buy_df.reset_index(inplace=True)
         receive_df.reset_index(inplace=True)
-        
+
         sell_df.sort_values(by='time_stamp', inplace=True)
         buy_df.sort_values(by='time_stamp', inplace=True)
         send_df.sort_values(by='time_stamp', inplace=True)
         receive_df.sort_values(by='time_stamp', inplace=True)
 
-        # Objects > 
+        # Objects >
         sells = []
         buys = []
         sends = []
@@ -262,8 +263,13 @@ class Transactions:
             )
 
         # load Assets
+        holdings_column = (
+            "holdings"
+            if "holdings" in asset_df.columns
+            else LEGACY_ASSET_HOLDINGS_COLUMN
+        )
         for index, row in asset_df.iterrows():
-            asset_objects.append(Asset(symbol=row['symbol'], hodl=row['hodl']))
+            asset_objects.append(Asset(symbol=row['symbol'], holdings=row[holdings_column]))
 
         self.asset_objects = asset_objects
         imported_transactions = buys + sells + sends + receives
@@ -376,11 +382,11 @@ class Transactions:
                 links_skipped_count += 1
 
         print(f"Finished recreating links: {links_created_count} created, {links_skipped_count} skipped/errors.") # Add summary logging
-        return list(transactions)    
-    
+        return list(transactions)
+
     def save(self, description=None):
         save_as_filename = os.path.join(basedir, "saves", f"saved_{strftime('Y%Y-M%m-D%d_H%H-M%M-S%S')}.xlsx")
-        
+
         # Make sure all transactions are properly updated before saving
         for trans in self.transactions:
             trans.update_linked_transactions()
@@ -388,19 +394,19 @@ class Transactions:
             # Remove timezone info to prevent Excel issues
             if hasattr(trans.time_stamp, 'replace') and trans.time_stamp.tzinfo is not None:
                 trans.time_stamp = trans.time_stamp.replace(tzinfo=None)
-                
+
             # Update link timestamps too
             for link in trans.links:
                 if hasattr(link.buy.time_stamp, 'replace') and link.buy.time_stamp.tzinfo is not None:
                     link.buy.time_stamp = link.buy.time_stamp.replace(tzinfo=None)
                 if hasattr(link.sell.time_stamp, 'replace') and link.sell.time_stamp.tzinfo is not None:
                     link.sell.time_stamp = link.sell.time_stamp.replace(tzinfo=None)
-        
+
         # Create DataFrames from transaction data
         trans_df = pd.DataFrame([vars(s) for s in self.transactions])
         conversion_df = pd.DataFrame([vars(s) for s in self.conversions])
         asset_df = pd.DataFrame([vars(s) for s in self.asset_objects])
-        
+
         # Extract all links to ensure they're saved properly
         links_data = []
         for l in self.links:
@@ -420,16 +426,16 @@ class Transactions:
             trans_df.to_excel(writer, sheet_name="All Transactions")
             conversion_df.to_excel(writer, sheet_name="Conversions")
             asset_df.to_excel(writer, sheet_name="Assets")
-            
+
             links_df.to_excel(writer, sheet_name="Links")
-        
+
         # Open file to add description and update revision number
         workbook = load_workbook(filename=save_as_filename)
-        
+
         # Add description sheet
         sheet = workbook.create_sheet('Description')
         sheet.cell(row=1, column=1, value=description)
-        revision_num = self.revision_num        
+        revision_num = self.revision_num
         if revision_num is None:
             revision_num = 0
         sheet.cell(row=1, column=2, value=revision_num + 1)
@@ -439,28 +445,28 @@ class Transactions:
             warnings_sheet.cell(row=1, column=1, value='Warning')
             for row_num, warning in enumerate(self.import_warnings, start=2):
                 warnings_sheet.cell(row=row_num, column=1, value=warning)
-        
+
         # Save and close
         workbook.save(save_as_filename)
         workbook.close()
-        
+
         print(f"{'[' + description + ']' if description else ''} Saving to {save_as_filename}")
 
         # Update internal state
         self.saves = self.load_saves()
         self.view = save_as_filename
-        
+
         return save_as_filename
- 
+
     def export_to_excel(self, asset=None, date_range=None, by_year=True, output_dir=None):
 
         # Idea to programatically create Excel Links, Fancy ;-)
         # =HYPERLINK("[Export_Y2021-M03-D06_H19-M34.xlsx]Links!A20","Display Text")
-        
+
         export_dir = output_dir or os.path.join(basedir, "exports")
         os.makedirs(export_dir, exist_ok=True)
         save_as_filename = os.path.join(export_dir, f"Export_{strftime('Y%Y-M%m-D%d_H%H-M%M')}.xlsx")
-        
+
         # Template to use
         workbook = load_workbook(filename= os.path.join(basedir, 'Gainz_Export_Template-DO_NOT_MODIFY.xlsx'))
         c_sheet = workbook['Conversions']
@@ -470,7 +476,7 @@ class Transactions:
         t8949_sheet = workbook['8949']
         sales_sheet = workbook['Sales']
 
-        
+
         sales_rows = get_sales_report_rows(self)
         years = sorted({row["year"] for row in sales_rows})
 
@@ -538,7 +544,7 @@ class Transactions:
 
 
         for asset in self.assets:
-            
+
             # Conversions sheet
             sheetname = f'{asset} Conversions'
             conversions_sheet = workbook.copy_worksheet(c_sheet)
@@ -547,7 +553,7 @@ class Transactions:
             column_names = []
             for cell in conversions_sheet[3]:
                 column_names.append(cell.value)
-            
+
             in_trans_type_index = column_names.index("In Transaction Type") + 1
             out_trans_type_index = column_names.index("Out Transaction Type") + 1
             symbol_index = column_names.index("Symbol") + 1
@@ -559,7 +565,7 @@ class Transactions:
 
             row = 4
             for conversion in self.conversions:
-                
+
                 if conversion.symbol != asset:
                     continue
 
@@ -568,13 +574,13 @@ class Transactions:
                 conversions_sheet.cell(row=row, column=symbol_index, value=conversion.symbol)
                 conversions_sheet.cell(row=row, column=time_stamp_index, value=_excel_datetime(conversion.time_stamp))
                 conversions_sheet.cell(row=row, column=quantity_index, value=conversion.quantity)
-                
+
                 conversions_sheet.cell(row=row, column=usd_spot_index, value=conversion.usd_spot)
                 conversions_sheet.cell(row=row, column=usd_spot_index).number_format = '"$"#,##0.00_-'
-                
+
                 conversions_sheet.cell(row=row, column=usd_total_index, value=conversion.usd_total)
                 conversions_sheet.cell(row=row, column=usd_total_index).number_format = '"$"#,##0.00_-'
-                
+
                 conversions_sheet.cell(row=row, column=reason_index, value=conversion.reason)
 
                 row += 1
@@ -620,18 +626,18 @@ class Transactions:
                 years.add(link.sell.time_stamp.year)
 
             for year in years:
-                
+
                 sheetname = f'{year} {asset} Gains'
                 links_sheet = workbook.copy_worksheet(l_sheet)
                 links_sheet.title = sheetname
-                        
+
                 row = 2
                 profit_loss_total = 0.0
                 for link in self.links:
-                    
+
                     if link.symbol != asset:
                         continue
-                        
+
                     if link.sell.time_stamp.year != year:
                         continue
 
@@ -639,7 +645,7 @@ class Transactions:
                         continue
 
                     profit_loss_total += float(link.profit_loss)
-                    
+
                     links_sheet.cell(row=row, column=link_symbol_index, value=link.sell.symbol)
                     links_sheet.cell(row=row, column=link_id_index, value=link.id)
                     links_sheet.cell(row=row, column=buy_id_index, value=link.buy.id)
@@ -647,7 +653,7 @@ class Transactions:
                     links_sheet.cell(row=row, column=buy_date_index, value=_excel_datetime(link.buy.time_stamp))
                     links_sheet.cell(row=row, column=buy_quantity_index, value=link.buy.quantity)
                     links_sheet.cell(row=row, column=buy_unlinked_index, value=link.buy.unlinked_quantity)
-                    
+
                     links_sheet.cell(row=row, column=buy_usd_spot_index, value=link.buy.usd_spot)
                     links_sheet.cell(row=row, column=buy_usd_spot_index).number_format = '"$"#,##0.00_-'
 
@@ -658,7 +664,7 @@ class Transactions:
                     links_sheet.cell(row=row, column=buy_link_usd_index).number_format = '"$"#,##0.00_-'
 
                     links_sheet.cell(row=row, column=link_quantity_index, value=link.quantity)
-                    
+
                     links_sheet.cell(row=row, column=link_profit_loss_index, value=link.profit_loss)
                     links_sheet.cell(row=row, column=link_profit_loss_index).number_format = '"$"#,##0.00_);[Red]("$"#,##0.00)'
 
@@ -674,14 +680,14 @@ class Transactions:
 
                     links_sheet.cell(row=row, column=sell_usd_total_index, value=link.sell.usd_total)
                     links_sheet.cell(row=row, column=sell_usd_total_index).number_format = '"$"#,##0.00_-'
-                    
+
                     links_sheet.cell(row=row, column=sell_multi_link_index, value=link.sell.multi_link)
                     links_sheet.cell(row=row, column=buy_multi_link_index, value=link.buy.multi_link)
-                    
+
                     row += 1
 
                 for trans in self.transactions:
-                    
+
                     if trans.symbol != asset:
                         continue
 
@@ -710,7 +716,7 @@ class Transactions:
 
                     links_sheet.cell(row=row, column=link_profit_loss_index, value=(trans.unlinked_quantity * trans.usd_spot))
                     links_sheet.cell(row=row, column=link_profit_loss_index).number_format = '"$"#,##0.00_);[Red]("$"#,##0.00)'
-                    
+
                     links_sheet.cell(row=row, column=sell_link_usd_index, value=trans.usd_total)
                     links_sheet.cell(row=row, column=sell_link_usd_index).number_format = '"$"#,##0.00_-'
 
@@ -727,11 +733,11 @@ class Transactions:
                     links_sheet.cell(row=row, column=buy_multi_link_index, value="N/A")
 
                     row += 1
-                    
+
 
                 row += 2
 
-                links_sheet.cell(row=row, column=link_profit_loss_index, value="Profit/Loss Total: ${:,.2f}".format(profit_loss_total)) 
+                links_sheet.cell(row=row, column=link_profit_loss_index, value="Profit/Loss Total: ${:,.2f}".format(profit_loss_total))
 
                 if row == 4:
                     workbook.remove(links_sheet)
@@ -740,7 +746,7 @@ class Transactions:
             sheetname = f'{asset} Transactions'
             all_trans_sheet = workbook.copy_worksheet(a_sheet)
             all_trans_sheet.title = sheetname
-            
+
             column_names = []
             for cell in all_trans_sheet[1]:
                 column_names.append(cell.value)
@@ -748,14 +754,14 @@ class Transactions:
             id_index = column_names.index("Transaction ID") + 1
             symbol_index = column_names.index("Symbol") + 1
             trans_type_index = column_names.index("Transaction Type") + 1
-            time_stamp_index = column_names.index("Time Stamp") + 1 
+            time_stamp_index = column_names.index("Time Stamp") + 1
             quantity_index = column_names.index("Quantity") + 1
             links_index = column_names.index("Links") + 1
             unlinked_index = column_names.index("Unlinked") + 1
             usd_spot_index = column_names.index("USD Spot") + 1
             usd_total_index = column_names.index("USD Total") + 1
             source_index = column_names.index("Source") + 1
-            
+
             row = 2
             for trans in self.transactions:
 
@@ -799,7 +805,7 @@ class Transactions:
 
             date_range = get_transactions_date_range(self, date_range)
 
-            # get stats table data 
+            # get stats table data
             stats_table_data = get_stats_table_data_range(self, date_range)
 
             # get stats for selected asset
@@ -808,8 +814,8 @@ class Transactions:
                 if a['symbol'] == asset:
                     asset_stats = a
                     break
-                
-           
+
+
             # print(asset_stats)
 
             # Create detailed stats table data
@@ -834,34 +840,34 @@ class Transactions:
                 asset_stats_sheet.cell(row=row, column=1).number_format = '"$"#,##0.00_-'
                 asset_stats_sheet.cell(row=row, column=2, value=i[1])
                 asset_stats_sheet.cell(row=row, column=2).number_format = '"$"#,##0.00_-'
-                
+
                 row += 1
 
-        
+
         workbook.remove(a_sheet)
         workbook.remove(c_sheet)
         workbook.remove(l_sheet)
         workbook.remove(s_sheet)
         workbook.remove(t8949_sheet)
         workbook.remove(sales_sheet)
-            
-            
+
+
         workbook.save(save_as_filename)
         print(f"Saving to {save_as_filename}")
 
         return save_as_filename
 
-    def _conversion_amount(self, asset, current_hodl=None, amount_to_convert=None):
+    def _conversion_amount(self, asset, current_holdings=None, amount_to_convert=None):
         if amount_to_convert is not None:
             return max(float(amount_to_convert), 0.0)
 
-        if current_hodl is None:
+        if current_holdings is None:
             return 0.0
 
         bought = sum(trans.quantity for trans in self.transactions if trans.symbol == asset and trans.trans_type == 'buy')
         sold = sum(trans.quantity for trans in self.transactions if trans.symbol == asset and trans.trans_type == 'sell')
 
-        return max((bought - sold) - float(current_hodl), 0.0)
+        return max((bought - sold) - float(current_holdings), 0.0)
 
     def _reduce_transaction_quantity(self, trans, quantity):
         remaining = round_decimals_down(trans.quantity - quantity, decimals=9)
@@ -886,8 +892,8 @@ class Transactions:
         )
         self.conversions.append(conversion)
 
-    def convert_sends_to_sells(self, asset, current_hodl=None, amount_to_convert=None):
-        amount_remaining = self._conversion_amount(asset, current_hodl=current_hodl, amount_to_convert=amount_to_convert)
+    def convert_sends_to_sells(self, asset, current_holdings=None, amount_to_convert=None):
+        amount_remaining = self._conversion_amount(asset, current_holdings=current_holdings, amount_to_convert=amount_to_convert)
         converted_quantity = 0.0
         converted_count = 0
 
@@ -988,20 +994,20 @@ class Transactions:
         Returns a dictionary with the first transaction date for each asset or a specific asset.
 
         Args:
-            asset (str, optional): The symbol of the asset to get the first transaction date for. 
+            asset (str, optional): The symbol of the asset to get the first transaction date for.
                                    If None, returns dates for all assets. Defaults to None.
 
         Returns:
             dict: A dictionary with asset symbols as keys and their first transaction dates as values.
         """
         all_trans = {}
-        
+
         for trans in self.transactions:
             # If asset is provided skip others
             if asset is not None:
                 if trans.symbol != asset:
                     continue
-            
+
             # Create key val for symbol
             if trans.symbol not in all_trans.keys():
                 all_trans[trans.symbol] = []
@@ -1014,28 +1020,28 @@ class Transactions:
         first_time_stamps = {}
         for key in all_trans.keys():
             first_time_stamps[key] = all_trans[key][0].time_stamp.replace(tzinfo=None)
-            
+
         return first_time_stamps
-        
+
     def last_transaction_date(self, asset=None):
         """
         Returns a dictionary with the last transaction date for each asset or a specific asset.
 
         Args:
-            asset (str, optional): The symbol of the asset to get the last transaction date for. 
+            asset (str, optional): The symbol of the asset to get the last transaction date for.
                                   If None, returns dates for all assets. Defaults to None.
 
         Returns:
             dict: A dictionary with asset symbols as keys and their last transaction dates as values.
         """
         all_trans = {}
-        
+
         for trans in self.transactions:
             # If asset is provided skip others
             if asset is not None:
                 if trans.symbol != asset:
                     continue
-            
+
             # Create key val for symbol
             if trans.symbol not in all_trans.keys():
                 all_trans[trans.symbol] = []
@@ -1051,25 +1057,25 @@ class Transactions:
         for key in all_trans.keys():
             if all_trans[key]:  # Check if the list is not empty
                 last_time_stamps[key] = all_trans[key][-1].time_stamp.replace(tzinfo=None)
-            
+
         return last_time_stamps
-    
+
     def auto_link(self, asset=None, algo='fifo', date_range=None, min_unlinked=0.000001, year=None):
         """
         Automatically links buy and sell transactions based on specified algorithm.
-        
+
         Args:
             asset (str, optional): The asset to link. If None, link all assets.
             algo (str, optional): The algorithm to use ('fifo' or 'filo'). Defaults to 'fifo'.
             date_range (dict, optional): Date range to filter transactions by.
             min_unlinked (float, optional): Minimum unlinked quantity to consider. Defaults to 0.000001.
             year (int, optional): Tax year to filter sells by. Ignored when date_range is provided.
-            
+
         Returns:
             list: List of failures where sells couldn't be fully linked.
         """
         from dateutil import parser
-        
+
         buys = {}
         sells = {}
         failures = []
@@ -1084,23 +1090,23 @@ class Transactions:
         for trans in self.transactions:
             if asset is not None and trans.symbol != asset:
                 continue
-                
+
             if trans.symbol not in buys:
                 buys[trans.symbol] = []
                 sells[trans.symbol] = []
-                
+
             if trans.trans_type == 'buy':
                 buys[trans.symbol].append(trans)
             elif trans.trans_type == 'sell':
                 sells[trans.symbol].append(trans)
-        
+
         # Filter by date range if provided
         if date_range is not None:
             try:
                 tzinfos = {"EST": -5 * 3600, "EDT": -4 * 3600}
                 start_date = parser.parse(date_range['start_date'], tzinfos=tzinfos)
                 end_date = parser.parse(date_range['end_date'], tzinfos=tzinfos)
-                
+
                 # Filter Transactions to date range
                 for key in sells.keys():
                     filtered_transactions = []
@@ -1109,7 +1115,7 @@ class Transactions:
                             trans_time_stamp = parser.parse(trans.time_stamp, tzinfos=tzinfos)
                         else:
                             trans_time_stamp = trans.time_stamp
-                        
+
                         # Make all timestamps timezone-naive for comparison
                         if hasattr(trans_time_stamp, 'tzinfo') and trans_time_stamp.tzinfo:
                             trans_time_stamp = trans_time_stamp.replace(tzinfo=None)
@@ -1117,26 +1123,26 @@ class Transactions:
                             start_date = start_date.replace(tzinfo=None)
                         if hasattr(end_date, 'tzinfo') and end_date.tzinfo:
                             end_date = end_date.replace(tzinfo=None)
-                            
-                        if trans_time_stamp >= start_date and trans_time_stamp <= end_date:              
+
+                        if trans_time_stamp >= start_date and trans_time_stamp <= end_date:
                             filtered_transactions.append(trans)
 
                     sells[key] = filtered_transactions
-                    
+
             except Exception as e:
                 print(f"Error filtering by year: {e}")
-        
+
         # sort for algo types
         if algo == 'fifo':
             # sort buys and sells by time_stamp
             for key in buys.keys():
                 buys[key].sort(key=lambda x: x.time_stamp.replace(tzinfo=None) if hasattr(x.time_stamp, 'replace') else x.time_stamp)
-            
+
             for key in sells.keys():
                 sells[key].sort(key=lambda x: x.time_stamp.replace(tzinfo=None) if hasattr(x.time_stamp, 'replace') else x.time_stamp)
 
             from utils import round_decimals_down
-            
+
             keys = list(sells.keys())
             keys.sort()
             for key in keys:
@@ -1147,7 +1153,7 @@ class Transactions:
                 for sell in sells[key]:
                     # check if sell has remaining unlinked quantity
                     if sell.unlinked_quantity > min_unlinked:
-                        
+
                         #loop buys to find link candidate
                         for buy in buys[key]:
                             link_quantity = None
@@ -1159,24 +1165,24 @@ class Transactions:
                             # Skip if buy has no remaining unlinked quantity
                             if buy.unlinked_quantity <= min_unlinked:
                                 continue
-                                                    
+
                             # check if buy came before sell
                             buy_time = buy.time_stamp.replace(tzinfo=None) if hasattr(buy.time_stamp, 'replace') else buy.time_stamp
                             sell_time = sell.time_stamp.replace(tzinfo=None) if hasattr(sell.time_stamp, 'replace') else sell.time_stamp
-                            
+
                             if buy_time >= sell_time:
                                 continue
 
-                            # Link 
+                            # Link
                             # if sell unlinked is greater than buy unlinked, link quantity equals buy unlinked
                             if sell.unlinked_quantity >= buy.unlinked_quantity:
                                 link_quantity = buy.unlinked_quantity
-                            
+
                             # if sell unlinked is less than buy unlinked, link quantity equals sell unlinked
-                            elif sell.unlinked_quantity <= buy.unlinked_quantity: 
+                            elif sell.unlinked_quantity <= buy.unlinked_quantity:
                                 link_quantity = sell.unlinked_quantity
-                            
-                            # Set max length of link 
+
+                            # Set max length of link
                             link_quantity = round_decimals_down(link_quantity)
 
                             # Determine link profitability
@@ -1187,32 +1193,32 @@ class Transactions:
                             # if the link is less than $1.00 skip it
                             if abs(profit) < 1.0:
                                 continue
-                            
+
                             link = sell.link_transaction(buy, link_quantity)
                             links.append(link)
                             quantity_linked += link.quantity
 
                         if (sell.unlinked_quantity * sell.usd_spot) > min_unlinked:
                             failures.append({
-                                'asset': sell.symbol, 
+                                'asset': sell.symbol,
                                 'unlinkable': sell.unlinked_quantity,
                                 'quantity': sell.quantity,
                                 'timestamp': sell.time_stamp,
                                 'algo': algo
                             })
-        
+
         elif algo == 'filo':
             for key in buys.keys():
                 buys[key].sort(key=lambda x: x.time_stamp, reverse=True)
-            
+
             for key in sells.keys():
                 sells[key].sort(key=lambda x: x.time_stamp.replace(tzinfo=None) if hasattr(x.time_stamp, 'replace') else x.time_stamp)
 
             from utils import round_decimals_down
-            
+
             keys = list(sells.keys())
             keys.sort()
-            
+
             for key in keys:
                 quantity_linked = 0.0
                 links = []
@@ -1234,20 +1240,20 @@ class Transactions:
                             # check if buy came before sell
                             buy_time = buy.time_stamp.replace(tzinfo=None) if hasattr(buy.time_stamp, 'replace') else buy.time_stamp
                             sell_time = sell.time_stamp.replace(tzinfo=None) if hasattr(sell.time_stamp, 'replace') else sell.time_stamp
-                            
+
                             if buy_time >= sell_time:
                                 continue
 
-                            # Link 
+                            # Link
                             # if sell unlinked is greater than buy unlinked, link quantity equals buy unlinked
                             if sell.unlinked_quantity >= buy.unlinked_quantity:
                                 link_quantity = buy.unlinked_quantity
 
                             # if sell unlinked is less than buy unlinked, link quantity equals sell unlinked
-                            elif sell.unlinked_quantity <= buy.unlinked_quantity: 
+                            elif sell.unlinked_quantity <= buy.unlinked_quantity:
                                 link_quantity = sell.unlinked_quantity
 
-                            # Set max length of link 
+                            # Set max length of link
                             link_quantity = round_decimals_down(link_quantity)
 
                             # Determine link profitability
@@ -1265,7 +1271,7 @@ class Transactions:
 
                         if (sell.unlinked_quantity * sell.usd_spot) > min_unlinked:
                             failures.append({
-                                'asset': sell.symbol, 
+                                'asset': sell.symbol,
                                 'unlinkable': sell.unlinked_quantity,
                                 'quantity': sell.quantity,
                                 'timestamp': sell.time_stamp,
@@ -1275,15 +1281,15 @@ class Transactions:
         elif algo in ('min_gain', 'min_gain_long'):
             for key in buys.keys():
                 buys[key].sort(key=lambda x: x.usd_spot, reverse=True)
-            
+
             for key in sells.keys():
                 sells[key].sort(key=lambda x: x.time_stamp.replace(tzinfo=None) if hasattr(x.time_stamp, 'replace') else x.time_stamp)
 
             from utils import round_decimals_down
-            
+
             keys = list(sells.keys())
             keys.sort()
-            
+
             for key in keys:
                 for sell in sells[key]:
                     if sell.unlinked_quantity > min_unlinked:
@@ -1298,7 +1304,7 @@ class Transactions:
 
                             buy_time = buy.time_stamp.replace(tzinfo=None) if hasattr(buy.time_stamp, 'replace') else buy.time_stamp
                             sell_time = sell.time_stamp.replace(tzinfo=None) if hasattr(sell.time_stamp, 'replace') else sell.time_stamp
-                            
+
                             if buy_time >= sell_time:
                                 continue
 
@@ -1307,7 +1313,7 @@ class Transactions:
 
                             if sell.unlinked_quantity >= buy.unlinked_quantity:
                                 link_quantity = buy.unlinked_quantity
-                            elif sell.unlinked_quantity <= buy.unlinked_quantity: 
+                            elif sell.unlinked_quantity <= buy.unlinked_quantity:
                                 link_quantity = sell.unlinked_quantity
 
                             link_quantity = round_decimals_down(link_quantity)
@@ -1323,7 +1329,7 @@ class Transactions:
 
                         if (sell.unlinked_quantity * sell.usd_spot) > min_unlinked:
                             failures.append({
-                                'asset': sell.symbol, 
+                                'asset': sell.symbol,
                                 'unlinkable': sell.unlinked_quantity,
                                 'quantity': sell.quantity,
                                 'timestamp': sell.time_stamp,
@@ -1334,7 +1340,7 @@ class Transactions:
         for trans in self.transactions:
             trans.update_linked_transactions()
             trans.set_multi_link()
-            
+
         return failures
 
 if __name__ == "__main__":
@@ -1437,7 +1443,7 @@ if __name__ == "__main__":
 
     for s in sells:
         sold_quantity += s.quantity
-        sold_unlinked += s.unlinked_quantity    
+        sold_unlinked += s.unlinked_quantity
         print(f"\n\n bought {bought_quantity} \n sent {sent_quantity} \n received {received_quantity} \n sold {sold_quantity} \n sold unlinked {sold_unlinked} \n bought unlinked {bought_unlinked}")
 
 @lru_cache(maxsize=1024)

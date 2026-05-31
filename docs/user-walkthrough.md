@@ -58,7 +58,7 @@ The top summary band answers the first important question: is the file set ready
 Watch these values:
 
 - `Reconciliation`: overall readiness.
-- `Assets needing HODL`: assets where you have not entered current holdings.
+- `Assets needing holdings`: assets where you have not entered current holdings.
 - `Assets with mismatches`: declared holdings do not match imported buys/sells.
 - `Import warnings`: rows Gainz could not fully interpret.
 - `Unlinked sales`: sells that do not yet have basis links.
@@ -80,22 +80,22 @@ Most first-time demo runs should start with `FIFO`.
 
 Repeat for every asset with unlinked sales. Then return to **Stats & Charts** and confirm `Unlinked sales` has dropped.
 
-## 5. Declare Current HODL
+## 5. Declare Current Holdings
 
-Open **HODL & Accounting**.
+Open **Holdings & Accounting**.
 
 This page is the guided current-holdings walkthrough. For each asset:
 
 1. Select the asset row.
 2. Enter the amount you currently hold across wallets and exchanges.
-3. Save declared HODL.
+3. Save declared holdings.
 4. Review the status and next action.
 
 Gainz compares:
 
 - `Expected From Buys/Sells Only`: buys minus sells.
 - `Imported Net After Transfers`: buys plus receives minus sells minus sends.
-- `Declared HODL`: what you say you actually hold today.
+- `Declared Holdings`: what you say you actually hold today.
 
 If the status is `Mismatch`, review missing buys, missing disposals, sends, receives, gifts, income, losses, or conversions.
 
@@ -123,7 +123,7 @@ The **Audit Readiness** panel summarizes whether the packet is worth generating:
 - Form 8949 row count.
 - Form 8949 gain/loss total.
 - Unlinked sales count.
-- HODL gaps.
+- Holdings gaps.
 - Holdings mismatches.
 - Import warnings.
 - Next action.
@@ -163,6 +163,6 @@ The first-user walkthrough surfaced a few high-value improvements:
 
 - Add a **Load Demo Data** button so users can try Gainz without finding files manually.
 - Add **Run FIFO Auto Link For All Assets** for a smoother first pass.
-- Add **Use Expected HODL** actions for demo and clearly matched import sets.
+- Add **Use Expected Holdings** actions for demo and clearly matched import sets.
 - Link Export readiness blockers directly to the page/action that fixes each issue.
 - Add a visible file-picker button next to drag-and-drop upload.

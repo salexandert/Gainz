@@ -35,7 +35,7 @@ schema_type: SoftwareApplication
     </div>
     <div class="card">
       <h3>Do my current holdings make sense?</h3>
-      <p>Reconciliation compares declared HODL, buys and sells, transfers, and current lot estimates across assets.</p>
+      <p>Reconciliation compares declared holdings, buys and sells, transfers, and current lot estimates across assets.</p>
     </div>
     <div class="card">
       <h3>Can I explain my tax work later?</h3>

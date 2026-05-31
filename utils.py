@@ -114,7 +114,7 @@ def _prorated_fee(transaction, quantity):
 
 
 def is_long_term_link(link):
-    return link.hodl_duration.days > 365
+    return link.holding_duration.days > 365
 
 
 def get_taxable_links(transactions, asset=None, date_range=None):
@@ -310,10 +310,10 @@ def get_audit_readiness_summary(transactions):
         for row in stats_rows
         if _stats_row_has_unlinked_sales(row)
     ]
-    assets_needing_hodl = [
+    assets_needing_holdings = [
         row[0]
         for row in holdings_rows
-        if row[6] == "Needs declared HODL"
+        if row[6] == "Needs declared holdings"
     ]
     assets_with_mismatches = [
         row[0]
@@ -331,9 +331,9 @@ def get_audit_readiness_summary(transactions):
             "Complete basis links for: " + ", ".join(assets_with_unlinked_sales)
         )
 
-    if assets_needing_hodl:
+    if assets_needing_holdings:
         blockers.append(
-            "Declare current HODL for: " + ", ".join(assets_needing_hodl)
+            "Declare current holdings for: " + ", ".join(assets_needing_holdings)
         )
 
     if assets_with_mismatches:
@@ -377,7 +377,7 @@ def get_audit_readiness_summary(transactions):
             "transactions": len(getattr(transactions, "transactions", [])),
             "assets": len(getattr(transactions, "assets", set())),
             "links": len(getattr(transactions, "links", set())),
-            "assets_needing_hodl": len(assets_needing_hodl),
+            "assets_needing_holdings": len(assets_needing_holdings),
             "assets_with_mismatches": len(assets_with_mismatches),
             "assets_with_unlinked_sales": len(assets_with_unlinked_sales),
             "import_warnings": len(import_warnings),
@@ -404,12 +404,12 @@ def get_audit_readiness_summary(transactions):
 def fetch_crypto_price(trans):
 
     symbol = f"{trans.symbol}-USD"
-    
-    start_time_obj = trans.time_stamp    
+
+    start_time_obj = trans.time_stamp
     start_time_formatted = start_time_obj.isoformat(timespec='milliseconds').split('.')[0] + '.' + start_time_obj.isoformat(timespec='milliseconds').split('.')[1][:3] + 'Z'
     end_time_obj = start_time_obj + datetime.timedelta(minutes=2)
     end_time_formatted = end_time_obj.isoformat(timespec='milliseconds').split('.')[0] + '.' + end_time_obj.isoformat(timespec='milliseconds').split('.')[1][:3] + 'Z'
-        
+
     url = f"https://api.exchange.coinbase.com/products/{symbol}/candles?granularity=60&start={start_time_formatted}&end={end_time_formatted}"
     headers = {"Accept": "application/json"}
     response =  requests.request("GET", url, headers=headers, timeout=1)
@@ -424,7 +424,7 @@ def fetch_crypto_price(trans):
         # timestampnum = response.json()[0][0]
         # response_time_obj = datetime.datetime.utcfromtimestamp(timestampnum)
         # input_time_obj = dateutil.parser.parse(timestamp)
-        
+
         # print(f"The Price of {symbol} was looked up using coinbase api {price} @ {start_time_obj}")
         # print(symbol)
         # print('timestamp on api input', input_time_obj)
@@ -460,15 +460,15 @@ def get_stats_table_data(transactions):
 
     # Get links
     links = set([
-            link 
+            link
             for trans in transactions
             for link in trans.links
             ])
 
     stats_table_data = []
-        
+
     for asset in transactions.assets:
-        
+
         total_purchased_quantity = 0.0
         total_purchased_unlinked_quantity = 0.0
         total_purchased_usd = 0.0
@@ -498,7 +498,7 @@ def get_stats_table_data(transactions):
                 total_purchased_quantity += trans.quantity
                 total_purchased_unlinked_quantity += trans.unlinked_quantity
                 total_purchased_usd += trans.usd_total
-                
+
 
             elif trans.trans_type.lower() == "sell":
                 total_sold_quantity += trans.quantity
@@ -515,41 +515,41 @@ def get_stats_table_data(transactions):
 
             # print(f"Total Sold in usd: {total_sold_usd}")
             # print(f"Trans USD Total {trans.usd_total}")
-        
-        hodl = "N/A"
-        
+
+        holdings = "N/A"
+
         for a in transactions.asset_objects:
             if a.symbol != asset:
                 continue
-            
-            # print(f"Asset Object symbol {a.symbol} Asset {asset} HODL {a.hodl}")
-            if a.hodl is not None:
-                hodl = a.hodl
-                # print(f"Asset Object symbol {a.symbol} Asset {asset} HODL {a.hodl}")
+
+            # print(f"Asset Object symbol {a.symbol} Asset {asset} Holdings {a.holdings}")
+            if a.holdings is not None:
+                holdings = a.holdings
+                # print(f"Asset Object symbol {a.symbol} Asset {asset} Holdings {a.holdings}")
 
         total_sold_unlinked_quantity = round_decimals_down(total_sold_unlinked_quantity)
         if total_sold_unlinked_quantity != 0 and total_sold_unlinked_quantity < 0.0009:
             total_sold_unlinked_quantity = "Less than .0009"
 
 
-                                
-        stats_table_data.append({   
+
+        stats_table_data.append({
                 "symbol": f"{asset}",
                 "total_purchased_quantity": format_quantity(total_purchased_quantity),
                 "total_purchased_unlinked_quantity": format_quantity(total_purchased_unlinked_quantity),
                 "total_purchased_usd": "${:,.2f}".format(total_purchased_usd),
-                "total_sold_quantity": format_quantity(total_sold_quantity), 
+                "total_sold_quantity": format_quantity(total_sold_quantity),
                 "total_sold_unlinked_quantity": format_quantity(total_sold_unlinked_quantity),
                 "total_sold_usd": "${:,.2f}".format(total_sold_usd),
                 "total_profit_loss": "${:,.2f}".format(profit_loss),
                 "total_sent_quantity": format_quantity(total_sent_quantity),
                 "total_received_quantity": format_quantity(total_received_quantity),
-                "hodl": format_quantity(hodl) if hodl != "N/A" else hodl
+                "holdings": format_quantity(holdings) if holdings != "N/A" else holdings
 
             })
-    
+
     return stats_table_data
-        
+
 
 def get_all_trans_table_data(transactions):
     all_trans_table_data = []
@@ -563,7 +563,7 @@ def get_all_trans_table_data(transactions):
         trans_data['quantity'] = trans.quantity
         trans_data['unlinked_quantity'] = trans.unlinked_quantity
         trans_data['usd_total'] = "${:,.2f}".format(trans.usd_total)
-        
+
         all_trans_table_data.append(trans_data)
 
     return all_trans_table_data
@@ -600,8 +600,8 @@ def get_linked_table_data(transactions, asset, date_range):
 
         start_date = date_range['start_date']
         end_date = date_range['end_date']
-        
-    
+
+
     # Filter Transactions to date range
     filtered_transactions = []
 
@@ -624,18 +624,18 @@ def get_linked_table_data(transactions, asset, date_range):
                 filtered_transactions.append(trans)
 
         elif start_date and end_date:
-            if trans_time_stamp >= start_date and trans_time_stamp <= end_date:              
+            if trans_time_stamp >= start_date and trans_time_stamp <= end_date:
                 filtered_transactions.append(trans)
 
     # Get links
     links = set([
-            link 
+            link
             for trans in filtered_transactions
             for link in trans.links
             ])
 
     # print(f" {asset} len of links {len(links)}")
-    
+
     # Get linked Table Data
     linked_table_data = []
     for link in links:
@@ -643,7 +643,7 @@ def get_linked_table_data(transactions, asset, date_range):
         linked_table_data.append([
             link.quantity,
             "${:,.2f}".format(link.profit_loss),
-            td_format(link.hodl_duration),
+            td_format(link.holding_duration),
             link.buy.time_stamp,
             link.buy.quantity,
             "${:,.2f}".format(link.buy.usd_total),
@@ -659,49 +659,49 @@ def get_linkable_table_data(transactions, trans1_obj):
     # Get Linkable Table Data
     linkable_table_data = []
     for trans in transactions:
-        
+
         # Don't show if different Asset types
         if trans1_obj.symbol != trans.symbol:
-            continue            
+            continue
 
         # Don't show if 0.0 unlinked quantity WE SHOULD TEST 0 NOT 0.0 AS 0.01 ISSUE CAN ARRISE
         if trans1_obj.unlinked_quantity <= 0.0 or trans.unlinked_quantity <= 0.0:
             continue
-        
+
         # Don't show if same type
         if trans.trans_type == trans1_obj.trans_type:
             continue
-        
+
         # Don't show if already linked
         # if trans.name in other_transactions:
         #     continue
-        
+
         # Don't show if time problem
         if trans1_obj.trans_type == "sell":
-            if trans1_obj.time_stamp < trans.time_stamp: 
+            if trans1_obj.time_stamp < trans.time_stamp:
                 continue
-        
+
         elif trans1_obj.trans_type == "buy":
             if trans1_obj.time_stamp < trans.time_stamp:
                 continue
 
         # Determine Buy and Sell Objects
         if trans1_obj.trans_type == "sell" and trans.trans_type == "buy":
-            
+
             sell_obj = trans1_obj
             buy_obj = trans
 
         elif trans1_obj.trans_type == "buy" and trans.trans_type == "sell":
             sell_obj = trans
             buy_obj = trans1_obj
-        
+
         else:
             continue
 
         # Determine max link quantity
         if sell_obj.unlinked_quantity <= buy_obj.unlinked_quantity:
             quantity = sell_obj.unlinked_quantity
-        
+
         elif sell_obj.unlinked_quantity >= buy_obj.unlinked_quantity:
             quantity = buy_obj.unlinked_quantity
 
@@ -710,19 +710,19 @@ def get_linkable_table_data(transactions, trans1_obj):
         sell_price = quantity * sell_obj.usd_spot
         profit = sell_price - buy_price
 
-        
+
         linkable_table_data.append([
-            trans.name, 
+            trans.name,
             trans.trans_type.capitalize(),
             trans.symbol,
-            trans.time_stamp, 
+            trans.time_stamp,
             trans.quantity,
             trans.unlinked_quantity,
-            "${:,.2f}".format(trans.usd_spot), 
+            "${:,.2f}".format(trans.usd_spot),
             "${:,.2f}".format(trans.usd_total),
             "${:,.2f}".format(profit)
             ])
-    
+
     return linkable_table_data
 
 
@@ -739,7 +739,7 @@ def get_stats_table_data_range(transactions, date_range=None):
             start_date = start_date.replace(tzinfo=None)
         if end_date.tzinfo is not None:
             end_date = end_date.replace(tzinfo=None)
-  
+
         # Filter Transactions to date range
         filtered_transactions = []
         for trans in transactions:
@@ -757,22 +757,22 @@ def get_stats_table_data_range(transactions, date_range=None):
                     filtered_transactions.append(trans)
 
             elif start_date and end_date:
-                if trans_time_stamp >= start_date and trans_time_stamp <= end_date:              
+                if trans_time_stamp >= start_date and trans_time_stamp <= end_date:
                     filtered_transactions.append(trans)
 
-        
+
         # Get links
         links = set([
-                link 
+                link
                 for trans in filtered_transactions
                 for link in trans.links
                 ])
 
 
         stats_table_data = []
-            
+
         for asset in transactions.assets:
-            
+
             total_purchased_quantity = 0.0
             total_purchased_unlinked_quantity = 0.0
             total_purchased_usd = 0.0
@@ -799,8 +799,8 @@ def get_stats_table_data_range(transactions, date_range=None):
 
             buy_prices = []
             sell_prices = []
-                        
-            # average_hodl_length = 0.0
+
+            # average_holdings_length = 0.0
 
             num_buys = 0
             num_sells = 0
@@ -808,7 +808,7 @@ def get_stats_table_data_range(transactions, date_range=None):
             num_receives = 0
 
             num_links = 0
-            
+
 
             for row in get_form_8949_report_rows(transactions, asset=asset, date_range=date_range):
                 num_links += 1
@@ -836,7 +836,7 @@ def get_stats_table_data_range(transactions, date_range=None):
                         total_purchased_unlinked_quantity += trans.unlinked_quantity
                         total_purchased_usd += trans.usd_total
                         buy_prices.append(trans.usd_total)
-                        
+
 
                     elif trans.trans_type.lower() == "sell":
                         num_sells += 1
@@ -859,42 +859,42 @@ def get_stats_table_data_range(transactions, date_range=None):
                     elif trans.trans_type.lower() == "receive":
                         num_receives += 1
                         total_received_quantity += trans.quantity
-            
+
             if len(buy_prices) > 0 and total_purchased_quantity:
                 average_buy_price = total_purchased_usd / total_purchased_quantity
-            
+
             else:
                 average_buy_price = 0.0
-            
+
             if len(sell_prices) > 0 and total_sold_quantity:
                 average_sell_price = total_sold_usd / total_sold_quantity
-            
+
             else:
                 average_sell_price = 0.0
 
-            hodl = "N/A"
-        
+            holdings = "N/A"
+
             for a in transactions.asset_objects:
                 if a.symbol != asset:
                     continue
-                
-                # print(f"Asset Object symbol {a.symbol} Asset {asset} HODL {a.hodl}")
-                if a.hodl is not None:
-                    hodl = a.hodl
-                    # print(f"Asset Object symbol {a.symbol} Asset {asset} HODL {a.hodl}")
+
+                # print(f"Asset Object symbol {a.symbol} Asset {asset} Holdings {a.holdings}")
+                if a.holdings is not None:
+                    holdings = a.holdings
+                    # print(f"Asset Object symbol {a.symbol} Asset {asset} Holdings {a.holdings}")
 
             total_sold_unlinked_quantity = round_decimals_down(total_sold_unlinked_quantity)
             if total_sold_unlinked_quantity != 0 and abs(total_sold_unlinked_quantity) < .0009:
                 total_sold_unlinked_quantity = "Less than .0009"
 
 
-            stats_table_data.append({   
+            stats_table_data.append({
                     "symbol": f"{asset}",
                     "total_purchased_quantity": format_quantity(total_purchased_quantity),
                     "total_purchased_unlinked_quantity": format_quantity(round_decimals_down(total_purchased_unlinked_quantity)),
                     "total_purchased_usd": "${:,.2f}".format(total_purchased_usd),
-                    
-                    "total_sold_quantity": format_quantity(total_sold_quantity), 
+
+                    "total_sold_quantity": format_quantity(total_sold_quantity),
                     "total_sold_unlinked_quantity": format_quantity(total_sold_unlinked_quantity),
                     "total_sold_usd": "${:,.2f}".format(total_sold_usd),
                     "profit_loss_total": "${:,.2f}".format(profit_loss_total),
@@ -908,7 +908,7 @@ def get_stats_table_data_range(transactions, date_range=None):
                     "proceeds_short": "${:,.2f}".format(proceeds_short),
                     "cost_basis_short": "${:,.2f}".format(cost_basis_short),
                     "gain_short": "${:,.2f}".format(gain_short),
-                    
+
                     "total_sent_quantity": format_quantity(total_sent_quantity),
                     "total_received_quantity": format_quantity(total_received_quantity),
 
@@ -919,18 +919,18 @@ def get_stats_table_data_range(transactions, date_range=None):
 
                     "average_buy_price": "${:,.2f}".format(average_buy_price),
                     "average_sell_price": "${:,.2f}".format(average_sell_price),
-                    "hodl": format_quantity(hodl) if hodl != "N/A" else hodl,
+                    "holdings": format_quantity(holdings) if holdings != "N/A" else holdings,
                     "has_sells_without_links": num_sells > 0 and num_links == 0,
                     "has_unlinked_sells": total_sold_unlinked_quantity != 0,
-                    
+
                 })
-    
+
 
     return stats_table_data
-   
+
 def get_current_holdings_lots(transactions, asset=None):
-    declared_hodl = transactions.get_hodl(asset) if asset and hasattr(transactions, "get_hodl") else None
-    allocation_remaining = declared_hodl
+    declared_holdings = transactions.get_holdings(asset) if asset and hasattr(transactions, "get_holdings") else None
+    allocation_remaining = declared_holdings
     lots = []
 
     for trans in transactions:
@@ -949,7 +949,7 @@ def get_current_holdings_lots(transactions, asset=None):
 
         lots.append((trans, remaining_quantity))
 
-    if declared_hodl is not None:
+    if declared_holdings is not None:
         lots.sort(key=lambda lot: comparable_datetime(lot[0].time_stamp), reverse=True)
     else:
         lots.sort(key=lambda lot: comparable_datetime(lot[0].time_stamp))
@@ -1059,7 +1059,7 @@ def get_unrealized_chart_data(transactions, asset, current_usd_spot=None):
 
 
 def get_holdings_reconciliation(transactions, asset):
-    declared_hodl = transactions.get_hodl(asset) if hasattr(transactions, "get_hodl") else None
+    declared_holdings = transactions.get_holdings(asset) if hasattr(transactions, "get_holdings") else None
     totals = {
         "buy": 0.0,
         "sell": 0.0,
@@ -1071,7 +1071,7 @@ def get_holdings_reconciliation(transactions, asset):
         if trans.symbol == asset and trans.trans_type in totals:
             totals[trans.trans_type] += trans.quantity
 
-    expected_hodl = totals["buy"] - totals["sell"]
+    expected_holdings = totals["buy"] - totals["sell"]
     imported_net = totals["buy"] + totals["receive"] - totals["sell"] - totals["send"]
     lot_quantity = 0.0
 
@@ -1079,14 +1079,14 @@ def get_holdings_reconciliation(transactions, asset):
         if trans.symbol == asset and trans.trans_type in ("buy", "receive"):
             lot_quantity += max(trans.unlinked_quantity, 0.0)
 
-    if declared_hodl is None:
+    if declared_holdings is None:
         difference = None
-        status = "Needs declared HODL"
+        status = "Needs declared holdings"
         next_action = "Enter the actual current holding for this asset."
-        allocation_method = "Showing unlinked buy/receive lots because no declared HODL is saved."
+        allocation_method = "Showing unlinked buy/receive lots because no declared holdings are saved."
     else:
-        difference = expected_hodl - declared_hodl
-        allocation_method = "FIFO remaining estimate: oldest disposals are assumed consumed first, so declared HODL is allocated to newest available lots."
+        difference = expected_holdings - declared_holdings
+        allocation_method = "FIFO remaining estimate: oldest disposals are assumed consumed first, so declared holdings are allocated to newest available lots."
 
         if abs(difference) <= 0.00000001:
             status = "Matched"
@@ -1100,10 +1100,10 @@ def get_holdings_reconciliation(transactions, asset):
 
     return {
         "asset": asset,
-        "declared_hodl": declared_hodl,
+        "declared_holdings": declared_holdings,
         "buy_quantity": totals["buy"],
         "sell_quantity": totals["sell"],
-        "expected_hodl": expected_hodl,
+        "expected_holdings": expected_holdings,
         "imported_net": imported_net,
         "available_lot_quantity": lot_quantity,
         "difference": difference,
@@ -1118,18 +1118,18 @@ def get_holdings_reconciliation_summary(transactions, asset):
 
     return [
         [
-            "Declared HODL",
-            format_quantity(reconciliation["declared_hodl"])
-            if reconciliation["declared_hodl"] is not None
+            "Declared Holdings",
+            format_quantity(reconciliation["declared_holdings"])
+            if reconciliation["declared_holdings"] is not None
             else "N/A",
         ],
         ["Buy Quantity", format_quantity(reconciliation["buy_quantity"])],
         ["Sell Quantity", format_quantity(reconciliation["sell_quantity"])],
-        ["Expected From Buys/Sells Only", format_quantity(reconciliation["expected_hodl"])],
+        ["Expected From Buys/Sells Only", format_quantity(reconciliation["expected_holdings"])],
         ["Imported Net After Transfers", format_quantity(reconciliation["imported_net"])],
         ["Available Buy/Receive Lot Quantity", format_quantity(reconciliation["available_lot_quantity"])],
         [
-            "Difference vs Declared HODL",
+            "Difference vs Declared Holdings",
             format_quantity(reconciliation["difference"])
             if reconciliation["difference"] is not None
             else "N/A",
@@ -1155,11 +1155,11 @@ def get_multi_asset_holdings_reconciliation_table_data(transactions):
         table_data.append([
             asset,
             (
-                format_quantity(reconciliation["declared_hodl"])
-                if reconciliation["declared_hodl"] is not None
+                format_quantity(reconciliation["declared_holdings"])
+                if reconciliation["declared_holdings"] is not None
                 else "N/A"
             ),
-            format_quantity(reconciliation["expected_hodl"]),
+            format_quantity(reconciliation["expected_holdings"]),
             format_quantity(reconciliation["imported_net"]),
             format_quantity(reconciliation["available_lot_quantity"]),
             (
@@ -1175,12 +1175,12 @@ def get_multi_asset_holdings_reconciliation_table_data(transactions):
 
 
 def get_all_trans_table_data_range(transactions, asset, date_range):
-    
+
     if date_range:
 
         start_date = date_range['start_date']
         end_date = date_range['end_date']
-                                                             
+
         # Filter Transactions to date range
         filtered_transactions = []
         for trans in transactions:
@@ -1193,13 +1193,13 @@ def get_all_trans_table_data_range(transactions, asset, date_range):
                     filtered_transactions.append(trans)
 
             elif start_date and end_date:
-                if trans.time_stamp >= start_date and trans.time_stamp <= end_date:              
+                if trans.time_stamp >= start_date and trans.time_stamp <= end_date:
                     filtered_transactions.append(trans)
 
 
     all_trans_table_data = []
     for trans in filtered_transactions:
-        
+
         all_trans_table_data.append([
             trans.name,
             trans.trans_type,
@@ -1209,7 +1209,7 @@ def get_all_trans_table_data_range(transactions, asset, date_range):
             "${:,.2f}".format(trans.usd_spot),
             "${:,.2f}".format(trans.usd_total)
         ])
-        
+
 
     return all_trans_table_data
 
@@ -1223,15 +1223,15 @@ def get_transactions_date_range(transactions, date_range):
         for time_stamp in first_time_stamps.values():
             if first_time_stamp is None:
                 first_time_stamp = time_stamp
-                
+
             if time_stamp < first_time_stamp:
-                first_time_stamp = time_stamp 
+                first_time_stamp = time_stamp
 
         date_range['start_date'] = first_time_stamp
 
     else:
         date_range['start_date'] = datetime.datetime.strptime(date_range['start_date'], "%m/%d/%Y %H:%M %p")
-        
+
 
     if date_range['end_date'] == '':
         last_time_stamps = transactions.last_transaction_date()
@@ -1241,12 +1241,12 @@ def get_transactions_date_range(transactions, date_range):
             if last_time_stamp is None:
                 last_time_stamp = time_stamp
                 continue
-                        
+
             if time_stamp > last_time_stamp:
                 last_time_stamp = time_stamp
 
         date_range['end_date'] = last_time_stamp
-    
+
     else:
         date_range['end_date'] = datetime.datetime.strptime(date_range['end_date'], "%m/%d/%Y %H:%M %p")
 
@@ -1255,12 +1255,12 @@ def get_transactions_date_range(transactions, date_range):
 
 
 def get_sells_trans_table_data_range(transactions, asset, date_range):
-    
+
     if date_range:
 
         start_date = date_range['start_date']
         end_date = date_range['end_date']
-                                                                    
+
         # Filter Transactions to date range
         filtered_transactions = []
         for trans in transactions:
@@ -1276,7 +1276,7 @@ def get_sells_trans_table_data_range(transactions, asset, date_range):
                     filtered_transactions.append(trans)
 
             elif start_date and end_date:
-                if trans.time_stamp >= start_date and trans.time_stamp <= end_date:              
+                if trans.time_stamp >= start_date and trans.time_stamp <= end_date:
                     filtered_transactions.append(trans)
 
 
@@ -1287,11 +1287,11 @@ def get_sells_trans_table_data_range(transactions, asset, date_range):
             trans.update_linked_transactions()
 
             if trans.unlinked_quantity != 0.0 and trans.unlinked_quantity < 0.0009:
-                
+
                 unlinked_quantity = "Less than 0.0009"
             else:
                 unlinked_quantity = trans.unlinked_quantity
-        
+
             table_data.append([
                 trans.source,
                 trans.symbol,
@@ -1301,25 +1301,25 @@ def get_sells_trans_table_data_range(transactions, asset, date_range):
                 "${:,.2f}".format(trans.usd_spot),
                 "${:,.2f}".format(trans.usd_total)
             ])
-        
+
 
 
     return table_data
 
 
 def get_buys_trans_table_data_range(transactions, asset, date_range):
-    
+
     if date_range:
 
         start_date = date_range['start_date']
         end_date = date_range['end_date']
-                                                                    
+
         # Filter Transactions to date range
         filtered_transactions = []
         for trans in transactions:
             if trans.symbol != asset:
                 continue
-            
+
             if start_date and not end_date:
                 if trans.time_stamp >= start_date:
                     filtered_transactions.append(trans)
@@ -1329,7 +1329,7 @@ def get_buys_trans_table_data_range(transactions, asset, date_range):
                     filtered_transactions.append(trans)
 
             elif start_date and end_date:
-                if trans.time_stamp >= start_date and trans.time_stamp <= end_date:              
+                if trans.time_stamp >= start_date and trans.time_stamp <= end_date:
                     filtered_transactions.append(trans)
 
 
@@ -1338,11 +1338,11 @@ def get_buys_trans_table_data_range(transactions, asset, date_range):
         if trans.trans_type == "buy":
 
             if trans.unlinked_quantity != 0.0 and trans.unlinked_quantity < 0.0009:
-                
+
                 unlinked_quantity = "Less than 0.0009"
             else:
                 unlinked_quantity = trans.unlinked_quantity
-        
+
             table_data.append([
                 trans.source,
                 trans.symbol,
@@ -1352,25 +1352,25 @@ def get_buys_trans_table_data_range(transactions, asset, date_range):
                 "${:,.2f}".format(trans.usd_spot),
                 "${:,.2f}".format(trans.usd_total)
             ])
-    
-    
+
+
 
     return table_data
 
 
 def get_sends_trans_table_data_range(transactions, asset, date_range):
-    
+
     if date_range:
 
         start_date = date_range['start_date']
         end_date = date_range['end_date']
-                                                                    
+
         # Filter Transactions to date range
         filtered_transactions = []
         for trans in transactions:
             if trans.symbol != asset:
                 continue
-            
+
             if start_date and not end_date:
                 if trans.time_stamp >= start_date:
                     filtered_transactions.append(trans)
@@ -1380,16 +1380,16 @@ def get_sends_trans_table_data_range(transactions, asset, date_range):
                     filtered_transactions.append(trans)
 
             elif start_date and end_date:
-                if trans.time_stamp >= start_date and trans.time_stamp <= end_date:              
+                if trans.time_stamp >= start_date and trans.time_stamp <= end_date:
                     filtered_transactions.append(trans)
 
 
     table_data = []
     for trans in filtered_transactions:
         if trans.trans_type == "send":
-            
+
             if trans.unlinked_quantity != 0.0 and trans.unlinked_quantity < 0.0009:
-                
+
                 unlinked_quantity = "Less than 0.0009"
             else:
                 unlinked_quantity = trans.unlinked_quantity
@@ -1404,24 +1404,24 @@ def get_sends_trans_table_data_range(transactions, asset, date_range):
                 "${:,.2f}".format(trans.usd_spot),
                 "${:,.2f}".format(trans.usd_total)
             ])
-        
-   
+
+
 
     return table_data
 
 
 
 def get_receives_trans_table_data_range(transactions, asset, date_range):
-    
+
     start_date = date_range['start_date']
     end_date = date_range['end_date']
-                                                                
+
     # Filter Transactions to date range
     filtered_transactions = []
     for trans in transactions:
         if trans.symbol != asset:
             continue
-        
+
         if start_date and not end_date:
             if trans.time_stamp >= start_date:
                 filtered_transactions.append(trans)
@@ -1431,7 +1431,7 @@ def get_receives_trans_table_data_range(transactions, asset, date_range):
                 filtered_transactions.append(trans)
 
         elif start_date and end_date:
-            if trans.time_stamp >= start_date and trans.time_stamp <= end_date:              
+            if trans.time_stamp >= start_date and trans.time_stamp <= end_date:
                 filtered_transactions.append(trans)
 
 
@@ -1441,11 +1441,11 @@ def get_receives_trans_table_data_range(transactions, asset, date_range):
 
 
             if trans.unlinked_quantity != 0.0 and trans.unlinked_quantity < 0.0009:
-                
+
                 unlinked_quantity = "Less than 0.0009"
             else:
                 unlinked_quantity = trans.unlinked_quantity
-        
+
             table_data.append([
                 trans.source,
                 trans.symbol,
@@ -1455,8 +1455,8 @@ def get_receives_trans_table_data_range(transactions, asset, date_range):
                 "${:,.2f}".format(trans.usd_spot),
                 "${:,.2f}".format(trans.usd_total)
             ])
-    
-   
+
+
 
     return table_data
 
@@ -1472,7 +1472,7 @@ def get_trans_obj_from_table_data(transactions, symbol, trans_type, quantity, ti
             if isinstance(trans.time_stamp, datetime.date):
                 trans2_time_stamp = trans.time_stamp
                 # trans2_time_stamp = trans2_time_stamp.replace(microsecond=0)
-            
+
             else:
                 trans2_time_stamp = trans.time_stamp.to_pydatetime()
                 time_stamp = parser.parse(time_stamp, tzinfos=tzinfos)
@@ -1489,12 +1489,12 @@ def get_trans_obj_from_table_data(transactions, symbol, trans_type, quantity, ti
                 # print(f"Time Stamp {sell_time_stamp}  {trans2_time_stamp}")
                 # print(f"Time Stamp {type(sell_time_stamp)}  {type(trans2_time_stamp)}")
                 # print(sell_time_stamp == trans2_time_stamp)
-                
+
                 trans_obj = trans
-               
+
                 break
 
-        
+
     return trans_obj
 
 
@@ -1503,7 +1503,7 @@ def get_all_links_table_data(transactions, asset):
 
     # Get links
     links = set([
-            link 
+            link
             for trans in transactions if trans.symbol == asset
             for link in trans.links
             ])
@@ -1525,7 +1525,7 @@ def get_all_links_table_data(transactions, asset):
             "${:,.2f}".format(link.profit_loss)
         ])
 
-  
+
 
     return table_data
 
