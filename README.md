@@ -121,6 +121,14 @@ The audit packet includes the Excel workbook, Form 8949 detail CSVs, Form 8949 t
 - [Release readiness checklist](docs/release-readiness.md)
 - [Donation setup](docs/donations.md)
 
+## Screenshots And Wiki
+
+The GitHub wiki includes a visual walkthrough with screenshots captured from synthetic demo data:
+
+- [Gainz wiki walkthrough](https://github.com/salexandert/Gainz/wiki)
+
+These screenshots are meant to show the first-run workflow without exposing private transaction history.
+
 ## Public Site And SEO
 
 The `docs/` folder is ready to publish as a GitHub Pages site or a static site at <https://cryptogainz.store>. It includes:
