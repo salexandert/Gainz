@@ -222,6 +222,44 @@ nav a {
   background: #fff;
 }
 
+.download-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, .55fr);
+  gap: 1.25rem;
+  align-items: start;
+  margin: 1.5rem 0;
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.download-panel h2 {
+  margin-top: 0;
+}
+
+.download-meta {
+  display: grid;
+  gap: .7rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.download-meta div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: .55rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.download-meta div:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
 article {
   max-width: 820px;
 }
@@ -264,7 +302,8 @@ pre {
   }
 
   .hero,
-  .grid {
+  .grid,
+  .download-panel {
     grid-template-columns: 1fr;
   }
 

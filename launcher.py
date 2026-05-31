@@ -9,6 +9,7 @@ import webbrowser
 from tkinter import messagebox, ttk
 from urllib.request import urlopen
 
+from app_version import APP_VERSION
 
 APP_NAME = "Gainz"
 DEFAULT_HOST = "127.0.0.1"
@@ -69,7 +70,7 @@ def start_gainz_server(port, error_queue):
 class GainzLauncher(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title(APP_NAME)
+        self.title(f"{APP_NAME} {APP_VERSION}")
         self.geometry("520x320")
         self.resizable(False, False)
         self.configure(padx=24, pady=22)
@@ -94,7 +95,7 @@ class GainzLauncher(tk.Tk):
         return f"First-run credentials, when needed, are saved at:\n{credentials_path}"
 
     def build_ui(self):
-        title = ttk.Label(self, text="Gainz is starting", font=("Segoe UI", 16, "bold"))
+        title = ttk.Label(self, text=f"Gainz {APP_VERSION} is starting", font=("Segoe UI", 16, "bold"))
         title.pack(anchor="w")
 
         description = ttk.Label(
@@ -145,7 +146,7 @@ class GainzLauncher(tk.Tk):
         if wait_for_server(self.url, timeout=1):
             self.status.set("Gainz is running.")
             self.open_button.configure(state="normal")
-            self.title(f"{APP_NAME} - Running")
+            self.title(f"{APP_NAME} {APP_VERSION} - Running")
             return
 
         self.after(500, self.check_startup)

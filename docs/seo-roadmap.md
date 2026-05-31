@@ -39,7 +39,7 @@ Supporting phrases:
 2. A "What to give your CPA" checklist for crypto CSV reconciliation.
 3. A Coinbase missing cost basis troubleshooting guide.
 4. A current holdings reconciliation explainer with screenshots.
-5. A Windows install guide with release checksums.
+5. Screenshots for the Windows download page and first-run launcher.
 
 ## Product Work That Improves SEO Conversion
 
@@ -50,6 +50,7 @@ Search traffic only matters if the first-run experience proves value quickly. Th
 - Readiness blocker links that jump to the exact fix.
 - Download/Open output folder action after export.
 - Screenshots and demo packet generated entirely from synthetic data.
+- A signed Windows installer after the first unsigned zip proves useful.
 
 ## Publishing Checklist
 
@@ -58,7 +59,7 @@ Search traffic only matters if the first-run experience proves value quickly. Th
 3. Confirm `https://cryptogainz.store/sitemap.xml` loads.
 4. Add Google Search Console once the domain is live.
 5. Submit the sitemap in Search Console.
-6. Add release download links after a public Windows build is ready.
+6. Confirm release download links resolve after the first public Windows build is published.
 7. Add screenshots from the synthetic demo workflow.
 8. Keep donation language optional and separate from tax advice.
 

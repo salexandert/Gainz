@@ -68,6 +68,15 @@ $env:GAINZ_ADMIN_PASSWORD="choose-a-local-password"
 python run.py
 ```
 
+## Download Packaged Build
+
+The public Windows package is published through GitHub Releases:
+
+- Latest download: <https://github.com/salexandert/Gainz/releases/latest/download/Gainz-Windows.zip>
+- Checksum: <https://github.com/salexandert/Gainz/releases/latest/download/Gainz-Windows.zip.sha256>
+
+Unzip the package and double-click `Gainz.exe`. The launcher starts the local server, shows the web interface link, and keeps your transaction data on your machine.
+
 ## Common Workflow
 
 1. Import transaction CSVs.
@@ -148,7 +157,7 @@ pip install pyinstaller
 .\scripts\build_windows_exe.ps1
 ```
 
-The resulting `dist\Gainz.exe` starts the local server in the background, shows a window confirming that Gainz is running, and provides a button to open the web interface.
+The script creates `dist\Gainz.exe`, a versioned zip such as `dist\Gainz-Windows-v0.1.0.zip`, a stable `dist\Gainz-Windows.zip`, and SHA-256 checksum files. `Gainz.exe` starts the local server in the background, shows a window confirming that Gainz is running, and provides a button to open the web interface.
 
 ## License
 

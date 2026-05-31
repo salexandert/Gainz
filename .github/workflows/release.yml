@@ -1,0 +1,74 @@
+name: Build Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Verify tests
+        run: python -m pytest Tests
+
+      - name: Build Windows package
+        shell: pwsh
+        run: .\scripts\build_windows_exe.ps1
+
+      - name: Create release notes
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          @"
+          # Gainz $version
+
+          Gainz is a local-first crypto tax audit packet and reconciliation tool.
+
+          ## Download
+
+          Download `Gainz-Windows.zip`, unzip it, and double-click `Gainz.exe`.
+
+          Windows may show a SmartScreen warning because this early build is not code-signed yet. Only run releases downloaded from this repository or cryptogainz.store.
+
+          ## Verification
+
+          A SHA-256 checksum file is attached next to the zip.
+
+          ## Important
+
+          Gainz is documentation support. It is not tax, legal, or financial advice. Review outputs with a qualified tax professional before filing.
+          "@ | Set-Content -LiteralPath release_notes.md
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { "manual-release" }
+          $version = (Get-Content VERSION -Raw).Trim()
+          gh release create $tag `
+            dist/Gainz-Windows.zip `
+            dist/Gainz-Windows.zip.sha256 `
+            "dist/Gainz-Windows-v$version.zip" `
+            "dist/Gainz-Windows-v$version.zip.sha256" `
+            --title "Gainz $version" `
+            --notes-file release_notes.md

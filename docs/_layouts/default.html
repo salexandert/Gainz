@@ -27,6 +27,7 @@
       "description": {{ page_description | jsonify }},
       "url": {{ page.url | absolute_url | jsonify }},
       {% if page.schema_type == 'SoftwareApplication' %}
+      "softwareVersion": {{ site.version | jsonify }},
       "applicationCategory": "FinanceApplication",
       "operatingSystem": "Windows, macOS, Linux",
       "offers": {
@@ -51,6 +52,7 @@
         <span>Gainz</span>
       </a>
       <nav aria-label="Primary">
+        <a href="{{ '/download/' | relative_url }}">Download</a>
         <a href="{{ '/guides/' | relative_url }}">Guides</a>
         <a href="{{ '/guides/local-crypto-tax-software/' | relative_url }}">Why Local</a>
         <a href="{{ '/how-gainz-calculates-basis/' | relative_url }}">Basis</a>

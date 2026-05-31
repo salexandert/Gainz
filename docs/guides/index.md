@@ -20,5 +20,6 @@ Use these guides when you are trying to turn exchange CSVs into reviewable crypt
 
 ## Product Walkthrough
 
+- [Download Gainz for Windows](../download/)
 - [Using Gainz from import to audit packet](../user-walkthrough/)
 - [How Gainz calculates basis](../how-gainz-calculates-basis/)

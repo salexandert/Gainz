@@ -10,7 +10,8 @@ schema_type: SoftwareApplication
     <h1>Gainz</h1>
     <p>Turn messy crypto exports into linked basis, Form 8949-style rows, current holdings reconciliation, and an audit packet you can review with a qualified tax professional.</p>
     <div class="button-row">
-      <a class="button" href="{{ '/user-walkthrough/' | relative_url }}">Start the walkthrough</a>
+      <a class="button" href="{{ '/download/' | relative_url }}">Download Gainz for Windows</a>
+      <a class="button-secondary" href="{{ '/user-walkthrough/' | relative_url }}">Start the walkthrough</a>
       <a class="button-secondary" href="{{ '/guides/crypto-form-8949-audit-packet/' | relative_url }}">See audit packet guide</a>
     </div>
   </div>
@@ -55,6 +56,12 @@ These pages target the moments where people are stuck with exchange exports, mis
   <li><a href="{{ '/guides/crypto-form-8949-audit-packet/' | relative_url }}">How to build a crypto Form 8949 audit packet</a></li>
   <li><a href="{{ '/guides/local-crypto-tax-software/' | relative_url }}">Why local crypto tax software matters for private tax data</a></li>
 </ul>
+
+## Download
+
+The first public package is a local Windows build. It starts a desktop launcher window, runs Gainz on your own computer, and gives you a button to open the local web interface.
+
+<p><a class="button" href="{{ '/download/' | relative_url }}">Go to the Download page</a></p>
 
 ## Important Limit
 
