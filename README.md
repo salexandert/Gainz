@@ -62,13 +62,6 @@ You can also include **off-exchange events**, like converting ETH to BTC via Sha
 
 ---
 
-## 🎥 Video Walkthrough
-
-Watch the full introduction and walkthrough:
-👉 [https://youtu.be/g_02xOu1F7M](https://youtu.be/g_02xOu1F7M)
-
----
-
 ## 🛠 Download & Installation
 
 ### ✅ Compiled Versions (Windows & Mac)
@@ -119,5 +112,4 @@ Thank you for your interest and support.
 I hope Gainz is exactly what you were looking for!
 
 ---
-
 
