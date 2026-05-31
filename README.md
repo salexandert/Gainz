@@ -64,12 +64,10 @@ You can also include **off-exchange events**, like converting ETH to BTC via Sha
 
 ## 🛠 Download & Run
 
-### ✅ Compiled Versions (Windows & Mac)
+### ✅ Compiled Version (Windows)
 
 Download from Google Drive:
 [https://drive.google.com/drive/folders/1YLyRRWitJ1pHVVMHnspB783Pq52DWUnC?usp=share_link](https://drive.google.com/drive/folders/1YLyRRWitJ1pHVVMHnspB783Pq52DWUnC?usp=share_link)
-
-> *Note: Mac version may be a few versions behind.*
 
 ### 🧪 Or compile it Yourself
 
@@ -112,4 +110,3 @@ Thank you for your interest and support.
 I hope Gainz is exactly what you were looking for!
 
 ---
-
