@@ -157,7 +157,7 @@ pip install pyinstaller
 .\scripts\build_windows_exe.ps1
 ```
 
-The script creates `dist\Gainz.exe`, a versioned zip such as `dist\Gainz-Windows-v0.1.0.zip`, a stable `dist\Gainz-Windows.zip`, and SHA-256 checksum files. `Gainz.exe` starts the local server in the background, shows a window confirming that Gainz is running, and provides a button to open the web interface.
+The script creates `dist\Gainz.exe`, a versioned zip such as `dist\Gainz-Windows-v0.1.1.zip`, a stable `dist\Gainz-Windows.zip`, and SHA-256 checksum files. `Gainz.exe` starts the local server in the background, shows a window confirming that Gainz is running, and provides a button to open the web interface.
 
 ## License
 
