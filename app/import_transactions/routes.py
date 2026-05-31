@@ -16,6 +16,8 @@ from utils import *
 
 import dateutil.parser
 import os
+from collections import Counter
+from datetime import datetime
 
 from flask import Blueprint, request
 from transactions import Transactions
@@ -41,6 +43,83 @@ class CurrentHoldings(FlaskForm):
     quantity = DecimalField('Quantity', rounding=None)
 
     submit = SubmitField('Submit')
+
+
+def _format_modified_time(timestamp):
+    if not timestamp:
+        return "N/A"
+
+    return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %I:%M %p")
+
+
+def _current_save_summary(transactions):
+    saves = transactions.load_saves()
+    current_view = getattr(transactions, "view", "") or ""
+    current_save = next((save for save in saves if save["value"] == current_view), None)
+
+    if current_save is None and saves:
+        current_save = saves[-1]
+
+    revision = getattr(transactions, "revision_num", None)
+    if (revision is None or revision == 0) and current_save:
+        revision = current_save.get("revision_num") or revision
+
+    return {
+        "revision": revision or 0,
+        "save_count": len(saves),
+        "current_file": current_save["value"] if current_save else "Unsaved session",
+        "current_name": os.path.basename(current_save["value"]) if current_save else "Unsaved session",
+        "current_description": current_save["description"] if current_save else "",
+        "current_modified": _format_modified_time(current_save["modified_time"]) if current_save else "N/A",
+        "recent_saves": [
+            {
+                "file": save["value"],
+                "name": os.path.basename(save["value"]),
+                "description": save["description"] or "",
+                "revision": save.get("revision_num") or "",
+                "modified": _format_modified_time(save.get("modified_time")),
+            }
+            for save in reversed(saves[-5:])
+        ],
+    }
+
+
+def _data_source_summary(transactions):
+    source_counter = Counter()
+    type_counter = Counter()
+
+    for transaction in getattr(transactions, "transactions", []):
+        source = getattr(transaction, "source", "") or "Manual / Unknown"
+        source_counter[source] += 1
+        type_counter[getattr(transaction, "trans_type", "unknown")] += 1
+
+    sources = []
+    for source, count in source_counter.most_common():
+        exists = os.path.exists(str(source))
+        is_gainz_source = str(source).startswith("Gainz App") or "Converted in Gainz App" in str(source)
+        sources.append({
+            "source": source,
+            "name": os.path.basename(str(source)) if source != "Manual / Unknown" else source,
+            "count": count,
+            "status": "Available" if exists else "Generated in Gainz" if is_gainz_source else "Not found",
+            "is_file": exists,
+            "is_gainz_source": is_gainz_source,
+        })
+
+    return {
+        "transaction_count": len(getattr(transactions, "transactions", [])),
+        "asset_count": len(getattr(transactions, "assets", set())),
+        "link_count": len(getattr(transactions, "links", set())),
+        "source_count": len(sources),
+        "sources": sources,
+        "type_counts": {
+            "buy": type_counter.get("buy", 0),
+            "sell": type_counter.get("sell", 0),
+            "send": type_counter.get("send", 0),
+            "receive": type_counter.get("receive", 0),
+        },
+        "import_warnings": getattr(transactions, "import_warnings", []) or [],
+    }
 
 
 @blueprint.route('/', methods=['GET', 'POST'])
@@ -71,7 +150,15 @@ def import_wizard():
     stats_table_data = get_stats_table_data(transactions)
     all_trans_table_data = get_all_trans_table_data(transactions)
 
-    return render_template('import_transactions.html', manual_trans=manual_trans, current_holdings=current_holdings, transactions=all_trans_table_data, stats_table_data=stats_table_data)
+    return render_template(
+        'import_transactions.html',
+        manual_trans=manual_trans,
+        current_holdings=current_holdings,
+        transactions=all_trans_table_data,
+        stats_table_data=stats_table_data,
+        save_summary=_current_save_summary(transactions),
+        data_summary=_data_source_summary(transactions),
+    )
 
 
 @blueprint.route('/mapping_preview', methods=['POST'])

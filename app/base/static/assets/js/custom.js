@@ -1664,7 +1664,7 @@ $(document).ready(function() {
 } );
 
 
-// Import Transactions Page
+// Import & Manage Data Page
 
 $(document).ready(function() {
 

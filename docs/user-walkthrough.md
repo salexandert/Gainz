@@ -26,7 +26,7 @@ instance/first_run_credentials.txt
 
 ## 2. Import Transaction Files
 
-Open **Import Transactions**.
+Open **Import & Manage Data**.
 
 If you are learning Gainz, click **Try Demo Data**. This loads the bundled synthetic Cash App, Coinbase, and Coinbase Convert files so you can reach Stats, Auto Link, and Export quickly.
 

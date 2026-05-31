@@ -29,7 +29,7 @@ Sells need basis links before the result is tax-ready. Sends and receives are tr
 ## Recommended Workflow
 
 1. Start Gainz locally.
-2. Open **Import Transactions**.
+2. Open **Import & Manage Data**.
 3. Upload the Cash App CSV.
 4. Open **Stats & Charts** and check import warnings.
 5. Open **Auto Link**, select BTC, and run FIFO or the method you intend to review.

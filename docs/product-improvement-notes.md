@@ -55,7 +55,7 @@ First-user walkthrough notes:
 
 Recommended next first-run features:
 
-1. Load Demo Data: one button that imports the bundled synthetic CSVs into a clean session. Status: shipped on Import Transactions.
+1. Load Demo Data: one button that imports the bundled synthetic CSVs into a clean session. Status: shipped on Import & Manage Data.
 2. Link All Assets: one guided action that runs FIFO for every asset with unlinked sells and reports failures.
 3. Use Expected Holdings: when a user is using demo data or explicitly chooses to trust imported buys/sells, prefill declared holdings from expected quantity.
 4. Readiness Blocker Links: each Export readiness blocker should point to Import, Auto Link, Holdings & Accounting, or Stats with the relevant asset selected.

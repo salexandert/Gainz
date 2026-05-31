@@ -1,6 +1,6 @@
 {% extends "base_site.html" %}
 
-{% block title %} Import Transactions {% endblock title %}
+{% block title %} Import & Manage Data {% endblock title %}
 
 {% block stylesheets %}
   {{ super() }}
@@ -15,7 +15,7 @@
     <div class="card">
       <div class="card-body">
         <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
-          <h4 class="card-title">Step 1: Import CSV's from exchange</h4>
+          <h4 class="card-title">Import & Manage Data</h4>
           <div class="card card-plain">
             <div class="card-header" role="tab" id="headingOne">
               <a data-toggle="collapse" data-parent="#accordion" href="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
@@ -40,6 +40,85 @@
   </div>
 </div>
 <!-- /Page Description and Instructions -->
+
+<!-- Data Summary -->
+<div class="row">
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <p class="card-category">Current Revision</p>
+        <h4 class="card-title">{{ save_summary.revision }}</h4>
+        <p class="text-muted mb-0">{{ save_summary.save_count }} saved revision{% if save_summary.save_count != 1 %}s{% endif %}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <p class="card-category">Transactions</p>
+        <h4 class="card-title">{{ data_summary.transaction_count }}</h4>
+        <p class="text-muted mb-0">{{ data_summary.asset_count }} asset{% if data_summary.asset_count != 1 %}s{% endif %}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <p class="card-category">Data Sources</p>
+        <h4 class="card-title">{{ data_summary.source_count }}</h4>
+        <p class="text-muted mb-0">{{ data_summary.link_count }} basis link{% if data_summary.link_count != 1 %}s{% endif %}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <p class="card-category">Import Warnings</p>
+        <h4 class="card-title">{{ data_summary.import_warnings|length }}</h4>
+        <p class="text-muted mb-0">Review before audit packet</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Current Save</h5>
+        <p class="mb-1" title="{{ save_summary.current_file }}"><strong>File:</strong> {{ save_summary.current_name }}</p>
+        <p class="mb-1"><strong>Description:</strong> {{ save_summary.current_description or "No description" }}</p>
+        <p class="mb-0"><strong>Modified:</strong> {{ save_summary.current_modified }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Transaction Mix</h5>
+        <div class="row text-center">
+          <div class="col-3">
+            <p class="card-category">Buys</p>
+            <strong>{{ data_summary.type_counts.buy }}</strong>
+          </div>
+          <div class="col-3">
+            <p class="card-category">Sells</p>
+            <strong>{{ data_summary.type_counts.sell }}</strong>
+          </div>
+          <div class="col-3">
+            <p class="card-category">Sends</p>
+            <strong>{{ data_summary.type_counts.send }}</strong>
+          </div>
+          <div class="col-3">
+            <p class="card-category">Receives</p>
+            <strong>{{ data_summary.type_counts.receive }}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Data Summary -->
       
 
 <!-- Upload -->
@@ -49,7 +128,7 @@
       <div class="card-body">
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
           <div>
-            <h5 class="mb-1">Import Transactions</h5>
+            <h5 class="mb-1">Import Data</h5>
             <p class="text-muted mb-0">Use demo data first, or upload your own CSV.</p>
           </div>
           <button type="button" id="import_demo_data_button" class="btn btn-outline-primary btn-sm" data-demo-url="{{ url_for('import_transactions_blueprint.import_demo_data') }}">Try Demo Data</button>
@@ -84,6 +163,103 @@
   </div>
 </div>
 <!-- /Upload  -->
+
+<!-- Data Sources -->
+<div class="row">
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Current Data Sources</h5>
+        <div class="table-responsive">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Rows</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for source in data_summary.sources %}
+              <tr>
+                <td title="{{ source.source }}">{{ source.name }}</td>
+                <td>{{ source.count }}</td>
+                <td>
+                  {% if source.is_file %}
+                    <span class="badge badge-success">{{ source.status }}</span>
+                  {% elif source.is_gainz_source %}
+                    <span class="badge badge-info">{{ source.status }}</span>
+                  {% else %}
+                    <span class="badge badge-warning">{{ source.status }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="3" class="text-muted">No imported data yet.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="text-muted mb-0">Source files are copied into audit packets when they still exist on disk. Refresh this page after imports to update the summary.</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Recent Revisions</h5>
+        <div class="table-responsive">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th>Revision</th>
+                <th>Description</th>
+                <th>Modified</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for save in save_summary.recent_saves %}
+              <tr>
+                <td>{{ save.revision or "N/A" }}</td>
+                <td title="{{ save.file }}">{{ save.description or save.name }}</td>
+                <td>{{ save.modified }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="3" class="text-muted">No saved revisions yet.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <a class="btn btn-sm btn-outline-primary" href="/history">Open History</a>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Data Sources -->
+
+{% if data_summary.import_warnings %}
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Import Warnings</h5>
+        <ul class="mb-0">
+          {% for warning in data_summary.import_warnings[:8] %}
+          <li>{{ warning }}</li>
+          {% endfor %}
+        </ul>
+        {% if data_summary.import_warnings|length > 8 %}
+        <p class="text-muted mb-0 mt-2">Showing 8 of {{ data_summary.import_warnings|length }} warnings. Full warnings are included on Stats & Charts and in audit packets.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 
 
