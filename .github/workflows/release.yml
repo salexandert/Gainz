@@ -15,11 +15,42 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Validate version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') {
+            throw "VERSION must be semantic version format, got '$version'."
+          }
+
+          $appVersion = (Select-String -Path app_version.py -Pattern 'APP_VERSION\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          if ($appVersion -ne $version) {
+            throw "app_version.py ($appVersion) does not match VERSION ($version)."
+          }
+
+          $docsVersion = (Select-String -Path docs/_config.yml -Pattern '^version:\s*(.+)$').Matches[0].Groups[1].Value.Trim().Trim('"').Trim("'")
+          if ($docsVersion -ne $version) {
+            throw "docs/_config.yml ($docsVersion) does not match VERSION ($version)."
+          }
+
+          $tag = "v$version"
+          if ($env:GITHUB_REF -like "refs/tags/*" -and $env:GITHUB_REF_NAME -ne $tag) {
+            throw "Tag $env:GITHUB_REF_NAME does not match VERSION $version. Expected $tag."
+          }
+
+          "GAINZ_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "GAINZ_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Install dependencies
         run: |
@@ -37,9 +68,8 @@ jobs:
       - name: Create release notes
         shell: pwsh
         run: |
-          $version = (Get-Content VERSION -Raw).Trim()
           @"
-          # Gainz $version
+          # Gainz $env:GAINZ_VERSION
 
           Gainz is a local-first crypto tax audit packet and reconciliation tool.
 
@@ -58,17 +88,26 @@ jobs:
           Gainz is documentation support. It is not tax, legal, or financial advice. Review outputs with a qualified tax professional before filing.
           "@ | Set-Content -LiteralPath release_notes.md
 
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gainz-Windows-v${{ steps.version.outputs.version }}
+          path: |
+            dist/Gainz-Windows.zip
+            dist/Gainz-Windows.zip.sha256
+            dist/Gainz-Windows-v${{ steps.version.outputs.version }}.zip
+            dist/Gainz-Windows-v${{ steps.version.outputs.version }}.zip.sha256
+
       - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { "manual-release" }
-          $version = (Get-Content VERSION -Raw).Trim()
-          gh release create $tag `
+          gh release create $env:GAINZ_TAG `
             dist/Gainz-Windows.zip `
             dist/Gainz-Windows.zip.sha256 `
-            "dist/Gainz-Windows-v$version.zip" `
-            "dist/Gainz-Windows-v$version.zip.sha256" `
-            --title "Gainz $version" `
+            "dist/Gainz-Windows-v$env:GAINZ_VERSION.zip" `
+            "dist/Gainz-Windows-v$env:GAINZ_VERSION.zip.sha256" `
+            --title "Gainz $env:GAINZ_VERSION" `
             --notes-file release_notes.md

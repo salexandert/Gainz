@@ -150,6 +150,16 @@ python launcher.py
 
 The first supported distribution target should be a local desktop-style build, not a hosted SaaS product. A hosted version would require a much stronger security and compliance model because it would handle sensitive tax data.
 
+## Versioning
+
+`VERSION` is the source of truth for releases. Keep `VERSION`, `app_version.py`, and `docs/_config.yml` in sync by running:
+
+```powershell
+.\scripts\set_version.ps1 0.2.0
+```
+
+Public releases are created from Git tags. After merging a version bump, push a matching tag such as `v0.2.0`. The release workflow validates that the tag and version files match before publishing.
+
 For a clickable Windows build, install PyInstaller in the build environment and run:
 
 ```powershell
@@ -157,7 +167,7 @@ pip install pyinstaller
 .\scripts\build_windows_exe.ps1
 ```
 
-The script creates `dist\Gainz.exe`, a versioned zip such as `dist\Gainz-Windows-v0.1.1.zip`, a stable `dist\Gainz-Windows.zip`, and SHA-256 checksum files. `Gainz.exe` starts the local server in the background, shows a window confirming that Gainz is running, and provides a button to open the web interface.
+The script creates `dist\Gainz.exe`, a versioned zip such as `dist\Gainz-Windows-v0.2.0.zip`, a stable `dist\Gainz-Windows.zip`, and SHA-256 checksum files. `Gainz.exe` starts the local server in the background, shows a window confirming that Gainz is running, and provides a button to open the web interface.
 
 ## License
 
