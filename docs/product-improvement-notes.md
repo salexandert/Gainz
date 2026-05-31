@@ -87,7 +87,7 @@ Discovery should target concrete, anxious searches rather than broad crypto-tax 
 Recommended public launch assets:
 
 - GitHub Releases with a Windows build and checksums.
-- A short demo video using `demo_data/`.
+- A screenshot-driven demo using `demo_data/`.
 - A sample audit packet generated only from synthetic data.
 - A landing page focused on local-first privacy and CPA review packets.
 - Import-specific guides for Cash App, Coinbase, Coinbase Convert, and Kraken/template workflows.
