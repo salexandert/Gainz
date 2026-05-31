@@ -15,6 +15,7 @@ from wtforms.fields import DateTimeLocalField
 from utils import *
 
 import dateutil.parser
+import os
 
 from flask import Blueprint, request
 from transactions import Transactions
@@ -59,6 +60,8 @@ def import_wizard():
             file = request.files['file']
             if file and file.filename:
                 result = ImportService(current_app.config['UPLOAD_FOLDER']).import_upload(file, transactions)
+                if result.get("mapping_required"):
+                    session["pending_import_file_path"] = result["file_path"]
                 return jsonify(result)
 
         # Current holdings
@@ -69,5 +72,57 @@ def import_wizard():
     all_trans_table_data = get_all_trans_table_data(transactions)
 
     return render_template('import_transactions.html', manual_trans=manual_trans, current_holdings=current_holdings, transactions=all_trans_table_data, stats_table_data=stats_table_data)
+
+
+@blueprint.route('/mapping_preview', methods=['POST'])
+@login_required
+def mapping_preview():
+    file_path = session.get("pending_import_file_path")
+    if not file_path or not os.path.exists(file_path):
+        return jsonify({"error": "Upload a CSV before mapping columns."}), 400
+
+    data = request.get_json(silent=True) or {}
+    header_row = data.get("header_row") or 1
+    analysis = ImportService(current_app.config['UPLOAD_FOLDER']).analyze_import_file(
+        file_path,
+        header_row=header_row,
+    )
+    return jsonify({"mapping": analysis})
+
+
+@blueprint.route('/mapped_import', methods=['POST'])
+@login_required
+def mapped_import():
+    file_path = session.get("pending_import_file_path")
+    if not file_path or not os.path.exists(file_path):
+        return jsonify({"error": "Upload a CSV before mapping columns."}), 400
+
+    data = request.get_json(silent=True) or {}
+    header_row = data.get("header_row") or 1
+    column_mapping = data.get("column_mapping") or {}
+
+    transactions = current_app.config['transactions']
+    result = ImportService(current_app.config['UPLOAD_FOLDER']).import_mapped_file(
+        file_path,
+        transactions,
+        header_row=header_row,
+        column_mapping=column_mapping,
+    )
+
+    if not result.get("mapping_required"):
+        session.pop("pending_import_file_path", None)
+
+    return jsonify(result)
+
+
+@blueprint.route('/demo', methods=['POST'])
+@login_required
+def import_demo_data():
+    transactions = current_app.config['transactions']
+    result = ImportService(current_app.config['UPLOAD_FOLDER']).import_demo_data(
+        transactions,
+        repo_root=current_app.root_path + "/..",
+    )
+    return jsonify(result)
 
 

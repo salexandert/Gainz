@@ -1,5 +1,6 @@
 # This module will handle parsing-related functions.
 
+import csv
 import pandas as pd
 import dateutil
 import os
@@ -160,7 +161,7 @@ COLUMN_ALIASES = {
 }
 
 TRANSACTION_TYPE_KEYWORDS = {
-    'Buy': ['buy', 'bought', 'purchase', 'purchased', 'acquisition'],
+    'Buy': ['buy', 'bought', 'purchase', 'purchased', 'acquire', 'acquired', 'acquisition'],
     'Sell': ['sell', 'sold', 'sale', 'cash out'],
     'Send': ['send', 'sent', 'withdrawal', 'withdraw', 'transfer out', 'outgoing'],
     'Receive': ['receive', 'received', 'deposit', 'incoming', 'reward', 'staking', 'interest', 'airdrop'],
@@ -195,6 +196,18 @@ ASSET_NAME_ALIASES = {
 }
 
 FIAT_ASSET_SYMBOLS = {'USD', 'US DOLLAR', 'US DOLLARS', 'DOLLAR', 'DOLLARS', '$'}
+STANDARD_IMPORT_COLUMNS = {'Asset Type', 'Asset Amount', 'Date', 'Asset Price', 'Transaction Type'}
+REQUIRED_IMPORT_FIELDS = ['date', 'transaction_type', 'asset_type', 'asset_amount']
+PRICING_IMPORT_FIELDS = ['asset_price', 'subtotal', 'total', 'net_amount', 'fiat_amount']
+IMPORT_MAPPING_FIELDS = [
+    {'field': 'date', 'label': 'Date/time', 'required': True},
+    {'field': 'transaction_type', 'label': 'Transaction type', 'required': True},
+    {'field': 'asset_type', 'label': 'Asset symbol', 'required': True},
+    {'field': 'asset_amount', 'label': 'Asset quantity', 'required': True},
+    {'field': 'asset_price', 'label': 'USD spot price per unit', 'required': False},
+    {'field': 'fiat_amount', 'label': 'Total USD value', 'required': False},
+    {'field': 'notes', 'label': 'Notes/details', 'required': False},
+]
 
 
 def parse_quantity_value(value):
@@ -265,12 +278,35 @@ def _matches_header_heuristic(field, normalized_header):
     return False
 
 
-def build_column_lookup(columns):
+def _actual_column_name(columns, selected_column):
+    selected_normalized = normalize_column_name(selected_column)
+
+    for column in columns:
+        if column == selected_column or normalize_column_name(column) == selected_normalized:
+            return column
+
+    return None
+
+
+def build_column_lookup(columns, column_mapping=None):
     normalized_columns = [(column, normalize_column_name(column)) for column in columns]
     lookup = {}
     used_columns = set()
 
+    if column_mapping:
+        for field, selected_column in column_mapping.items():
+            if field not in COLUMN_ALIASES or not selected_column:
+                continue
+
+            actual_column = _actual_column_name(columns, selected_column)
+            if actual_column is not None:
+                lookup[field] = actual_column
+                used_columns.add(actual_column)
+
     for field, aliases in COLUMN_ALIASES.items():
+        if field in lookup:
+            continue
+
         normalized_aliases = [normalize_column_name(alias) for alias in aliases]
         for alias in normalized_aliases:
             match = next(
@@ -303,6 +339,109 @@ def build_column_lookup(columns):
             used_columns.add(match)
 
     return lookup
+
+
+def get_import_column_status(columns, column_mapping=None):
+    column_lookup = build_column_lookup(columns, column_mapping=column_mapping)
+    missing_required = [
+        field
+        for field in REQUIRED_IMPORT_FIELDS
+        if field not in column_lookup
+    ]
+    has_pricing = any(field in column_lookup for field in PRICING_IMPORT_FIELDS)
+
+    return {
+        'can_import': len(missing_required) == 0,
+        'missing_required': missing_required,
+        'has_pricing': has_pricing,
+        'column_lookup': column_lookup,
+        'score': len(REQUIRED_IMPORT_FIELDS) - len(missing_required) + (1 if has_pricing else 0),
+    }
+
+
+def build_column_mapping_suggestions(columns):
+    column_lookup = build_column_lookup(columns)
+    suggestions = {}
+
+    for field_config in IMPORT_MAPPING_FIELDS:
+        field = field_config['field']
+        suggestions[field] = column_lookup.get(field, '')
+
+    if not suggestions.get('fiat_amount'):
+        for pricing_field in ('total', 'subtotal', 'net_amount', 'fiat_amount'):
+            if pricing_field in column_lookup:
+                suggestions['fiat_amount'] = column_lookup[pricing_field]
+                break
+
+    return suggestions
+
+
+def get_import_mapping_fields():
+    return [field.copy() for field in IMPORT_MAPPING_FIELDS]
+
+
+def read_csv_columns(file_path, header_row=1):
+    skiprows = max(int(header_row or 1) - 1, 0)
+    return pd.read_csv(file_path, skiprows=skiprows, nrows=0).columns.tolist()
+
+
+def _scan_csv_header_rows(file_path, max_rows=12):
+    candidates = []
+
+    with open(file_path, newline='', encoding='utf-8-sig', errors='replace') as file:
+        reader = csv.reader(file)
+
+        for row_number, row in enumerate(reader, start=1):
+            if row_number > max_rows:
+                break
+
+            cleaned_row = [cell.strip() for cell in row]
+            if not any(cleaned_row):
+                continue
+
+            status = get_import_column_status(cleaned_row)
+            candidates.append({
+                'row_number': row_number,
+                'score': status['score'],
+                'can_import': status['can_import'],
+                'has_pricing': status['has_pricing'],
+                'missing_required': status['missing_required'],
+                'columns': cleaned_row,
+            })
+
+    candidates.sort(
+        key=lambda candidate: (
+            candidate['can_import'],
+            candidate['has_pricing'],
+            candidate['score'],
+            -candidate['row_number'],
+        ),
+        reverse=True,
+    )
+    return candidates
+
+
+def analyze_csv_import(file_path, header_row=None, column_mapping=None):
+    if header_row is None:
+        candidates = _scan_csv_header_rows(file_path)
+        best_candidate = candidates[0] if candidates else {'row_number': 1}
+        header_row = best_candidate.get('row_number', 1)
+    else:
+        candidates = _scan_csv_header_rows(file_path)
+
+    columns = read_csv_columns(file_path, header_row=header_row)
+    status = get_import_column_status(columns, column_mapping=column_mapping)
+
+    return {
+        'can_import': status['can_import'],
+        'has_pricing': status['has_pricing'],
+        'header_row': int(header_row or 1),
+        'columns': columns,
+        'suggested_mapping': build_column_mapping_suggestions(columns),
+        'mapping_fields': get_import_mapping_fields(),
+        'missing_required': status['missing_required'],
+        'header_candidates': candidates[:5],
+    }
 
 
 def get_row_value(row, column_lookup, field, default=None):
@@ -376,8 +515,8 @@ def _standard_row_from_lookup(row, column_lookup):
     }
 
 
-def transform_generic_to_standard(df):
-    column_lookup = build_column_lookup(df.columns)
+def transform_generic_to_standard(df, column_mapping=None):
+    column_lookup = build_column_lookup(df.columns, column_mapping=column_mapping)
     required_fields = {'date', 'transaction_type', 'asset_type', 'asset_amount'}
 
     if not required_fields.issubset(column_lookup):
@@ -410,7 +549,7 @@ def parse_coinbase_convert_note(note):
     }
 
 
-def detect_csv_format(file_path):
+def detect_csv_format(file_path, header_row=1):
     """
     Detects the CSV format by examining the header row.
     
@@ -421,7 +560,7 @@ def detect_csv_format(file_path):
         str: 'cashapp', 'coinbase', or 'unknown'
     """
     try:
-        header = pd.read_csv(file_path, nrows=0).columns.tolist()
+        header = read_csv_columns(file_path, header_row=header_row)
         column_lookup = build_column_lookup(header)
         normalized_headers = {normalize_column_name(header_name) for header_name in header}
         filename_hint = normalize_column_name(os.path.basename(file_path))
@@ -547,7 +686,7 @@ def transform_coinbase_to_standard(df):
 
     return pd.DataFrame(rows)
 
-def import_transactions(file_path, transactions):
+def import_transactions(file_path, transactions, header_row=1, column_mapping=None):
     """
     Imports transactions from a given file path and adds them to the Transactions object.
     Prevents duplicate imports by checking for existing transactions with the same attributes.
@@ -556,6 +695,8 @@ def import_transactions(file_path, transactions):
     Args:
         file_path (str): The path to the file containing transaction data.
         transactions (Transactions): The Transactions object to update.
+        header_row (int): 1-based row number containing CSV headers.
+        column_mapping (dict): Optional canonical field to CSV column mapping.
 
     Returns:
         tuple: (imported_count, skipped_count) Count of transactions imported and skipped due to duplicates.
@@ -609,15 +750,19 @@ def import_transactions(file_path, transactions):
         return False
 
     try:
+        import_warnings = []
+
         # Detect the CSV format
-        csv_format = detect_csv_format(file_path)
+        csv_format = detect_csv_format(file_path, header_row=header_row)
         print(f"Detected CSV format: {csv_format}")
-        
+
         # Read the CSV file
-        raw_df = pd.read_csv(file_path)
-        
+        raw_df = pd.read_csv(file_path, skiprows=max(int(header_row or 1) - 1, 0))
+
         # Transform to standard format based on detected format
-        if csv_format == 'cashapp':
+        if column_mapping:
+            trans_df = transform_generic_to_standard(raw_df, column_mapping=column_mapping)
+        elif csv_format == 'cashapp':
             trans_df = transform_cashapp_to_standard(raw_df)
         elif csv_format == 'coinbase':
             trans_df = transform_coinbase_to_standard(raw_df)
@@ -625,13 +770,31 @@ def import_transactions(file_path, transactions):
             trans_df = transform_generic_to_standard(raw_df)
             if trans_df is raw_df:
                 print("Warning: Unknown CSV format. Attempting to process as-is.")
-        
+
+        missing_standard_columns = STANDARD_IMPORT_COLUMNS - set(trans_df.columns)
+        if missing_standard_columns:
+            warning = (
+                f"Could not identify required columns in {os.path.basename(file_path)}. "
+                "Use the import column mapper to choose Date/time, Transaction type, "
+                "Asset symbol, Asset quantity, and a USD spot price or total USD value."
+            )
+            print(f"Warning: {warning}")
+            import_warnings.append(warning)
+            existing_warnings = getattr(transactions, 'import_warnings', [])
+            transactions.import_warnings = existing_warnings + import_warnings
+            transactions.last_import_result = {
+                "file_path": file_path,
+                "imported_count": 0,
+                "skipped_count": 0,
+                "warnings": import_warnings,
+            }
+            return (0, 0)
+
         transactions_added = False
         imported_count = 0
         skipped_count = 0
-        import_warnings = []
-        
-        for row_number, (_, row) in enumerate(trans_df.iterrows(), start=2):
+
+        for row_number, (_, row) in enumerate(trans_df.iterrows(), start=int(header_row or 1) + 1):
             try:
                 symbol = normalize_asset_symbol(row['Asset Type'])
                 if not symbol or symbol in FIAT_ASSET_SYMBOLS:
@@ -646,7 +809,7 @@ def import_transactions(file_path, transactions):
                 quantity = parse_quantity_value(row['Asset Amount'])
                 time_stamp = parser.parse(row['Date'], tzinfos=tzinfos)
                 usd_spot = parse_money_value(row['Asset Price'])
-                
+
                 # Ensure trans_type is a string before calling lower()
                 trans_type = row['Transaction Type']
                 if not isinstance(trans_type, str):
@@ -673,7 +836,13 @@ def import_transactions(file_path, transactions):
                     print(f"Warning: {warning}")
                     import_warnings.append(warning)
                     continue
-                
+
+                if usd_spot == 0:
+                    import_warnings.append(
+                        f"Imported row {row_number} from {os.path.basename(file_path)} with $0 USD spot price. "
+                        "Map a USD spot price or total USD value column if this is not intentional."
+                    )
+
                 # Check for duplicates before adding
                 if is_duplicate(temp_trans, transactions.transactions):
                     # Use logger instead of print
@@ -725,4 +894,13 @@ def import_transactions(file_path, transactions):
             
     except Exception as e:
         print(f"Error importing transactions: {e}")
+        warning = f"Could not import {os.path.basename(file_path)}: {e}"
+        existing_warnings = getattr(transactions, 'import_warnings', [])
+        transactions.import_warnings = existing_warnings + [warning]
+        transactions.last_import_result = {
+            "file_path": file_path,
+            "imported_count": 0,
+            "skipped_count": 0,
+            "warnings": [warning],
+        }
         return (0, 0)

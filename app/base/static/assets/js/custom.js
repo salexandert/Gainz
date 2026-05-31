@@ -1,7 +1,112 @@
+function gainzFormatImportResult(result, fileName) {
+    var warnings = result.warnings || [];
+    var sourceName = fileName || result.filename || "uploaded file";
+    var message = "Imported " + (result.imported_count || 0) + " row(s)";
+
+    if (result.files && result.files.length) {
+        sourceName = result.files.length + " demo file(s)";
+    }
+
+    message += " from " + sourceName + ".";
+    message += " Skipped " + (result.skipped_count || 0) + " row(s).";
+
+    if (result.header_row_used && result.header_row_used > 1) {
+        message += " Used header row " + result.header_row_used + ".";
+    }
+
+    if (warnings.length > 0) {
+        message += " Review " + warnings.length + " warning(s) on Stats & Charts.";
+    } else {
+        message += " Next: import more files, then run Auto Link or open Holdings & Accounting.";
+    }
+
+    return message;
+}
+
+function gainzShowImportResult(result, fileName, alertClass) {
+    $("#import_upload_result")
+        .removeClass("alert-danger alert-info alert-warning")
+        .addClass(alertClass || "alert-info")
+        .text(gainzFormatImportResult(result, fileName))
+        .show();
+}
+
+function gainzBuildColumnSelect(field, columns, selectedColumn) {
+    var fieldName = field.field;
+    var select = $('<select class="form-control import-mapping-select"></select>');
+
+    select.attr("data-field", fieldName);
+    select.append($('<option value="">Do not use</option>'));
+
+    (columns || []).forEach(function (column) {
+        var option = $("<option></option>").attr("value", column).text(column);
+        if (column === selectedColumn) {
+            option.attr("selected", "selected");
+        }
+        select.append(option);
+    });
+
+    return select;
+}
+
+function gainzRenderColumnMapper(mapping) {
+    if (!mapping) {
+        return;
+    }
+
+    var mapper = $("#import_column_mapper");
+    var fieldsContainer = $("#import_mapping_fields");
+    var warningBox = $("#import_mapping_warning");
+    var columns = mapping.columns || [];
+    var suggestions = mapping.suggested_mapping || {};
+    var missing = mapping.missing_required || [];
+
+    $("#import_header_row").val(mapping.header_row || 1);
+    fieldsContainer.empty();
+
+    (mapping.mapping_fields || []).forEach(function (field) {
+        var selectedColumn = suggestions[field.field] || "";
+        var wrapper = $('<div class="col-md-4 mb-3"></div>');
+        var label = $("<label></label>").text(field.label + (field.required ? " *" : ""));
+        wrapper.append(label);
+        wrapper.append(gainzBuildColumnSelect(field, columns, selectedColumn));
+        fieldsContainer.append(wrapper);
+    });
+
+    if (missing.length > 0) {
+        warningBox
+            .text("Missing required fields: " + missing.join(", ") + ".")
+            .show();
+    } else if (!mapping.has_pricing) {
+        warningBox
+            .text("No USD price or total value column was detected. Gainz can import, but tax totals will need review.")
+            .show();
+    } else {
+        warningBox.hide();
+    }
+
+    mapper.show();
+}
+
+function gainzCollectColumnMapping() {
+    var mapping = {};
+
+    $(".import-mapping-select").each(function () {
+        var field = $(this).data("field");
+        var value = $(this).val();
+
+        if (value) {
+            mapping[field] = value;
+        }
+    });
+
+    return mapping;
+}
+
 if (window.Dropzone) {
     Dropzone.options.uploadCsvForm = {
         maxFilesize: 20,
-        acceptedFiles: ".csv,.xlsx",
+        acceptedFiles: ".csv",
         init: function () {
             this.on("success", function (file, response) {
                 var result = response || {};
@@ -13,22 +118,18 @@ if (window.Dropzone) {
                     }
                 }
 
-                var warnings = result.warnings || [];
-                var message = "Imported " + (result.imported_count || 0) + " row(s)";
-                message += " from " + (file.name || "uploaded file") + ".";
-                message += " Skipped " + (result.skipped_count || 0) + " row(s).";
-
-                if (warnings.length > 0) {
-                    message += " Review " + warnings.length + " warning(s) on Stats & Charts.";
-                } else {
-                    message += " Next: import more files, then run Auto Link or open Holdings & Accounting.";
+                if (result.mapping_required) {
+                    $("#import_upload_result")
+                        .removeClass("alert-danger alert-info")
+                        .addClass("alert-warning")
+                        .text((result.warnings || []).join(" "))
+                        .show();
+                    gainzRenderColumnMapper(result.mapping);
+                    return;
                 }
 
-                $("#import_upload_result")
-                    .removeClass("alert-danger")
-                    .addClass("alert-info")
-                    .text(message)
-                    .show();
+                $("#import_column_mapper").hide();
+                gainzShowImportResult(result, file.name || "uploaded file", "alert-info");
             });
 
             this.on("error", function (file, response) {
@@ -46,6 +147,93 @@ if (window.Dropzone) {
         }
     };
 }
+
+$(document).ready(function () {
+    $("#import_demo_data_button").on("click", function () {
+        var button = $(this);
+        var demoUrl = button.data("demo-url");
+
+        button.prop("disabled", true).text("Loading Demo Data...");
+
+        $.post(demoUrl)
+            .done(function (result) {
+                $("#import_column_mapper").hide();
+                gainzShowImportResult(result, "demo data", "alert-info");
+            })
+            .fail(function (xhr) {
+                var message = "Demo import failed.";
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    message += " " + xhr.responseJSON.error;
+                }
+                $("#import_upload_result")
+                    .removeClass("alert-info alert-warning")
+                    .addClass("alert-danger")
+                    .text(message)
+                    .show();
+            })
+            .always(function () {
+                button.prop("disabled", false).text("Try Demo Data");
+            });
+    });
+
+    $("#import_preview_mapping_button").on("click", function () {
+        var mapper = $("#import_column_mapper");
+        var previewUrl = mapper.data("preview-url");
+
+        $.ajax({
+            url: previewUrl,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ header_row: $("#import_header_row").val() })
+        }).done(function (result) {
+            gainzRenderColumnMapper(result.mapping);
+        }).fail(function (xhr) {
+            var message = "Could not preview that header row.";
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                message += " " + xhr.responseJSON.error;
+            }
+            $("#import_mapping_warning").text(message).show();
+        });
+    });
+
+    $("#import_submit_mapping_button").on("click", function () {
+        var mapper = $("#import_column_mapper");
+        var importUrl = mapper.data("import-url");
+
+        $.ajax({
+            url: importUrl,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({
+                header_row: $("#import_header_row").val(),
+                column_mapping: gainzCollectColumnMapping()
+            })
+        }).done(function (result) {
+            if (result.mapping_required) {
+                $("#import_upload_result")
+                    .removeClass("alert-danger alert-info")
+                    .addClass("alert-warning")
+                    .text((result.warnings || []).join(" "))
+                    .show();
+                gainzRenderColumnMapper(result.mapping);
+                return;
+            }
+
+            mapper.hide();
+            gainzShowImportResult(result, "mapped CSV", "alert-info");
+        }).fail(function (xhr) {
+            var message = "Mapped import failed.";
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                message += " " + xhr.responseJSON.error;
+            }
+            $("#import_upload_result")
+                .removeClass("alert-info alert-warning")
+                .addClass("alert-danger")
+                .text(message)
+                .show();
+        });
+    });
+});
 
 // Holdings & Accounting
 $(document).ready(function() {

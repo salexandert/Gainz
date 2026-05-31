@@ -37,7 +37,7 @@ Open correctness work:
 - CSV imports should tolerate common exchange header changes through a maintained alias dictionary.
 - Demo CSVs should include edge cases: buys, sells, sends, receives, converts, fees, and fiat rows.
 
-Status: in progress. The parser now uses a shared column-alias dictionary for Cash App, Coinbase, and generic CSV imports, with regression tests for renamed headers.
+Status: in progress. The parser now uses a shared column-alias dictionary for Cash App, Coinbase, and generic CSV imports, detects header rows after short preambles, prompts for manual column mapping when required fields are unclear, and has regression tests for renamed headers plus golden demo Form 8949 totals.
 
 ## Priority 4: Reduce UI Ambiguity
 
@@ -55,7 +55,7 @@ First-user walkthrough notes:
 
 Recommended next first-run features:
 
-1. Load Demo Data: one button that imports the bundled synthetic CSVs into a clean session.
+1. Load Demo Data: one button that imports the bundled synthetic CSVs into a clean session. Status: shipped on Import Transactions.
 2. Link All Assets: one guided action that runs FIFO for every asset with unlinked sells and reports failures.
 3. Use Expected Holdings: when a user is using demo data or explicitly chooses to trust imported buys/sells, prefill declared holdings from expected quantity.
 4. Readiness Blocker Links: each Export readiness blocker should point to Import, Auto Link, Holdings & Accounting, or Stats with the relevant asset selected.

@@ -28,6 +28,8 @@ instance/first_run_credentials.txt
 
 Open **Import Transactions**.
 
+If you are learning Gainz, click **Try Demo Data**. This loads the bundled synthetic Cash App, Coinbase, and Coinbase Convert files so you can reach Stats, Auto Link, and Export quickly.
+
 Upload one file at a time. Gainz shows how many rows were imported, skipped, or warned after each upload.
 
 Supported workflows currently include:
@@ -41,7 +43,7 @@ Supported workflows currently include:
 
 File names help Gainz detect the parser. Use names that include terms such as `cash_app`, `coinbase`, `coinbase_pro`, `gdax`, or `kraken`.
 
-Gainz also recognizes common column-name variations. For example, headers like `Transaction Date`, `Activity Type`, `Crypto Quantity`, `Token Symbol`, `Spot Price USD`, and `Transaction Value` can be mapped into the import fields even when an exchange changes its export wording.
+Gainz also recognizes common column-name variations. For example, headers like `Transaction Date`, `Activity Type`, `Crypto Quantity`, `Token Symbol`, `Spot Price USD`, and `Transaction Value` can be mapped into the import fields even when an exchange changes its export wording. If the columns are too unusual, Gainz will ask for the header row and let you choose the Date/time, Transaction type, Asset symbol, Asset quantity, and USD price/value columns.
 
 For a safe test run, upload:
 

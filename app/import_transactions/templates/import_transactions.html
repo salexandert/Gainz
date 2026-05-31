@@ -28,7 +28,7 @@
                 Drag and drop or click the upload area below to import an exchange CSV.
                 <br> Supported sample workflows include Cash App, Coinbase, Coinbase Convert rows, Coinbase Pro/GDAX fills, Kraken, and the template import.
                 <br> Coinbase Convert rows import as a source-asset sell and destination-asset buy using the Coinbase conversion total.
-                <br> File names help Gainz detect the format. Use names that include cash_app, coinbase, coinbase_pro, gdax, or kraken.
+                <br> Gainz recognizes common column-name changes. If the columns are unclear, it will ask you to choose the header row and map the required fields.
                 <br><br>
                 Upload one file at a time. After each upload, Gainz shows imported, skipped, and warning counts.
               </div>
@@ -47,8 +47,38 @@
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
+        <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+          <div>
+            <h5 class="mb-1">Import Transactions</h5>
+            <p class="text-muted mb-0">Use demo data first, or upload your own CSV.</p>
+          </div>
+          <button type="button" id="import_demo_data_button" class="btn btn-outline-primary btn-sm" data-demo-url="{{ url_for('import_transactions_blueprint.import_demo_data') }}">Try Demo Data</button>
+        </div>
         <div id="import_upload_result" class="alert alert-info" role="alert" style="display: none;"></div>
         <form id="upload_csv_form" action="{{ url_for('import_transactions_blueprint.import_wizard')}}" class="dropzone"></form>
+        <div
+          id="import_column_mapper"
+          class="mt-4"
+          data-preview-url="{{ url_for('import_transactions_blueprint.mapping_preview') }}"
+          data-import-url="{{ url_for('import_transactions_blueprint.mapped_import') }}"
+          style="display: none;"
+        >
+          <hr>
+          <h5>Map CSV Columns</h5>
+          <p class="text-muted">Choose the row that contains headers, then match your CSV columns to the fields Gainz needs.</p>
+          <div class="row align-items-end">
+            <div class="col-md-3">
+              <label for="import_header_row">Header row</label>
+              <input type="number" min="1" step="1" id="import_header_row" class="form-control" value="1">
+            </div>
+            <div class="col-md-3">
+              <button type="button" id="import_preview_mapping_button" class="btn btn-outline-secondary btn-sm mt-3">Preview Columns</button>
+            </div>
+          </div>
+          <div id="import_mapping_warning" class="alert alert-warning mt-3" style="display: none;"></div>
+          <div id="import_mapping_fields" class="row mt-3"></div>
+          <button type="button" id="import_submit_mapping_button" class="btn btn-primary btn-sm mt-3">Import With These Columns</button>
+        </div>
       </div>
     </div>
   </div>

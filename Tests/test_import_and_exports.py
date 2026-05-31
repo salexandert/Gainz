@@ -140,6 +140,82 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual(["receive", "send"], [t.trans_type for t in transactions.transactions])
         self.assertEqual([100.0, 125.0], [t.usd_spot for t in transactions.transactions])
 
+    def test_import_service_finds_header_row_after_preamble(self):
+        transactions = empty_transactions()
+        csv_text = "\n".join([
+            "Wallet Export",
+            "Generated for demo testing",
+            "Created At,Operation,Token Symbol,Token Quantity,Transaction Value",
+            "2024-02-01 09:00:00 UTC,Receive,SOL,3.5,$350.00",
+        ])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "wallet_export_with_preamble.csv"
+            upload_dir = Path(temp_dir) / "uploads"
+            source.write_text(csv_text, encoding="utf-8")
+            result = ImportService(upload_dir).import_upload(FileUpload(source), transactions)
+
+        self.assertEqual(1, result["imported_count"])
+        self.assertEqual(3, result["header_row_used"])
+        self.assertEqual("SOL", transactions.transactions[0].symbol)
+
+    def test_import_service_returns_mapping_prompt_for_unknown_columns(self):
+        transactions = empty_transactions()
+        csv_text = "\n".join([
+            "When,Kind,Thing,Units,Value",
+            "2024-02-01 09:00:00 UTC,Acquire,SOL,3.5,$350.00",
+        ])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "unknown_columns.csv"
+            upload_dir = Path(temp_dir) / "uploads"
+            source.write_text(csv_text, encoding="utf-8")
+            service = ImportService(upload_dir)
+            result = service.import_upload(FileUpload(source), transactions)
+
+            self.assertTrue(result["mapping_required"])
+            mapped_result = service.import_mapped_file(
+                result["file_path"],
+                transactions,
+                header_row=1,
+                column_mapping={
+                    "date": "When",
+                    "transaction_type": "Kind",
+                    "asset_type": "Thing",
+                    "asset_amount": "Units",
+                    "fiat_amount": "Value",
+                },
+            )
+
+        self.assertEqual(1, mapped_result["imported_count"])
+        self.assertEqual([], mapped_result["warnings"])
+        self.assertEqual("buy", transactions.transactions[0].trans_type)
+        self.assertEqual(100.0, transactions.transactions[0].usd_spot)
+
+    def test_demo_data_golden_form_8949_totals_after_fifo_linking(self):
+        transactions = empty_transactions()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = ImportService(temp_dir).import_demo_data(transactions, repo_root=Path.cwd())
+
+        self.assertEqual(8, result["imported_count"])
+        self.assertEqual([], result["warnings"])
+        self.assertEqual([], transactions.auto_link(asset=None, algo="fifo"))
+
+        totals = get_form_8949_totals(transactions)
+        self.assertEqual(1, totals["short"]["rows"])
+        self.assertEqual(2000.0, totals["short"]["proceeds"])
+        self.assertEqual(600.0, totals["short"]["cost_basis"])
+        self.assertEqual(1400.0, totals["short"]["gain_loss"])
+        self.assertEqual(2, totals["long"]["rows"])
+        self.assertEqual(5700.0, totals["long"]["proceeds"])
+        self.assertEqual(3800.0, totals["long"]["cost_basis"])
+        self.assertEqual(1900.0, totals["long"]["gain_loss"])
+        self.assertEqual(3, totals["total"]["rows"])
+        self.assertEqual(7700.0, totals["total"]["proceeds"])
+        self.assertEqual(4400.0, totals["total"]["cost_basis"])
+        self.assertEqual(3300.0, totals["total"]["gain_loss"])
+
     def test_export_includes_8949_short_totals(self):
         transactions = empty_transactions()
         buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "demo")

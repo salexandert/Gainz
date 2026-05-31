@@ -102,7 +102,7 @@ A good demo run is:
 
 1. Start Gainz with `python launcher.py`.
 2. Open **Import Transactions**.
-3. Upload each demo CSV one file at a time.
+3. Click **Try Demo Data**, or upload each demo CSV one file at a time.
 4. Open **Auto Link**, select each asset, and run **FIFO**.
 5. Open **Holdings & Accounting** and declare current holdings for each demo asset.
 6. Open **Stats & Charts** to review reconciliation and current lots.
