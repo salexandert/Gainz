@@ -59,4 +59,4 @@ if __name__ == "__main__":
     )
     print("\nClose this window when finished.\n")
 
-    app.run(debug=True)
+    app.run(debug=app.config.get("DEBUG", False), use_reloader=False)
