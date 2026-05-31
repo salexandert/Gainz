@@ -80,6 +80,66 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual(4000, transactions.transactions[0].usd_spot)
         self.assertEqual(100000, transactions.transactions[1].usd_spot)
 
+    def test_import_service_imports_cash_app_with_updated_headers(self):
+        transactions = empty_transactions()
+        csv_text = "\n".join([
+            "Reference ID,Transaction Date,Activity,Fiat Currency,USD Amount,Network Fee,Crypto,Spot Price USD,Crypto Quantity",
+            "cash-new-001,2024-01-05 10:15:00 PST,Bitcoin Purchase,USD,-$1000.00,$0.00,Bitcoin,\"$40,000.00\",0.025 BTC",
+            "cash-new-002,2024-08-20 14:00:00 PDT,Bitcoin Sale,USD,$1200.00,-$12.00,Bitcoin,\"$60,000.00\",0.020 BTC",
+        ])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "cash_app_updated.csv"
+            upload_dir = Path(temp_dir) / "uploads"
+            source.write_text(csv_text, encoding="utf-8")
+            result = ImportService(upload_dir).import_upload(FileUpload(source), transactions)
+
+        self.assertEqual(2, result["imported_count"])
+        self.assertEqual(0, result["skipped_count"])
+        self.assertEqual([], result["warnings"])
+        self.assertEqual(["buy", "sell"], [t.trans_type for t in transactions.transactions])
+        self.assertEqual(["BTC", "BTC"], [t.symbol for t in transactions.transactions])
+
+    def test_import_service_imports_coinbase_with_updated_headers(self):
+        transactions = empty_transactions()
+        csv_text = "\n".join([
+            "Trade ID,Date UTC,Activity Type,Asset Symbol,Amount Transacted,Unit Price,Total Amount,Memo",
+            "cb-new-001,2023-01-10 12:00:00 UTC,Purchased,ETH,2.0,$1200.00,$2400.00,Bought 2 ETH",
+            "cb-new-002,2024-03-20 12:00:00 UTC,Sold,ETH,-1.5,$3000.00,$4500.00,Sold 1.5 ETH",
+        ])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "coinbase_updated.csv"
+            upload_dir = Path(temp_dir) / "uploads"
+            source.write_text(csv_text, encoding="utf-8")
+            result = ImportService(upload_dir).import_upload(FileUpload(source), transactions)
+
+        self.assertEqual(2, result["imported_count"])
+        self.assertEqual(0, result["skipped_count"])
+        self.assertEqual([], result["warnings"])
+        self.assertEqual(["buy", "sell"], [t.trans_type for t in transactions.transactions])
+        self.assertEqual([2.0, 1.5], [t.quantity for t in transactions.transactions])
+
+    def test_import_service_imports_generic_alias_csv(self):
+        transactions = empty_transactions()
+        csv_text = "\n".join([
+            "Created At,Operation,Token Symbol,Token Quantity,Transaction Value",
+            "2024-02-01 09:00:00 UTC,Receive,SOL,3.5,$350.00",
+            "2024-02-15 09:00:00 UTC,Send,SOL,1.0,$125.00",
+        ])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "wallet_export.csv"
+            upload_dir = Path(temp_dir) / "uploads"
+            source.write_text(csv_text, encoding="utf-8")
+            result = ImportService(upload_dir).import_upload(FileUpload(source), transactions)
+
+        self.assertEqual(2, result["imported_count"])
+        self.assertEqual(0, result["skipped_count"])
+        self.assertEqual([], result["warnings"])
+        self.assertEqual(["receive", "send"], [t.trans_type for t in transactions.transactions])
+        self.assertEqual([100.0, 125.0], [t.usd_spot for t in transactions.transactions])
+
     def test_export_includes_8949_short_totals(self):
         transactions = empty_transactions()
         buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "demo")

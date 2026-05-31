@@ -34,7 +34,10 @@ Open correctness work:
 
 - Coinbase `Convert` rows should keep importing as paired sell/buy legs with regression coverage.
 - The Import page should show a summary of imported, duplicate, skipped, and warning rows immediately after upload.
+- CSV imports should tolerate common exchange header changes through a maintained alias dictionary.
 - Demo CSVs should include edge cases: buys, sells, sends, receives, converts, fees, and fiat rows.
+
+Status: in progress. The parser now uses a shared column-alias dictionary for Cash App, Coinbase, and generic CSV imports, with regression tests for renamed headers.
 
 ## Priority 4: Reduce UI Ambiguity
 

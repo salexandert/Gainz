@@ -31,6 +31,8 @@ Gainz currently includes parsers or workflows for:
 - Kraken/custom imports through the template workflow
 - Manual transaction entry
 
+The Cash App, Coinbase, and generic CSV import path recognizes common header aliases such as `Transaction Date`, `Activity Type`, `Crypto Quantity`, `Token Symbol`, `Spot Price USD`, and `Transaction Value`, so small export format changes are less likely to break imports.
+
 See `demo_data/` for small sample files that are safe to use for testing.
 
 ## Quick Start From Source
