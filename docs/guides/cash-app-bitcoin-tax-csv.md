@@ -38,7 +38,7 @@ Sells need basis links before the result is tax-ready. Sends and receives are tr
 
 ## What To Review Before Filing
 
-Pay special attention to unlinked BTC sells, sends that may represent disposals, receives that may need outside basis, and any holdings mismatch. Those are signs that the Cash App CSV alone may not tell the full story.
+Pay special attention to unlinked BTC sells, sends that may represent disposals, receives that may need outside basis, and any holdings item marked Needs Review. Those are signs that the Cash App CSV alone may not tell the full story.
 
 Gainz is local documentation support, not tax advice. Review the output with a qualified tax professional.
 

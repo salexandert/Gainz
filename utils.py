@@ -318,7 +318,7 @@ def get_audit_readiness_summary(transactions):
     assets_with_mismatches = [
         row[0]
         for row in holdings_rows
-        if row[6] == "Mismatch"
+        if row[6] == "Needs Review"
     ]
     blockers = []
     warnings = []
@@ -338,7 +338,7 @@ def get_audit_readiness_summary(transactions):
 
     if assets_with_mismatches:
         blockers.append(
-            "Resolve holdings mismatches for: " + ", ".join(assets_with_mismatches)
+            "Review holdings discrepancies for: " + ", ".join(assets_with_mismatches)
         )
 
     if import_warnings:
@@ -354,7 +354,7 @@ def get_audit_readiness_summary(transactions):
 
     if blockers:
         status = "Not ready"
-        status_class = "status-mismatch"
+        status_class = "status-needs-review"
         next_action = blockers[0]
     elif warnings:
         status = "Review warnings"
@@ -362,7 +362,7 @@ def get_audit_readiness_summary(transactions):
         next_action = warnings[0]
     else:
         status = "Ready"
-        status_class = "status-matched"
+        status_class = "status-verified"
         next_action = "Generate the audit packet and review the exported files."
 
     return {
@@ -1089,13 +1089,13 @@ def get_holdings_reconciliation(transactions, asset):
         allocation_method = "FIFO remaining estimate: oldest disposals are assumed consumed first, so declared holdings are allocated to newest available lots."
 
         if abs(difference) <= 0.00000001:
-            status = "Matched"
+            status = "Verified"
             next_action = "Review lots and proceed to basis linking."
         elif difference > 0:
-            status = "Mismatch"
+            status = "Needs Review"
             next_action = "Classify missing disposals/losses or convert sends to sells until the difference is resolved."
         else:
-            status = "Mismatch"
+            status = "Needs Review"
             next_action = "Add missing acquisitions or convert receives to buys until the difference is resolved."
 
     return {

@@ -70,7 +70,7 @@ These should be treated as adoption features, not just polish. They shorten the 
 
 Status: in progress. Audit packets now include linked Form 8949 detail CSVs, Form 8949 totals, holdings reconciliation, current holdings lots, import warnings, the generated Excel report, copied source files, and packet manifests.
 
-The Export page now shows an Audit Readiness panel before packet generation. It summarizes Form 8949 row count/totals, unlinked sales, holdings gaps, mismatches, warnings, next action, and packet contents.
+The Export page now shows an Audit Readiness panel before packet generation. It summarizes Form 8949 row count/totals, unlinked sales, holdings gaps, needs-review items, warnings, next action, and packet contents.
 
 ## Discovery And Adoption Positioning
 

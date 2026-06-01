@@ -89,7 +89,7 @@ def _holdings_reconciliation_rows(raw_holdings_rows, stats_table_data):
 
 def _stats_summary(stats_table_data, raw_holdings_rows, import_warnings):
     assets_needing_holdings = sum(1 for row in raw_holdings_rows if row[1] == "N/A")
-    assets_with_mismatches = sum(1 for row in raw_holdings_rows if row[6] == "Mismatch")
+    assets_with_mismatches = sum(1 for row in raw_holdings_rows if row[6] == "Needs Review")
     unlinked_sales = sum(1 for row in stats_table_data if _has_unlinked_sales(row))
     import_warning_count = len(import_warnings or [])
     is_ready = (
@@ -101,7 +101,7 @@ def _stats_summary(stats_table_data, raw_holdings_rows, import_warnings):
 
     return {
         "reconciliation": "Ready" if is_ready else "Not ready",
-        "reconciliation_class": "status-matched" if is_ready else "status-mismatch",
+        "reconciliation_class": "status-verified" if is_ready else "status-needs-review",
         "assets_needing_holdings": assets_needing_holdings,
         "assets_with_mismatches": assets_with_mismatches,
         "import_warnings": import_warning_count,
@@ -167,7 +167,7 @@ def _auto_fix_safe_issues(transactions, year_value='All Time'):
     review_required = [
         row[0]
         for row in payload['holdings_reconciliation_table_data']
-        if row[6] in ("Mismatch", "Needs declared holdings")
+        if row[6] in ("Needs Review", "Needs declared holdings")
     ]
 
     if links_created > 0:

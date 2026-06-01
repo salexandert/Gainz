@@ -35,7 +35,7 @@ Before generating a packet, check:
 - Unlinked sales are zero or intentionally explained.
 - Import warnings have been reviewed.
 - Declared holdings are entered for relevant assets.
-- Holdings mismatches are resolved or documented.
+- Holdings items marked Needs Review are resolved or documented.
 - Source files are preserved when possible.
 
 ## Who This Helps

@@ -63,7 +63,7 @@ Watch these values:
 
 - `Reconciliation`: overall readiness.
 - `Assets needing holdings`: assets where you have not entered current holdings.
-- `Assets with mismatches`: declared holdings do not match imported buys/sells.
+- `Needs review`: declared holdings do not reconcile with imported buys/sells.
 - `Import warnings`: rows Gainz could not fully interpret.
 - `Unlinked sales`: sells that do not yet have basis links.
 
@@ -101,7 +101,7 @@ Gainz compares:
 - `Imported Net After Transfers`: buys plus receives minus sells minus sends.
 - `Declared Holdings`: what you say you actually hold today.
 
-If the status is `Mismatch`, review missing buys, missing disposals, sends, receives, gifts, income, losses, or conversions.
+If the status is `Needs Review`, review missing buys, missing disposals, sends, receives, gifts, income, losses, or conversions.
 
 ## 6. Review Current Lots
 
@@ -128,7 +128,7 @@ The **Audit Readiness** panel summarizes whether the packet is worth generating:
 - Form 8949 gain/loss total.
 - Unlinked sales count.
 - Holdings gaps.
-- Holdings mismatches.
+- Holdings review items.
 - Import warnings.
 - Next action.
 
@@ -159,7 +159,7 @@ The audit packet includes:
 
 Gainz is documentation support. It is not tax, legal, or financial advice.
 
-Before filing, review outputs yourself and with a qualified tax professional. Pay special attention to import warnings, unlinked sales, holdings mismatches, manually converted transactions, and any asset whose source history is incomplete.
+Before filing, review outputs yourself and with a qualified tax professional. Pay special attention to import warnings, unlinked sales, holdings review items, manually converted transactions, and any asset whose source history is incomplete.
 
 ## Current First-Run Improvements Planned
 

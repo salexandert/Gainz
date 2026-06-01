@@ -173,7 +173,7 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual("0.75", rows[0][1])
         self.assertEqual("0.75", rows[0][2])
         self.assertEqual("0", rows[0][5])
-        self.assertEqual("Matched", rows[0][6])
+        self.assertEqual("Verified", rows[0][6])
         self.assertEqual("N/A", rows[1][1])
         self.assertEqual("Needs declared holdings", rows[1][6])
 
@@ -250,8 +250,8 @@ class TransactionsEngineTests(unittest.TestCase):
 
         self.assertEqual(1, payload["links_created"])
         self.assertEqual(["BTC"], payload["fixed_assets"])
-        self.assertEqual("Matched", statuses["BTC"])
-        self.assertEqual("Mismatch", statuses["SOL"])
+        self.assertEqual("Verified", statuses["BTC"])
+        self.assertEqual("Needs Review", statuses["SOL"])
         self.assertIn("SOL", payload["review_required_assets"])
         self.assertIn("Auto-linked 1 FIFO basis link", payload["message"])
         self.assertEqual(

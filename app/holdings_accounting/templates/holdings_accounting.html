@@ -25,11 +25,11 @@
             <strong id="holdings_summary_need_holdings">{{ holdings_summary.assets_needing_holdings }}</strong>
           </button>
           <button type="button" class="holdings-progress-item holdings-progress-action" data-holdings-filter="matched" aria-describedby="holdings_summary_action">
-            <span>Matched</span>
+            <span>Verified</span>
             <strong id="holdings_summary_matched">{{ holdings_summary.assets_matched }}</strong>
           </button>
           <button type="button" class="holdings-progress-item holdings-progress-action" data-holdings-filter="mismatch" aria-describedby="holdings_summary_action">
-            <span>Mismatches</span>
+            <span>Needs Review</span>
             <strong id="holdings_summary_mismatch">{{ holdings_summary.assets_with_mismatch }}</strong>
           </button>
         </div>
@@ -72,7 +72,7 @@
             <div class="holdings-step-number">5</div>
             <div>
               <h5>Verify on Stats</h5>
-              <p>Once assets are declared and mismatches are handled, review Current Holdings Reconciliation, current lots, unlinked sales, and audit packet readiness.</p>
+              <p>Once assets are declared and review items are handled, review Current Holdings Reconciliation, current lots, unlinked sales, and audit packet readiness.</p>
               <a class="btn btn-sm btn-outline-primary" href="/stats">Open Stats & Charts</a>
             </div>
           </div>

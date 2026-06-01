@@ -316,7 +316,7 @@ class ImportAndExportTests(unittest.TestCase):
             with open(packet_path / "01_reports" / "holdings_reconciliation.csv", newline="", encoding="utf-8") as file:
                 holdings_rows = list(csv.DictReader(file))
             self.assertEqual("BTC", holdings_rows[0]["asset"])
-            self.assertEqual("Matched", holdings_rows[0]["status"])
+            self.assertEqual("Verified", holdings_rows[0]["status"])
 
             summary = json.loads((packet_path / "03_manifests" / "audit_packet_summary.json").read_text(encoding="utf-8"))
             self.assertEqual(200, summary["form_8949_totals"]["total"]["gain_loss"])

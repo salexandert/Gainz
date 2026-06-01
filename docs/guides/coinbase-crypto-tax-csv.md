@@ -22,7 +22,7 @@ Open **Stats & Charts** and check:
 - Import warnings.
 - Unlinked sales.
 - Assets needing declared holdings.
-- Assets with holdings mismatches.
+- Assets marked Needs Review in holdings reconciliation.
 
 An imported table is not automatically tax-ready. Tax-ready results require basis links for taxable sells and review of transfer gaps.
 

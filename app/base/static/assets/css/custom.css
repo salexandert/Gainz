@@ -114,7 +114,8 @@
     white-space: nowrap;
 }
 
-.status-matched {
+.status-matched,
+.status-verified {
     background: rgba(45, 206, 137, 0.14);
     color: #1c7f55 !important;
 }
@@ -124,7 +125,8 @@
     color: #b84322 !important;
 }
 
-.status-mismatch {
+.status-mismatch,
+.status-needs-review {
     background: rgba(245, 54, 92, 0.14);
     color: #b31d3c !important;
 }

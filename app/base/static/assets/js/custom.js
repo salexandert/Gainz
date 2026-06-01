@@ -262,7 +262,7 @@ $(document).ready(function() {
         var badge = $('#holdings_status_badge');
         var className = 'status-' + String(status || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         badge
-            .removeClass('status-matched status-needs-declared-holdings status-mismatch status-unlinked-sales')
+            .removeClass('status-matched status-verified status-needs-declared-holdings status-mismatch status-needs-review status-unlinked-sales')
             .addClass(className)
             .text(status);
     }
@@ -390,18 +390,18 @@ $(document).ready(function() {
         $('#holdings_quantity').val(holdingsFormatQuantity(holdings));
 
         if (Math.abs(difference) <= 0.00000001 && soldUnlinked <= 0.00000001) {
-            $('#holdings_next_action').text(asset + ' is matched against buys and sells. Continue to Stats & Charts to inspect current lots and audit packet readiness.');
-            holdingsSetBadge('Matched');
+            $('#holdings_next_action').text(asset + ' is verified against buys and sells. Continue to Stats & Charts to inspect current lots and audit packet readiness.');
+            holdingsSetBadge('Verified');
         } else if (soldUnlinked > 0.00000001) {
             $('#holdings_next_action').text(asset + ' still has unlinked sales. Run Auto Link or manually review links before trusting tax totals.');
             holdingsSetBadge('Unlinked sales');
         } else if (difference > 0) {
             $('#holdings_next_action').text('Imported activity says you should hold more ' + asset + ' than you declared. Look for missing sells, disposals, losses, or transfers that should be taxable events.');
             $('#convert_text').text('Gainz can help convert known sends or lost lots, but only use this after confirming the missing activity.');
-            holdingsSetBadge('Mismatch');
+            holdingsSetBadge('Needs Review');
         } else {
             $('#holdings_next_action').text('Declared holdings are higher than imported buys/sells explain. Look for missing buys, income, gifts, or transfers that need basis.');
-            holdingsSetBadge('Mismatch');
+            holdingsSetBadge('Needs Review');
         }
     }
 
@@ -464,11 +464,11 @@ $(document).ready(function() {
                 scroll: '#eh_stats_datatable'
             },
             matched: {
-                message: 'Showing matched assets. These do not need a holdings fix; use Stats & Charts or Export to review readiness.',
+                message: 'Showing verified assets. These do not need a holdings fix; use Stats & Charts or Export to review readiness.',
                 scroll: '#eh_stats_datatable'
             },
             mismatch: {
-                message: 'Showing assets where declared holdings and imported buys/sells disagree. Select one to see whether you need missing sells, losses, buys, income, or transfer basis.',
+                message: 'Showing assets that need review because declared holdings and imported buys/sells disagree. Select one to see whether you need missing sells, losses, buys, income, or transfer basis.',
                 scroll: '#eh_stats_datatable'
             }
         };
@@ -796,7 +796,7 @@ $(document).ready(function() {
 
         $('#stats_summary_reconciliation')
             .text(summary.reconciliation)
-            .removeClass('status-matched status-needs-declared-holdings status-mismatch status-unlinked-sales')
+            .removeClass('status-matched status-verified status-needs-declared-holdings status-mismatch status-needs-review status-unlinked-sales')
             .addClass(summary.reconciliation_class || statusClassName(summary.reconciliation));
         $('#stats_summary_assets_needing_holdings').text(summary.assets_needing_holdings);
         $('#stats_summary_assets_with_mismatches').text(summary.assets_with_mismatches);

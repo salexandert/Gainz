@@ -41,8 +41,8 @@ def _holdings_summary(transactions):
     return {
         "asset_count": len(rows),
         "assets_needing_holdings": sum(1 for row in rows if row[1] == "N/A"),
-        "assets_matched": sum(1 for row in rows if row[6] == "Matched"),
-        "assets_with_mismatch": sum(1 for row in rows if row[6] == "Mismatch"),
+        "assets_matched": sum(1 for row in rows if row[6] == "Verified"),
+        "assets_with_mismatch": sum(1 for row in rows if row[6] == "Needs Review"),
     }
 
 
