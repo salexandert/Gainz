@@ -62,6 +62,16 @@ You can also include **off-exchange events**, like converting ETH to BTC via Sha
 
 ---
 
+## 📖 Wiki Walkthrough
+
+For a visual walkthrough with screenshots, start here:
+
+[Gainz Wiki Walkthrough](https://github.com/salexandert/Gainz/wiki)
+
+The wiki shows the recommended flow from import, to holdings reconciliation, to auto-linking, review, model sell, and export.
+
+---
+
 ## 🛠 Download & Run
 
 ### ✅ Compiled Version (Windows)
