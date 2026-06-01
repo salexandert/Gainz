@@ -945,9 +945,23 @@ $(document).ready(function() {
 
     var myChart = null;
     var selectedStatsRowData = null;
+    var activeStatsAssetFilter = 'all';
 
     function chartCurrency(value) {
         return formatter.format(Number(value || 0));
+    }
+
+    function statsParseQuantity(value) {
+        if (value === undefined || value === null || value === 'N/A') {
+            return null;
+        }
+
+        var parsed = Number(String(value).replace('$', '').replace(/,/g, '').trim());
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function statsRegexEscape(value) {
+        return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     function resetGainzChart(message) {
@@ -1132,6 +1146,156 @@ $(document).ready(function() {
         return null;
     }
 
+    function statsScrollTo(selector) {
+        var target = $(selector);
+        if (target.length == 0) {
+            return;
+        }
+
+        $('html, body').animate({
+            scrollTop: Math.max(target.offset().top - 90, 0)
+        }, 250);
+    }
+
+    function statsSetSummaryAction(actionName) {
+        $('.stats-summary-action')
+            .removeClass('active')
+            .attr('aria-pressed', 'false');
+        $('.stats-summary-action[data-stats-summary-action="' + actionName + '"]')
+            .addClass('active')
+            .attr('aria-pressed', 'true');
+    }
+
+    function statsShowSummaryMessage(message) {
+        $('#stats_summary_action').text(message).show();
+    }
+
+    function statsClearAssetFilter() {
+        activeStatsAssetFilter = 'all';
+        if ($.fn.DataTable.isDataTable('#statspage_stats_datatable')) {
+            table.search('').draw();
+        }
+    }
+
+    function statsClearHoldingsFilter() {
+        holdingsReconciliationTable.search('');
+        holdingsReconciliationTable.columns().search('').draw();
+    }
+
+    function statsSelectFirstVisibleAsset() {
+        var visibleRows = table.rows({ filter: 'applied' }).data();
+        table.rows().deselect();
+
+        if (visibleRows.length == 0) {
+            return 0;
+        }
+
+        var firstVisibleRow = visibleRows[0];
+        table.rows(function(index, rowData) {
+            return rowData && firstVisibleRow && rowData[0] == firstVisibleRow[0];
+        }).select();
+        loadSelectedStatsAsset(firstVisibleRow, $('#stats_usd_spot').val());
+
+        return visibleRows.length;
+    }
+
+    function statsFocusHoldingsRows(statuses, emptyMessage, populatedMessage) {
+        statsClearAssetFilter();
+        statsClearHoldingsFilter();
+
+        if (statuses && statuses.length > 0) {
+            var statusRegex = '^(' + statuses.map(statsRegexEscape).join('|') + ')$';
+            holdingsReconciliationTable.column(6).search(statusRegex, true, false).draw();
+        } else {
+            holdingsReconciliationTable.draw();
+        }
+
+        $('#collapse_portfolio_holdings_reconciliation').collapse('show');
+
+        var visibleRows = holdingsReconciliationTable.rows({ filter: 'applied' }).data();
+        holdingsReconciliationTable.rows().deselect();
+
+        if (visibleRows.length > 0) {
+            var firstRow = visibleRows[0];
+            holdingsReconciliationTable.rows(function(index, rowData) {
+                return rowData && firstRow && rowData[0] == firstRow[0];
+            }).select();
+
+            var statsRow = getStatsRowForAsset(firstRow[0]);
+            if (statsRow) {
+                loadSelectedStatsAsset(statsRow, $('#stats_usd_spot').val());
+            }
+
+            statsShowSummaryMessage(populatedMessage + ' ' + visibleRows.length + ' asset' + (visibleRows.length == 1 ? '' : 's') + ' shown.');
+        } else {
+            statsShowSummaryMessage(emptyMessage);
+        }
+
+        statsScrollTo('#statspage_all_holdings_reconciliation_datatable');
+    }
+
+    function statsFocusImportWarnings() {
+        statsClearAssetFilter();
+        statsClearHoldingsFilter();
+
+        if ($('#stats_import_warnings').is(':visible')) {
+            statsShowSummaryMessage('Showing import warnings that need review before relying on totals.');
+            statsScrollTo('#stats_import_warnings');
+        } else {
+            statsShowSummaryMessage('No import warnings are currently reported for this save.');
+            statsScrollTo('#stats_summary_band');
+        }
+    }
+
+    function statsFocusUnlinkedSales() {
+        activeStatsAssetFilter = 'unlinked-sales';
+        statsClearHoldingsFilter();
+        table.search('').draw();
+
+        var visibleRows = statsSelectFirstVisibleAsset();
+        $('#collapse_sales').collapse('show');
+
+        if ($('#stats_auto_fix_panel').is(':visible')) {
+            statsScrollTo('#stats_auto_fix_panel');
+        } else {
+            statsScrollTo('#statspage_stats_datatable');
+        }
+
+        if (visibleRows > 0) {
+            statsShowSummaryMessage('Showing assets with unlinked sales. ' + visibleRows + ' asset' + (visibleRows == 1 ? '' : 's') + ' shown; use Auto-Fix Safe Issues or inspect the selected asset.');
+        } else {
+            statsShowSummaryMessage('No assets currently have unlinked sales.');
+        }
+    }
+
+    function statsHandleSummaryClick(actionName) {
+        statsSetSummaryAction(actionName);
+
+        if (actionName == 'reconciliation') {
+            statsFocusHoldingsRows(
+                ['Needs Review', 'Needs declared holdings', 'Unlinked sales'],
+                'Reconciliation is ready; all holdings rows are verified.',
+                'Showing holdings rows keeping reconciliation from ready.'
+            );
+        } else if (actionName == 'assets-needing-holdings') {
+            statsFocusHoldingsRows(
+                ['Needs declared holdings'],
+                'No assets need declared holdings right now.',
+                'Showing assets that still need declared holdings.'
+            );
+        } else if (actionName == 'needs-review') {
+            statsFocusHoldingsRows(
+                ['Needs Review', 'Unlinked sales'],
+                'No holdings rows need review right now.',
+                'Showing holdings rows that need review.'
+            );
+        } else if (actionName == 'import-warnings') {
+            statsFocusImportWarnings();
+        } else if (actionName == 'unlinked-sales') {
+            statsFocusUnlinkedSales();
+        }
+    }
+
 
     if ($(".datetimepicker").length != 0) {
         $('.datetimepicker').datetimepicker({
@@ -1209,6 +1373,18 @@ $(document).ready(function() {
         select: {
             style: 'single'
         },
+    });
+
+    $.fn.dataTable.ext.search.push(function(settings, rowData) {
+        if (settings.nTable.id !== 'statspage_stats_datatable') {
+            return true;
+        }
+
+        if (activeStatsAssetFilter == 'unlinked-sales') {
+            return (statsParseQuantity(rowData[3]) || 0) > 0.00000001;
+        }
+
+        return true;
     });
 
     $('#statspage_detailed_datatable').DataTable({
@@ -1290,6 +1466,10 @@ $(document).ready(function() {
         select: {
             style: 'single'
         },
+    });
+
+    $('.stats-summary-action').on('click', function() {
+        statsHandleSummaryClick($(this).data('stats-summary-action'));
     });
 
     $("#stats_auto_fix_safe_button").click(function(){

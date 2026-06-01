@@ -55,6 +55,30 @@
     padding: 12px 14px;
 }
 
+.stats-summary-action {
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.stats-summary-action:hover,
+.stats-summary-action:focus {
+    border-color: #51cbce;
+    box-shadow: 0 6px 18px rgba(81, 203, 206, 0.18);
+    outline: none;
+    transform: translateY(-1px);
+}
+
+.stats-summary-action.active {
+    border-color: #51cbce;
+    box-shadow: 0 0 0 2px rgba(81, 203, 206, 0.2);
+}
+
+.stats-summary-action-message {
+    margin: -4px 15px 16px;
+}
+
 .model-summary-band {
     display: grid;
     gap: 12px;

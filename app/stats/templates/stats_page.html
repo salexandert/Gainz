@@ -54,27 +54,28 @@
 <!-- /Page Description and Instructions -->
 
 <div id="stats_summary_band" class="stats-summary-band">
-  <div class="stats-summary-item">
+  <button type="button" class="stats-summary-item stats-summary-action" data-stats-summary-action="reconciliation">
     <span>Reconciliation</span>
     <strong id="stats_summary_reconciliation" class="gainz-status-badge {{ stats_summary.reconciliation_class }}">{{ stats_summary.reconciliation }}</strong>
-  </div>
-  <div class="stats-summary-item">
+  </button>
+  <button type="button" class="stats-summary-item stats-summary-action" data-stats-summary-action="assets-needing-holdings">
     <span>Assets needing holdings</span>
     <strong id="stats_summary_assets_needing_holdings">{{ stats_summary.assets_needing_holdings }}</strong>
-  </div>
-  <div class="stats-summary-item">
+  </button>
+  <button type="button" class="stats-summary-item stats-summary-action" data-stats-summary-action="needs-review">
     <span>Needs review</span>
     <strong id="stats_summary_assets_with_mismatches">{{ stats_summary.assets_with_mismatches }}</strong>
-  </div>
-  <div class="stats-summary-item">
+  </button>
+  <button type="button" class="stats-summary-item stats-summary-action" data-stats-summary-action="import-warnings">
     <span>Import warnings</span>
     <strong id="stats_summary_import_warnings">{{ stats_summary.import_warnings }}</strong>
-  </div>
-  <div class="stats-summary-item">
+  </button>
+  <button type="button" class="stats-summary-item stats-summary-action" data-stats-summary-action="unlinked-sales">
     <span>Unlinked sales</span>
     <strong id="stats_summary_unlinked_sales">{{ stats_summary.unlinked_sales }}</strong>
-  </div>
+  </button>
 </div>
+<div id="stats_summary_action" class="stats-summary-action-message alert alert-info" role="status" style="display: none;"></div>
 
 <div id="stats_reconciliation_warning" class="alert alert-warning" role="alert" {% if reconciliation_status.is_reconciled %}style="display: none;"{% endif %}>
   <strong>Not reconciled yet.</strong>
