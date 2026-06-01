@@ -17,6 +17,56 @@ from utils import *
 from app.services.auto_link_service import AutoLinkService
 
 
+def _auto_link_preview_time(trans):
+    return trans.time_stamp.replace(tzinfo=None) if hasattr(trans.time_stamp, 'replace') else trans.time_stamp
+
+
+def _preview_auto_link_failures(asset, buys, sells, algo, min_unlinked=0.000001):
+    reverse_buys = algo == 'filo'
+    ordered_buys = sorted(buys, key=_auto_link_preview_time, reverse=reverse_buys)
+    ordered_sells = sorted(sells, key=_auto_link_preview_time)
+    buy_remaining = {id(buy): buy.unlinked_quantity for buy in ordered_buys}
+    failures = []
+
+    for sell in ordered_sells:
+        sell_remaining = sell.unlinked_quantity
+        if sell_remaining <= min_unlinked:
+            continue
+
+        for buy in ordered_buys:
+            if sell_remaining <= min_unlinked:
+                break
+
+            if buy_remaining[id(buy)] <= min_unlinked:
+                continue
+
+            if _auto_link_preview_time(buy) >= _auto_link_preview_time(sell):
+                continue
+
+            link_quantity = min(sell_remaining, buy_remaining[id(buy)])
+            link_quantity = round_decimals_down(link_quantity)
+            if link_quantity <= min_unlinked:
+                continue
+
+            profit = (sell.usd_spot - buy.usd_spot) * link_quantity
+            if abs(profit) < 1.0:
+                continue
+
+            buy_remaining[id(buy)] -= link_quantity
+            sell_remaining -= link_quantity
+
+        if (sell_remaining * sell.usd_spot) > min_unlinked:
+            failures.append({
+                'asset': asset,
+                'unlinkable': sell_remaining,
+                'quantity': sell.quantity,
+                'timestamp': sell.time_stamp,
+                'algo': algo,
+            })
+
+    return failures
+
+
 
 @blueprint.route('/', methods=['GET'])
 @login_required
@@ -71,17 +121,6 @@ def auto_link_pre_check():
 
     transactions = current_app.config['transactions']
 
-    auto_link_failures = transactions.auto_link(asset=asset, algo='fifo', pre_check=True)
-
-    auto_link_failures.extend(transactions.auto_link(asset=asset, algo='filo', pre_check=True))
-
-    auto_link_check_failed = False
-
-    if len(auto_link_failures) > 0:
-        for i in auto_link_failures:
-            if i['unlinkable'] > 0.000009:
-                auto_link_check_failed = True
-
     buys = [trans for trans in transactions if trans.symbol == asset and trans.trans_type == "buy"]
     sends = [trans for trans in transactions if trans.symbol == asset and trans.trans_type == "send"]
     receives = [trans for trans in transactions if trans.symbol == asset and trans.trans_type == "receive"]
@@ -91,6 +130,16 @@ def auto_link_pre_check():
     sends.sort(key=lambda x: x.time_stamp)
     receives.sort(key=lambda x: x.time_stamp)
     sells.sort(key=lambda x: x.time_stamp)
+
+    auto_link_failures = _preview_auto_link_failures(asset, buys, sells, 'fifo')
+    auto_link_failures.extend(_preview_auto_link_failures(asset, buys, sells, 'filo'))
+
+    auto_link_check_failed = False
+
+    if len(auto_link_failures) > 0:
+        for i in auto_link_failures:
+            if i['unlinkable'] > 0.000009:
+                auto_link_check_failed = True
 
     sold = 0.0
     bought = 0.0

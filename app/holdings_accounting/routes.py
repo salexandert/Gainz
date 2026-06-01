@@ -148,6 +148,17 @@ def holdings_info():
     })
 
 
+@blueprint.route('/difference_breakdown', methods=['POST'])
+@login_required
+def difference_breakdown():
+    asset_data = request.json.get('asset') if request.json else None
+    asset_symbol = asset_data[0] if isinstance(asset_data, list) else asset_data
+
+    transactions = current_app.config['transactions']
+
+    return jsonify(get_holdings_difference_breakdown(transactions, asset_symbol))
+
+
 
 @blueprint.route('/sends_to_sells', methods=['POST'])
 @login_required
@@ -157,44 +168,8 @@ def sends_to_sells():
     asset = request.json['asset'][0]
     amount_to_convert = float(request.json['quantity'])
 
-    quantity_of_sends_converted_to_sells = None
-    number_of_converted_transactions = None
-
-    for a in transactions.asset_objects:
-        if a.symbol != asset:
-            continue
-
-        result_str = transactions.convert_sends_to_sells(asset=asset, amount_to_convert=amount_to_convert)
-
-        transactions.save(description="Converted Sends to sells")
-
-    auto_link_failures = transactions.auto_link(asset=asset, algo='fifo', pre_check=True)
-
-    if len(auto_link_failures) > 0:
-        for failure in auto_link_failures:
-
-            send_to_delete = None
-
-            for trans in transactions:
-                if trans.trans_type != "sell":
-                    continue
-
-                if trans.symbol != failure['asset']:
-                    continue
-
-                if trans.quantity != failure['quantity']:
-                    continue
-
-                if trans.time_stamp != failure['timestamp']:
-                    continue
-
-                send_to_delete = trans
-                break
-
-            if send_to_delete is not None:
-                print(f"We need to delete \n [{send_to_delete}] \n")
-                # quantity = send_to_delete.quantity
-                # del(send_to_delete)
+    result_str = transactions.convert_sends_to_sells(asset=asset, amount_to_convert=amount_to_convert)
+    transactions.save(description="Converted Sends to sells")
 
     return jsonify(result_str)
 

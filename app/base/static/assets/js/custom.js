@@ -241,6 +241,9 @@ $(document).ready(function() {
         return;
     }
 
+    var holdingsDifferenceYearlyTable = null;
+    var holdingsDifferenceTransactionsTable = null;
+
     function holdingsParseQuantity(value) {
         if (value === undefined || value === null || value === 'N/A') {
             return null;
@@ -258,9 +261,13 @@ $(document).ready(function() {
         return value.toFixed(8).replace(/0+$/, '').replace(/\.$/, '') || '0';
     }
 
+    function holdingsStatusClass(status) {
+        return 'status-' + String(status || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    }
+
     function holdingsSetBadge(status) {
         var badge = $('#holdings_status_badge');
-        var className = 'status-' + String(status || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        var className = holdingsStatusClass(status);
         badge
             .removeClass('status-matched status-verified status-needs-declared-holdings status-mismatch status-needs-review status-unlinked-sales')
             .addClass(className)
@@ -327,14 +334,105 @@ $(document).ready(function() {
         }, 250);
     }
 
+    function holdingsClearDifferenceBreakdown() {
+        $('#holdings_difference_breakdown').hide();
+        $('#holdings_difference_formula').text('Select an asset to see how the difference was calculated.');
+        $('#holdings_difference_declared_formula, #holdings_difference_transfer_formula, #holdings_difference_interpretation').text('');
+        $('#holdings_difference_transaction_count').text('0 transactions');
+        $('#holdings_breakdown_buys, #holdings_breakdown_sells, #holdings_breakdown_sends, #holdings_breakdown_receives, #holdings_breakdown_imported_net').text('--');
+
+        if (holdingsDifferenceYearlyTable) {
+            holdingsDifferenceYearlyTable.clear().draw();
+        }
+
+        if (holdingsDifferenceTransactionsTable) {
+            holdingsDifferenceTransactionsTable.clear().draw();
+        }
+    }
+
+    function holdingsShowDifferenceLoading(rowData) {
+        $('#holdings_difference_breakdown').show();
+        $('#holdings_difference_formula').text('Loading ' + rowData[0] + ' timeline...');
+        $('#holdings_difference_declared_formula, #holdings_difference_transfer_formula, #holdings_difference_interpretation').text('');
+        $('#holdings_difference_transaction_count').text('Loading');
+        $('#holdings_breakdown_buys, #holdings_breakdown_sells, #holdings_breakdown_sends, #holdings_breakdown_receives, #holdings_breakdown_imported_net').text('--');
+
+        if (holdingsDifferenceYearlyTable) {
+            holdingsDifferenceYearlyTable.clear().draw();
+        }
+
+        if (holdingsDifferenceTransactionsTable) {
+            holdingsDifferenceTransactionsTable.clear().draw();
+        }
+    }
+
+    function holdingsRenderDifferenceBreakdown(data) {
+        var summary = data && data.summary ? data.summary : {};
+        var transactionCount = summary.transaction_count || 0;
+
+        $('#holdings_difference_breakdown').show();
+        $('#holdings_difference_formula').text(summary.expected_formula || 'No activity found for this asset.');
+        $('#holdings_difference_declared_formula').text(summary.difference_formula || '');
+        $('#holdings_difference_transfer_formula').text(summary.transfer_formula || '');
+        $('#holdings_difference_interpretation').text(summary.interpretation || '');
+        $('#holdings_breakdown_buys').text(summary.buy_quantity || '--');
+        $('#holdings_breakdown_sells').text(summary.sell_quantity || '--');
+        $('#holdings_breakdown_sends').text(summary.send_quantity || '--');
+        $('#holdings_breakdown_receives').text(summary.receive_quantity || '--');
+        $('#holdings_breakdown_imported_net').text(summary.imported_net || '--');
+        $('#holdings_difference_transaction_count')
+            .removeClass('status-matched status-verified status-needs-declared-holdings status-mismatch status-needs-review status-unlinked-sales')
+            .addClass(holdingsStatusClass(summary.status))
+            .text(transactionCount + ' transaction' + (transactionCount == 1 ? '' : 's'));
+
+        if (holdingsDifferenceYearlyTable) {
+            holdingsDifferenceYearlyTable.clear();
+            holdingsDifferenceYearlyTable.rows.add(data.yearly_rows || []).draw();
+        }
+
+        if (holdingsDifferenceTransactionsTable) {
+            holdingsDifferenceTransactionsTable.clear();
+            holdingsDifferenceTransactionsTable.rows.add(data.transaction_rows || []).draw();
+        }
+    }
+
+    function holdingsLoadDifferenceBreakdown(rowData) {
+        if (!rowData) {
+            holdingsClearDifferenceBreakdown();
+            return;
+        }
+
+        holdingsShowDifferenceLoading(rowData);
+
+        $.ajax({
+            type: "POST",
+            url: "/holdings_accounting/difference_breakdown",
+            data: JSON.stringify({
+                'asset': rowData
+              }),
+            dataType: "json",
+            contentType: 'application/json',
+            success: function (data) {
+                holdingsRenderDifferenceBreakdown(data);
+            },
+            error: function () {
+                $('#holdings_difference_formula').text('Could not load the transaction timeline for this asset.');
+                $('#holdings_difference_transaction_count').text('Error');
+            },
+        });
+    }
+
     function holdingsLoadRow(rowData) {
         $('#holdings_save_message').hide().text('');
         holdingsRenderSelection(rowData);
 
         if (!rowData) {
             $('#auto_actions_datatable').DataTable().clear().draw();
+            holdingsClearDifferenceBreakdown();
             return;
         }
+
+        holdingsLoadDifferenceBreakdown(rowData);
 
         $.ajax({
             type: "POST",
@@ -359,6 +457,7 @@ $(document).ready(function() {
             $('#holdings_next_action').text('Pick an asset to see the next action.');
             $('#holdings_quantity').attr('placeholder', 'Select an asset first').val('');
             holdingsSetBadge('Needs asset');
+            holdingsClearDifferenceBreakdown();
             return;
         }
 
@@ -420,6 +519,16 @@ $(document).ready(function() {
         select: {
             style: 'multiple'
         },
+    });
+
+    holdingsDifferenceYearlyTable = $('#holdings_difference_yearly_datatable').DataTable({
+        "pageLength": 10,
+        "order": [[ 0, "asc" ]],
+    });
+
+    holdingsDifferenceTransactionsTable = $('#holdings_difference_transactions_datatable').DataTable({
+        "pageLength": 25,
+        "order": [[ 0, "asc" ]],
     });
 
     var activeHoldingsFilter = 'all';
@@ -573,7 +682,14 @@ $(document).ready(function() {
                     }
                 }
 
+                if (updatedRow) {
+                    table.rows(function(index, data) {
+                        return data && data[0] == updatedRow[0];
+                    }).select();
+                }
+
                 holdingsRenderSelection(updatedRow || rowData);
+                holdingsLoadDifferenceBreakdown(updatedRow || rowData);
                 $('#holdings_quantity').focus().select();
                 $('#holdings_save_message').text(data['message'] || 'Declared holdings saved.').show();
             },

@@ -159,6 +159,83 @@
           Pick an asset to see the next action.
         </div>
 
+        <div id="holdings_difference_breakdown" class="holdings-difference-panel" style="display: none;">
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start">
+            <div>
+              <h5>How This Difference Is Calculated</h5>
+              <p id="holdings_difference_formula">Select an asset to see how the difference was calculated.</p>
+            </div>
+            <span id="holdings_difference_transaction_count" class="gainz-status-badge status-needs-review">0 transactions</span>
+          </div>
+          <p id="holdings_difference_declared_formula"></p>
+          <p id="holdings_difference_transfer_formula"></p>
+          <div id="holdings_difference_interpretation" class="alert alert-light" role="status"></div>
+
+          <div class="holdings-difference-grid">
+            <div class="holdings-metric">
+              <span>Buys</span>
+              <strong id="holdings_breakdown_buys">--</strong>
+            </div>
+            <div class="holdings-metric">
+              <span>Sells</span>
+              <strong id="holdings_breakdown_sells">--</strong>
+            </div>
+            <div class="holdings-metric">
+              <span>Sends</span>
+              <strong id="holdings_breakdown_sends">--</strong>
+            </div>
+            <div class="holdings-metric">
+              <span>Receives</span>
+              <strong id="holdings_breakdown_receives">--</strong>
+            </div>
+            <div class="holdings-metric">
+              <span>Imported Net After Transfers</span>
+              <strong id="holdings_breakdown_imported_net">--</strong>
+            </div>
+          </div>
+
+          <h6>Year-by-Year Movement</h6>
+          <div class="table-responsive">
+            <table id="holdings_difference_yearly_datatable" class="table table-striped table-bordered" style="width:100%">
+              <thead>
+                <tr>
+                  <th>Year</th>
+                  <th>Transactions</th>
+                  <th>Buys</th>
+                  <th>Sells</th>
+                  <th>Sends</th>
+                  <th>Receives</th>
+                  <th>Expected Delta</th>
+                  <th>Expected Running</th>
+                  <th>Imported Net Delta</th>
+                  <th>Imported Net Running</th>
+                </tr>
+              </thead>
+            </table>
+          </div>
+
+          <h6>Transaction Timeline</h6>
+          <p class="card-category">Expected balance changes only on buys and sells. Imported net also includes sends and receives, so it helps explain whether the gap is probably missing classifications or transfer history.</p>
+          <div class="table-responsive">
+            <table id="holdings_difference_transactions_datatable" class="table table-striped table-bordered" style="width:100%">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Quantity</th>
+                  <th>USD Spot</th>
+                  <th>USD Total</th>
+                  <th>Expected Delta</th>
+                  <th>Expected Running</th>
+                  <th>Imported Net Delta</th>
+                  <th>Imported Net Running</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+            </table>
+          </div>
+        </div>
+
         <div class="form-group row">
           <label class="control-label col-md-2 col-sm-3" for="holdings_quantity">Current Holdings</label>
           <div class="col-md-4 col-sm-5">

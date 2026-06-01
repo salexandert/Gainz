@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 import transactions as transactions_module
+from app.auto_link.routes import _preview_auto_link_failures
 from app.model.routes import _model_sale_payload
 from app.stats.routes import _auto_fix_safe_issues
 from openpyxl import Workbook
@@ -13,6 +14,7 @@ from transactions import Transactions
 from utils import (
     get_audit_readiness_summary,
     get_current_holdings_lot_table_data,
+    get_holdings_difference_breakdown,
     get_multi_asset_holdings_reconciliation_table_data,
     get_unrealized_chart_data,
 )
@@ -176,6 +178,67 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual("Verified", rows[0][6])
         self.assertEqual("N/A", rows[1][1])
         self.assertEqual("Needs declared holdings", rows[1][6])
+
+    def test_holdings_difference_breakdown_explains_running_timeline(self):
+        transactions = empty_transactions()
+        transactions.set_holdings("BTC", 0.5)
+        transactions.transactions = [
+            Buy("BTC", 2, datetime.datetime(2024, 1, 1), 100, "C:\\private\\coinbase.csv"),
+            Sell("BTC", 0.25, datetime.datetime(2024, 2, 1), 200, "C:\\private\\coinbase.csv"),
+            Send("BTC", 0.75, datetime.datetime(2024, 3, 1), 250, "C:\\private\\cash_app.csv"),
+            Receive("BTC", 0.1, datetime.datetime(2025, 1, 1), "wallet.csv", 300),
+        ]
+
+        breakdown = get_holdings_difference_breakdown(transactions, "BTC")
+
+        self.assertEqual("1.75", breakdown["summary"]["expected_holdings"])
+        self.assertEqual("1.25", breakdown["summary"]["difference"])
+        self.assertEqual("1.1", breakdown["summary"]["imported_net"])
+        self.assertIn("Buys 2 - sells 0.25 = 1.75 BTC", breakdown["summary"]["expected_formula"])
+        self.assertIn("Expected 1.75 - declared 0.5 = 1.25 BTC", breakdown["summary"]["difference_formula"])
+        self.assertEqual([
+            "2024",
+            3,
+            "2",
+            "0.25",
+            "0.75",
+            "0",
+            "1.75",
+            "1.75",
+            "1",
+            "1",
+        ], breakdown["yearly_rows"][0])
+        self.assertEqual([
+            "2025",
+            1,
+            "0",
+            "0",
+            "0",
+            "0.1",
+            "0",
+            "1.75",
+            "0.1",
+            "1.1",
+        ], breakdown["yearly_rows"][1])
+        self.assertEqual(4, len(breakdown["transaction_rows"]))
+        self.assertEqual("coinbase.csv", breakdown["transaction_rows"][0][9])
+        self.assertEqual("0", breakdown["transaction_rows"][2][5])
+        self.assertEqual("-0.75", breakdown["transaction_rows"][2][7])
+        self.assertEqual("1", breakdown["transaction_rows"][2][8])
+
+    def test_auto_link_preview_reports_failures_without_creating_links(self):
+        buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "test")
+        covered_sell = Sell("BTC", 0.5, datetime.datetime(2024, 2, 1), 300, "test")
+        early_sell = Sell("BTC", 0.5, datetime.datetime(2023, 12, 1), 300, "test")
+
+        covered_failures = _preview_auto_link_failures("BTC", [buy], [covered_sell], "fifo")
+        early_failures = _preview_auto_link_failures("BTC", [buy], [early_sell], "fifo")
+
+        self.assertEqual([], covered_failures)
+        self.assertEqual(0, len(buy.links))
+        self.assertEqual(0, len(covered_sell.links))
+        self.assertEqual(1, len(early_failures))
+        self.assertEqual(0.5, early_failures[0]["unlinkable"])
 
     def test_set_holdings_creates_and_updates_asset_record(self):
         transactions = empty_transactions()

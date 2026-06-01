@@ -252,6 +252,41 @@
     padding: 16px;
 }
 
+.holdings-difference-panel {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    margin: 18px 0;
+    padding: 16px;
+}
+
+.holdings-difference-panel h5,
+.holdings-difference-panel h6 {
+    font-weight: 700;
+}
+
+.holdings-difference-panel h6 {
+    margin-top: 18px;
+}
+
+.holdings-difference-panel p {
+    color: #4f5962;
+    margin-bottom: 8px;
+}
+
+.holdings-difference-panel .alert-light {
+    background: #f8f9fa;
+    border-color: rgba(0, 0, 0, 0.08);
+    color: #252422;
+}
+
+.holdings-difference-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    margin: 16px 0;
+}
+
 .holdings-hidden-legacy {
     display: none;
 }

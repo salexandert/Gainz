@@ -1103,6 +1103,8 @@ def get_holdings_reconciliation(transactions, asset):
         "declared_holdings": declared_holdings,
         "buy_quantity": totals["buy"],
         "sell_quantity": totals["sell"],
+        "send_quantity": totals["send"],
+        "receive_quantity": totals["receive"],
         "expected_holdings": expected_holdings,
         "imported_net": imported_net,
         "available_lot_quantity": lot_quantity,
@@ -1138,6 +1140,181 @@ def get_holdings_reconciliation_summary(transactions, asset):
         ["Next Action", reconciliation["next_action"]],
         ["Lot Allocation Method", reconciliation["lot_allocation_method"]],
     ]
+
+
+def _holdings_source_name(source):
+    source_text = str(source or "").replace("\\", os.sep)
+    return os.path.basename(source_text) or "Manual"
+
+
+def _holdings_delta_for_expected(trans):
+    if trans.trans_type == "buy":
+        return trans.quantity
+
+    if trans.trans_type == "sell":
+        return -trans.quantity
+
+    return 0.0
+
+
+def _holdings_delta_for_imported_net(trans):
+    if trans.trans_type in ("buy", "receive"):
+        return trans.quantity
+
+    if trans.trans_type in ("sell", "send"):
+        return -trans.quantity
+
+    return 0.0
+
+
+def _holdings_reconciliation_interpretation(reconciliation):
+    difference = reconciliation["difference"]
+    asset = reconciliation["asset"]
+
+    if reconciliation["declared_holdings"] is None:
+        return f"Save declared {asset} holdings to calculate the difference."
+
+    if abs(difference) <= 0.00000001:
+        return "This asset is verified against imported buys and sells. Review lots and links before export."
+
+    if difference > 0:
+        return (
+            "Expected holdings are higher than declared holdings. Review sends, missing sells, disposals, "
+            "losses, or transfers before treating the difference as a taxable event."
+        )
+
+    return (
+        "Declared holdings are higher than imported buys and sells explain. Review missing buys, income, "
+        "gifts, or transfers that need basis."
+    )
+
+
+def get_holdings_difference_breakdown(transactions, asset):
+    asset = str(asset or "").upper()
+    reconciliation = get_holdings_reconciliation(transactions, asset)
+    declared_holdings = reconciliation["declared_holdings"]
+
+    transaction_rows = []
+    yearly_totals = {}
+    running_expected = 0.0
+    running_imported_net = 0.0
+
+    asset_transactions = sorted(
+        [
+            trans
+            for trans in transactions
+            if trans.symbol == asset and trans.trans_type in ("buy", "sell", "send", "receive")
+        ],
+        key=lambda trans: comparable_datetime(trans.time_stamp),
+    )
+
+    for trans in asset_transactions:
+        year = trans.time_stamp.year if hasattr(trans.time_stamp, "year") else str(trans.time_stamp)[:4]
+        if year not in yearly_totals:
+            yearly_totals[year] = {
+                "buy": 0.0,
+                "sell": 0.0,
+                "send": 0.0,
+                "receive": 0.0,
+                "count": 0,
+            }
+
+        yearly_totals[year][trans.trans_type] += trans.quantity
+        yearly_totals[year]["count"] += 1
+
+        expected_delta = _holdings_delta_for_expected(trans)
+        imported_net_delta = _holdings_delta_for_imported_net(trans)
+        running_expected += expected_delta
+        running_imported_net += imported_net_delta
+
+        transaction_rows.append([
+            _format_report_datetime(trans.time_stamp),
+            trans.trans_type.title(),
+            format_quantity(trans.quantity),
+            currency(trans.usd_spot),
+            currency(trans.usd_total),
+            format_quantity(expected_delta),
+            format_quantity(running_expected),
+            format_quantity(imported_net_delta),
+            format_quantity(running_imported_net),
+            _holdings_source_name(trans.source),
+        ])
+
+    yearly_rows = []
+    running_expected = 0.0
+    running_imported_net = 0.0
+
+    for year in sorted(yearly_totals):
+        totals = yearly_totals[year]
+        expected_delta = totals["buy"] - totals["sell"]
+        imported_net_delta = totals["buy"] + totals["receive"] - totals["sell"] - totals["send"]
+        running_expected += expected_delta
+        running_imported_net += imported_net_delta
+
+        yearly_rows.append([
+            str(year),
+            totals["count"],
+            format_quantity(totals["buy"]),
+            format_quantity(totals["sell"]),
+            format_quantity(totals["send"]),
+            format_quantity(totals["receive"]),
+            format_quantity(expected_delta),
+            format_quantity(running_expected),
+            format_quantity(imported_net_delta),
+            format_quantity(running_imported_net),
+        ])
+
+    expected_formula = (
+        f"Buys {format_quantity(reconciliation['buy_quantity'])} - sells "
+        f"{format_quantity(reconciliation['sell_quantity'])} = "
+        f"{format_quantity(reconciliation['expected_holdings'])} {asset} expected from buys/sells only."
+    )
+    transfer_formula = (
+        f"Including transfers: buys {format_quantity(reconciliation['buy_quantity'])} + receives "
+        f"{format_quantity(reconciliation['receive_quantity'])} - sells "
+        f"{format_quantity(reconciliation['sell_quantity'])} - sends "
+        f"{format_quantity(reconciliation['send_quantity'])} = "
+        f"{format_quantity(reconciliation['imported_net'])} {asset} imported net after transfers."
+    )
+
+    if declared_holdings is None:
+        difference_formula = f"No declared {asset} holdings are saved yet."
+    else:
+        difference_formula = (
+            f"Expected {format_quantity(reconciliation['expected_holdings'])} - declared "
+            f"{format_quantity(declared_holdings)} = "
+            f"{format_quantity(reconciliation['difference'])} {asset} difference vs declared holdings."
+        )
+
+    return {
+        "summary": {
+            "asset": asset,
+            "declared_holdings": (
+                format_quantity(declared_holdings)
+                if declared_holdings is not None
+                else "N/A"
+            ),
+            "buy_quantity": format_quantity(reconciliation["buy_quantity"]),
+            "sell_quantity": format_quantity(reconciliation["sell_quantity"]),
+            "send_quantity": format_quantity(reconciliation["send_quantity"]),
+            "receive_quantity": format_quantity(reconciliation["receive_quantity"]),
+            "expected_holdings": format_quantity(reconciliation["expected_holdings"]),
+            "imported_net": format_quantity(reconciliation["imported_net"]),
+            "difference": (
+                format_quantity(reconciliation["difference"])
+                if reconciliation["difference"] is not None
+                else "N/A"
+            ),
+            "status": reconciliation["status"],
+            "transaction_count": len(asset_transactions),
+            "expected_formula": expected_formula,
+            "difference_formula": difference_formula,
+            "transfer_formula": transfer_formula,
+            "interpretation": _holdings_reconciliation_interpretation(reconciliation),
+        },
+        "yearly_rows": yearly_rows,
+        "transaction_rows": transaction_rows,
+    }
 
 
 def get_multi_asset_holdings_reconciliation_table_data(transactions):
