@@ -16,22 +16,25 @@
         <p class="card-category">Use this page to declare what you currently hold, compare that against imported activity, and decide what data is still missing.</p>
 
         <div class="holdings-progress-band">
-          <div class="holdings-progress-item">
+          <button type="button" class="holdings-progress-item holdings-progress-action" data-holdings-filter="all" aria-describedby="holdings_summary_action">
             <span>Assets</span>
             <strong id="holdings_summary_asset_count">{{ holdings_summary.asset_count }}</strong>
-          </div>
-          <div class="holdings-progress-item">
+          </button>
+          <button type="button" class="holdings-progress-item holdings-progress-action" data-holdings-filter="needs" aria-describedby="holdings_summary_action">
             <span>Need Holdings</span>
             <strong id="holdings_summary_need_holdings">{{ holdings_summary.assets_needing_holdings }}</strong>
-          </div>
-          <div class="holdings-progress-item">
+          </button>
+          <button type="button" class="holdings-progress-item holdings-progress-action" data-holdings-filter="matched" aria-describedby="holdings_summary_action">
             <span>Matched</span>
             <strong id="holdings_summary_matched">{{ holdings_summary.assets_matched }}</strong>
-          </div>
-          <div class="holdings-progress-item">
+          </button>
+          <button type="button" class="holdings-progress-item holdings-progress-action" data-holdings-filter="mismatch" aria-describedby="holdings_summary_action">
             <span>Mismatches</span>
             <strong id="holdings_summary_mismatch">{{ holdings_summary.assets_with_mismatch }}</strong>
-          </div>
+          </button>
+        </div>
+        <div id="holdings_summary_action" class="holdings-summary-action alert alert-info" role="status">
+          Click a summary card to focus the asset list and see the next step.
         </div>
 
         <div class="holdings-walkthrough">

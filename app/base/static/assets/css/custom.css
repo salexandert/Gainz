@@ -153,6 +153,29 @@
     padding: 12px 14px;
 }
 
+.holdings-progress-action {
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.holdings-progress-action:hover,
+.holdings-progress-action:focus {
+    border-color: #51cbce;
+    box-shadow: 0 6px 18px rgba(81, 203, 206, 0.18);
+    outline: none;
+    transform: translateY(-1px);
+}
+
+.holdings-progress-action.active {
+    border-color: #51cbce;
+    box-shadow: 0 0 0 2px rgba(81, 203, 206, 0.2);
+}
+
+.holdings-summary-action {
+    margin: -4px 0 18px;
+}
+
 .holdings-progress-item span,
 .holdings-metric span {
     color: #6c757d;

@@ -278,6 +278,31 @@ $(document).ready(function() {
         $('#holdings_summary_mismatch').text(summary.assets_with_mismatch);
     }
 
+    function holdingsRowStatus(rowData) {
+        if (!rowData) {
+            return 'unknown';
+        }
+
+        var buys = holdingsParseQuantity(rowData[1]) || 0;
+        var sells = holdingsParseQuantity(rowData[2]) || 0;
+        var soldUnlinked = holdingsParseQuantity(rowData[3]) || 0;
+        var holdings = holdingsParseQuantity(rowData[8]);
+
+        if (holdings === null) {
+            return 'needs';
+        }
+
+        if (soldUnlinked > 0.00000001) {
+            return 'unlinked';
+        }
+
+        if (Math.abs((buys - sells) - holdings) <= 0.00000001) {
+            return 'matched';
+        }
+
+        return 'mismatch';
+    }
+
     function holdingsRowsSet(rows) {
         if (!rows) {
             return;
@@ -289,6 +314,42 @@ $(document).ready(function() {
 
     function holdingsSelectedAssetRow() {
         return table.row({selected:true}).data();
+    }
+
+    function holdingsScrollTo(selector) {
+        var target = $(selector);
+        if (target.length == 0) {
+            return;
+        }
+
+        $('html, body').animate({
+            scrollTop: Math.max(target.offset().top - 90, 0)
+        }, 250);
+    }
+
+    function holdingsLoadRow(rowData) {
+        $('#holdings_save_message').hide().text('');
+        holdingsRenderSelection(rowData);
+
+        if (!rowData) {
+            $('#auto_actions_datatable').DataTable().clear().draw();
+            return;
+        }
+
+        $.ajax({
+            type: "POST",
+            url: "/auto_link/auto_link_pre_check",
+            data: JSON.stringify({
+                'row_data': rowData
+              }),
+            dataType: "json",
+            contentType: 'application/json',
+            success: function (data) {
+
+                $('#auto_actions_datatable').DataTable().clear();
+                $('#auto_actions_datatable').DataTable().rows.add(data['auto_suggestions']).draw();
+            },
+        });
     }
 
     function holdingsRenderSelection(rowData) {
@@ -361,33 +422,91 @@ $(document).ready(function() {
         },
     });
 
+    var activeHoldingsFilter = 'all';
+
     var table = $('#eh_stats_datatable').DataTable({
         select: {
             style: 'single'
         },
     });
 
-    $('#eh_stats_datatable tbody').on( 'click', 'tr', function () {
-        var rowData = table.row(this).data();
-        $('#holdings_save_message').hide().text('');
-        holdingsRenderSelection(rowData);
+    $.fn.dataTable.ext.search.push(function(settings, rowData) {
+        if (settings.nTable.id !== 'eh_stats_datatable') {
+            return true;
+        }
 
-        $.ajax({
-            type: "POST",
-            url: "/auto_link/auto_link_pre_check",
-            data: JSON.stringify({
-                'row_data': rowData
-              }),
-            dataType: "json",
-            contentType: 'application/json',
-            success: function (data) {
+        if (activeHoldingsFilter == 'all') {
+            return true;
+        }
 
-                $('#auto_actions_datatable').DataTable().clear();
-                $('#auto_actions_datatable').DataTable().rows.add(data['auto_suggestions']).draw();
-            },
-        });
-
+        return holdingsRowStatus(rowData) == activeHoldingsFilter;
     });
+
+    function holdingsApplySummaryFilter(filterName, options) {
+        options = options || {};
+        activeHoldingsFilter = filterName || 'all';
+        $('.holdings-progress-action')
+            .removeClass('active')
+            .attr('aria-pressed', 'false');
+        $('.holdings-progress-action[data-holdings-filter="' + activeHoldingsFilter + '"]')
+            .addClass('active')
+            .attr('aria-pressed', 'true');
+
+        table.search('').draw();
+
+        var labels = {
+            all: {
+                message: 'Showing all assets. Select any row to declare holdings or review the current next action.',
+                scroll: '#eh_stats_datatable'
+            },
+            needs: {
+                message: 'Showing assets that still need declared holdings. Select one, enter what you currently hold, then save.',
+                scroll: '#eh_stats_datatable'
+            },
+            matched: {
+                message: 'Showing matched assets. These do not need a holdings fix; use Stats & Charts or Export to review readiness.',
+                scroll: '#eh_stats_datatable'
+            },
+            mismatch: {
+                message: 'Showing assets where declared holdings and imported buys/sells disagree. Select one to see whether you need missing sells, losses, buys, income, or transfer basis.',
+                scroll: '#eh_stats_datatable'
+            }
+        };
+        var label = labels[activeHoldingsFilter] || labels.all;
+        var visibleRows = table.rows({ filter: 'applied' }).data();
+
+        $('#holdings_summary_action').text(
+            label.message + ' ' + visibleRows.length + ' asset' + (visibleRows.length == 1 ? '' : 's') + ' shown.'
+        );
+
+        if (visibleRows.length > 0 && activeHoldingsFilter != 'all') {
+            table.rows().deselect();
+            var firstVisibleRow = visibleRows[0];
+            table.rows(function(index, rowData) {
+                return rowData && firstVisibleRow && rowData[0] == firstVisibleRow[0];
+            }).select();
+            holdingsLoadRow(firstVisibleRow);
+            if (!options.skipScroll) {
+                holdingsScrollTo('#holdings_selected_asset');
+            }
+        } else {
+            table.rows().deselect();
+            holdingsLoadRow(null);
+            if (!options.skipScroll) {
+                holdingsScrollTo(label.scroll);
+            }
+        }
+    }
+
+    $('.holdings-progress-action').on('click', function() {
+        holdingsApplySummaryFilter($(this).data('holdings-filter'));
+    });
+
+    $('#eh_stats_datatable tbody').on( 'click', 'tr', function () {
+        holdingsLoadRow(table.row(this).data());
+    });
+
+    holdingsApplySummaryFilter('all', { skipScroll: true });
 
     $("#auto_action_button").click(function(){
 
