@@ -13,7 +13,7 @@
     <div class="card">
       <div class="card-body">
         <h4 class="card-title">Holdings & Accounting Walkthrough</h4>
-        <p class="card-category">Use this page to declare what you currently hold, compare that against imported activity, and decide what data is still missing.</p>
+        <p class="card-category">Use this page to record what you currently hold, compare that against imported activity, and identify records that may need review.</p>
 
         <div class="holdings-progress-band">
           <button type="button" class="holdings-progress-item holdings-progress-action" data-holdings-filter="all" aria-describedby="holdings_summary_action">
@@ -51,7 +51,7 @@
             <div class="holdings-step-number">2</div>
             <div>
               <h5>Declare current holdings</h5>
-              <p>Select each asset below and enter the amount you actually hold today across exchanges, wallets, and custody accounts.</p>
+              <p>Select each asset below and enter the amount you want Gainz to use for reconciliation, based on your exchange, wallet, and custody records.</p>
             </div>
           </div>
           <div class="holdings-step">
@@ -156,7 +156,7 @@
 
         <div id="holdings_save_message" class="alert alert-success" role="alert" style="display: none;"></div>
         <div id="holdings_next_action" class="alert alert-info" role="alert">
-          Pick an asset to see the next action.
+          Pick an asset to see review guidance.
         </div>
 
         <div id="holdings_difference_breakdown" class="holdings-difference-panel" style="display: none;">
@@ -248,15 +248,15 @@
 
         <div class="holdings-resolution-panel">
           <h5>Optional Resolution Tools</h5>
-          <p id="convert_text">Use these only when you know the accounting treatment. If you know the missing transaction, adding the real transaction is better than converting activity automatically.</p>
+          <p id="convert_text">Use these only when supported by source records. If you know the missing transaction, adding the actual transaction is preferable to automatic reclassification.</p>
           <div class="form-group row">
             <label class="control-label col-md-2 col-sm-3" for="convert_quantity">Quantity</label>
             <div class="col-md-4 col-sm-5">
               <input type="number" step="any" id="convert_quantity" class="form-control" placeholder="Quantity to resolve">
             </div>
             <div class="col-md-6 col-sm-12">
-              <button type="button" id="sends_to_sells_button" class="btn btn-warning">Convert Sends to Sells</button>
-              <button type="button" id="buys_to_lost_button" class="btn btn-warning">Convert Buys to Lost</button>
+              <button type="button" id="sends_to_sells_button" class="btn btn-warning">Reclassify Documented Sends</button>
+              <button type="button" id="buys_to_lost_button" class="btn btn-warning">Reclassify Documented Lost Lots</button>
             </div>
           </div>
         </div>

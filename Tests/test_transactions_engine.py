@@ -264,7 +264,7 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual(1, readiness["metrics"]["assets_with_unlinked_sales"])
         self.assertEqual(1, readiness["metrics"]["assets_needing_holdings"])
         self.assertEqual(0, readiness["metrics"]["form_8949_rows"])
-        self.assertTrue(any("Complete basis links" in blocker for blocker in readiness["blockers"]))
+        self.assertTrue(any("Review or create basis links" in blocker for blocker in readiness["blockers"]))
 
     def test_audit_readiness_is_ready_when_links_and_holdings_match(self):
         transactions = empty_transactions()
@@ -277,7 +277,7 @@ class TransactionsEngineTests(unittest.TestCase):
         readiness = get_audit_readiness_summary(transactions)
 
         self.assertTrue(readiness["is_ready"])
-        self.assertEqual("Ready", readiness["status"])
+        self.assertEqual("Ready for review", readiness["status"])
         self.assertEqual(1, readiness["metrics"]["form_8949_rows"])
         self.assertEqual("$75.00", readiness["metrics"]["form_8949_proceeds"])
         self.assertEqual("$25.00", readiness["metrics"]["form_8949_cost_basis"])
@@ -316,9 +316,9 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual("Verified", statuses["BTC"])
         self.assertEqual("Needs Review", statuses["SOL"])
         self.assertIn("SOL", payload["review_required_assets"])
-        self.assertIn("Auto-linked 1 FIFO basis link", payload["message"])
+        self.assertIn("Added 1 FIFO basis link", payload["message"])
         self.assertEqual(
-            ["Auto-fixed safe Stats issues with FIFO basis links"],
+            ["Added FIFO basis links from Stats review"],
             transactions.saved_descriptions,
         )
 
@@ -383,7 +383,7 @@ class TransactionsEngineTests(unittest.TestCase):
 
         sells = [trans for trans in transactions if trans.trans_type == "sell"]
         sends = [trans for trans in transactions if trans.trans_type == "send"]
-        self.assertIn("Converted 2.0 SOL", message)
+        self.assertIn("Reclassified 2.0 SOL", message)
         self.assertEqual(1, len(sells))
         self.assertEqual(1, len(sends))
         self.assertAlmostEqual(2, sells[0].quantity)

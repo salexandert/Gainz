@@ -61,9 +61,9 @@ def holdings_accounting():
 
         transactions.convert_sends_to_sells(asset=asset, current_holdings=holdings)
 
-        transactions.save(description="Converted Sends to Sells")
+        transactions.save(description="Reclassified documented sends as sells")
 
-        return jsonify("Converted Sends to Sells!")
+        return jsonify("Reclassified documented sends as sells for review.")
 
 
     return render_template(
@@ -169,7 +169,7 @@ def sends_to_sells():
     amount_to_convert = float(request.json['quantity'])
 
     result_str = transactions.convert_sends_to_sells(asset=asset, amount_to_convert=amount_to_convert)
-    transactions.save(description="Converted Sends to sells")
+    transactions.save(description="Reclassified documented sends as sells")
 
     return jsonify(result_str)
 
@@ -188,9 +188,9 @@ def buys_to_lost():
 
     transactions.convert_buys_to_lost(asset=asset, amount=amount)
 
-    transactions.save(description="Converted Buys to Lost")
+    transactions.save(description="Reclassified documented buy lots as lost")
 
-    return jsonify("Yess")
+    return jsonify("Reclassified documented buy lots as lost for review.")
 
 
 @blueprint.route('/receive_to_buy', methods=['POST'])
@@ -208,8 +208,8 @@ def receive_to_buy():
 
         transactions.convert_receives_to_buys(asset=asset, amount_to_convert=amount_to_convert)
 
-        transactions.save(description="Converted receives to buys")
+        transactions.save(description="Reclassified documented receives as buys")
 
         # current_app.config['transactions'] = transactions.load()
 
-    return jsonify("Yess")
+    return jsonify("Reclassified documented receives as buys for review.")

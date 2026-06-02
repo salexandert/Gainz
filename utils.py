@@ -328,12 +328,12 @@ def get_audit_readiness_summary(transactions):
 
     if assets_with_unlinked_sales:
         blockers.append(
-            "Complete basis links for: " + ", ".join(assets_with_unlinked_sales)
+            "Review or create basis links for: " + ", ".join(assets_with_unlinked_sales)
         )
 
     if assets_needing_holdings:
         blockers.append(
-            "Declare current holdings for: " + ", ".join(assets_needing_holdings)
+            "Record current holdings for: " + ", ".join(assets_needing_holdings)
         )
 
     if assets_with_mismatches:
@@ -348,7 +348,7 @@ def get_audit_readiness_summary(transactions):
         )
 
     if form_8949_totals["total"]["rows"] == 0 and any(row.get("num_sells", 0) > 0 for row in stats_rows):
-        blockers.append("Sells exist, but no linked Form 8949 rows are ready.")
+        blockers.append("Sells exist, but no linked Form 8949-style rows can be generated yet.")
 
     is_ready = len(blockers) == 0 and len(warnings) == 0
 
@@ -361,9 +361,9 @@ def get_audit_readiness_summary(transactions):
         status_class = "status-unlinked-sales"
         next_action = warnings[0]
     else:
-        status = "Ready"
+        status = "Ready for review"
         status_class = "status-verified"
-        next_action = "Generate the audit packet and review the exported files."
+        next_action = "Generate the audit packet, then review exported files against source records."
 
     return {
         "status": status,
@@ -1093,7 +1093,7 @@ def get_holdings_reconciliation(transactions, asset):
 
         if abs(difference) <= 0.00000001:
             status = "Verified"
-            next_action = "No quantity difference was detected from imported buys and sells. Review source records, lots, and basis links before relying on outputs."
+            next_action = "No quantity difference was detected from imported buys and sells. Review source records, lots, and basis links before using generated reports."
         elif difference > 0:
             status = "Needs Review"
             next_action = (
@@ -1189,7 +1189,7 @@ def _holdings_reconciliation_interpretation(reconciliation):
     if difference > 0:
         return (
             "The calculated net from imported buys and sells is higher than declared holdings. Review sends, "
-            "missing disposals, losses, transfers, or other records before using this difference in tax outputs."
+            "missing disposals, losses, transfers, or other records before using generated reports."
         )
 
     return (

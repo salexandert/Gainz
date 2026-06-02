@@ -106,7 +106,7 @@ A good demo run is:
 4. Open **Auto Link**, select each asset, and run **FIFO**.
 5. Open **Holdings & Accounting** and declare current holdings for each demo asset.
 6. Open **Stats & Charts** to review reconciliation and current lots.
-7. Open **Export** and confirm **Audit Readiness** says `Ready`.
+7. Open **Export** and confirm **Audit Packet Review Status** says `Ready for review`.
 8. Click **Generate Audit Packet**.
 
 The audit packet includes the Excel workbook, Form 8949 detail CSVs, Form 8949 totals, holdings reconciliation, current holdings lots, import warnings, copied source files when available, hashes, and a methodology memo.

@@ -377,7 +377,7 @@ def load():
 
     transactions.load(filename)
 
-    return jsonify("Yess")
+    return jsonify("Revision loaded.")
 
 
 @blueprint.route('/revert',  methods=['POST'])
@@ -391,7 +391,7 @@ def revert():
     transactions.load(filename)
     transactions.save(f"Reverted to {filename}")
 
-    return jsonify("Yess")
+    return jsonify("Revision restored and saved as a new revision.")
 
 
 @blueprint.route('/delete',  methods=['POST'])
@@ -407,7 +407,7 @@ def delete():
 
     current_app.config['transactions'] = transactions
 
-    return jsonify("Yess")
+    return jsonify("Revision file moved aside and save list refreshed.")
 
 @blueprint.route('/save',  methods=['POST'])
 @login_required

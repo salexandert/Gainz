@@ -77,10 +77,10 @@ Select an asset row, choose a year or `All Time`, then choose a linking method:
 
 - `FIFO`: oldest available buys first.
 - `FILO`: newest available buys first.
-- `Min Gain`: higher-basis lots first, where appropriate for your chosen method.
-- `Min Gain Long`: prefer long-term lots where possible.
+- `Min Gain`: higher-basis lots first for comparison under your selected method.
+- `Min Gain Long`: long-term lots first for comparison under your selected method.
 
-Most first-time demo runs should start with `FIFO`.
+For a simple first review pass, use `FIFO`.
 
 Repeat for every asset with unlinked sales. Then return to **Stats & Charts** and confirm `Unlinked sales` has dropped.
 
@@ -93,12 +93,12 @@ This page is the guided current-holdings walkthrough. For each asset:
 1. Select the asset row.
 2. Enter the amount you currently hold across wallets and exchanges.
 3. Save declared holdings.
-4. Review the status and next action.
+4. Review the status and guidance.
 
 Gainz compares:
 
-- `Expected From Buys/Sells Only`: buys minus sells.
-- `Imported Net After Transfers`: buys plus receives minus sells minus sends.
+- `Calculated Net From Imported Buys/Sells`: buys minus sells.
+- `Imported Net Including Transfers`: buys plus receives minus sells minus sends.
 - `Declared Holdings`: what you say you actually hold today.
 
 If the status is `Needs Review`, review missing buys, missing disposals, sends, receives, gifts, income, losses, or conversions.
@@ -118,11 +118,11 @@ Review:
 
 The current-lot estimate explains which remaining acquisition lots support current holdings. This is especially useful when you need to explain how today's balance relates to past buys and sells.
 
-## 7. Review Audit Readiness
+## 7. Review Audit Packet Status
 
 Open **Export**.
 
-The **Audit Readiness** panel summarizes whether the packet is worth generating:
+The **Audit Packet Review Status** panel summarizes whether the packet is ready for review:
 
 - Form 8949 row count.
 - Form 8949 gain/loss total.
@@ -130,9 +130,9 @@ The **Audit Readiness** panel summarizes whether the packet is worth generating:
 - Holdings gaps.
 - Holdings review items.
 - Import warnings.
-- Next action.
+- Review guidance.
 
-If the status is `Not ready`, follow the listed blockers before relying on the packet.
+If the status is `Not ready`, review the listed blockers before using the packet.
 
 ## 8. Generate Outputs
 
@@ -159,7 +159,7 @@ The audit packet includes:
 
 Gainz is documentation support. It is not tax, legal, or financial advice.
 
-Before filing, review outputs yourself and with a qualified tax professional. Pay special attention to import warnings, unlinked sales, holdings review items, manually converted transactions, and any asset whose source history is incomplete.
+Before filing, review outputs yourself and with a qualified tax professional. Pay special attention to import warnings, unlinked sales, holdings review items, manually reclassified transactions, and any asset whose source history is incomplete.
 
 ## Current First-Run Improvements Planned
 

@@ -66,7 +66,7 @@ These should be treated as adoption features, not just polish. They shorten the 
 ## Priority 5: Audit Packet Integration
 
 - The audit packet should include a holdings-lot report, import warnings, selected save metadata, and reconciliation status.
-- It should distinguish raw imported ledger evidence from tax-ready forms.
+- It should distinguish raw imported ledger evidence from review-ready Form 8949-style reports.
 
 Status: in progress. Audit packets now include linked Form 8949 detail CSVs, Form 8949 totals, holdings reconciliation, current holdings lots, import warnings, the generated Excel report, copied source files, and packet manifests.
 

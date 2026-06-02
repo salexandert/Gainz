@@ -96,7 +96,11 @@ def _data_source_summary(transactions):
     sources = []
     for source, count in source_counter.most_common():
         exists = os.path.exists(str(source))
-        is_gainz_source = str(source).startswith("Gainz App") or "Converted in Gainz App" in str(source)
+        is_gainz_source = (
+            str(source).startswith("Gainz App")
+            or "Converted in Gainz App" in str(source)
+            or "Reclassified in Gainz App" in str(source)
+        )
         sources.append({
             "source": source,
             "name": os.path.basename(str(source)) if source != "Manual / Unknown" else source,

@@ -79,7 +79,7 @@ function gainzRenderColumnMapper(mapping) {
             .show();
     } else if (!mapping.has_pricing) {
         warningBox
-            .text("No USD price or total value column was detected. Gainz can import, but tax totals will need review.")
+            .text("No USD price or total value column was detected. Gainz can import the rows, but generated reports will need review.")
             .show();
     } else {
         warningBox.hide();
@@ -542,13 +542,13 @@ $(document).ready(function() {
         $('#holdings_quantity').val(holdingsFormatQuantity(holdings));
 
         if (Math.abs(difference) <= 0.00000001 && soldUnlinked <= 0.00000001) {
-            $('#holdings_next_action').text(asset + ' has no quantity difference from imported buys and sells. Review source records, lots, and basis links before relying on outputs.');
+            $('#holdings_next_action').text(asset + ' has no quantity difference from imported buys and sells. Review source records, lots, and basis links before using generated reports.');
             holdingsSetBadge('Verified');
         } else if (soldUnlinked > 0.00000001) {
-            $('#holdings_next_action').text(asset + ' still has unlinked sales. Run Auto Link or manually review links before relying on tax totals.');
+            $('#holdings_next_action').text(asset + ' still has unlinked sales. Run Auto Link or manually review links before using generated reports.');
             holdingsSetBadge('Unlinked sales');
         } else if (difference > 0) {
-            $('#holdings_next_action').text('The calculated net from imported buys and sells is higher than declared ' + asset + '. Review missing disposals, transfers, losses, or other records before using this difference in tax outputs.');
+            $('#holdings_next_action').text('The calculated net from imported buys and sells is higher than declared ' + asset + '. Review source records for missing disposals, transfers, losses, or other activity before using generated reports.');
             $('#convert_text').text('Gainz can help reclassify known sends or lost lots, but only use this when supported by documentation.');
             holdingsSetBadge('Needs Review');
         } else {
@@ -626,11 +626,11 @@ $(document).ready(function() {
                 scroll: '#eh_stats_datatable'
             },
             matched: {
-                message: 'Showing verified assets. These do not need a holdings fix; use Stats & Charts or Export to review readiness.',
+                message: 'Showing verified assets. These have no quantity difference in Gainz. Use Stats & Charts or Export to review the supporting reports.',
                 scroll: '#eh_stats_datatable'
             },
             mismatch: {
-                message: 'Showing assets that need review because declared holdings and imported buys/sells disagree. Select one to see whether you need missing sells, losses, buys, income, or transfer basis.',
+                message: 'Showing assets that need review because declared holdings and imported buys/sells differ. Select one to review possible missing records or unsupported classifications.',
                 scroll: '#eh_stats_datatable'
             }
         };
@@ -1292,7 +1292,7 @@ $(document).ready(function() {
         statsClearHoldingsFilter();
 
         if ($('#stats_import_warnings').is(':visible')) {
-            statsShowSummaryMessage('Showing import warnings that need review before relying on totals.');
+            statsShowSummaryMessage('Showing import warnings that need review before using generated reports.');
             statsScrollTo('#stats_import_warnings');
         } else {
             statsShowSummaryMessage('No import warnings are currently reported for this save.');
@@ -1315,7 +1315,7 @@ $(document).ready(function() {
         }
 
         if (visibleRows > 0) {
-            statsShowSummaryMessage('Showing assets with unlinked sales. ' + visibleRows + ' asset' + (visibleRows == 1 ? '' : 's') + ' shown; use Auto-Fix Safe Issues or inspect the selected asset.');
+            statsShowSummaryMessage('Showing assets with unlinked sales. ' + visibleRows + ' asset' + (visibleRows == 1 ? '' : 's') + ' shown; run FIFO Auto Link or inspect the selected asset.');
         } else {
             statsShowSummaryMessage('No assets currently have unlinked sales.');
         }
@@ -1530,7 +1530,7 @@ $(document).ready(function() {
         var selectedAsset = selectedStatsRowData ? selectedStatsRowData[0] : null;
 
         $('#stats_auto_fix_result').removeClass('text-danger').text('');
-        button.prop('disabled', true).text('Auto-Fixing...');
+        button.prop('disabled', true).text('Linking...');
 
         $.ajax({
             type: "POST",
@@ -1547,7 +1547,7 @@ $(document).ready(function() {
                 setStatsImportWarnings(data['import_warnings']);
                 setStatsSummary(data['stats_summary']);
                 setAllHoldingsReconciliation(data['holdings_reconciliation_table_data']);
-                $('#stats_auto_fix_result').text(data['message'] || 'Safe auto-fix complete.');
+                $('#stats_auto_fix_result').text(data['message'] || 'FIFO auto-link complete. Review the generated links.');
                 $('#stats_auto_fix_panel').show();
 
                 if (selectedAsset) {
@@ -1560,10 +1560,10 @@ $(document).ready(function() {
             error: function () {
                 $('#stats_auto_fix_result')
                     .addClass('text-danger')
-                    .text('Safe auto-fix could not run. Please try Auto Link or review the data manually.');
+                    .text('FIFO auto-link could not run. Please try Auto Link or review the data manually.');
             },
             complete: function () {
-                button.prop('disabled', false).text('Auto-Fix Safe Issues');
+                button.prop('disabled', false).text('Run FIFO Auto Link');
             },
         });
     });

@@ -24,8 +24,8 @@
             </div>
             <div id="collapse_1" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
               <div class="card-body">
-                Use this page to manually add, delete, and convert, transactions. Add any buys or sells that were not imported from CSV. 
-                <br> Additionally you can convert sends to sells or receives to buys when appropriate.
+                Use this page to manually add, delete, and review transaction classifications. Add any buys or sells that were not imported from CSV.
+                <br> Reclassify sends, receives, or lost lots only when source records support that classification.
                 <br>
                 <br>
 
@@ -261,7 +261,7 @@
                   </thead>  
                 </table>
                 <button type="button" id="buys_delete_button" class="btn btn-danger">Delete</button>
-                <button type="button" id="buys_convert_button" class="btn btn-warning">Convert to Lost</button>
+                <button type="button" id="buys_convert_button" class="btn btn-warning">Reclassify as Documented Loss</button>
               </div>
               <!-- /Card Body -->
             </div>
@@ -306,7 +306,7 @@
                     </tr>
                   </thead>  
                 </table>
-                <button type="button" id="send_convert_button" class="btn btn-warning">Convert to Sell</button>
+                <button type="button" id="send_convert_button" class="btn btn-warning">Reclassify as Documented Sale</button>
               
               </div>
               <!-- /Card Body -->
@@ -353,7 +353,7 @@
                   </thead>  
                 </table>
 
-                <button type="button" id="receive_convert_button" class="btn btn-warning">Convert to Buy(s)</button>
+                <button type="button" id="receive_convert_button" class="btn btn-warning">Reclassify as Documented Buy(s)</button>
               
               </div>
               <!-- /Card Body -->

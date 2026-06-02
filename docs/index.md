@@ -31,7 +31,7 @@ schema_type: SoftwareApplication
   <div class="grid">
     <div class="card">
       <h3>What did I pay for this crypto?</h3>
-      <p>Gainz links taxable sells to earlier buy lots so you can inspect the cost basis behind each reported gain or loss.</p>
+      <p>Gainz links sale records to earlier buy lots so you can inspect the cost basis behind each Form 8949-style gain or loss.</p>
     </div>
     <div class="card">
       <h3>Do my current holdings make sense?</h3>

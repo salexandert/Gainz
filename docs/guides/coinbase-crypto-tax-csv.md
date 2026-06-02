@@ -1,13 +1,13 @@
 ---
 title: Coinbase Crypto Tax CSV Import Guide
-description: Learn how Gainz imports Coinbase CSV files, flags warnings, links taxable disposals, and reconciles current crypto holdings locally.
+description: Learn how Gainz imports Coinbase CSV files, flags warnings, creates reviewable basis links, and reconciles current crypto holdings locally.
 ---
 
 <article>
 
 # Coinbase Crypto Tax CSV Import Guide
 
-Coinbase exports can include buys, sells, sends, receives, fees, and conversions. Gainz imports Coinbase CSV activity into a local crypto accounting workbench so you can inspect what happened before relying on tax totals.
+Coinbase exports can include buys, sells, sends, receives, fees, and conversions. Gainz imports Coinbase CSV activity into a local crypto accounting workbench so you can inspect what happened before using generated reports.
 
 ## Before You Import
 
@@ -24,17 +24,17 @@ Open **Stats & Charts** and check:
 - Assets needing declared holdings.
 - Assets marked Needs Review in holdings reconciliation.
 
-An imported table is not automatically tax-ready. Tax-ready results require basis links for taxable sells and review of transfer gaps.
+An imported table is not automatically review-ready. Generated reports require basis links for sells and review of transfer gaps.
 
 ## Linking Coinbase Sells
 
-Use **Auto Link** to connect Coinbase sells to earlier buy lots. FIFO is the most common first review pass because it is easy to inspect, but Gainz also supports FILO and gain-minimizing methods for review.
+Use **Auto Link** to connect Coinbase sells to earlier buy lots. FIFO is a common first review pass because it is easy to inspect, but Gainz also supports FILO and higher-basis comparison methods for review.
 
 After linking, the Form 8949-style rows and audit packet totals are generated from those links.
 
 ## Current Holdings Reconciliation
 
-Coinbase data may not include every wallet movement or external acquisition. Gainz compares declared holdings against imported buys, sells, sends, and receives so you can spot missing data before relying on the packet.
+Coinbase data may not include every wallet movement or external acquisition. Gainz compares declared holdings against imported buys, sells, sends, and receives so you can spot missing data before using the packet.
 
 Gainz is not tax, legal, or financial advice. Use it to prepare documentation for review.
 

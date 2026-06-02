@@ -38,7 +38,7 @@ def _stats_reconciliation_status(stats_table_data):
         "assets_needing_links": assets_needing_links,
         "message": (
             "Not reconciled yet: sells exist without complete basis links. "
-            "Run Auto Link, load a reconciled save, or review links before using these totals for tax filing."
+            "Run Auto Link, load a reviewed save, or inspect basis links before using generated reports."
             if assets_needing_links else ""
         )
     }
@@ -80,7 +80,7 @@ def _holdings_reconciliation_rows(raw_holdings_rows, stats_table_data):
 
         if _has_unlinked_sales(stats_by_asset.get(asset)):
             row[6] = "Unlinked sales"
-            row[7] = "Use Auto-Fix Safe Issues or review basis links before relying on this asset's tax totals."
+            row[7] = "Run FIFO Auto Link or review basis links before using this asset in generated reports."
 
         table_rows.append(row)
 
@@ -161,7 +161,7 @@ def _auto_fix_safe_issues(transactions, year_value='All Time'):
 
     links_created = len(transactions.links) - before_link_count
     if links_created > 0:
-        transactions.save(description="Auto-fixed safe Stats issues with FIFO basis links")
+        transactions.save(description="Added FIFO basis links from Stats review")
 
     payload = _stats_response_payload(transactions, year_value)
     review_required = [
@@ -171,11 +171,11 @@ def _auto_fix_safe_issues(transactions, year_value='All Time'):
     ]
 
     if links_created > 0:
-        message = f"Auto-linked {links_created} FIFO basis link(s) across {len(assets_needing_links)} asset(s)."
+        message = f"Added {links_created} FIFO basis link(s) across {len(assets_needing_links)} asset(s) for review."
     elif assets_needing_links:
         message = "No new FIFO links could be created. Review basis lots or missing acquisitions for the listed assets."
     else:
-        message = "No safe automatic fixes are currently available."
+        message = "No automatic FIFO links are currently available."
 
     if review_required:
         message = f"{message} {len(review_required)} asset(s) still need declared holdings or reclassification review."
@@ -358,7 +358,7 @@ def selected_asset():
     data_dict['reconciliation_status'] = {
         "is_reconciled": not (asset_stats.get('has_sells_without_links') or asset_stats.get('has_unlinked_sells')),
         "message": (
-            f"Not reconciled yet: {asset} has sells without complete basis links."
+            f"Not reconciled yet: {asset} has sells without complete basis links. Review links before using generated reports."
             if asset_stats.get('has_sells_without_links') or asset_stats.get('has_unlinked_sells')
             else ""
         )

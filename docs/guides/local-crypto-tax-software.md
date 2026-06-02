@@ -24,6 +24,6 @@ The benefit is control. You can hand a prepared packet to a qualified tax profes
 
 ## Best Fit
 
-Gainz is most useful when you have exchange CSVs, want an inspectable cost-basis trail, and care about explaining current holdings and tax outputs. It is not a replacement for professional judgment or a full hosted tax filing platform.
+Gainz is most useful when you have exchange CSVs, want an inspectable cost-basis trail, and care about explaining current holdings and generated reports. It is not a replacement for professional judgment or a full hosted tax filing platform.
 
 </article>

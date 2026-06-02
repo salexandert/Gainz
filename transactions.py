@@ -890,7 +890,7 @@ class Transactions:
             input_usd_spot=trans.usd_spot,
             input_usd_total=quantity * trans.usd_spot,
             reason=reason,
-            source=f"{trans.source} Converted in Gainz App",
+            source=f"{trans.source} Reclassified in Gainz App",
         )
         self.conversions.append(conversion)
 
@@ -915,18 +915,18 @@ class Transactions:
                 quantity=quantity,
                 time_stamp=send.time_stamp,
                 usd_spot=send.usd_spot,
-                source="Gainz App Send to Sell",
+                source="Gainz App documented send sale",
             )
 
             self.transactions.append(sell)
-            self._record_conversion(send, quantity, 'sell', 'Converted Send to Sell')
+            self._record_conversion(send, quantity, 'sell', 'Reclassified documented send as sell')
             self._reduce_transaction_quantity(send, quantity)
 
             amount_remaining -= quantity
             converted_quantity += quantity
             converted_count += 1
 
-        return f"Converted {converted_quantity} {asset} from {converted_count} send transaction(s) to sell transaction(s)."
+        return f"Reclassified {converted_quantity} {asset} from {converted_count} send transaction(s) as sell transaction(s) for review."
 
     def convert_buys_to_lost(self, asset, amount):
         amount_remaining = max(float(amount), 0.0)
@@ -944,14 +944,14 @@ class Transactions:
                 break
 
             quantity = min(buy.unlinked_quantity, amount_remaining)
-            self._record_conversion(buy, quantity, 'lost', 'Converted Buy to Lost')
+            self._record_conversion(buy, quantity, 'lost', 'Reclassified documented buy lot as lost')
             self._reduce_transaction_quantity(buy, quantity)
 
             amount_remaining -= quantity
             converted_quantity += quantity
             converted_count += 1
 
-        return f"Converted {converted_quantity} {asset} from {converted_count} buy transaction(s) to lost."
+        return f"Reclassified {converted_quantity} {asset} from {converted_count} buy transaction(s) as lost lots for review."
 
     def convert_receives_to_buys(self, asset, amount_to_convert):
         amount_remaining = max(float(amount_to_convert), 0.0)
@@ -974,18 +974,18 @@ class Transactions:
                 quantity=quantity,
                 time_stamp=receive.time_stamp,
                 usd_spot=receive.usd_spot,
-                source="Gainz App Receive to Buy",
+                source="Gainz App documented receive buy",
             )
 
             self.transactions.append(buy)
-            self._record_conversion(receive, quantity, 'buy', 'Converted Receive to Buy')
+            self._record_conversion(receive, quantity, 'buy', 'Reclassified documented receive as buy')
             self._reduce_transaction_quantity(receive, quantity)
 
             amount_remaining -= quantity
             converted_quantity += quantity
             converted_count += 1
 
-        return f"Converted {converted_quantity} {asset} from {converted_count} receive transaction(s) to buy transaction(s)."
+        return f"Reclassified {converted_quantity} {asset} from {converted_count} receive transaction(s) as buy transaction(s) for review."
 
 
     def delete(self, filename):

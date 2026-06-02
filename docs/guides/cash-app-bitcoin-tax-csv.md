@@ -7,7 +7,7 @@ description: Learn how Gainz imports Cash App Bitcoin CSV exports, links BTC sel
 
 # Cash App Bitcoin Tax CSV Guide
 
-Cash App can be a simple place to buy and sell Bitcoin, but tax time can still get uncomfortable when you need to prove what you paid for each BTC sale. Gainz helps by importing Cash App CSV exports into a local ledger, then linking taxable BTC sells back to earlier buy lots.
+Cash App can be a simple place to buy and sell Bitcoin, but tax time can still get uncomfortable when you need to support what you paid for each BTC sale. Gainz helps by importing Cash App CSV exports into a local ledger, then linking BTC sale records back to earlier buy lots.
 
 ## What To Export
 
@@ -24,7 +24,7 @@ Gainz reads Bitcoin activity into transaction types:
 - `send`: BTC moved out of the visible Cash App history.
 - `receive`: BTC moved into the visible Cash App history.
 
-Sells need basis links before the result is tax-ready. Sends and receives are transfer evidence, not automatically taxable by themselves.
+Sells need basis links before generated reports are review-ready. Sends and receives are transfer evidence, not tax conclusions by themselves.
 
 ## Recommended Workflow
 

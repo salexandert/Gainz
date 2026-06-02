@@ -24,7 +24,7 @@
             </div>
             <div id="collapseOne" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
               <div class="card-body">
-                Use this page to export all data to a human readable excel. Sheets for 8949 Short/Long by year along with many others are included.
+                Use this page to export a human-readable workbook and audit packet for review. Form 8949-style Short/Long sheets by year are included when basis links exist.
 
               </div>
             </div>
@@ -43,8 +43,8 @@
       <div class="card-body">
         <div class="d-flex flex-wrap justify-content-between align-items-start">
           <div>
-            <h4 class="card-title">Audit Readiness</h4>
-            <p class="card-category">Packet status before export</p>
+            <h4 class="card-title">Audit Packet Review Status</h4>
+            <p class="card-category">Items to review before export</p>
           </div>
           <span class="gainz-status-badge {{ audit_readiness.status_class }}">{{ audit_readiness.status }}</span>
         </div>
@@ -77,12 +77,12 @@
         </div>
 
         <div class="audit-next-action">
-          <strong>Next action:</strong> {{ audit_readiness.next_action }}
+          <strong>Review guidance:</strong> {{ audit_readiness.next_action }}
         </div>
 
         {% if audit_readiness.blockers %}
         <div class="alert alert-warning" role="alert">
-          <strong>Resolve before relying on this packet:</strong>
+          <strong>Review before using this packet:</strong>
           <ul class="mb-0">
             {% for blocker in audit_readiness.blockers %}
             <li>{{ blocker }}</li>

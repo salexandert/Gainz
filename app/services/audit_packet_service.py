@@ -122,7 +122,7 @@ class AuditPacketService:
             "",
             "This packet was generated locally by Gainz.",
             "",
-            "Gainz links taxable sells to earlier buy lots according to the user's selected accounting method. Unlinked sells, unexplained sends, and unexplained receives should be reviewed before relying on outputs.",
+            "Gainz links sale records to earlier buy lots according to the user's selected method. Unlinked sells, unexplained sends, and unexplained receives should be reviewed against source records before using generated reports.",
             "",
             f"Transaction count: {len(transactions.transactions)}",
             f"Assets: {assets}",

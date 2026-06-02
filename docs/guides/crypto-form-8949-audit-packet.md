@@ -7,7 +7,7 @@ description: Build a local crypto tax audit packet with linked Form 8949 rows, t
 
 # Crypto Form 8949 Audit Packet Guide
 
-Crypto tax work is easier to trust when the final totals can be traced back to source files and lot links. Gainz generates a local audit packet so you can review the evidence behind Form 8949-style rows before filing.
+Crypto tax work is easier to review when generated totals can be traced back to source files and lot links. Gainz generates a local audit packet so you can review the evidence behind Form 8949-style rows before filing.
 
 ## What The Packet Includes
 
@@ -26,7 +26,7 @@ A Gainz audit packet can include:
 
 ## Why Links Come First
 
-Form 8949-style output is generated from links between taxable sells and earlier buy lots. If a sell is not linked, Gainz should treat the packet as not ready instead of quietly producing a weak answer.
+Form 8949-style output is generated from links between sale records and earlier buy lots. If a sell is not linked, Gainz marks the packet as not ready for review instead of quietly producing a weak answer.
 
 ## Readiness Signals
 
