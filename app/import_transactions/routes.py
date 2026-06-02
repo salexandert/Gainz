@@ -122,6 +122,62 @@ def _data_source_summary(transactions):
     }
 
 
+def _remove_data_source(transactions, source):
+    source = str(source or "")
+    original_transactions = list(getattr(transactions, "transactions", []))
+    removed_transactions = [
+        transaction
+        for transaction in original_transactions
+        if str(getattr(transaction, "source", "") or "Manual / Unknown") == source
+    ]
+
+    if not removed_transactions:
+        return {
+            "removed_count": 0,
+            "source": source,
+            "source_name": os.path.basename(source) or source or "Manual / Unknown",
+        }
+
+    removed_ids = {id(transaction) for transaction in removed_transactions}
+    removed_links = {
+        link
+        for transaction in removed_transactions
+        for link in getattr(transaction, "links", [])
+    }
+
+    remaining_transactions = [
+        transaction
+        for transaction in original_transactions
+        if id(transaction) not in removed_ids
+    ]
+
+    for transaction in remaining_transactions:
+        transaction.links = [
+            link
+            for link in getattr(transaction, "links", [])
+            if (
+                link not in removed_links
+                and id(getattr(link, "buy", None)) not in removed_ids
+                and id(getattr(link, "sell", None)) not in removed_ids
+            )
+        ]
+        transaction.update_linked_transactions()
+        transaction.set_multi_link()
+
+    transactions.transactions = remaining_transactions
+    transactions.conversions = [
+        conversion
+        for conversion in getattr(transactions, "conversions", [])
+        if str(getattr(conversion, "source", "") or "") != source
+    ]
+
+    return {
+        "removed_count": len(removed_transactions),
+        "source": source,
+        "source_name": os.path.basename(source) or source or "Manual / Unknown",
+    }
+
+
 @blueprint.route('/', methods=['GET', 'POST'])
 @login_required
 def import_wizard():
@@ -211,5 +267,39 @@ def import_demo_data():
         repo_root=current_app.root_path + "/..",
     )
     return jsonify(result)
+
+
+@blueprint.route('/remove_source', methods=['POST'])
+@login_required
+def remove_source():
+    data = request.get_json(silent=True) or {}
+    source = data.get("source")
+
+    if not source:
+        return jsonify({"error": "Choose a data source to remove."}), 400
+
+    transactions = current_app.config['transactions']
+    result = _remove_data_source(transactions, source)
+
+    if result["removed_count"] == 0:
+        return jsonify({"error": "No transactions matched that data source."}), 404
+
+    save_path = transactions.save(
+        description=f"Removed data source {result['source_name']}"
+    )
+
+    return jsonify({
+        "message": (
+            f"Removed {result['removed_count']} transaction"
+            f"{'' if result['removed_count'] == 1 else 's'} from {result['source_name']} "
+            "and saved a new revision. Prior revisions remain available in History."
+        ),
+        "removed_count": result["removed_count"],
+        "source": result["source"],
+        "source_name": result["source_name"],
+        "save_path": save_path,
+        "save_summary": _current_save_summary(transactions),
+        "data_summary": _data_source_summary(transactions),
+    })
 
 

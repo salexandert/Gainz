@@ -58,14 +58,14 @@
             <div class="holdings-step-number">3</div>
             <div>
               <h5>Compare the two stories</h5>
-              <p><strong>Expected from buys/sells only</strong> asks: if imports were complete, how much should remain? Your declared holdings tell Gainz whether something is missing.</p>
+              <p><strong>Calculated net from imported buys/sells</strong> asks: based only on imported buy and sell records, how much should remain? Your declared holdings help identify records that may need review.</p>
             </div>
           </div>
           <div class="holdings-step">
             <div class="holdings-step-number">4</div>
             <div>
               <h5>Resolve gaps deliberately</h5>
-              <p>If expected holdings are too high, look for missing sells, disposals, losses, or transfers that should become taxable events. If expected holdings are too low, look for missing buys, income, gifts, or transfers that need basis.</p>
+              <p>If calculated holdings differ from declared holdings, review source records for missing acquisitions, disposals, transfers, losses, income, gifts, or other activity. Reclassify only when supported by documentation.</p>
             </div>
           </div>
           <div class="holdings-step">
@@ -137,7 +137,7 @@
 
         <div class="holdings-workbench-grid">
           <div class="holdings-metric">
-            <span>Expected From Buys/Sells Only</span>
+            <span>Calculated Net From Imported Buys/Sells</span>
             <strong id="holdings_expected_from_activity">--</strong>
           </div>
           <div class="holdings-metric">
@@ -189,7 +189,7 @@
               <strong id="holdings_breakdown_receives">--</strong>
             </div>
             <div class="holdings-metric">
-              <span>Imported Net After Transfers</span>
+              <span>Imported Net Including Transfers</span>
               <strong id="holdings_breakdown_imported_net">--</strong>
             </div>
           </div>
@@ -215,7 +215,7 @@
           </div>
 
           <h6>Transaction Timeline</h6>
-          <p class="card-category">Expected balance changes only on buys and sells. Imported net also includes sends and receives, so it helps explain whether the gap is probably missing classifications or transfer history.</p>
+          <p class="card-category">The calculated buy/sell net changes only on buys and sells. Imported net also includes sends and receives, so it helps identify records that may need review.</p>
           <div class="table-responsive">
             <table id="holdings_difference_transactions_datatable" class="table table-striped table-bordered" style="width:100%">
               <thead>

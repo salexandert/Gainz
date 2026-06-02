@@ -170,13 +170,19 @@
     <div class="card">
       <div class="card-body">
         <h5 class="card-title">Current Data Sources</h5>
+        <div id="data_source_action_result" class="alert alert-info" role="alert" style="display: none;"></div>
+        <p class="text-muted">
+          Remove a source only removes its transactions from the current data set and saves a new revision.
+          Previous revisions remain available in History, and source CSV files are not deleted from disk.
+        </p>
         <div class="table-responsive">
-          <table class="table table-striped">
+          <table id="import_data_sources_table" class="table table-striped" data-remove-url="{{ url_for('import_transactions_blueprint.remove_source') }}">
             <thead>
               <tr>
                 <th>Source</th>
                 <th>Rows</th>
                 <th>Status</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -193,16 +199,27 @@
                     <span class="badge badge-warning">{{ source.status }}</span>
                   {% endif %}
                 </td>
+                <td>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger remove-data-source-button"
+                    data-source="{{ source.source }}"
+                    data-source-name="{{ source.name }}"
+                    data-source-count="{{ source.count }}"
+                  >
+                    Remove from Current Data
+                  </button>
+                </td>
               </tr>
               {% else %}
               <tr>
-                <td colspan="3" class="text-muted">No imported data yet.</td>
+                <td colspan="4" class="text-muted">No imported data yet.</td>
               </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
-        <p class="text-muted mb-0">Source files are copied into audit packets when they still exist on disk. Refresh this page after imports to update the summary.</p>
+        <p class="text-muted mb-0">Source files are copied into audit packets when they still exist on disk. Refresh this page after imports or source removal to update the summary.</p>
       </div>
     </div>
   </div>
@@ -210,6 +227,7 @@
     <div class="card">
       <div class="card-body">
         <h5 class="card-title">Recent Revisions</h5>
+        <p class="text-muted">Every import, source removal, holdings edit, and auto-fix should create a revision so you can return to an earlier state.</p>
         <div class="table-responsive">
           <table class="table table-striped">
             <thead>

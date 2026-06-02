@@ -7,6 +7,7 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
+from app.import_transactions.routes import _remove_data_source
 from app.services.audit_packet_service import AuditPacketService
 from app.services.import_service import ImportService
 from transaction import Buy, Sell
@@ -25,6 +26,7 @@ def empty_transactions():
     transactions.index = 0
     transactions.conversions = []
     transactions.asset_objects = []
+    transactions.import_warnings = []
     transactions.view = ""
     transactions.transactions = []
     transactions.save = lambda description=None: None
@@ -51,6 +53,21 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual(0, result["skipped_count"])
         self.assertEqual(["buy", "buy", "sell"], [t.trans_type for t in transactions.transactions])
         self.assertEqual({"BTC"}, transactions.assets)
+
+    def test_remove_data_source_removes_transactions_and_cleans_links(self):
+        transactions = empty_transactions()
+        removed_buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "remove.csv")
+        remaining_buy = Buy("BTC", 2, datetime.datetime(2024, 1, 2), 100, "keep.csv")
+        remaining_sell = Sell("BTC", 0.5, datetime.datetime(2024, 2, 1), 300, "keep.csv")
+        remaining_sell.link_transaction(removed_buy, 0.5)
+        transactions.transactions = [removed_buy, remaining_buy, remaining_sell]
+
+        result = _remove_data_source(transactions, "remove.csv")
+
+        self.assertEqual(1, result["removed_count"])
+        self.assertEqual(["keep.csv", "keep.csv"], [transaction.source for transaction in transactions.transactions])
+        self.assertEqual([], remaining_sell.links)
+        self.assertEqual([], remaining_sell.linked_transactions)
 
     def test_import_service_imports_coinbase_sample(self):
         transactions = empty_transactions()

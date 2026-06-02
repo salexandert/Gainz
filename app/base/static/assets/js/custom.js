@@ -233,6 +233,59 @@ $(document).ready(function () {
                 .show();
         });
     });
+
+    $(".remove-data-source-button").on("click", function () {
+        var button = $(this);
+        var table = $("#import_data_sources_table");
+        var removeUrl = table.data("remove-url");
+        var source = button.data("source");
+        var sourceName = button.data("source-name") || "this source";
+        var sourceCount = button.data("source-count") || 0;
+        var resultBox = $("#data_source_action_result");
+        var confirmation = [
+            "Remove " + sourceCount + " transaction(s) from " + sourceName + " in the current data set?",
+            "",
+            "Gainz will save a new revision. Prior revisions stay available in History.",
+            "The original CSV file will not be deleted from disk."
+        ].join("\n");
+
+        if (!window.confirm(confirmation)) {
+            return;
+        }
+
+        button.prop("disabled", true).text("Removing...");
+        resultBox
+            .removeClass("alert-danger alert-info alert-success")
+            .addClass("alert-info")
+            .text("Removing data source and saving a new revision...")
+            .show();
+
+        $.ajax({
+            url: removeUrl,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ source: source })
+        }).done(function (result) {
+            resultBox
+                .removeClass("alert-info alert-danger")
+                .addClass("alert-success")
+                .text(result.message || "Data source removed and new revision saved.");
+            window.setTimeout(function () {
+                window.location.reload();
+            }, 900);
+        }).fail(function (xhr) {
+            var message = "Could not remove that data source.";
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                message += " " + xhr.responseJSON.error;
+            }
+            resultBox
+                .removeClass("alert-info alert-success")
+                .addClass("alert-danger")
+                .text(message)
+                .show();
+            button.prop("disabled", false).text("Remove from Current Data");
+        });
+    });
 });
 
 // Holdings & Accounting
@@ -472,13 +525,13 @@ $(document).ready(function() {
         $('#holdings_expected_from_activity').text(holdingsFormatQuantity(expectedHoldings));
         $('#holdings_unlinked_sales').text(holdingsFormatQuantity(soldUnlinked));
         $('#holdings_quantity').attr('placeholder', 'Current holding for ' + asset);
-        $('#convert_text').text('Use these only when you know the accounting treatment. If you know the missing transaction, adding the real transaction is better than converting activity automatically.');
+        $('#convert_text').text('Use these tools only when supported by source records. If you know the missing transaction, adding the actual transaction is preferable to automatic reclassification.');
 
         if (holdings === null) {
             $('#holdings_declared_current').text('--');
             $('#holdings_difference').text('--');
             $('#holdings_quantity').val('');
-            $('#holdings_next_action').text('Enter the amount of ' + asset + ' you currently hold across all wallets and exchanges. This becomes the anchor for the rest of the reconciliation.');
+            $('#holdings_next_action').text('Enter the amount of ' + asset + ' you want Gainz to use for reconciliation. Keep source records for the amount entered.');
             holdingsSetBadge('Needs declared holdings');
             return;
         }
@@ -489,17 +542,17 @@ $(document).ready(function() {
         $('#holdings_quantity').val(holdingsFormatQuantity(holdings));
 
         if (Math.abs(difference) <= 0.00000001 && soldUnlinked <= 0.00000001) {
-            $('#holdings_next_action').text(asset + ' is verified against buys and sells. Continue to Stats & Charts to inspect current lots and audit packet readiness.');
+            $('#holdings_next_action').text(asset + ' has no quantity difference from imported buys and sells. Review source records, lots, and basis links before relying on outputs.');
             holdingsSetBadge('Verified');
         } else if (soldUnlinked > 0.00000001) {
-            $('#holdings_next_action').text(asset + ' still has unlinked sales. Run Auto Link or manually review links before trusting tax totals.');
+            $('#holdings_next_action').text(asset + ' still has unlinked sales. Run Auto Link or manually review links before relying on tax totals.');
             holdingsSetBadge('Unlinked sales');
         } else if (difference > 0) {
-            $('#holdings_next_action').text('Imported activity says you should hold more ' + asset + ' than you declared. Look for missing sells, disposals, losses, or transfers that should be taxable events.');
-            $('#convert_text').text('Gainz can help convert known sends or lost lots, but only use this after confirming the missing activity.');
+            $('#holdings_next_action').text('The calculated net from imported buys and sells is higher than declared ' + asset + '. Review missing disposals, transfers, losses, or other records before using this difference in tax outputs.');
+            $('#convert_text').text('Gainz can help reclassify known sends or lost lots, but only use this when supported by documentation.');
             holdingsSetBadge('Needs Review');
         } else {
-            $('#holdings_next_action').text('Declared holdings are higher than imported buys/sells explain. Look for missing buys, income, gifts, or transfers that need basis.');
+            $('#holdings_next_action').text('Declared holdings are higher than imported buys and sells currently explain. Review missing acquisitions, income, gifts, transfers, or other records that may need basis support.');
             holdingsSetBadge('Needs Review');
         }
     }

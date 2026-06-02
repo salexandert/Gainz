@@ -1082,21 +1082,30 @@ def get_holdings_reconciliation(transactions, asset):
     if declared_holdings is None:
         difference = None
         status = "Needs declared holdings"
-        next_action = "Enter the actual current holding for this asset."
-        allocation_method = "Showing unlinked buy/receive lots because no declared holdings are saved."
+        next_action = "Enter the current quantity you want Gainz to use for reconciliation. Keep source records for the amount entered."
+        allocation_method = "No declared holdings are saved, so Gainz is showing unlinked buy and receive lots for review."
     else:
         difference = expected_holdings - declared_holdings
-        allocation_method = "FIFO remaining estimate: oldest disposals are assumed consumed first, so declared holdings are allocated to newest available lots."
+        allocation_method = (
+            "Review estimate only: available lots are displayed using a FIFO-style assumption. "
+            "Confirm final accounting treatment against source records or with a qualified tax professional."
+        )
 
         if abs(difference) <= 0.00000001:
             status = "Verified"
-            next_action = "Review lots and proceed to basis linking."
+            next_action = "No quantity difference was detected from imported buys and sells. Review source records, lots, and basis links before relying on outputs."
         elif difference > 0:
             status = "Needs Review"
-            next_action = "Classify missing disposals/losses or convert sends to sells until the difference is resolved."
+            next_action = (
+                "Review whether the difference is explained by missing disposals, transfers, losses, or other records. "
+                "Reclassify activity only when supported by documentation."
+            )
         else:
             status = "Needs Review"
-            next_action = "Add missing acquisitions or convert receives to buys until the difference is resolved."
+            next_action = (
+                "Review whether the difference is explained by missing acquisitions, income, gifts, transfers, or other records. "
+                "Add or reclassify activity only when supported by documentation."
+            )
 
     return {
         "asset": asset,
@@ -1125,20 +1134,20 @@ def get_holdings_reconciliation_summary(transactions, asset):
             if reconciliation["declared_holdings"] is not None
             else "N/A",
         ],
-        ["Buy Quantity", format_quantity(reconciliation["buy_quantity"])],
-        ["Sell Quantity", format_quantity(reconciliation["sell_quantity"])],
-        ["Expected From Buys/Sells Only", format_quantity(reconciliation["expected_holdings"])],
-        ["Imported Net After Transfers", format_quantity(reconciliation["imported_net"])],
+        ["Imported Buy Quantity", format_quantity(reconciliation["buy_quantity"])],
+        ["Imported Sell Quantity", format_quantity(reconciliation["sell_quantity"])],
+        ["Calculated Net From Imported Buys/Sells", format_quantity(reconciliation["expected_holdings"])],
+        ["Imported Net Including Transfers", format_quantity(reconciliation["imported_net"])],
         ["Available Buy/Receive Lot Quantity", format_quantity(reconciliation["available_lot_quantity"])],
         [
-            "Difference vs Declared Holdings",
+            "Review Difference vs Declared Holdings",
             format_quantity(reconciliation["difference"])
             if reconciliation["difference"] is not None
             else "N/A",
         ],
         ["Status", reconciliation["status"]],
-        ["Next Action", reconciliation["next_action"]],
-        ["Lot Allocation Method", reconciliation["lot_allocation_method"]],
+        ["Review Guidance", reconciliation["next_action"]],
+        ["Lot Allocation Assumption", reconciliation["lot_allocation_method"]],
     ]
 
 
@@ -1175,17 +1184,17 @@ def _holdings_reconciliation_interpretation(reconciliation):
         return f"Save declared {asset} holdings to calculate the difference."
 
     if abs(difference) <= 0.00000001:
-        return "This asset is verified against imported buys and sells. Review lots and links before export."
+        return "This asset is verified against imported buys and sells. Review lots, links, and source records before export."
 
     if difference > 0:
         return (
-            "Expected holdings are higher than declared holdings. Review sends, missing sells, disposals, "
-            "losses, or transfers before treating the difference as a taxable event."
+            "The calculated net from imported buys and sells is higher than declared holdings. Review sends, "
+            "missing disposals, losses, transfers, or other records before using this difference in tax outputs."
         )
 
     return (
-        "Declared holdings are higher than imported buys and sells explain. Review missing buys, income, "
-        "gifts, or transfers that need basis."
+        "Declared holdings are higher than imported buys and sells currently explain. Review missing acquisitions, income, "
+        "gifts, transfers, or other records that may need basis support."
     )
 
 
@@ -1267,7 +1276,7 @@ def get_holdings_difference_breakdown(transactions, asset):
     expected_formula = (
         f"Buys {format_quantity(reconciliation['buy_quantity'])} - sells "
         f"{format_quantity(reconciliation['sell_quantity'])} = "
-        f"{format_quantity(reconciliation['expected_holdings'])} {asset} expected from buys/sells only."
+        f"{format_quantity(reconciliation['expected_holdings'])} {asset} calculated from imported buys/sells only."
     )
     transfer_formula = (
         f"Including transfers: buys {format_quantity(reconciliation['buy_quantity'])} + receives "
@@ -1283,7 +1292,7 @@ def get_holdings_difference_breakdown(transactions, asset):
         difference_formula = (
             f"Expected {format_quantity(reconciliation['expected_holdings'])} - declared "
             f"{format_quantity(declared_holdings)} = "
-            f"{format_quantity(reconciliation['difference'])} {asset} difference vs declared holdings."
+            f"{format_quantity(reconciliation['difference'])} {asset} review difference vs declared holdings."
         )
 
     return {

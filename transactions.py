@@ -438,7 +438,8 @@ class Transactions:
         revision_num = self.revision_num
         if revision_num is None:
             revision_num = 0
-        sheet.cell(row=1, column=2, value=revision_num + 1)
+        next_revision_num = revision_num + 1
+        sheet.cell(row=1, column=2, value=next_revision_num)
 
         if getattr(self, 'import_warnings', None):
             warnings_sheet = workbook.create_sheet('Import Warnings')
@@ -455,6 +456,7 @@ class Transactions:
         # Update internal state
         self.saves = self.load_saves()
         self.view = save_as_filename
+        self.revision_num = next_revision_num
 
         return save_as_filename
 
