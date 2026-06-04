@@ -1,4 +1,4 @@
-from flask import Flask, url_for
+from flask import Flask, redirect, request, url_for
 from flask_login import current_user
 from .extensions import db, login_manager
 from importlib import import_module
@@ -33,6 +33,17 @@ def register_blueprints(app):
         ):
         module = import_module('app.{}.routes'.format(module_name))
         app.register_blueprint(module.blueprint)
+
+    @app.route('/add_transactions', defaults={'path': ''}, methods=['GET', 'POST'])
+    @app.route('/add_transactions/', defaults={'path': ''}, methods=['GET', 'POST'])
+    @app.route('/add_transactions/<path:path>', methods=['GET', 'POST'])
+    def legacy_add_transactions_redirect(path):
+        target = '/import_data'
+        if path:
+            target = f'{target}/{path}'
+        if request.query_string:
+            target = f"{target}?{request.query_string.decode('utf-8')}"
+        return redirect(target, code=308)
 
 
 def configure_database(app):

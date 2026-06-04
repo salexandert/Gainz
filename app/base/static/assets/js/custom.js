@@ -2313,7 +2313,7 @@ $(document).ready(function() {
 
         $.ajax({
             type: "POST",
-            url: "/add_transactions/add_transactions_selected_asset",
+            url: "/import_data/add_transactions_selected_asset",
             data: JSON.stringify({
                 'row_data':  $('#add_transactions_stats_datatable').DataTable().row( this ).data(),
                 'unlinked_remaining': $('#manage_trans_buys_checkbox_unlinked').is(':checked')
@@ -2348,7 +2348,7 @@ $(document).ready(function() {
     $("#sells_delete_button").click(function(){
         $.ajax({
             type: "POST",
-            url: "/add_transactions/delete_transactions",
+            url: "/import_data/delete_transactions",
             data: JSON.stringify({
                 'row_data': $('#add_transactions_sells_datatable').DataTable().row( {selected:true} ).data(),
                 'asset': $('#add_transactions_stats_datatable').DataTable().row( {selected:true} ).data(),
@@ -2377,7 +2377,7 @@ $(document).ready(function() {
 
         $.ajax({
             type: "POST",
-            url: "/add_transactions/add_transactions_selected_asset",
+            url: "/import_data/add_transactions_selected_asset",
             data: JSON.stringify(json_data),
 
             contentType: 'application/json',
@@ -2407,7 +2407,7 @@ $(document).ready(function() {
 
         $.ajax({
             type: "POST",
-            url: "/add_transactions/add_transactions_selected_asset",
+            url: "/import_data/add_transactions_selected_asset",
             data: JSON.stringify({
                 'row_data':  $('#add_transactions_stats_datatable').DataTable().row( {selected:true} ).data(),
                 'unlinked_remaining': $('#manage_trans_buys_checkbox_unlinked').is(':checked'),
@@ -2441,7 +2441,7 @@ $(document).ready(function() {
     $("#buys_delete_button").click(function(){
         $.ajax({
             type: "POST",
-            url: "/add_transactions/delete_transactions",
+            url: "/import_data/delete_transactions",
             data: JSON.stringify({
                 'row_data': $('#add_transactions_buys_datatable').DataTable().row( {selected:true} ).data(),
                 'asset': $('#add_transactions_stats_datatable').DataTable().row( {selected:true} ).data(),
@@ -2459,7 +2459,7 @@ $(document).ready(function() {
     $("#buys_convert_button").click(function(){
         $.ajax({
             type: "POST",
-            url: "/add_transactions/buy_convert",
+            url: "/import_data/buy_convert",
             data: JSON.stringify({
                 'row_data': $('#add_transactions_buys_datatable').DataTable().row( {selected:true} ).data(),
               }),
@@ -2475,7 +2475,7 @@ $(document).ready(function() {
     $("#receive_convert_button").click(function(){
         $.ajax({
             type: "POST",
-            url: "/add_transactions/receive_convert",
+            url: "/import_data/receive_convert",
             data: JSON.stringify({
                 'table_data': $('#add_transactions_receive_datatable').DataTable().rows( {selected:true} ).data(),
               }),
@@ -2491,7 +2491,7 @@ $(document).ready(function() {
     $("#send_convert_button").click(function(){
         $.ajax({
             type: "POST",
-            url: "/add_transactions/send_convert",
+            url: "/import_data/send_convert",
             data: JSON.stringify({
                 'row_data': $('#add_transactions_sends_datatable').DataTable().row( {selected:true} ).data(),
               }),
