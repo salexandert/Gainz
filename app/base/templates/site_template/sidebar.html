@@ -2,13 +2,13 @@
 
 <!-- sidebar menu -->
 <div class="logo">
-  <a href="{{ store_url or '/home' }}" class="simple-text logo-mini" {% if store_url %}target="_blank" rel="noopener noreferrer"{% endif %}>
+  <a href="/home" class="simple-text logo-mini">
     <div class="logo-image-small">
       <img src="{{ url_for('static', filename='/assets/img/gainz_logo.jpg') }}">
     </div>
     <!-- <p>CT</p> -->
   </a>
-  <a href="{{ store_url or '/home' }}" class="simple-text logo-normal" {% if store_url %}target="_blank" rel="noopener noreferrer"{% endif %}>
+  <a href="/home" class="simple-text logo-normal">
     Gainz!
     <!-- <div class="logo-image-big">
       <img src="../assets/img/logo-big.png">
