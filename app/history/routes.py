@@ -1,5 +1,5 @@
 from . import blueprint
-from flask import render_template, request, jsonify, current_app
+from flask import redirect, render_template, request, jsonify, current_app
 from flask_login import login_required, current_user
 from utils import *
 from transactions import Transactions
@@ -8,13 +8,7 @@ from transactions import Transactions
 @blueprint.route('/',  methods=['GET'])
 @login_required
 def index():
-
-    transactions = current_app.config['transactions']
-    stats_table_data = get_stats_table_data(transactions)
-
-    saves = transactions.load_saves()
-
-    return render_template('history.html', stats_table_data=stats_table_data, history=saves)
+    return redirect('/import_transactions/#revision-history')
 
 @blueprint.route('/compare_selected',  methods=['POST'])
 @login_required
