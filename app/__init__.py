@@ -131,6 +131,10 @@ def create_app(config, selenium=False):
     if selenium:
         app.config['LOGIN_DISABLED'] = True
 
+    @app.route('/healthz')
+    def healthz():
+        return {'status': 'ok'}
+
     register_extensions(app)
     register_blueprints(app)
     configure_database(app)

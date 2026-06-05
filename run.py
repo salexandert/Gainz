@@ -45,13 +45,21 @@ parsers_logger = logging.getLogger('parsers')
 parsers_logger.setLevel(logging.DEBUG)
 
 if __name__ == "__main__":
+    host = os.environ.get("GAINZ_HOST", "127.0.0.1")
+    port = int(os.environ.get("GAINZ_PORT", "5000"))
+    url = f"http://{host}:{port}"
+    debug_enabled = os.environ.get("GAINZ_FLASK_DEBUG", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
 
     print(f"Logging to: {os.path.abspath(log_filename)}")
     print(
         "\n\nGainz App runs on a non-production (Flask) web server you can safely ignore the warning(s) below."
     )
     print(
-        "\nTo access Gainz go to http://127.0.0.1:5000 in a web browser. Preferably Chrome"
+        f"\nTo access Gainz go to {url} in a web browser. Preferably Chrome"
     )
     print(
         "\nIf this is your first run, credentials are in instance/first_run_credentials.txt "
@@ -59,4 +67,4 @@ if __name__ == "__main__":
     )
     print("\nClose this window when finished.\n")
 
-    app.run(debug=app.config.get("DEBUG", False), use_reloader=False)
+    app.run(host=host, port=port, debug=debug_enabled, use_reloader=False)

@@ -15,6 +15,7 @@ APP_NAME = "Gainz"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 5000
 DEFAULT_SUPPORT_URL = "https://cash.app/$SAl3xander"
+STARTUP_CHECK_INTERVAL_MS = 500
 
 
 def app_base_dir():
@@ -42,6 +43,10 @@ def server_url(port):
     return f"http://{DEFAULT_HOST}:{port}"
 
 
+def health_url(port):
+    return f"{server_url(port)}/healthz"
+
+
 def support_url():
     return os.environ.get("GAINZ_SUPPORT_URL", DEFAULT_SUPPORT_URL)
 
@@ -60,6 +65,9 @@ def wait_for_server(url, timeout=20):
 
 def start_gainz_server(port, error_queue):
     try:
+        os.environ["GAINZ_HOST"] = DEFAULT_HOST
+        os.environ["GAINZ_PORT"] = str(port)
+
         from run import app
 
         app.run(host=DEFAULT_HOST, port=port, debug=False, use_reloader=False)
@@ -79,10 +87,16 @@ class GainzLauncher(tk.Tk):
         os.chdir(app_base_dir())
         self.port = find_available_port()
         self.url = server_url(self.port)
+        self.health_url = health_url(self.port)
         self.support_url = support_url()
         self.error_queue = queue.Queue()
+        self.started_at = time.time()
+        self.browser_opened = False
 
-        self.status = tk.StringVar(value="Starting Gainz...")
+        self.status = tk.StringVar(
+            value="Starting Gainz local server. This can take a minute while your save loads..."
+        )
+        self.heading_text = tk.StringVar(value=f"Gainz {APP_VERSION} is starting")
         self.url_text = tk.StringVar(value=self.url)
         self.credentials_text = tk.StringVar(value=self.credentials_message())
 
@@ -95,7 +109,7 @@ class GainzLauncher(tk.Tk):
         return f"First-run credentials, when needed, are saved at:\n{credentials_path}"
 
     def build_ui(self):
-        title = ttk.Label(self, text=f"Gainz {APP_VERSION} is starting", font=("Segoe UI", 16, "bold"))
+        title = ttk.Label(self, textvariable=self.heading_text, font=("Segoe UI", 16, "bold"))
         title.pack(anchor="w")
 
         description = ttk.Label(
@@ -143,13 +157,22 @@ class GainzLauncher(tk.Tk):
             self.open_button.configure(state="disabled")
             return
 
-        if wait_for_server(self.url, timeout=1):
+        elapsed = int(time.time() - self.started_at)
+        self.status.set(
+            f"Starting Gainz local server... {elapsed}s elapsed. Keep this window open."
+        )
+
+        if wait_for_server(self.health_url, timeout=1):
+            self.heading_text.set(f"Gainz {APP_VERSION} is running")
             self.status.set("Gainz is running.")
             self.open_button.configure(state="normal")
             self.title(f"{APP_NAME} {APP_VERSION} - Running")
+            if not self.browser_opened and os.environ.get("GAINZ_AUTO_OPEN", "1") != "0":
+                self.browser_opened = True
+                self.after(250, self.open_gainz)
             return
 
-        self.after(500, self.check_startup)
+        self.after(STARTUP_CHECK_INTERVAL_MS, self.check_startup)
 
     def open_gainz(self):
         webbrowser.open(self.url)
