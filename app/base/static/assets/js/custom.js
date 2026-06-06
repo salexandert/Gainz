@@ -2267,7 +2267,7 @@ function showSwal(type, title, text) {
 
 
 
-// Add and Manage Transactions Page
+// Add Manual Transactions Page
 $(document).ready(function() {
 
 

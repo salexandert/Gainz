@@ -283,7 +283,7 @@ def auto_link_pre_check():
 
                         description = (
                             f"Sent {send.quantity} on {send.time_stamp} and received {receive.quantity} {(receive.time_stamp - send.time_stamp).days} days later"
-                            f" with a difference of {difference:.9f}. If the difference is a sell create it on the Add and Manage Transactions page."
+                            f" with a difference of {difference:.9f}. If the difference is a sell create it on the Add Manual Transactions page."
                         )
 
                         id = f"DIF:{send_index}:{receive_index}"
