@@ -31,9 +31,12 @@ class ManualTransaction(FlaskForm):
     submit = SubmitField('Submit')
 
 
+@blueprint.route('', methods=['GET'])
 @blueprint.route('/', methods=['GET', 'POST'])
 @login_required
 def add_transaction():
+    if request.method == 'GET':
+        return redirect('/import_transactions/#manual-transactions')
 
     transactions = current_app.config['transactions']
     manual_trans = ManualTransaction()

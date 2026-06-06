@@ -164,6 +164,69 @@
 </div>
 <!-- /Upload  -->
 
+<!-- Manual Transactions -->
+<div class="row" id="manual-transactions">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+          <div>
+            <h5 class="mb-1">Add Manual Transactions</h5>
+            <p class="text-muted mb-0">Add known buys or sells that were not imported from a CSV.</p>
+          </div>
+        </div>
+        {% if request.args.get('manual_added') %}
+        <div class="alert alert-success" role="alert">
+          Manual {{ request.args.get('manual_added') }} transaction added and saved as a new revision.
+        </div>
+        {% endif %}
+        <form method="POST" action="{{ url_for('import_transactions_blueprint.import_wizard') }}#manual-transactions">
+          {{ manual_trans.hidden_tag() }}
+          <div class="row">
+            <div class="col-md-2">
+              <label>{{ manual_trans.type.label }}<span class="required">*</span></label>
+              <div class="form-group">
+                {{ manual_trans.type(class_="form-control") }}
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label>{{ manual_trans.timestamp.label }}<span class="required">*</span></label>
+              <div class="form-group">
+                {{ manual_trans.timestamp(class_="form-control") }}
+              </div>
+            </div>
+            <div class="col-md-2">
+              <label>{{ manual_trans.symbol.label }}<span class="required">*</span></label>
+              <div class="form-group">
+                {{ manual_trans.symbol(class_="form-control", placeholder="BTC") }}
+              </div>
+            </div>
+            <div class="col-md-2">
+              <label>{{ manual_trans.quantity.label }}<span class="required">*</span></label>
+              <div class="form-group">
+                {{ manual_trans.quantity(class_="form-control", placeholder="0.00000000") }}
+              </div>
+            </div>
+            <div class="col-md-2">
+              <label>{{ manual_trans.usd_spot.label }}<span class="required">*</span></label>
+              <div class="form-group">
+                {{ manual_trans.usd_spot(class_="form-control", placeholder="65000.00") }}
+              </div>
+            </div>
+            <div class="col-md-1 d-flex align-items-end">
+              {{ manual_trans.submit(class_="btn btn-info btn-round btn-sm mb-3", value="Add") }}
+            </div>
+          </div>
+        </form>
+        <p class="text-muted mb-0">
+          Manual entries are saved with source <strong>Gainz App Manual Add</strong> and appear in data sources, revisions, holdings reconciliation, and exports.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Manual Transactions -->
+
 <!-- Data Sources -->
 <div class="row">
   <div class="col-md-7">

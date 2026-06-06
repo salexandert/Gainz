@@ -207,6 +207,35 @@ def import_wizard():
         if current_holdings.validate_on_submit():
             pass
 
+        if manual_trans.validate_on_submit():
+            if manual_trans.type.data == 'buy':
+                trans = Buy(
+                    trans_type=manual_trans.type.data,
+                    time_stamp=manual_trans.timestamp.data,
+                    quantity=float(manual_trans.quantity.data),
+                    usd_spot=float(manual_trans.usd_spot.data),
+                    symbol=manual_trans.symbol.data.upper(),
+                    source="Gainz App Manual Add"
+                )
+            else:
+                trans = Sell(
+                    trans_type=manual_trans.type.data,
+                    time_stamp=manual_trans.timestamp.data,
+                    quantity=float(manual_trans.quantity.data),
+                    usd_spot=float(manual_trans.usd_spot.data),
+                    symbol=manual_trans.symbol.data.upper(),
+                    source="Gainz App Manual Add"
+                )
+
+            transactions.transactions.append(trans)
+            transactions.save(description="Manually Added Transaction")
+            return redirect(
+                url_for(
+                    'import_transactions_blueprint.import_wizard',
+                    manual_added=trans.symbol,
+                ) + '#manual-transactions'
+            )
+
     stats_table_data = get_stats_table_data(transactions)
     all_trans_table_data = get_all_trans_table_data(transactions)
 
