@@ -63,6 +63,10 @@ The first public package is a local Windows build. It starts a desktop launcher 
 
 <p><a class="button" href="{{ '/download/' | relative_url }}">Go to the Download page</a></p>
 
+## Public Website
+
+The public Gainz website is <https://cryptogainz.store>. The temporary Netlify URL is <https://gainzstore.netlify.app/> while DNS and caches settle.
+
 ## Important Limit
 
 Gainz is documentation support. It is not tax, legal, or financial advice. Always review exports with a qualified tax professional before filing.

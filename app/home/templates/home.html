@@ -30,6 +30,9 @@
         <div class="gainz-home-actions">
           <a class="btn btn-primary btn-round" href="/holdings_accounting">Open Holdings & Accounting</a>
           <a class="btn btn-outline-primary btn-round" href="/import_transactions/">Import & Manage Data</a>
+          {% if store_url %}
+          <a class="btn btn-outline-primary btn-round" href="{{ store_url }}" target="_blank" rel="noopener noreferrer">Visit Gainz Website</a>
+          {% endif %}
         </div>
         <div class="gainz-home-flow">
           <div>

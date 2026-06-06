@@ -24,6 +24,8 @@ Supporting phrases:
 
 ## What Exists Now
 
+- Public website: <https://cryptogainz.store>.
+- Temporary Netlify URL during DNS/cache propagation: <https://gainzstore.netlify.app/>.
 - `docs/index.md`: public landing page.
 - `docs/guides/cash-app-bitcoin-tax-csv.md`: Cash App Bitcoin import guide.
 - `docs/guides/coinbase-crypto-tax-csv.md`: Coinbase CSV guide.
@@ -54,7 +56,7 @@ Search traffic only matters if the first-run experience proves value quickly. Th
 
 ## Publishing Checklist
 
-1. Enable GitHub Pages from the `docs/` folder or deploy `docs/` to <https://cryptogainz.store>.
+1. Keep <https://cryptogainz.store> pointed at the Netlify production deployment.
 2. Confirm every guide has a unique title and meta description.
 3. Confirm `https://cryptogainz.store/sitemap.xml` loads.
 4. Add Google Search Console once the domain is live.

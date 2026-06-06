@@ -113,6 +113,7 @@ The audit packet includes the Excel workbook, Form 8949 detail CSVs, Form 8949 t
 
 ## Documentation
 
+- Official website: <https://cryptogainz.store>
 - [Public site and guide hub](docs/index.md)
 - [Using Gainz from import to audit packet](docs/user-walkthrough.md)
 - [How Gainz calculates basis](docs/how-gainz-calculates-basis.md)
@@ -131,13 +132,15 @@ These screenshots are meant to show the first-run workflow without exposing priv
 
 ## Public Site And SEO
 
-The `docs/` folder is ready to publish as a GitHub Pages site or a static site at <https://cryptogainz.store>. It includes:
+The public website is live at <https://cryptogainz.store>. The temporary Netlify URL is <https://gainzstore.netlify.app/> while DNS and caches settle.
+
+The `docs/` folder remains the source for project guides and SEO-oriented documentation. It includes:
 
 - A local-first landing page.
 - Focused guides for Cash App, Coinbase, Coinbase Convert, Form 8949 audit packets, and private local crypto tax software.
 - Page titles, meta descriptions, canonical URLs, Open Graph metadata, a crawler-friendly sitemap, and `robots.txt`.
 
-The best early SEO strategy is useful, specific documentation for people trying to reconcile crypto CSVs, not generic crypto-tax content. Start with the guide pages, then add screenshots, release downloads, and synthetic demo outputs as the product becomes easier for first-time users.
+The best early SEO strategy is useful, specific documentation for people trying to reconcile crypto CSVs, not generic crypto-tax content. Keep expanding guide pages with screenshots, release downloads, and synthetic demo outputs as the product becomes easier for first-time users.
 
 ## Support Gainz
 

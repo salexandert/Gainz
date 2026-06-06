@@ -13,6 +13,7 @@ This checklist describes what should be true before Gainz is shared outside a tr
 - Demo CSVs contain synthetic data only.
 - User walkthrough explains import, auto-link, holdings, Stats, Export, and audit packet review.
 - Public docs state that Gainz is local-first documentation support, not tax advice.
+- Public website at `https://cryptogainz.store` is linked from the app, README, and GitHub repository metadata.
 - Tests cover core lot linking and parser behavior.
 
 ## Required Before Packaged Desktop Release
