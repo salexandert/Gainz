@@ -10,7 +10,63 @@ permissions:
   contents: write
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "VERSION must be semantic version format, got '$version'." >&2
+            exit 1
+          fi
+
+          app_version="$(python - <<'PY'
+import re
+from pathlib import Path
+text = Path("app_version.py").read_text(encoding="utf-8")
+print(re.search(r'APP_VERSION\s*=\s*"([^"]+)"', text).group(1))
+PY
+)"
+          if [[ "$app_version" != "$version" ]]; then
+            echo "app_version.py ($app_version) does not match VERSION ($version)." >&2
+            exit 1
+          fi
+
+          docs_version="$(python - <<'PY'
+import re
+from pathlib import Path
+text = Path("docs/_config.yml").read_text(encoding="utf-8")
+print(re.search(r'^version:\s*(.+)$', text, re.MULTILINE).group(1).strip().strip('"').strip("'"))
+PY
+)"
+          if [[ "$docs_version" != "$version" ]]; then
+            echo "docs/_config.yml ($docs_version) does not match VERSION ($version)." >&2
+            exit 1
+          fi
+
+          tag="v$version"
+          if [[ "${GITHUB_REF}" == refs/tags/* && "${GITHUB_REF_NAME}" != "$tag" ]]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match VERSION $version. Expected $tag." >&2
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
   windows:
+    needs: validate
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -23,34 +79,48 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Validate version
-        id: version
-        shell: pwsh
+      - name: Install dependencies
         run: |
-          $version = (Get-Content VERSION -Raw).Trim()
-          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') {
-            throw "VERSION must be semantic version format, got '$version'."
-          }
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller pytest
 
-          $appVersion = (Select-String -Path app_version.py -Pattern 'APP_VERSION\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
-          if ($appVersion -ne $version) {
-            throw "app_version.py ($appVersion) does not match VERSION ($version)."
-          }
+      - name: Verify tests
+        run: python -m pytest Tests
 
-          $docsVersion = (Select-String -Path docs/_config.yml -Pattern '^version:\s*(.+)$').Matches[0].Groups[1].Value.Trim().Trim('"').Trim("'")
-          if ($docsVersion -ne $version) {
-            throw "docs/_config.yml ($docsVersion) does not match VERSION ($version)."
-          }
+      - name: Remove test-only packaging dependencies
+        run: pip uninstall -y pytest
 
-          $tag = "v$version"
-          if ($env:GITHUB_REF -like "refs/tags/*" -and $env:GITHUB_REF_NAME -ne $tag) {
-            throw "Tag $env:GITHUB_REF_NAME does not match VERSION $version. Expected $tag."
-          }
+      - name: Build Windows package
+        shell: pwsh
+        run: .\scripts\build_windows_exe.ps1
 
-          "GAINZ_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "GAINZ_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+      - name: Verify Windows release artifacts
+        run: python scripts/test_release_artifacts.py --platform windows --version "${{ needs.validate.outputs.version }}"
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gainz-Windows-v${{ needs.validate.outputs.version }}
+          path: |
+            dist/Gainz-Windows.zip
+            dist/Gainz-Windows.zip.sha256
+            dist/Gainz-Windows-v${{ needs.validate.outputs.version }}.zip
+            dist/Gainz-Windows-v${{ needs.validate.outputs.version }}.zip.sha256
+
+  macos:
+    needs: validate
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
@@ -61,53 +131,77 @@ jobs:
       - name: Verify tests
         run: python -m pytest Tests
 
-      - name: Build Windows package
-        shell: pwsh
-        run: .\scripts\build_windows_exe.ps1
+      - name: Remove test-only packaging dependencies
+        run: pip uninstall -y pytest
+
+      - name: Build macOS package
+        run: bash scripts/build_macos_app.sh
+
+      - name: Verify macOS release artifacts
+        run: python scripts/test_release_artifacts.py --platform macos --version "${{ needs.validate.outputs.version }}"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gainz-macOS-v${{ needs.validate.outputs.version }}
+          path: |
+            dist/Gainz-macOS.zip
+            dist/Gainz-macOS.zip.sha256
+            dist/Gainz-macOS-v${{ needs.validate.outputs.version }}.zip
+            dist/Gainz-macOS-v${{ needs.validate.outputs.version }}.zip.sha256
+
+  publish:
+    needs:
+      - validate
+      - windows
+      - macos
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
 
       - name: Create release notes
-        shell: pwsh
+        shell: bash
         run: |
-          @"
-          # Gainz $env:GAINZ_VERSION
+          cat > release_notes.md <<EOF
+          # Gainz ${{ needs.validate.outputs.version }}
 
           Gainz is a local-first crypto tax audit packet and reconciliation tool.
 
-          ## Download
+          ## Downloads
 
-          Download `Gainz-Windows.zip`, unzip it, and double-click `Gainz.exe`.
+          - Windows: download \`Gainz-Windows.zip\`, unzip it, and double-click \`Gainz.exe\`.
+          - macOS: download \`Gainz-macOS.zip\`, unzip it, and open \`Gainz.app\`.
 
-          Windows may show a SmartScreen warning because this early build is not code-signed yet. Only run releases downloaded from this repository or cryptogainz.store.
+          Windows may show a SmartScreen warning and macOS may show an unidentified developer warning because these early builds are not code-signed yet. Only run releases downloaded from this repository or cryptogainz.store.
 
           ## Verification
 
-          A SHA-256 checksum file is attached next to the zip.
+          SHA-256 checksum files are attached next to each zip.
 
           ## Important
 
           Gainz is documentation support. It is not tax, legal, or financial advice. Review outputs with a qualified tax professional before filing.
-          "@ | Set-Content -LiteralPath release_notes.md
-
-      - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Gainz-Windows-v${{ steps.version.outputs.version }}
-          path: |
-            dist/Gainz-Windows.zip
-            dist/Gainz-Windows.zip.sha256
-            dist/Gainz-Windows-v${{ steps.version.outputs.version }}.zip
-            dist/Gainz-Windows-v${{ steps.version.outputs.version }}.zip.sha256
+          EOF
 
       - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: pwsh
+          GAINZ_TAG: ${{ needs.validate.outputs.tag }}
+        shell: bash
         run: |
-          gh release create $env:GAINZ_TAG `
-            dist/Gainz-Windows.zip `
-            dist/Gainz-Windows.zip.sha256 `
-            "dist/Gainz-Windows-v$env:GAINZ_VERSION.zip" `
-            "dist/Gainz-Windows-v$env:GAINZ_VERSION.zip.sha256" `
-            --title "Gainz $env:GAINZ_VERSION" `
+          gh release create "$GAINZ_TAG" \
+            release-artifacts/Gainz-Windows.zip \
+            release-artifacts/Gainz-Windows.zip.sha256 \
+            "release-artifacts/Gainz-Windows-v${{ needs.validate.outputs.version }}.zip" \
+            "release-artifacts/Gainz-Windows-v${{ needs.validate.outputs.version }}.zip.sha256" \
+            release-artifacts/Gainz-macOS.zip \
+            release-artifacts/Gainz-macOS.zip.sha256 \
+            "release-artifacts/Gainz-macOS-v${{ needs.validate.outputs.version }}.zip" \
+            "release-artifacts/Gainz-macOS-v${{ needs.validate.outputs.version }}.zip.sha256" \
+            --title "Gainz ${{ needs.validate.outputs.version }}" \
             --notes-file release_notes.md

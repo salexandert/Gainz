@@ -26,6 +26,7 @@ This checklist describes what should be true before Gainz is shared outside a tr
 - No private or developer-only scripts are included in release artifacts.
 - Donation/support links are configured through `GAINZ_SUPPORT_URL` and verified in the app, launcher, README, and GitHub funding metadata.
 - Public Windows releases include `Gainz-Windows.zip` and `Gainz-Windows.zip.sha256`.
+- Public macOS releases include `Gainz-macOS.zip` and `Gainz-macOS.zip.sha256`.
 
 ## Required Before Hosted Release
 

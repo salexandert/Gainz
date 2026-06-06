@@ -70,14 +70,16 @@ $env:GAINZ_ADMIN_PASSWORD="choose-a-local-password"
 python run.py
 ```
 
-## Download Packaged Build
+## Download Packaged Builds
 
-The public Windows package is published through GitHub Releases:
+Public desktop packages are published through GitHub Releases:
 
-- Latest download: <https://github.com/salexandert/Gainz/releases/latest/download/Gainz-Windows.zip>
-- Checksum: <https://github.com/salexandert/Gainz/releases/latest/download/Gainz-Windows.zip.sha256>
+- Windows download: <https://github.com/salexandert/Gainz/releases/latest/download/Gainz-Windows.zip>
+- Windows checksum: <https://github.com/salexandert/Gainz/releases/latest/download/Gainz-Windows.zip.sha256>
+- macOS download: <https://github.com/salexandert/Gainz/releases/latest/download/Gainz-macOS.zip>
+- macOS checksum: <https://github.com/salexandert/Gainz/releases/latest/download/Gainz-macOS.zip.sha256>
 
-Unzip the package and double-click `Gainz.exe`. The launcher starts the local server, shows the web interface link, and keeps your transaction data on your machine.
+Unzip the package and open `Gainz.exe` on Windows or `Gainz.app` on macOS. The launcher starts the local server, shows the web interface link, and keeps your transaction data on your machine.
 
 ## Common Workflow
 
@@ -171,7 +173,7 @@ The first supported distribution target should be a local desktop-style build, n
 .\scripts\set_version.ps1 0.2.0
 ```
 
-Public releases are created from Git tags. After merging a version bump, push a matching tag such as `v0.2.0`. The release workflow validates that the tag and version files match before publishing.
+Public releases are created from Git tags. After merging a version bump, push a matching tag such as `v0.2.0`. The release workflow validates that the tag and version files match, builds Windows and macOS packages, verifies the release zips and checksums, then publishes them to GitHub Releases.
 
 For a clickable Windows build, install PyInstaller in the build environment and run:
 
@@ -181,6 +183,25 @@ pip install pyinstaller
 ```
 
 The script creates `dist\Gainz.exe`, a versioned zip such as `dist\Gainz-Windows-v0.2.0.zip`, a stable `dist\Gainz-Windows.zip`, and SHA-256 checksum files. `Gainz.exe` starts the local server in the background, shows a window confirming that Gainz is running, and provides a button to open the web interface.
+
+For a macOS build, run this on macOS:
+
+```bash
+python3 -m pip install pyinstaller
+bash scripts/build_macos_app.sh
+```
+
+The script creates `dist/Gainz.app`, a versioned zip such as `dist/Gainz-macOS-v0.2.0.zip`, a stable `dist/Gainz-macOS.zip`, and SHA-256 checksum files.
+
+To verify packaged artifacts after a local build:
+
+```powershell
+python scripts/test_release_artifacts.py --platform windows --version 0.2.0
+```
+
+```bash
+python3 scripts/test_release_artifacts.py --platform macos --version 0.2.0
+```
 
 ## License
 

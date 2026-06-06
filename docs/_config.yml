@@ -5,6 +5,8 @@ baseurl: ""
 version: 0.2.0
 download_url: https://github.com/salexandert/Gainz/releases/latest/download/Gainz-Windows.zip
 checksum_url: https://github.com/salexandert/Gainz/releases/latest/download/Gainz-Windows.zip.sha256
+macos_download_url: https://github.com/salexandert/Gainz/releases/latest/download/Gainz-macOS.zip
+macos_checksum_url: https://github.com/salexandert/Gainz/releases/latest/download/Gainz-macOS.zip.sha256
 markdown: kramdown
 permalink: pretty
 
