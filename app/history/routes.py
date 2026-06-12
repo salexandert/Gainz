@@ -1,14 +1,64 @@
 from . import blueprint
-from flask import redirect, render_template, request, jsonify, current_app
+from flask import redirect, render_template, request, jsonify, current_app, url_for
 from flask_login import login_required, current_user
 from utils import *
 from transactions import Transactions
+import os
+from datetime import datetime
+
+
+def _current_transactions():
+    transactions = current_app.config.get('transactions')
+    if transactions is None:
+        transactions = Transactions()
+        current_app.config['transactions'] = transactions
+    return transactions
+
+
+def _format_modified_time(timestamp):
+    if not timestamp:
+        return "N/A"
+
+    return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %I:%M %p")
+
+
+def _save_rows(transactions):
+    saves = transactions.load_saves()
+    current_view = os.path.abspath(getattr(transactions, "view", "") or "")
+    rows = []
+
+    for save in reversed(saves):
+        save_path = os.path.abspath(save["value"])
+        rows.append({
+            "file": save["value"],
+            "name": os.path.basename(save["value"]),
+            "description": save.get("description") or "No description",
+            "revision": save.get("revision_num") or "N/A",
+            "modified": _format_modified_time(save.get("modified_time")),
+            "is_current": save_path == current_view,
+        })
+
+    return rows
+
+
+def _find_known_save(transactions, filename):
+    requested = os.path.abspath(str(filename or ""))
+    for save in transactions.load_saves():
+        if os.path.abspath(save["value"]) == requested:
+            return save
+
+    return None
 
 
 @blueprint.route('/',  methods=['GET'])
 @login_required
 def index():
-    return redirect('/import_transactions/#revision-history')
+    transactions = _current_transactions()
+    return render_template(
+        'history.html',
+        history=_save_rows(transactions),
+        restored=request.args.get("restored"),
+    )
 
 @blueprint.route('/compare_selected',  methods=['POST'])
 @login_required
@@ -365,9 +415,11 @@ def selected_asset():
 @login_required
 def load():
 
-    transactions = current_app.config['transactions']
+    transactions = _current_transactions()
 
     filename = request.json['data'][0]
+    if not _find_known_save(transactions, filename):
+        return jsonify({"error": "Choose a valid saved revision."}), 400
 
     transactions.load(filename)
 
@@ -378,14 +430,32 @@ def load():
 @login_required
 def revert():
 
-    transactions = current_app.config['transactions']
+    transactions = _current_transactions()
 
+    data = request.get_json(silent=True) or {}
+    filename = request.form.get("file")
+    if not filename and data.get("data"):
+        filename = data["data"][0]
 
-    filename = request.json['data'][0]
-    transactions.load(filename)
-    transactions.save(f"Reverted to {filename}")
+    save = _find_known_save(transactions, filename)
+    if not save:
+        message = "Choose a valid saved revision to restore."
+        if request.is_json:
+            return jsonify({"error": message}), 400
+        return redirect(url_for('history_blueprint.index', restored=message))
 
-    return jsonify("Revision restored and saved as a new revision.")
+    transactions.load(save["value"])
+    revision = save.get("revision_num") or "unknown"
+    description = f"Restored revision {revision} from {os.path.basename(save['value'])}"
+    restored_path = transactions.save(description)
+
+    if request.is_json:
+        return jsonify({
+            "message": "Revision restored and saved as a new latest revision.",
+            "restored_from": save["value"],
+            "save_path": restored_path,
+        })
+    return redirect(url_for('history_blueprint.index', restored=description))
 
 
 @blueprint.route('/delete',  methods=['POST'])

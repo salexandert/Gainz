@@ -1643,170 +1643,34 @@ $(document).ready(function() {
 
 // history page code
 $(document).ready(function() {
+    if ($('#historypage_datatable').length === 0) {
+        return;
+    }
 
-    // init tables
-    var table = $('#historypage_datatable').DataTable({
-        select: {
-            style: 'multi'
-        },
+    $('#historypage_datatable').DataTable({
+        order: [],
+        pageLength: 25
     });
 
-    $('#historypage_stats_datatable').DataTable({
-        select: {
-            style: 'single'
-        },
-    });
+    $('.history-restore-form').on('submit', function() {
+        var button = $(this).find('button[type="submit"]');
+        var revision = button.data('revision') || 'this revision';
+        var description = button.data('description') || '';
+        var message = [
+            'Restore revision ' + revision + ' as the latest Gainz revision?',
+            '',
+            description,
+            '',
+            'This will not delete newer saves. Gainz will create a new revision from the selected save.'
+        ].join('\n');
 
-
-    $('#historypage_detailed_datatable').DataTable({
-        "pageLength": 50,
-        select: {
-            style: 'single'
-        },
-    });
-
-
-    table.on('select', function(e, dt, type, indexes) {
-
-
-        //If two rows are selected
-        if ($('#historypage_datatable').DataTable().rows( {selected:true} ).count() == 2) {
-            console.log('two rows selected')
-
-            $.ajax({
-                type: "POST",
-                url: "/history/compare_selected",
-                data: JSON.stringify({
-                    'row_data': $('#historypage_datatable').DataTable().rows( {selected:true} ).data(),
-                    }),
-
-                contentType: 'application/json',
-                success: function (data) {
-                    console.log(data)
-                    $('#historypage_stats_datatable').DataTable().clear();
-                }
-
-            });
-
-        //If one row is selected
-        } else {
-            console.log('Single Row is selected')
-            $.ajax({
-                type: "POST",
-                url: "/history/selected_save",
-                data: JSON.stringify({
-                    'row_data': $('#historypage_datatable').DataTable().row( {selected:true} ).data(),
-                    }),
-
-                contentType: 'application/json',
-                success: function (data) {
-
-                    console.log(data)
-                    var names = data['column_names']
-
-                    // Check if the DataTable is initialized
-                    if ($.fn.DataTable.isDataTable('#historypage_stats_datatable')) {
-                        // Get the DataTable instance
-                        var table = $('#historypage_stats_datatable').DataTable();
-
-                        // Loop over the list of names
-                        for (var i = 0; i < names.length; i++) {
-                            // Check if the column exists
-                            if (i < table.columns().count()) {
-                                // Update the column title
-                                table.column(i).header().innerHTML = names[i];
-                            } else {
-                                console.log('Column ' + i + ' does not exist');
-                            }
-                        }
-
-                        // Redraw the table to reflect the changes
-                        table.columns.adjust().draw();
-                    } else {
-                        console.log('DataTable is not initialized');
-                    }
-
-                    $('#historypage_stats_datatable').DataTable().clear();
-                    $('#historypage_stats_datatable').DataTable().rows.add(data['rows']).draw();
-
-
-                },
-            });
+        if (!window.confirm(message)) {
+            return false;
         }
 
+        button.prop('disabled', true).text('Restoring...');
+        return true;
     });
-
-
-    $("#load_button").click(function(){
-        $.ajax({
-            type: "POST",
-            url: "/history/load",
-            data: JSON.stringify({
-                'data': $('#history_datatable').DataTable().row( {selected:true} ).data(),
-
-              }),
-            dataType: "json",
-            contentType: 'application/json',
-            success: function (data) {
-                location.reload()
-            },
-        });
-    });
-
-
-    $("#revert_button").click(function(){
-
-        $.ajax({
-            type: "POST",
-            url: "/history/revert",
-            data: JSON.stringify({
-                'data': $('#history_datatable').DataTable().row( {selected:true} ).data(),
-
-              }),
-            dataType: "json",
-            contentType: 'application/json',
-            success: function (data) {
-                location.reload()
-
-            },
-        });
-    });
-
-    $("#delete_button").click(function(){
-
-        $.ajax({
-            type: "POST",
-            url: "/history/delete",
-            data: JSON.stringify({
-                'data': $('#history_datatable').DataTable().row( {selected:true} ).data(),
-
-              }),
-            dataType: "json",
-            contentType: 'application/json',
-            success: function (data) {
-                location.reload()
-            },
-        });
-    });
-
-    $("#save_button").click(function(){
-
-        $.ajax({
-            type: "POST",
-            url: "/history/save",
-            data: JSON.stringify({
-                'data': $('#history_datatable').DataTable().row( {selected:true} ).data(),
-
-              }),
-            dataType: "json",
-            contentType: 'application/json',
-            success: function (data) {
-                location.reload()
-            },
-        });
-    });
-
-
 } );
 
 // export page code
