@@ -14,6 +14,7 @@ except ImportError:  # pragma: no cover - exercised on Windows
 
 
 LOCK_FILENAME = "gainz.lock"
+_ACQUIRED_LOCK_PATHS = set()
 
 
 class SingleInstanceLock:
@@ -27,6 +28,10 @@ class SingleInstanceLock:
     def acquire(self):
         if self.acquired:
             return True
+
+        lock_key = os.path.abspath(self.path)
+        if lock_key in _ACQUIRED_LOCK_PATHS:
+            return False
 
         self._handle = open(self.path, "a+", encoding="utf-8")
         self._handle.seek(0, os.SEEK_END)
@@ -50,6 +55,7 @@ class SingleInstanceLock:
             return False
 
         self.acquired = True
+        _ACQUIRED_LOCK_PATHS.add(lock_key)
         self.write_info(status="starting")
         return True
 
@@ -86,6 +92,7 @@ class SingleInstanceLock:
             elif fcntl:
                 fcntl.lockf(self._handle.fileno(), fcntl.LOCK_UN)
         finally:
+            _ACQUIRED_LOCK_PATHS.discard(os.path.abspath(self.path))
             self._handle.close()
             self._handle = None
             self.acquired = False
