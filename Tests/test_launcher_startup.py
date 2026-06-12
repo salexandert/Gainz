@@ -12,6 +12,17 @@ class LauncherStartupTests(unittest.TestCase):
 
         self.assertIn("/healthz", rules)
 
+    def test_account_password_route_is_available_from_top_nav(self):
+        app = create_app(config_dict["Debug"], selenium=True)
+
+        with app.test_request_context("/"):
+            rendered_nav = app.jinja_env.get_template(
+                "site_template/top_navigation.html"
+            ).render()
+
+        self.assertIn("/setting/change_password", rendered_nav)
+        self.assertIn("Change password", rendered_nav)
+
     def test_launcher_health_url_uses_local_server_url(self):
         self.assertEqual("http://127.0.0.1:5000", server_url(5000))
         self.assertEqual("http://127.0.0.1:5000/healthz", health_url(5000))

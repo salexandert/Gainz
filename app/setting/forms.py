@@ -17,6 +17,6 @@ class setting_password_Form(FlaskForm):
     password = PasswordField('Password', id='pwd_setting')
 
 class change_password_Form(FlaskForm):
-    origin_password = PasswordField('Type Origin Password', id='origin_assword')
-    new_password = PasswordField('Type New Password', id='new_assword')
-    new_password2 = PasswordField('Type New Password Again', id='new_assword2')
+    origin_password = PasswordField('Current password', id='current_password')
+    new_password = PasswordField('New password', id='new_password')
+    new_password2 = PasswordField('Confirm new password', id='confirm_new_password')
