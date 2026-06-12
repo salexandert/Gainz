@@ -173,7 +173,7 @@ The first supported distribution target should be a local desktop-style build, n
 .\scripts\set_version.ps1 0.2.0
 ```
 
-Public releases are created from Git tags. After merging a version bump, push a matching tag such as `v0.2.0`. The release workflow validates that the tag and version files match, builds Windows and macOS packages, verifies the release zips and checksums, then publishes them to GitHub Releases.
+Public releases are created from Git tags. After merging a version bump to `main`, the `Auto Tag Release Version` workflow creates the matching tag such as `v0.2.0`. That tag triggers the release workflow, which validates that the tag and version files match, builds Windows and macOS packages, verifies the release zips and checksums, then publishes them to GitHub Releases. The website download buttons point at GitHub's latest release assets, so they update when the release publishes.
 
 For a clickable Windows build, install PyInstaller in the build environment and run:
 

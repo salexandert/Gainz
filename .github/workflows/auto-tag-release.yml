@@ -1,0 +1,87 @@
+name: Auto Tag Release Version
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - VERSION
+      - app_version.py
+      - docs/_config.yml
+      - .github/workflows/auto-tag-release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-tag-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release version files
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "VERSION must be semantic version format, got '$version'." >&2
+            exit 1
+          fi
+
+          app_version="$(python - <<'PY'
+import re
+from pathlib import Path
+text = Path("app_version.py").read_text(encoding="utf-8")
+print(re.search(r'APP_VERSION\s*=\s*"([^"]+)"', text).group(1))
+PY
+)"
+          if [[ "$app_version" != "$version" ]]; then
+            echo "app_version.py ($app_version) does not match VERSION ($version)." >&2
+            exit 1
+          fi
+
+          docs_version="$(python - <<'PY'
+import re
+from pathlib import Path
+text = Path("docs/_config.yml").read_text(encoding="utf-8")
+print(re.search(r'^version:\s*(.+)$', text, re.MULTILINE).group(1).strip().strip('"').strip("'"))
+PY
+)"
+          if [[ "$docs_version" != "$version" ]]; then
+            echo "docs/_config.yml ($docs_version) does not match VERSION ($version)." >&2
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag when missing
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "$TAG already exists locally."
+            exit 0
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "$TAG already exists on origin."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Gainz $TAG"
+          git push origin "$TAG"
