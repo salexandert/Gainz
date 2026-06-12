@@ -32,38 +32,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="$(tr -d '[:space:]' < VERSION)"
-          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "VERSION must be semantic version format, got '$version'." >&2
-            exit 1
-          fi
-
-          app_version="$(python - <<'PY'
-import re
-from pathlib import Path
-text = Path("app_version.py").read_text(encoding="utf-8")
-print(re.search(r'APP_VERSION\s*=\s*"([^"]+)"', text).group(1))
-PY
-)"
-          if [[ "$app_version" != "$version" ]]; then
-            echo "app_version.py ($app_version) does not match VERSION ($version)." >&2
-            exit 1
-          fi
-
-          docs_version="$(python - <<'PY'
-import re
-from pathlib import Path
-text = Path("docs/_config.yml").read_text(encoding="utf-8")
-print(re.search(r'^version:\s*(.+)$', text, re.MULTILINE).group(1).strip().strip('"').strip("'"))
-PY
-)"
-          if [[ "$docs_version" != "$version" ]]; then
-            echo "docs/_config.yml ($docs_version) does not match VERSION ($version)." >&2
-            exit 1
-          fi
-
+          python scripts/validate_release_version.py
+          source scripts/release_version.env
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Create tag when missing
         env:
