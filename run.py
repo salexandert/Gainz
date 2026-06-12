@@ -4,9 +4,27 @@ from app import create_app, db
 from transactions import Transactions
 import sys
 import os
+import webbrowser
+
+from single_instance import SingleInstanceLock
 
 
 get_config_mode = os.environ.get("GENTELELLA_CONFIG_MODE", "Debug")
+_single_instance_lock = None
+
+if __name__ == "__main__":
+    _base_dir = os.path.dirname(os.path.abspath(__file__))
+    _single_instance_lock = SingleInstanceLock(_base_dir)
+    if not _single_instance_lock.acquire():
+        _info = _single_instance_lock.read_info()
+        _port = int(_info.get("port") or os.environ.get("GAINZ_PORT", "5000"))
+        _url = _info.get("url") or f"http://127.0.0.1:{_port}"
+        print(f"Gainz is already running or starting at {_url}")
+        try:
+            webbrowser.open(_url)
+        except Exception:
+            pass
+        sys.exit(0)
 
 try:
     config_mode = config_dict[get_config_mode.capitalize()]
@@ -48,6 +66,8 @@ if __name__ == "__main__":
     host = os.environ.get("GAINZ_HOST", "127.0.0.1")
     port = int(os.environ.get("GAINZ_PORT", "5000"))
     url = f"http://{host}:{port}"
+    if _single_instance_lock:
+        _single_instance_lock.write_info(port=port, url=url, status="running")
     debug_enabled = os.environ.get("GAINZ_FLASK_DEBUG", "").lower() in (
         "1",
         "true",
@@ -67,4 +87,8 @@ if __name__ == "__main__":
     )
     print("\nClose this window when finished.\n")
 
-    app.run(host=host, port=port, debug=debug_enabled, use_reloader=False)
+    try:
+        app.run(host=host, port=port, debug=debug_enabled, use_reloader=False)
+    finally:
+        if _single_instance_lock:
+            _single_instance_lock.release()

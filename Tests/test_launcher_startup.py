@@ -1,8 +1,10 @@
 import unittest
+import tempfile
 
 from app import create_app
 from configs.config import config_dict
 from launcher import health_url, server_url
+from single_instance import SingleInstanceLock
 
 
 class LauncherStartupTests(unittest.TestCase):
@@ -26,6 +28,24 @@ class LauncherStartupTests(unittest.TestCase):
     def test_launcher_health_url_uses_local_server_url(self):
         self.assertEqual("http://127.0.0.1:5000", server_url(5000))
         self.assertEqual("http://127.0.0.1:5000/healthz", health_url(5000))
+
+    def test_single_instance_lock_blocks_competing_gainz_process(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            first = SingleInstanceLock(temp_dir)
+            second = SingleInstanceLock(temp_dir)
+
+            try:
+                self.assertTrue(first.acquire())
+                first.write_info(port=5007, url="http://127.0.0.1:5007", status="running")
+
+                self.assertFalse(second.acquire())
+                self.assertEqual("http://127.0.0.1:5007", second.read_info()["url"])
+
+                first.release()
+                self.assertTrue(second.acquire())
+            finally:
+                first.release()
+                second.release()
 
 
 if __name__ == "__main__":

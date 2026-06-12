@@ -10,6 +10,7 @@ from tkinter import messagebox, ttk
 from urllib.request import urlopen
 
 from app_version import APP_VERSION
+from single_instance import SingleInstanceLock
 
 APP_NAME = "Gainz"
 DEFAULT_HOST = "127.0.0.1"
@@ -51,6 +52,16 @@ def support_url():
     return os.environ.get("GAINZ_SUPPORT_URL", DEFAULT_SUPPORT_URL)
 
 
+def wait_for_lock_info(instance_lock, timeout=3):
+    deadline = time.time() + timeout
+    info = instance_lock.read_info()
+    while time.time() < deadline and not (info.get("port") or info.get("url")):
+        time.sleep(0.25)
+        info = instance_lock.read_info()
+
+    return info
+
+
 def wait_for_server(url, timeout=20):
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -76,8 +87,9 @@ def start_gainz_server(port, error_queue):
 
 
 class GainzLauncher(tk.Tk):
-    def __init__(self):
+    def __init__(self, instance_lock):
         super().__init__()
+        self.instance_lock = instance_lock
         self.title(f"{APP_NAME} {APP_VERSION}")
         self.geometry("520x320")
         self.resizable(False, False)
@@ -88,6 +100,7 @@ class GainzLauncher(tk.Tk):
         self.port = find_available_port()
         self.url = server_url(self.port)
         self.health_url = health_url(self.port)
+        self.instance_lock.write_info(port=self.port, url=self.url, status="starting")
         self.support_url = support_url()
         self.error_queue = queue.Queue()
         self.started_at = time.time()
@@ -165,6 +178,7 @@ class GainzLauncher(tk.Tk):
         if wait_for_server(self.health_url, timeout=1):
             self.heading_text.set(f"Gainz {APP_VERSION} is running")
             self.status.set("Gainz is running.")
+            self.instance_lock.write_info(port=self.port, url=self.url, status="running")
             self.open_button.configure(state="normal")
             self.title(f"{APP_NAME} {APP_VERSION} - Running")
             if not self.browser_opened and os.environ.get("GAINZ_AUTO_OPEN", "1") != "0":
@@ -186,12 +200,37 @@ class GainzLauncher(tk.Tk):
         webbrowser.open(self.support_url)
 
     def close_app(self):
+        self.instance_lock.release()
         self.destroy()
         os._exit(0)
 
 
 def main():
-    launcher = GainzLauncher()
+    os.chdir(app_base_dir())
+    instance_lock = SingleInstanceLock(app_base_dir())
+    if not instance_lock.acquire():
+        info = wait_for_lock_info(instance_lock)
+        port = int(info.get("port") or DEFAULT_PORT)
+        url = info.get("url") or server_url(port)
+        root = tk.Tk()
+        root.withdraw()
+
+        if wait_for_server(health_url(port), timeout=5):
+            webbrowser.open(url)
+            messagebox.showinfo(
+                APP_NAME,
+                f"Gainz is already running.\n\nOpening the existing app at:\n{url}",
+            )
+        else:
+            messagebox.showwarning(
+                APP_NAME,
+                "Gainz is already starting or another Gainz process is holding the app lock. "
+                "Wait a moment, then use the existing Gainz window or try again.",
+            )
+        root.destroy()
+        return
+
+    launcher = GainzLauncher(instance_lock)
     launcher.mainloop()
 
 
