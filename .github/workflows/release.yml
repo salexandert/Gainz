@@ -165,6 +165,7 @@ jobs:
         shell: bash
         run: |
           gh release create "$GAINZ_TAG" \
+            --repo "${{ github.repository }}" \
             release-artifacts/Gainz-Windows.zip \
             release-artifacts/Gainz-Windows.zip.sha256 \
             "release-artifacts/Gainz-Windows-v${{ needs.validate.outputs.version }}.zip" \
