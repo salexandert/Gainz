@@ -351,6 +351,20 @@
     margin-top: 10px;
 }
 
+.manual-batch-table th,
+.manual-batch-table td {
+    vertical-align: middle;
+}
+
+.manual-batch-table select,
+.manual-batch-table input {
+    min-width: 130px;
+}
+
+.manual-batch-table input[name="manual_timestamp[]"] {
+    min-width: 205px;
+}
+
 .holdings-hidden-legacy {
     display: none;
 }

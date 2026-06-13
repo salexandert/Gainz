@@ -190,44 +190,54 @@
         </div>
         {% if request.args.get('manual_added') %}
         <div class="alert alert-success" role="alert">
-          Manual {{ request.args.get('manual_added') }} transaction added and saved as a new revision.
+          {{ request.args.get('manual_added') }} manual transaction{% if request.args.get('manual_added') != '1' %}s{% endif %} added and saved as a new revision.
+        </div>
+        {% endif %}
+        {% if request.args.get('manual_error') %}
+        <div class="alert alert-warning" role="alert">
+          {{ request.args.get('manual_error') }}
         </div>
         {% endif %}
         <form method="POST" action="{{ url_for('import_transactions_blueprint.import_wizard') }}#manual-transactions">
           {{ manual_trans.hidden_tag() }}
-          <div class="row">
-            <div class="col-md-2">
-              <label>{{ manual_trans.type.label }}<span class="required">*</span></label>
-              <div class="form-group">
-                {{ manual_trans.type(class_="form-control") }}
-              </div>
-            </div>
-            <div class="col-md-3">
-              <label>{{ manual_trans.timestamp.label }}<span class="required">*</span></label>
-              <div class="form-group">
-                {{ manual_trans.timestamp(class_="form-control") }}
-              </div>
-            </div>
-            <div class="col-md-2">
-              <label>{{ manual_trans.symbol.label }}<span class="required">*</span></label>
-              <div class="form-group">
-                {{ manual_trans.symbol(class_="form-control", placeholder="BTC") }}
-              </div>
-            </div>
-            <div class="col-md-2">
-              <label>{{ manual_trans.quantity.label }}<span class="required">*</span></label>
-              <div class="form-group">
-                {{ manual_trans.quantity(class_="form-control", placeholder="0.00000000") }}
-              </div>
-            </div>
-            <div class="col-md-2">
-              <label>{{ manual_trans.usd_spot.label }}<span class="required">*</span></label>
-              <div class="form-group">
-                {{ manual_trans.usd_spot(class_="form-control", placeholder="65000.00") }}
-              </div>
-            </div>
-            <div class="col-md-1 d-flex align-items-end">
-              {{ manual_trans.submit(class_="btn btn-info btn-round btn-sm mb-3", value="Add") }}
+          <div class="table-responsive">
+            <table id="manual_transactions_table" class="table table-striped manual-batch-table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Timestamp</th>
+                  <th>Crypto Symbol</th>
+                  <th>Quantity</th>
+                  <th>USD Spot</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for index in range(5) %}
+                <tr>
+                  <td>
+                    <select name="manual_type[]" class="form-control">
+                      <option value="buy">Buy</option>
+                      <option value="sell">Sell</option>
+                    </select>
+                  </td>
+                  <td><input type="datetime-local" name="manual_timestamp[]" class="form-control"></td>
+                  <td><input type="text" name="manual_symbol[]" class="form-control text-uppercase" placeholder="BTC"></td>
+                  <td><input type="number" step="any" min="0" name="manual_quantity[]" class="form-control" placeholder="0.00000000"></td>
+                  <td><input type="number" step="any" min="0" name="manual_usd_spot[]" class="form-control" placeholder="65000.00"></td>
+                  <td>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-manual-row-button">Remove</button>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="d-flex flex-wrap align-items-center justify-content-between mt-3">
+            <p class="text-muted mb-2 mb-md-0">Fill as many rows as needed. Blank rows are ignored, and the batch is saved as one revision.</p>
+            <div>
+              <button type="button" id="add_manual_transaction_row" class="btn btn-outline-primary btn-sm">Add Row</button>
+              <button type="submit" name="manual_batch_submit" value="1" class="btn btn-info btn-round btn-sm">Add Manual Transactions</button>
             </div>
           </div>
         </form>

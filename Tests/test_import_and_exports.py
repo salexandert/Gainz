@@ -6,11 +6,16 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from flask import Flask
 from openpyxl import load_workbook
 
+from app import create_app
 from app.import_transactions import routes as import_routes
-from app.import_transactions.routes import _remove_data_source
+from app.import_transactions.routes import (
+    _manual_batch_rows,
+    _manual_row_is_blank,
+    _manual_transaction_from_values,
+    _remove_data_source,
+)
 from app.services.audit_packet_service import AuditPacketService
 from app.services.import_service import ImportService
 from transaction import Buy, Sell
@@ -20,6 +25,8 @@ from utils import (
     get_form_8949_table_data,
     get_form_8949_totals,
 )
+from configs.config import config_dict
+from werkzeug.datastructures import MultiDict
 
 
 def empty_transactions():
@@ -68,9 +75,8 @@ class ImportAndExportTests(unittest.TestCase):
         }]
         transactions.view = transactions.saves[0]["value"]
 
-        app = Flask(__name__)
+        app = create_app(config_dict["Debug"], selenium=True)
         app.config.update(
-            SECRET_KEY="test",
             WTF_CSRF_ENABLED=False,
             transactions=transactions,
             UPLOAD_FOLDER="uploads",
@@ -88,6 +94,120 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertNotIn("stats_table_data", context)
         self.assertNotIn("transactions", context)
         self.assertEqual(7, context["save_summary"]["revision"])
+
+    def test_import_page_renders_manual_batch_table(self):
+        app = create_app(config_dict["Debug"], selenium=True)
+        app.config.update(WTF_CSRF_ENABLED=False)
+
+        with app.test_request_context("/import_transactions/#manual-transactions"):
+            rendered_page = app.jinja_env.get_template(
+                "import_transactions.html"
+            ).render(
+                manual_trans=import_routes.ManualTransaction(),
+                current_holdings=import_routes.CurrentHoldings(),
+                save_summary={
+                    "revision": 0,
+                    "save_count": 0,
+                    "recent_saves": [],
+                },
+                data_summary={
+                    "transaction_count": 0,
+                    "asset_count": 0,
+                    "source_count": 0,
+                    "link_count": 0,
+                    "sources": [],
+                    "import_warnings": [],
+                    "type_counts": {},
+                },
+            )
+
+        self.assertIn('id="manual_transactions_table"', rendered_page)
+        self.assertIn('name="manual_type[]"', rendered_page)
+        self.assertIn('name="manual_batch_submit"', rendered_page)
+        self.assertIn("Blank rows are ignored", rendered_page)
+
+    def test_manual_batch_rows_skip_blanks_and_build_transactions(self):
+        form_data = MultiDict([
+            ("manual_type[]", "buy"),
+            ("manual_timestamp[]", "2024-01-01T09:30"),
+            ("manual_symbol[]", "btc"),
+            ("manual_quantity[]", "0.25"),
+            ("manual_usd_spot[]", "42000"),
+            ("manual_type[]", "sell"),
+            ("manual_timestamp[]", "2024-02-02T10:45"),
+            ("manual_symbol[]", "ETH"),
+            ("manual_quantity[]", "1.5"),
+            ("manual_usd_spot[]", "2500"),
+            ("manual_type[]", "buy"),
+            ("manual_timestamp[]", ""),
+            ("manual_symbol[]", ""),
+            ("manual_quantity[]", ""),
+            ("manual_usd_spot[]", ""),
+        ])
+
+        rows = [
+            row
+            for row in _manual_batch_rows(form_data)
+            if not _manual_row_is_blank(row)
+        ]
+        transactions = [
+            _manual_transaction_from_values(row, index + 1)
+            for index, row in enumerate(rows)
+        ]
+
+        self.assertEqual(2, len(transactions))
+        self.assertIsInstance(transactions[0], Buy)
+        self.assertIsInstance(transactions[1], Sell)
+        self.assertEqual("BTC", transactions[0].symbol)
+        self.assertEqual(0.25, transactions[0].quantity)
+        self.assertEqual(2500, transactions[1].usd_spot)
+        self.assertEqual("Gainz App Manual Add", transactions[1].source)
+
+    def test_manual_batch_rejects_partial_rows(self):
+        with self.assertRaisesRegex(ValueError, "Row 3: complete USD Spot"):
+            _manual_transaction_from_values(
+                {
+                    "type": "buy",
+                    "timestamp": "2024-01-01T09:30",
+                    "symbol": "BTC",
+                    "quantity": "0.5",
+                    "usd_spot": "",
+                },
+                row_number=3,
+            )
+
+    def test_import_page_posts_manual_batch_as_one_revision(self):
+        transactions = empty_transactions()
+        saved_descriptions = []
+        transactions.save = lambda description=None: saved_descriptions.append(description)
+        app = create_app(config_dict["Debug"], selenium=True)
+        app.config.update(
+            WTF_CSRF_ENABLED=False,
+            transactions=transactions,
+            UPLOAD_FOLDER="uploads",
+        )
+
+        form_data = {
+            "manual_batch_submit": "1",
+            "manual_type[]": ["buy", "sell", "buy"],
+            "manual_timestamp[]": ["2024-01-01T09:30", "2024-02-02T10:45", ""],
+            "manual_symbol[]": ["BTC", "ETH", ""],
+            "manual_quantity[]": ["0.25", "1.5", ""],
+            "manual_usd_spot[]": ["42000", "2500", ""],
+        }
+
+        with app.test_request_context(
+            "/import_transactions/",
+            method="POST",
+            data=form_data,
+        ):
+            response = import_routes.import_wizard.__wrapped__()
+
+        self.assertEqual(302, response.status_code)
+        self.assertIn("manual_added=2", response.location)
+        self.assertEqual(["Manually Added 2 Transactions"], saved_descriptions)
+        self.assertEqual(["buy", "sell"], [t.trans_type for t in transactions.transactions])
+        self.assertEqual(["BTC", "ETH"], [t.symbol for t in transactions.transactions])
 
     def test_remove_data_source_removes_transactions_and_cleans_links(self):
         transactions = empty_transactions()

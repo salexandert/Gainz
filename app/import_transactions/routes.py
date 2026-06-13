@@ -45,6 +45,96 @@ class CurrentHoldings(FlaskForm):
     submit = SubmitField('Submit')
 
 
+MANUAL_TRANSACTION_SOURCE = "Gainz App Manual Add"
+
+
+def _manual_row_is_blank(row):
+    return not any(
+        str(row.get(field, "") or "").strip()
+        for field in ("timestamp", "symbol", "quantity", "usd_spot")
+    )
+
+
+def _manual_transaction_from_values(row, row_number=None):
+    prefix = f"Row {row_number}: " if row_number else ""
+    trans_type = str(row.get("type", "") or "").strip().lower()
+    timestamp = str(row.get("timestamp", "") or "").strip()
+    symbol = str(row.get("symbol", "") or "").strip().upper()
+    quantity = str(row.get("quantity", "") or "").strip()
+    usd_spot = str(row.get("usd_spot", "") or "").strip()
+
+    if trans_type not in ("buy", "sell"):
+        raise ValueError(f"{prefix}choose Buy or Sell.")
+
+    missing = [
+        label
+        for field, label in (
+            ("timestamp", "Timestamp"),
+            ("symbol", "Crypto Symbol"),
+            ("quantity", "Quantity"),
+            ("usd_spot", "USD Spot"),
+        )
+        if not str(row.get(field, "") or "").strip()
+    ]
+    if missing:
+        raise ValueError(f"{prefix}complete {', '.join(missing)}.")
+
+    try:
+        parsed_timestamp = dateutil.parser.parse(timestamp)
+    except (TypeError, ValueError):
+        raise ValueError(f"{prefix}enter a valid timestamp.")
+
+    try:
+        parsed_quantity = float(quantity)
+        parsed_usd_spot = float(usd_spot)
+    except (TypeError, ValueError):
+        raise ValueError(f"{prefix}quantity and USD spot must be numbers.")
+
+    if parsed_quantity <= 0:
+        raise ValueError(f"{prefix}quantity must be greater than zero.")
+
+    if parsed_usd_spot < 0:
+        raise ValueError(f"{prefix}USD spot cannot be negative.")
+
+    transaction_class = Buy if trans_type == "buy" else Sell
+    return transaction_class(
+        trans_type=trans_type,
+        time_stamp=parsed_timestamp,
+        quantity=parsed_quantity,
+        usd_spot=parsed_usd_spot,
+        symbol=symbol,
+        source=MANUAL_TRANSACTION_SOURCE,
+    )
+
+
+def _manual_batch_rows(form_data):
+    types = form_data.getlist("manual_type[]")
+    timestamps = form_data.getlist("manual_timestamp[]")
+    symbols = form_data.getlist("manual_symbol[]")
+    quantities = form_data.getlist("manual_quantity[]")
+    usd_spots = form_data.getlist("manual_usd_spot[]")
+    row_count = max(
+        len(types),
+        len(timestamps),
+        len(symbols),
+        len(quantities),
+        len(usd_spots),
+    )
+    rows = []
+
+    for index in range(row_count):
+        rows.append({
+            "row_number": index + 1,
+            "type": (types + [""] * row_count)[index],
+            "timestamp": (timestamps + [""] * row_count)[index],
+            "symbol": (symbols + [""] * row_count)[index],
+            "quantity": (quantities + [""] * row_count)[index],
+            "usd_spot": (usd_spots + [""] * row_count)[index],
+        })
+
+    return rows
+
+
 def _format_modified_time(timestamp):
     if not timestamp:
         return "N/A"
@@ -212,32 +302,61 @@ def import_wizard():
         if current_holdings.validate_on_submit():
             pass
 
+        if "manual_batch_submit" in request.form:
+            rows = [
+                row
+                for row in _manual_batch_rows(request.form)
+                if not _manual_row_is_blank(row)
+            ]
+
+            if not rows:
+                return redirect(
+                    url_for(
+                        'import_transactions_blueprint.import_wizard',
+                        manual_error="Enter at least one manual transaction.",
+                    ) + '#manual-transactions'
+                )
+
+            try:
+                manual_transactions = [
+                    _manual_transaction_from_values(row, row.get("row_number"))
+                    for row in rows
+                ]
+            except ValueError as exc:
+                return redirect(
+                    url_for(
+                        'import_transactions_blueprint.import_wizard',
+                        manual_error=str(exc),
+                    ) + '#manual-transactions'
+                )
+
+            transactions.transactions.extend(manual_transactions)
+            count = len(manual_transactions)
+            transactions.save(
+                description=f"Manually Added {count} Transaction{'s' if count != 1 else ''}"
+            )
+            return redirect(
+                url_for(
+                    'import_transactions_blueprint.import_wizard',
+                    manual_added=count,
+                ) + '#manual-transactions'
+            )
+
         if manual_trans.validate_on_submit():
-            if manual_trans.type.data == 'buy':
-                trans = Buy(
-                    trans_type=manual_trans.type.data,
-                    time_stamp=manual_trans.timestamp.data,
-                    quantity=float(manual_trans.quantity.data),
-                    usd_spot=float(manual_trans.usd_spot.data),
-                    symbol=manual_trans.symbol.data.upper(),
-                    source="Gainz App Manual Add"
-                )
-            else:
-                trans = Sell(
-                    trans_type=manual_trans.type.data,
-                    time_stamp=manual_trans.timestamp.data,
-                    quantity=float(manual_trans.quantity.data),
-                    usd_spot=float(manual_trans.usd_spot.data),
-                    symbol=manual_trans.symbol.data.upper(),
-                    source="Gainz App Manual Add"
-                )
+            trans = _manual_transaction_from_values({
+                "type": manual_trans.type.data,
+                "timestamp": manual_trans.timestamp.data,
+                "symbol": manual_trans.symbol.data,
+                "quantity": manual_trans.quantity.data,
+                "usd_spot": manual_trans.usd_spot.data,
+            })
 
             transactions.transactions.append(trans)
             transactions.save(description="Manually Added Transaction")
             return redirect(
                 url_for(
                     'import_transactions_blueprint.import_wizard',
-                    manual_added=trans.symbol,
+                    manual_added=1,
                 ) + '#manual-transactions'
             )
 

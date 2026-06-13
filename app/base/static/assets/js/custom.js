@@ -2294,6 +2294,33 @@ $(document).ready(function() {
         },
     });
 
+    function manualTransactionRowHtml() {
+        return '' +
+            '<tr>' +
+            '<td><select name="manual_type[]" class="form-control">' +
+            '<option value="buy">Buy</option>' +
+            '<option value="sell">Sell</option>' +
+            '</select></td>' +
+            '<td><input type="datetime-local" name="manual_timestamp[]" class="form-control"></td>' +
+            '<td><input type="text" name="manual_symbol[]" class="form-control text-uppercase" placeholder="BTC"></td>' +
+            '<td><input type="number" step="any" min="0" name="manual_quantity[]" class="form-control" placeholder="0.00000000"></td>' +
+            '<td><input type="number" step="any" min="0" name="manual_usd_spot[]" class="form-control" placeholder="65000.00"></td>' +
+            '<td><button type="button" class="btn btn-sm btn-outline-danger remove-manual-row-button">Remove</button></td>' +
+            '</tr>';
+    }
+
+    $('#add_manual_transaction_row').on('click', function() {
+        $('#manual_transactions_table tbody').append(manualTransactionRowHtml());
+    });
+
+    $('#manual_transactions_table').on('click', '.remove-manual-row-button', function() {
+        $(this).closest('tr').remove();
+
+        if ($('#manual_transactions_table tbody tr').length == 0) {
+            $('#manual_transactions_table tbody').append(manualTransactionRowHtml());
+        }
+    });
+
 
 
 } );
