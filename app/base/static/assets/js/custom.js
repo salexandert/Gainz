@@ -889,10 +889,87 @@ $(document).ready(function() {
 
 // Auto Link Page
 $(document).ready(function() {
+    if ($('#al_stats_datatable').length == 0) {
+        return;
+    }
+
     var table = $('#al_stats_datatable').DataTable({
         select: {
             style: 'single'
         },
+    });
+
+    function autoLinkShowResult(message, isError) {
+        $('#auto_link_all_result')
+            .removeClass('text-muted text-danger text-success')
+            .addClass(isError ? 'text-danger' : 'text-success')
+            .text(message);
+    }
+
+    function selectedAutoLinkAsset() {
+        return table.row({selected:true}).data();
+    }
+
+    function runSelectedAutoLink(algo) {
+        var selectedAsset = selectedAutoLinkAsset();
+
+        if (!selectedAsset) {
+            autoLinkShowResult('Select an asset row before running that method.', true);
+            return;
+        }
+
+        $.ajax({
+            type: "POST",
+            url: "/auto_link/auto_link_asset",
+            data: JSON.stringify({
+                'algo': algo,
+                'asset': selectedAsset,
+                'year': $('#auto_link_year_dropdown').find(":selected").val()
+              }),
+            dataType: "json",
+            contentType: 'application/json',
+            success: function (data) {
+                autoLinkShowResult(data || 'Auto Link complete. Review generated links before using reports.', false);
+                window.setTimeout(function () {
+                    location.reload();
+                }, 800);
+            },
+            error: function () {
+                autoLinkShowResult('Auto Link could not run. Review the selected asset and try again.', true);
+            },
+        });
+    }
+
+    $("#auto_link_all_fifo").click(function(){
+        var button = $(this);
+        var originalText = button.text();
+        var endpoint = button.data('url') || "/auto_link/auto_link_all_fifo";
+
+        autoLinkShowResult('Running FIFO Auto Link across assets with unlinked sales...', false);
+        button.prop('disabled', true).text('Linking...');
+
+        $.ajax({
+            type: "POST",
+            url: endpoint,
+            data: JSON.stringify({
+                'year': $('#auto_link_year_dropdown').find(":selected").val()
+              }),
+            dataType: "json",
+            contentType: 'application/json',
+            success: function (data) {
+                var message = data && data.message ? data.message : 'FIFO Auto Link complete. Review generated links before using reports.';
+                autoLinkShowResult(message, false);
+                window.setTimeout(function () {
+                    location.reload();
+                }, 1000);
+            },
+            error: function () {
+                autoLinkShowResult('FIFO Auto Link could not run. Review imports and basis lots, then try again.', true);
+            },
+            complete: function () {
+                button.prop('disabled', false).text(originalText);
+            },
+        });
     });
 
 
@@ -918,78 +995,19 @@ $(document).ready(function() {
     // } );
 
     $("#min_gain_long").click(function(){
-        $.ajax({
-            type: "POST",
-            url: "/auto_link/auto_link_asset",
-            data: JSON.stringify({
-                'algo': 'min_gain_long',
-                'asset': $('#al_stats_datatable').DataTable().row( {selected:true} ).data(),
-                'year': $('#auto_link_year_dropdown').find(":selected").val()
-              }),
-            dataType: "json",
-            contentType: 'application/json',
-            success: function (data) {
-                alert(data)
-                location.reload()
-            },
-        });
-
+        runSelectedAutoLink('min_gain_long');
     });
 
     $("#min_gain").click(function(){
-        $.ajax({
-            type: "POST",
-            url: "/auto_link/auto_link_asset",
-            data: JSON.stringify({
-                'algo': 'min_gain',
-                'asset': $('#al_stats_datatable').DataTable().row( {selected:true} ).data(),
-                'year': $('#auto_link_year_dropdown').find(":selected").val()
-              }),
-            dataType: "json",
-            contentType: 'application/json',
-            success: function (data) {
-                alert(data)
-                location.reload()
-            },
-        });
-
+        runSelectedAutoLink('min_gain');
     });
 
     $("#link_w_fifo").click(function(){
-        $.ajax({
-            type: "POST",
-            url: "/auto_link/auto_link_asset",
-            data: JSON.stringify({
-                'algo': 'fifo',
-                'asset': $('#al_stats_datatable').DataTable().row( {selected:true} ).data(),
-                'year': $('#auto_link_year_dropdown').find(":selected").val()
-              }),
-            dataType: "json",
-            contentType: 'application/json',
-            success: function (data) {
-                alert(data)
-                location.reload()
-            },
-        });
-
+        runSelectedAutoLink('fifo');
     });
 
     $("#link_w_filo").click(function(){
-        $.ajax({
-            type: "POST",
-            url: "/auto_link/auto_link_asset",
-            data: JSON.stringify({
-                'algo': 'filo',
-                'asset': $('#al_stats_datatable').DataTable().row( {selected:true} ).data(),
-                'year': $('#auto_link_year_dropdown').find(":selected").val()
-              }),
-            dataType: "json",
-            contentType: 'application/json',
-            success: function (data) {
-                alert(data)
-                location.reload()
-            },
-        });
+        runSelectedAutoLink('filo');
     });
 
 

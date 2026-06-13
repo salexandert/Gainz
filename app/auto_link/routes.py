@@ -111,6 +111,35 @@ def auto_link_asset():
     return jsonify(message)
 
 
+@blueprint.route('/auto_link_all_fifo', methods=['POST'])
+@login_required
+def auto_link_all_fifo():
+    transactions = current_app.config['transactions']
+    year_value = request.json.get('year', 'All Time') if request.json else 'All Time'
+    service = AutoLinkService()
+    selected_year = service.selected_year(year_value)
+
+    result = service.auto_link_unlinked_sales(
+        transactions,
+        algo='fifo',
+        year=selected_year,
+        save_description="Added FIFO basis links from Auto Link guided action",
+    )
+
+    result['failures'] = [
+        {
+            'asset': failure.get('asset'),
+            'unlinkable': failure.get('unlinkable'),
+            'quantity': failure.get('quantity'),
+            'timestamp': str(failure.get('timestamp')),
+            'algo': failure.get('algo'),
+        }
+        for failure in result['failures']
+    ]
+
+    return jsonify(result)
+
+
 @blueprint.route('/auto_link_pre_check', methods=['POST'])
 @login_required
 def auto_link_pre_check():

@@ -7,6 +7,7 @@ from wtforms.fields import DateTimeLocalField
 from utils import *
 from wtforms import SubmitField
 from time import strftime
+from app.services.auto_link_service import AutoLinkService
 
 
 def _stats_table_rows(stats_table_data):
@@ -110,10 +111,7 @@ def _stats_summary(stats_table_data, raw_holdings_rows, import_warnings):
 
 
 def _selected_year(year_value):
-    if not year_value or year_value == 'All Time':
-        return None
-
-    return int(year_value)
+    return AutoLinkService().selected_year(year_value)
 
 
 def _stats_response_payload(transactions, year_value='All Time'):
@@ -141,27 +139,12 @@ def _stats_response_payload(transactions, year_value='All Time'):
 
 def _auto_fix_safe_issues(transactions, year_value='All Time'):
     selected_year = _selected_year(year_value)
-
-    if selected_year:
-        date_range = _date_range_for_year(transactions, selected_year)
-    else:
-        date_range = get_transactions_date_range(transactions, {'start_date': '', 'end_date': ''})
-
-    before_link_count = len(transactions.links)
-    stats_table_data = get_stats_table_data_range(transactions, date_range)
-    assets_needing_links = [
-        row['symbol']
-        for row in stats_table_data
-        if _has_unlinked_sales(row)
-    ]
-
-    failures = []
-    for asset in assets_needing_links:
-        failures.extend(transactions.auto_link(asset=asset, algo='fifo', year=selected_year))
-
-    links_created = len(transactions.links) - before_link_count
-    if links_created > 0:
-        transactions.save(description="Added FIFO basis links from Stats review")
+    auto_link_result = AutoLinkService().auto_link_unlinked_sales(
+        transactions,
+        algo='fifo',
+        year=selected_year,
+        save_description="Added FIFO basis links from Stats review",
+    )
 
     payload = _stats_response_payload(transactions, year_value)
     review_required = [
@@ -170,20 +153,15 @@ def _auto_fix_safe_issues(transactions, year_value='All Time'):
         if row[6] in ("Needs Review", "Needs declared holdings")
     ]
 
-    if links_created > 0:
-        message = f"Added {links_created} FIFO basis link(s) across {len(assets_needing_links)} asset(s) for review."
-    elif assets_needing_links:
-        message = "No new FIFO links could be created. Review basis lots or missing acquisitions for the listed assets."
-    else:
-        message = "No automatic FIFO links are currently available."
+    message = auto_link_result['message']
 
     if review_required:
         message = f"{message} {len(review_required)} asset(s) still need declared holdings or reclassification review."
 
     payload.update({
         'message': message,
-        'links_created': links_created,
-        'fixed_assets': assets_needing_links,
+        'links_created': auto_link_result['links_created'],
+        'fixed_assets': auto_link_result['fixed_assets'],
         'review_required_assets': review_required,
         'failures': [
             {
@@ -193,7 +171,7 @@ def _auto_fix_safe_issues(transactions, year_value='All Time'):
                 'timestamp': str(failure.get('timestamp')),
                 'algo': failure.get('algo'),
             }
-            for failure in failures
+            for failure in auto_link_result['failures']
         ],
     })
 

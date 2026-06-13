@@ -7,6 +7,7 @@ from pathlib import Path
 import transactions as transactions_module
 from app.auto_link.routes import _preview_auto_link_failures
 from app.model.routes import _model_sale_payload
+from app.services.auto_link_service import AutoLinkService
 from app.stats.routes import _auto_fix_safe_issues
 from openpyxl import Workbook
 from transaction import Buy, Receive, Sell, Send
@@ -398,6 +399,28 @@ class TransactionsEngineTests(unittest.TestCase):
             ["Added FIFO basis links from Stats review"],
             transactions.saved_descriptions,
         )
+
+    def test_auto_link_service_links_all_unlinked_sales_for_selected_year(self):
+        transactions = empty_transactions()
+        btc_buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "test")
+        btc_sell = Sell("BTC", 1, datetime.datetime(2024, 2, 1), 300, "test")
+        eth_buy = Buy("ETH", 1, datetime.datetime(2025, 1, 1), 100, "test")
+        eth_sell = Sell("ETH", 1, datetime.datetime(2025, 2, 1), 300, "test")
+        transactions.transactions = [btc_buy, btc_sell, eth_buy, eth_sell]
+
+        result = AutoLinkService().auto_link_unlinked_sales(
+            transactions,
+            algo="fifo",
+            year=2024,
+            save_description="test guided link",
+        )
+
+        self.assertEqual(1, result["links_created"])
+        self.assertEqual(["BTC"], result["fixed_assets"])
+        self.assertEqual([], result["failures"])
+        self.assertEqual(0, btc_sell.unlinked_quantity)
+        self.assertEqual(1, eth_sell.unlinked_quantity)
+        self.assertEqual(["test guided link"], transactions.saved_descriptions)
 
     def test_model_sell_defaults_to_fifo(self):
         transactions = empty_transactions()
