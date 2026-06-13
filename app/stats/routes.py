@@ -8,6 +8,7 @@ from utils import *
 from wtforms import SubmitField
 from time import strftime
 from app.services.auto_link_service import AutoLinkService
+from app.services.import_warning_service import import_warning_review_rows
 
 
 def _stats_table_rows(stats_table_data):
@@ -124,11 +125,13 @@ def _stats_response_payload(transactions, year_value='All Time'):
     stats_table_data = get_stats_table_data_range(transactions, date_range)
     raw_holdings_reconciliation = get_multi_asset_holdings_reconciliation_table_data(transactions)
     import_warnings = _stats_import_warnings(transactions)
+    import_warning_rows = import_warning_review_rows(import_warnings)
 
     return {
         'stats_table_rows': _stats_table_rows(stats_table_data),
         'reconciliation_status': _stats_reconciliation_status(stats_table_data),
         'import_warnings': import_warnings,
+        'import_warning_rows': import_warning_rows,
         'stats_summary': _stats_summary(stats_table_data, raw_holdings_reconciliation, import_warnings),
         'holdings_reconciliation_table_data': _holdings_reconciliation_rows(
             raw_holdings_reconciliation,
@@ -196,6 +199,7 @@ def index():
     ranged_stats_table_data = get_stats_table_data_range(transactions, all_time_range)
     raw_holdings_reconciliation = get_multi_asset_holdings_reconciliation_table_data(transactions)
     import_warnings = _stats_import_warnings(transactions)
+    import_warning_rows = import_warning_review_rows(import_warnings)
 
     return render_template(
         'stats_page.html',
@@ -204,6 +208,7 @@ def index():
         years=years,
         reconciliation_status=_stats_reconciliation_status(ranged_stats_table_data),
         import_warnings=import_warnings,
+        import_warning_rows=import_warning_rows,
         stats_summary=_stats_summary(ranged_stats_table_data, raw_holdings_reconciliation, import_warnings),
         holdings_reconciliation_table_data=_holdings_reconciliation_rows(
             raw_holdings_reconciliation,
@@ -325,6 +330,7 @@ def selected_asset():
     data_dict['holdings_reconciliation_data'] = holdings_reconciliation_data
     raw_holdings_reconciliation = get_multi_asset_holdings_reconciliation_table_data(transactions)
     import_warnings = _stats_import_warnings(transactions)
+    import_warning_rows = import_warning_review_rows(import_warnings)
     data_dict['holdings_reconciliation_table_data'] = _holdings_reconciliation_rows(
         raw_holdings_reconciliation,
         stats_table_data,
@@ -342,6 +348,7 @@ def selected_asset():
         )
     }
     data_dict['import_warnings'] = import_warnings
+    data_dict['import_warning_rows'] = import_warning_rows
     data_dict['stats_summary'] = _stats_summary(stats_table_data, raw_holdings_reconciliation, import_warnings)
 
     return jsonify(data_dict)
@@ -371,11 +378,13 @@ def date_range():
     stats_table_data = get_stats_table_data_range(transactions, date_range)
     raw_holdings_reconciliation = get_multi_asset_holdings_reconciliation_table_data(transactions)
     import_warnings = _stats_import_warnings(transactions)
+    import_warning_rows = import_warning_review_rows(import_warnings)
 
     data = {}
     data['stats_table_rows'] = _stats_table_rows(stats_table_data)
     data['reconciliation_status'] = _stats_reconciliation_status(stats_table_data)
     data['import_warnings'] = import_warnings
+    data['import_warning_rows'] = import_warning_rows
     data['stats_summary'] = _stats_summary(stats_table_data, raw_holdings_reconciliation, import_warnings)
     data['holdings_reconciliation_table_data'] = _holdings_reconciliation_rows(
         raw_holdings_reconciliation,

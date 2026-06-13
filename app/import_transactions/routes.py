@@ -22,6 +22,10 @@ from datetime import datetime
 from flask import Blueprint, request
 from transactions import Transactions
 from app.services.import_service import ImportService
+from app.services.import_warning_service import (
+    clear_import_warnings_for_source,
+    import_warning_review_rows,
+)
 
 import_transactions_bp = Blueprint('import_transactions', __name__)
 
@@ -200,6 +204,8 @@ def _data_source_summary(transactions):
             "is_gainz_source": is_gainz_source,
         })
 
+    import_warnings = getattr(transactions, "import_warnings", []) or []
+
     return {
         "transaction_count": len(getattr(transactions, "transactions", [])),
         "asset_count": len(getattr(transactions, "assets", set())),
@@ -212,7 +218,8 @@ def _data_source_summary(transactions):
             "send": type_counter.get("send", 0),
             "receive": type_counter.get("receive", 0),
         },
-        "import_warnings": getattr(transactions, "import_warnings", []) or [],
+        "import_warnings": import_warnings,
+        "import_warning_rows": import_warning_review_rows(import_warnings),
     }
 
 
@@ -231,6 +238,8 @@ def _public_import_result(result):
                 public_item["filename"] = os.path.basename(item_path)
             public_files.append(public_item)
         public_result["files"] = public_files
+
+    public_result["warning_rows"] = import_warning_review_rows(public_result.get("warnings", []))
 
     return public_result
 
@@ -290,6 +299,7 @@ def _remove_data_source(transactions, source):
         for conversion in getattr(transactions, "conversions", [])
         if str(getattr(conversion, "source", "") or "") != source
     ]
+    clear_import_warnings_for_source(transactions, source)
 
     return {
         "removed_count": len(removed_transactions),

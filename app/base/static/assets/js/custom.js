@@ -15,7 +15,7 @@ function gainzFormatImportResult(result, fileName) {
     }
 
     if (warnings.length > 0) {
-        message += " Review " + warnings.length + " warning(s) on Stats & Charts.";
+        message += " Review " + warnings.length + " warning(s) below before relying on generated reports.";
     } else {
         message += " Next: import more files, then run Auto Link or open Holdings & Accounting.";
     }
@@ -24,11 +24,119 @@ function gainzFormatImportResult(result, fileName) {
 }
 
 function gainzShowImportResult(result, fileName, alertClass) {
+    var warnings = result.warnings || [];
+    var warningRows = result.warning_rows || [];
+    var resultClass = alertClass || (warnings.length > 0 ? "alert-warning" : "alert-info");
+
     $("#import_upload_result")
         .removeClass("alert-danger alert-info alert-warning")
-        .addClass(alertClass || "alert-info")
+        .addClass(resultClass)
         .text(gainzFormatImportResult(result, fileName))
         .show();
+
+    if (warnings.length > 0 || warningRows.length > 0) {
+        gainzSetImportWarningWorkflow(
+            "#import_warning_workflow",
+            "#import_warning_workflow_table",
+            warnings,
+            warningRows
+        );
+    }
+}
+
+function gainzParseImportWarning(warning) {
+    var raw = String(warning || "");
+    var match = raw.match(/^(Skipped|Imported) row (\d+) from ([^:]+?)(?::| with )\s*(.*)$/i);
+    var source = "Current import";
+    var row = "N/A";
+    var detail = raw;
+    var issue = raw;
+    var status = "Needs review";
+    var nextAction = "Review the source row. If it should affect holdings or generated reports, fix the CSV mapping, re-import the source, or add a source-backed manual transaction.";
+
+    if (match) {
+        source = match[3];
+        row = match[2];
+        detail = match[4] || raw;
+        issue = detail;
+    }
+
+    var lower = raw.toLowerCase();
+    if (lower.indexOf("$0 usd spot price") !== -1 || lower.indexOf("usd spot price") !== -1) {
+        issue = "$0 USD spot price";
+        status = "Price review";
+        nextAction = "If the row has a USD value, remove this source and re-import with a mapped USD spot price or total USD value column. If it was truly zero-value, keep documentation with the source file.";
+    } else if (lower.indexOf("unrecognized transaction type") !== -1) {
+        var typeMatch = raw.match(/unrecognized transaction type '([^']+)'/i);
+        issue = "Unrecognized transaction type: " + (typeMatch ? typeMatch[1] : "unknown");
+        status = "Classification review";
+        nextAction = "Decide whether this row is a buy, sell, send, or receive. If it belongs in Gainz, use column review or add a manual transaction with the source row as support.";
+    } else if (lower.indexOf("could not identify required columns") !== -1) {
+        issue = "Required columns were not identified";
+        status = "Mapping needed";
+        nextAction = "Upload the file again with column review enabled, choose the header row, and map date, type, asset, quantity, and USD value columns.";
+    } else if (lower.indexOf("could not parse this row") !== -1) {
+        issue = "Could not parse row";
+        status = "Row review";
+        nextAction = "Check the source row's date, type, quantity, and USD value. Correct the CSV or add a manual transaction if the row should be included.";
+    }
+
+    return {
+        raw: raw,
+        source: source,
+        row: row,
+        issue: issue,
+        status: status,
+        next_action: nextAction
+    };
+}
+
+function gainzNormalizeImportWarningRows(warnings, warningRows) {
+    if (warningRows && warningRows.length > 0) {
+        return warningRows;
+    }
+
+    return (warnings || []).map(gainzParseImportWarning);
+}
+
+function gainzRenderImportWarningTable(tableSelector, rows) {
+    var table = $(tableSelector);
+    var tbody = table.find("tbody");
+
+    if (table.length === 0 || tbody.length === 0) {
+        return;
+    }
+
+    tbody.empty();
+
+    rows.forEach(function (row) {
+        var tableRow = $("<tr></tr>");
+        tableRow.append($("<td></td>").text(row.source || "Current import"));
+        tableRow.append($("<td></td>").text(row.row || "N/A"));
+        tableRow.append($("<td></td>").text(row.issue || row.raw || "Review import row"));
+
+        var badge = $('<span class="gainz-status-badge status-needs-review"></span>')
+            .text(row.status || "Needs review");
+        tableRow.append($("<td></td>").append(badge));
+        tableRow.append($('<td class="import-warning-action"></td>').text(row.next_action || row.raw || "Review this source row."));
+        tbody.append(tableRow);
+    });
+}
+
+function gainzSetImportWarningWorkflow(panelSelector, tableSelector, warnings, warningRows) {
+    var rows = gainzNormalizeImportWarningRows(warnings, warningRows);
+    var panel = $(panelSelector);
+
+    if (panel.length === 0) {
+        return;
+    }
+
+    if (rows.length > 0) {
+        gainzRenderImportWarningTable(tableSelector, rows);
+        panel.show();
+    } else {
+        panel.hide();
+    }
 }
 
 function gainzParseDisplayNumber(value) {
@@ -200,7 +308,7 @@ if (window.Dropzone) {
 
                 if (result.mapping_required) {
                     $("#import_upload_result")
-                        .removeClass("alert-danger alert-info")
+                        .removeClass("alert-danger alert-info alert-warning")
                         .addClass("alert-warning")
                         .text((result.warnings || []).join(" "))
                         .show();
@@ -209,7 +317,7 @@ if (window.Dropzone) {
                 }
 
                 $("#import_column_mapper").hide();
-                gainzShowImportResult(result, file.name || "uploaded file", "alert-info");
+                gainzShowImportResult(result, file.name || "uploaded file");
             });
 
             this.on("error", function (file, response) {
@@ -238,7 +346,7 @@ $(document).ready(function () {
         $.post(demoUrl)
             .done(function (result) {
                 $("#import_column_mapper").hide();
-                gainzShowImportResult(result, "demo data", "alert-info");
+                gainzShowImportResult(result, "demo data");
             })
             .fail(function (xhr) {
                 var message = "Demo import failed.";
@@ -302,7 +410,7 @@ $(document).ready(function () {
         }).done(function (result) {
             if (result.mapping_required) {
                 $("#import_upload_result")
-                    .removeClass("alert-danger alert-info")
+                    .removeClass("alert-danger alert-info alert-warning")
                     .addClass("alert-warning")
                     .text((result.warnings || []).join(" "))
                     .show();
@@ -311,7 +419,7 @@ $(document).ready(function () {
             }
 
             mapper.hide();
-            gainzShowImportResult(result, "mapped CSV", "alert-info");
+            gainzShowImportResult(result, "mapped CSV");
         }).fail(function (xhr) {
             var message = "Mapped import failed.";
             if (xhr.responseJSON && xhr.responseJSON.error) {
@@ -1217,18 +1325,13 @@ $(document).ready(function() {
         }
     }
 
-    function setStatsImportWarnings(warnings) {
-        var warningList = $('#stats_import_warnings_list');
-        warningList.empty();
-
-        if (warnings && warnings.length > 0) {
-            warnings.forEach(function(warning) {
-                warningList.append($('<li>').text(warning));
-            });
-            $('#stats_import_warnings').show();
-        } else {
-            $('#stats_import_warnings').hide();
-        }
+    function setStatsImportWarnings(warnings, warningRows) {
+        gainzSetImportWarningWorkflow(
+            "#stats_import_warnings",
+            "#stats_import_warnings_table",
+            warnings,
+            warningRows
+        );
     }
 
     function statusClassName(status) {
@@ -1464,7 +1567,7 @@ $(document).ready(function() {
                 $('#l8949_table').DataTable().rows.add(return_data['l8949_table_data'] || []).draw();
 
                 setStatsReconciliationWarning(return_data['reconciliation_status']);
-                setStatsImportWarnings(return_data['import_warnings']);
+                setStatsImportWarnings(return_data['import_warnings'], return_data['import_warning_rows']);
                 setStatsSummary(return_data['stats_summary']);
                 setAllHoldingsReconciliation(return_data['holdings_reconciliation_table_data']);
                 $('#collapse_sales, #collapse_8949_long, #collapse_8949_short').collapse('show');
@@ -1830,7 +1933,7 @@ $(document).ready(function() {
                 table.clear();
                 table.rows.add(data['stats_table_rows'] || []).draw();
                 setStatsReconciliationWarning(data['reconciliation_status']);
-                setStatsImportWarnings(data['import_warnings']);
+                setStatsImportWarnings(data['import_warnings'], data['import_warning_rows']);
                 setStatsSummary(data['stats_summary']);
                 setAllHoldingsReconciliation(data['holdings_reconciliation_table_data']);
                 $('#stats_auto_fix_result').text(data['message'] || 'FIFO auto-link complete. Review the generated links.');
@@ -1885,7 +1988,7 @@ $(document).ready(function() {
                 $('#statspage_stats_datatable').DataTable().clear();
                 $('#statspage_stats_datatable').DataTable().rows.add(data['stats_table_rows']).draw();
                 setStatsReconciliationWarning(data['reconciliation_status']);
-                setStatsImportWarnings(data['import_warnings']);
+                setStatsImportWarnings(data['import_warnings'], data['import_warning_rows']);
                 setAllHoldingsReconciliation(data['holdings_reconciliation_table_data']);
                 $('#statspage_detailed_datatable').DataTable().clear().draw();
                 $('#statspage_sells_datatable').DataTable().clear().draw();

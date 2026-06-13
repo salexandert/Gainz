@@ -146,6 +146,7 @@ COLUMN_ALIASES = {
     ],
     'total': [
         'total inclusive of fees and or spread',
+        'total inclusive of fees and spread',
         'total',
         'total amount',
         'total value',
@@ -167,7 +168,7 @@ TRANSACTION_TYPE_KEYWORDS = {
     'Buy': ['buy', 'bought', 'purchase', 'purchased', 'acquire', 'acquired', 'acquisition'],
     'Sell': ['sell', 'sold', 'sale', 'cash out'],
     'Send': ['send', 'sent', 'withdrawal', 'withdraw', 'transfer out', 'outgoing'],
-    'Receive': ['receive', 'received', 'deposit', 'incoming', 'reward', 'staking', 'interest', 'airdrop'],
+    'Receive': ['receive', 'received', 'deposit', 'incoming', 'reward', 'staking', 'interest', 'airdrop', 'earn', 'coinbase earn'],
 }
 
 ASSET_NAME_ALIASES = {

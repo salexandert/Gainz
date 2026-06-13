@@ -134,6 +134,55 @@
           <button type="button" id="import_demo_data_button" class="btn btn-outline-primary btn-sm" data-demo-url="{{ url_for('import_transactions_blueprint.import_demo_data') }}">Try Demo Data</button>
         </div>
         <div id="import_upload_result" class="alert alert-info" role="alert" style="display: none;"></div>
+        <div
+          id="import_warning_workflow"
+          class="import-warning-workflow alert alert-warning"
+          role="alert"
+          {% if not data_summary.import_warnings %}style="display: none;"{% endif %}
+        >
+          <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-start">
+            <div>
+              <strong>Import warnings need review.</strong>
+              <p class="mb-2">
+                Some rows were skipped or imported with missing values. Resolve these before relying on generated reports or audit packets.
+              </p>
+            </div>
+            <div class="import-warning-actions">
+              <a class="btn btn-sm btn-outline-primary" href="#import_review_columns_before_import">Enable column review</a>
+              <a class="btn btn-sm btn-outline-primary" href="#manual-transactions">Add manual rows</a>
+              <a class="btn btn-sm btn-outline-primary" href="#import_data_sources_table">Review sources</a>
+            </div>
+          </div>
+          <ol class="import-warning-steps">
+            <li>Open the source file and check the row shown below.</li>
+            <li>If Gainz missed columns, remove the source and re-import with column review enabled.</li>
+            <li>If the row belongs in the record but the source cannot be fixed, add a manual transaction backed by the source row.</li>
+          </ol>
+          <div class="table-responsive">
+            <table id="import_warning_workflow_table" class="table table-sm table-striped import-warning-table">
+              <thead>
+                <tr>
+                  <th>Source</th>
+                  <th>Row</th>
+                  <th>Issue</th>
+                  <th>Status</th>
+                  <th>Suggested next action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for warning in data_summary.import_warning_rows %}
+                <tr>
+                  <td>{{ warning.source }}</td>
+                  <td>{{ warning.row }}</td>
+                  <td>{{ warning.issue }}</td>
+                  <td><span class="gainz-status-badge status-needs-review">{{ warning.status }}</span></td>
+                  <td class="import-warning-action">{{ warning.next_action }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
         <div class="form-check mb-3">
           <label class="form-check-label" for="import_review_columns_before_import">
             <input id="import_review_columns_before_import" class="form-check-input" type="checkbox">
@@ -344,29 +393,6 @@
   </div>
 </div>
 <!-- /Data Sources -->
-
-{% if data_summary.import_warnings %}
-<div class="row">
-  <div class="col-md-12">
-    <div class="card">
-      <div class="card-body">
-        <h5 class="card-title">Import Warnings</h5>
-        <ul class="mb-0">
-          {% for warning in data_summary.import_warnings[:8] %}
-          <li>{{ warning }}</li>
-          {% endfor %}
-        </ul>
-        {% if data_summary.import_warnings|length > 8 %}
-        <p class="text-muted mb-0 mt-2">Showing 8 of {{ data_summary.import_warnings|length }} warnings. Full warnings are included on Stats & Charts and in audit packets.</p>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-
-
 
 {% endblock content %}
 

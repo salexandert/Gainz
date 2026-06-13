@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from app.services.export_service import ExportService
+from app.services.import_warning_service import import_warning_review_rows
 from utils import (
     FORM_8949_COLUMNS,
     format_quantity,
@@ -301,10 +302,20 @@ class AuditPacketService:
     def _write_import_warnings(self, packet_dir, transactions):
         warnings = getattr(transactions, "import_warnings", []) or []
         with open(packet_dir / "01_reports" / "import_warnings.csv", "w", newline="", encoding="utf-8") as file:
-            writer = csv.DictWriter(file, fieldnames=["warning"])
+            writer = csv.DictWriter(
+                file,
+                fieldnames=["source", "row", "issue", "status", "next_action", "warning"],
+            )
             writer.writeheader()
-            for warning in warnings:
-                writer.writerow({"warning": warning})
+            for row in import_warning_review_rows(warnings):
+                writer.writerow({
+                    "source": row["source"],
+                    "row": row["row"],
+                    "issue": row["issue"],
+                    "status": row["status"],
+                    "next_action": row["next_action"],
+                    "warning": row["raw"],
+                })
 
     def _write_inventory(self, packet_dir):
         rows = []

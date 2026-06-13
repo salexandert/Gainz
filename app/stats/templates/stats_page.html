@@ -93,13 +93,43 @@
   </div>
 </div>
 
-<div id="stats_import_warnings" class="alert alert-info" role="alert" {% if not import_warnings %}style="display: none;"{% endif %}>
-  <strong>Import warnings.</strong>
-  <ul id="stats_import_warnings_list" class="mb-0">
-    {% for warning in import_warnings %}
-      <li>{{ warning }}</li>
-    {% endfor %}
-  </ul>
+<div id="stats_import_warnings" class="import-warning-workflow alert alert-warning" role="alert" {% if not import_warnings %}style="display: none;"{% endif %}>
+  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-start">
+    <div>
+      <strong>Import warnings need review.</strong>
+      <p class="mb-2">
+        Some imported rows need a source-file decision before generated reports are ready to use.
+      </p>
+    </div>
+    <div class="import-warning-actions">
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('import_transactions_blueprint.import_wizard') }}#import_warning_workflow">Open import review</a>
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('import_transactions_blueprint.import_wizard') }}#manual-transactions">Add manual rows</a>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table id="stats_import_warnings_table" class="table table-sm table-striped import-warning-table">
+      <thead>
+        <tr>
+          <th>Source</th>
+          <th>Row</th>
+          <th>Issue</th>
+          <th>Status</th>
+          <th>Suggested next action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for warning in import_warning_rows %}
+        <tr>
+          <td>{{ warning.source }}</td>
+          <td>{{ warning.row }}</td>
+          <td>{{ warning.issue }}</td>
+          <td><span class="gainz-status-badge status-needs-review">{{ warning.status }}</span></td>
+          <td class="import-warning-action">{{ warning.next_action }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <!-- Holdings Reconciliation -->

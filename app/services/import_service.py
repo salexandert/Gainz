@@ -3,6 +3,7 @@ from pathlib import Path
 
 from werkzeug.utils import secure_filename
 
+from app.services.import_warning_service import clear_import_warnings_for_source
 from parsers import analyze_csv_import, import_transactions
 
 
@@ -27,6 +28,7 @@ class ImportService:
         file_storage.save(file_path)
         if not filename.lower().endswith(".csv"):
             warning = "Gainz currently imports CSV files. Export or save this file as CSV and try again."
+            clear_import_warnings_for_source(transactions, filename)
             transactions.last_import_result = {
                 "file_path": file_path,
                 "imported_count": 0,
@@ -52,6 +54,7 @@ class ImportService:
         if not analysis["can_import"]:
             return self._mapping_required_result(file_path, analysis)
 
+        clear_import_warnings_for_source(transactions, filename)
         imported_count, skipped_count = import_transactions(
             file_path,
             transactions,
@@ -78,6 +81,7 @@ class ImportService:
         if not analysis["can_import"]:
             return self._mapping_required_result(file_path, analysis)
 
+        clear_import_warnings_for_source(transactions, file_path)
         imported_count, skipped_count = import_transactions(
             file_path,
             transactions,
@@ -127,6 +131,7 @@ class ImportService:
 
         for demo_file in self.DEMO_FILES:
             source = demo_root / demo_file
+            clear_import_warnings_for_source(transactions, demo_file)
             imported_count, skipped_count = import_transactions(str(source), transactions)
             result_warnings = getattr(transactions, "last_import_result", {}).get("warnings", [])
             results.append({

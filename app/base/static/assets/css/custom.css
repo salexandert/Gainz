@@ -465,6 +465,41 @@
     font-size: 12px;
 }
 
+.import-warning-workflow {
+    color: #252422;
+}
+
+.import-warning-workflow p {
+    color: #4f5962;
+}
+
+.import-warning-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.import-warning-steps {
+    margin: 8px 0 12px;
+    padding-left: 20px;
+}
+
+.import-warning-table {
+    background: #fff;
+    margin-bottom: 0;
+}
+
+.import-warning-table th,
+.import-warning-table td {
+    vertical-align: top;
+    white-space: normal;
+}
+
+.import-warning-table .import-warning-action {
+    min-width: 260px;
+}
+
 .holdings-hidden-legacy {
     display: none;
 }

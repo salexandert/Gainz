@@ -19,6 +19,7 @@ from app.import_transactions.routes import (
 )
 from app.services.audit_packet_service import AuditPacketService
 from app.services.import_service import ImportService
+from app.services.import_warning_service import import_warning_review_rows
 from transaction import Buy, Sell
 from transactions import Transactions
 from utils import (
@@ -118,6 +119,7 @@ class ImportAndExportTests(unittest.TestCase):
                     "link_count": 0,
                     "sources": [],
                     "import_warnings": [],
+                    "import_warning_rows": [],
                     "type_counts": {},
                 },
             )
@@ -127,10 +129,48 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn('name="manual_batch_submit"', rendered_page)
         self.assertIn("Blank rows are ignored", rendered_page)
 
+    def test_import_page_renders_import_warning_workflow(self):
+        app = create_app(config_dict["Debug"], selenium=True)
+        app.config.update(WTF_CSRF_ENABLED=False)
+        warnings = [
+            "Skipped row 12 from coinbase.csv: unrecognized transaction type 'Mystery Reward'"
+        ]
+
+        with app.test_request_context("/import_transactions/"):
+            rendered_page = app.jinja_env.get_template(
+                "import_transactions.html"
+            ).render(
+                manual_trans=import_routes.ManualTransaction(),
+                current_holdings=import_routes.CurrentHoldings(),
+                save_summary={
+                    "revision": 0,
+                    "save_count": 0,
+                    "recent_saves": [],
+                },
+                data_summary={
+                    "transaction_count": 0,
+                    "asset_count": 0,
+                    "source_count": 0,
+                    "link_count": 0,
+                    "sources": [],
+                    "import_warnings": warnings,
+                    "import_warning_rows": import_warning_review_rows(warnings),
+                    "type_counts": {},
+                },
+            )
+
+        self.assertIn('id="import_warning_workflow"', rendered_page)
+        self.assertIn("Import warnings need review", rendered_page)
+        self.assertIn("coinbase.csv", rendered_page)
+        self.assertIn("Suggested next action", rendered_page)
+
     def test_public_import_result_strips_server_paths(self):
         result = _public_import_result({
             "file_path": r"C:\private\uploads\transactions.csv",
             "imported_count": 1,
+            "warnings": [
+                "Skipped row 12 from transactions.csv: unrecognized transaction type 'Mystery Reward'"
+            ],
             "files": [
                 {
                     "file_path": r"C:\private\demo_data\cash_app_sample.csv",
@@ -143,6 +183,8 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual("transactions.csv", result["filename"])
         self.assertNotIn("file_path", result["files"][0])
         self.assertEqual("cash_app_sample.csv", result["files"][0]["filename"])
+        self.assertEqual("transactions.csv", result["warning_rows"][0]["source"])
+        self.assertEqual("12", result["warning_rows"][0]["row"])
 
     def test_import_route_errors_do_not_expose_exception_details(self):
         app = create_app(config_dict["Debug"], selenium=True)
@@ -256,6 +298,10 @@ class ImportAndExportTests(unittest.TestCase):
         remaining_sell = Sell("BTC", 0.5, datetime.datetime(2024, 2, 1), 300, "keep.csv")
         remaining_sell.link_transaction(removed_buy, 0.5)
         transactions.transactions = [removed_buy, remaining_buy, remaining_sell]
+        transactions.import_warnings = [
+            "Skipped row 4 from remove.csv: unrecognized transaction type 'Mystery'",
+            "Skipped row 5 from keep.csv: unrecognized transaction type 'Mystery'",
+        ]
 
         result = _remove_data_source(transactions, "remove.csv")
 
@@ -263,6 +309,9 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual(["keep.csv", "keep.csv"], [transaction.source for transaction in transactions.transactions])
         self.assertEqual([], remaining_sell.links)
         self.assertEqual([], remaining_sell.linked_transactions)
+        self.assertEqual([
+            "Skipped row 5 from keep.csv: unrecognized transaction type 'Mystery'"
+        ], transactions.import_warnings)
 
     def test_import_service_imports_coinbase_sample(self):
         transactions = empty_transactions()
@@ -331,6 +380,26 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual([], result["warnings"])
         self.assertEqual(["buy", "sell"], [t.trans_type for t in transactions.transactions])
         self.assertEqual([2.0, 1.5], [t.quantity for t in transactions.transactions])
+
+    def test_import_service_imports_coinbase_earn_as_receive(self):
+        transactions = empty_transactions()
+        csv_text = "\n".join([
+            "Timestamp,Transaction Type,Asset,Quantity Transacted,Total Inclusive of Fees and Spread,Notes",
+            "2024-02-01 09:00:00 UTC,Coinbase Earn,SOL,3.5,$35.00,Earned SOL",
+        ])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "coinbase_earn.csv"
+            upload_dir = Path(temp_dir) / "uploads"
+            source.write_text(csv_text, encoding="utf-8")
+            result = ImportService(upload_dir).import_upload(FileUpload(source), transactions)
+
+        self.assertEqual(1, result["imported_count"])
+        self.assertEqual(0, result["skipped_count"])
+        self.assertEqual([], result["warnings"])
+        self.assertEqual("receive", transactions.transactions[0].trans_type)
+        self.assertEqual("SOL", transactions.transactions[0].symbol)
+        self.assertEqual(10.0, transactions.transactions[0].usd_spot)
 
     def test_import_service_imports_generic_alias_csv(self):
         transactions = empty_transactions()
@@ -604,6 +673,11 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertTrue((packet_path / "01_reports" / "tax_filing_alignment.csv").exists())
             self.assertEqual(1, len(list((packet_path / "01_reports").glob("*.xlsx"))))
             self.assertEqual(1, len(list((packet_path / "02_source_files").glob("*.csv"))))
+
+            with open(packet_path / "01_reports" / "import_warnings.csv", newline="", encoding="utf-8") as file:
+                warning_rows = list(csv.DictReader(file))
+            self.assertEqual("Example warning", warning_rows[0]["warning"])
+            self.assertEqual("Needs review", warning_rows[0]["status"])
 
             with open(packet_path / "01_reports" / "form_8949_totals.csv", newline="", encoding="utf-8") as file:
                 totals = {row["term"]: row for row in csv.DictReader(file)}
