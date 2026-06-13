@@ -31,6 +31,10 @@ function gainzShowImportResult(result, fileName, alertClass) {
         .show();
 }
 
+function gainzParseDisplayNumber(value) {
+    return Number(String(value).replace(/[$,]/g, '').trim());
+}
+
 function gainzBuildColumnSelect(field, columns, selectedColumn) {
     var fieldName = field.field;
     var select = $('<select class="form-control import-mapping-select"></select>');
@@ -378,7 +382,7 @@ $(document).ready(function() {
             return null;
         }
 
-        var parsed = Number(String(value).replace('$', '').replace(/,/g, '').trim());
+        var parsed = gainzParseDisplayNumber(value);
         return Number.isFinite(parsed) ? parsed : null;
     }
 
@@ -1244,7 +1248,7 @@ $(document).ready(function() {
             return null;
         }
 
-        var parsed = Number(String(value).replace('$', '').replace(/,/g, '').trim());
+        var parsed = gainzParseDisplayNumber(value);
         return Number.isFinite(parsed) ? parsed : null;
     }
 

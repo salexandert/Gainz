@@ -9,24 +9,12 @@ def _local_instance_path():
     )
 
 
-def _read_or_create_secret_key():
+def _read_secret_key():
     env_secret = os.environ.get('GAINZ_SECRET_KEY')
     if env_secret:
         return env_secret
 
-    instance_path = _local_instance_path()
-    os.makedirs(instance_path, exist_ok=True)
-    secret_path = os.path.join(instance_path, 'secret_key')
-
-    if os.path.exists(secret_path):
-        with open(secret_path, 'r', encoding='utf-8') as secret_file:
-            return secret_file.read().strip()
-
-    secret = secrets.token_urlsafe(48)
-    with open(secret_path, 'w', encoding='utf-8') as secret_file:
-        secret_file.write(secret)
-
-    return secret
+    return secrets.token_urlsafe(48)
 
 
 def _admin_config():
@@ -37,7 +25,7 @@ def _admin_config():
     }
 
 class Config(object):
-    SECRET_KEY = _read_or_create_secret_key()
+    SECRET_KEY = _read_secret_key()
     SQLALCHEMY_DATABASE_URI = 'sqlite:///database.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     STORE_URL = os.environ.get('GAINZ_STORE_URL', 'https://cryptogainz.store')

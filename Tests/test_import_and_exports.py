@@ -14,6 +14,7 @@ from app.import_transactions.routes import (
     _manual_batch_rows,
     _manual_row_is_blank,
     _manual_transaction_from_values,
+    _public_import_result,
     _remove_data_source,
 )
 from app.services.audit_packet_service import AuditPacketService
@@ -125,6 +126,23 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn('name="manual_type[]"', rendered_page)
         self.assertIn('name="manual_batch_submit"', rendered_page)
         self.assertIn("Blank rows are ignored", rendered_page)
+
+    def test_public_import_result_strips_server_paths(self):
+        result = _public_import_result({
+            "file_path": r"C:\private\uploads\transactions.csv",
+            "imported_count": 1,
+            "files": [
+                {
+                    "file_path": r"C:\private\demo_data\cash_app_sample.csv",
+                    "imported_count": 3,
+                }
+            ],
+        })
+
+        self.assertNotIn("file_path", result)
+        self.assertEqual("transactions.csv", result["filename"])
+        self.assertNotIn("file_path", result["files"][0])
+        self.assertEqual("cash_app_sample.csv", result["files"][0]["filename"])
 
     def test_manual_batch_rows_skip_blanks_and_build_transactions(self):
         form_data = MultiDict([

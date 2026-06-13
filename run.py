@@ -113,8 +113,7 @@ if __name__ == "__main__":
         f"\nTo access Gainz go to {url} in a web browser. Preferably Chrome"
     )
     print(
-        "\nIf this is your first run, credentials are in instance/first_run_credentials.txt "
-        "unless GAINZ_ADMIN_PASSWORD was provided."
+        "\nIf this is your first run, create a local admin account in the browser."
     )
     print("\nClose this window when finished.\n")
 

@@ -52,7 +52,7 @@ Gainz runs on your machine. Imported CSVs, saves, exports, and audit packets sta
 2. Double-click `Gainz.exe`.
 3. Keep the launcher window open while using Gainz.
 4. Click **Open Gainz** in the launcher.
-5. If first-run credentials are generated, the launcher shows where they were saved.
+5. On first run, create a local admin account in the browser.
 
 The launcher should make it clear that Gainz is running locally. Expect a small window with the local address, an **Open Gainz** button, a copy-link action, and a quit action. When the browser opens, the first screen should look like the local Gainz app, not a cloud login page.
 
@@ -65,7 +65,7 @@ The launcher should make it clear that Gainz is running locally. Expect a small 
 2. Open `Gainz.app`.
 3. Keep the launcher window open while using Gainz.
 4. Click **Open Gainz** in the launcher.
-5. If first-run credentials are generated, the launcher shows where they were saved.
+5. On first run, create a local admin account in the browser.
 
 ## Verify The Download
 

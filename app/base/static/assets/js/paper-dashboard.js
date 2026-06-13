@@ -82,7 +82,7 @@ $(document).ready(function() {
   $('.bootstrap-tagsinput').addClass('' + tagClass + '-badge');
 
   //    Activate bootstrap-select
-  if ($(".selectpicker").length != 0) {
+  if ($(".selectpicker").length != 0 && $.fn.selectpicker) {
     $(".selectpicker").selectpicker({
       iconBase: "nc-icon",
       tickIcon: "nc-check-2"

@@ -68,13 +68,9 @@ For developer console output, you can still run:
 python run.py
 ```
 
-On first run, Gainz creates a local admin account. If `GAINZ_ADMIN_PASSWORD` is not set, a one-time generated password is written to:
+On first run, Gainz asks you to create a local admin account in the browser. The password is hashed into the local database and is not written to a plaintext credentials file.
 
-```text
-instance/first_run_credentials.txt
-```
-
-Set these environment variables to control first-run credentials:
+Set these environment variables to pre-create the first local admin account instead:
 
 ```powershell
 $env:GAINZ_ADMIN_USERNAME="admin"

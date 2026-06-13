@@ -1,9 +1,12 @@
 import unittest
 import tempfile
 import socket
+from pathlib import Path
 from unittest.mock import patch
 
 from app import create_app
+from app.base.models import User
+from app.extensions import db
 from configs.config import config_dict
 from launcher import find_available_port, health_url, server_url
 from port_guard import require_port_available
@@ -98,6 +101,45 @@ class LauncherStartupTests(unittest.TestCase):
             with patch.dict("os.environ", {"GAINZ_PORT": str(occupied_port)}):
                 with self.assertRaises(RuntimeError):
                     find_available_port()
+
+    def test_first_run_setup_creates_local_admin_without_plaintext_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class FirstRunTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+                ADMIN = {
+                    "username": "admin",
+                    "email": "admin@local.gainz",
+                    "password": "",
+                }
+
+            app = create_app(FirstRunTestConfig, selenium=True)
+
+            with app.test_client() as client:
+                response = client.get("/login")
+                self.assertEqual(200, response.status_code)
+                self.assertIn(b"Create Local Admin", response.data)
+
+                response = client.post(
+                    "/login",
+                    data={
+                        "username": "admin",
+                        "email": "admin@local.gainz",
+                        "password": "local-password",
+                        "create_account": "1",
+                    },
+                )
+                self.assertEqual(302, response.status_code)
+
+            self.assertFalse((Path(temp_dir) / "first_run_credentials.txt").exists())
+
+            with app.app_context():
+                self.assertEqual(1, User.query.count())
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
 
 
 if __name__ == "__main__":

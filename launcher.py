@@ -113,8 +113,7 @@ class GainzLauncher(tk.Tk):
         self.after(250, self.check_startup)
 
     def credentials_message(self):
-        credentials_path = os.path.join(app_base_dir(), "instance", "first_run_credentials.txt")
-        return f"First-run credentials, when needed, are saved at:\n{credentials_path}"
+        return "First run: create a local admin account in the browser. No Gainz account data leaves this computer."
 
     def build_ui(self):
         title = ttk.Label(self, textvariable=self.heading_text, font=("Segoe UI", 16, "bold"))

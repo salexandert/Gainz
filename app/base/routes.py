@@ -1,4 +1,4 @@
-from flask import jsonify, render_template, redirect, request, url_for
+from flask import abort, current_app, render_template, redirect, request, url_for
 from flask_login import (
     current_user,
     login_required,
@@ -36,9 +36,53 @@ def route_errors(error):
 ## Login & Registration
 
 
+def _has_users():
+    return db.session.query(User.id).first() is not None
+
+
+def _is_local_request():
+    return request.remote_addr in ("127.0.0.1", "::1", "localhost")
+
+
 @blueprint.route('/login', methods=['GET', 'POST'])
 def login():
     login_form = LoginForm(request.form)
+    create_form = CreateAccountForm(request.form)
+
+    if not _has_users():
+        if not _is_local_request():
+            abort(403)
+
+        admin_username = current_app.config['ADMIN']['username']
+        if request.method == 'GET':
+            create_form.username.data = admin_username
+
+        status = ''
+        if 'create_account' in request.form:
+            username = (request.form.get('username') or '').strip()
+            email = (request.form.get('email') or '').strip() or 'admin@local.gainz'
+            password = request.form.get('password') or ''
+
+            if not username:
+                status = 'Choose a username.'
+            elif username != admin_username:
+                status = f'Use {admin_username} as the local admin username.'
+            elif len(password) < 8:
+                status = 'Use a password with at least 8 characters.'
+            else:
+                user = User(username=username, email=email, password=password)
+                user.add_to_db()
+                login_user(user)
+                return redirect(url_for('home_blueprint.index'))
+
+        return render_template(
+            'login/login.html',
+            login_form=login_form,
+            create_form=create_form,
+            setup_required=True,
+            status=status,
+        )
+
     if 'login' in request.form:
         user = User.query.filter_by(username=request.form['username']).first()
         if user:
@@ -49,11 +93,11 @@ def login():
                 status = 'Password Error !'
         else:
             status = "User doesn't exist !"
-        return render_template('login/login.html', login_form = login_form, status = status)
+        return render_template('login/login.html', login_form=login_form, create_form=create_form, status=status)
 
     if current_user.is_authenticated:
         return redirect(url_for('home_blueprint.index'))
-    return render_template('login/login.html', login_form = login_form, status = '')
+    return render_template('login/login.html', login_form=login_form, create_form=create_form, status='')
    
 @blueprint.route('/logout')
 @login_required

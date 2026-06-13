@@ -216,6 +216,25 @@ def _data_source_summary(transactions):
     }
 
 
+def _public_import_result(result):
+    public_result = dict(result or {})
+    file_path = public_result.pop("file_path", None)
+    if file_path and "filename" not in public_result:
+        public_result["filename"] = os.path.basename(file_path)
+
+    if "files" in public_result:
+        public_files = []
+        for item in public_result.get("files", []) or []:
+            public_item = dict(item)
+            item_path = public_item.pop("file_path", None)
+            if item_path and "filename" not in public_item:
+                public_item["filename"] = os.path.basename(item_path)
+            public_files.append(public_item)
+        public_result["files"] = public_files
+
+    return public_result
+
+
 def _remove_data_source(transactions, source):
     source = str(source or "")
     original_transactions = list(getattr(transactions, "transactions", []))
@@ -296,7 +315,7 @@ def import_wizard():
                 )
                 if result.get("mapping_required"):
                     session["pending_import_file_path"] = result["file_path"]
-                return jsonify(result)
+                return jsonify(_public_import_result(result))
 
         # Current holdings
         if current_holdings.validate_on_submit():
@@ -411,7 +430,7 @@ def mapped_import():
     if not result.get("mapping_required"):
         session.pop("pending_import_file_path", None)
 
-    return jsonify(result)
+    return jsonify(_public_import_result(result))
 
 
 @blueprint.route('/demo', methods=['POST'])
@@ -422,7 +441,7 @@ def import_demo_data():
         transactions,
         repo_root=current_app.root_path + "/..",
     )
-    return jsonify(result)
+    return jsonify(_public_import_result(result))
 
 
 @blueprint.route('/remove_source', methods=['POST'])

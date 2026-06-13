@@ -300,7 +300,10 @@ def selected_asset():
             total_in_usd=_parse_model_number(request.json.get('total_in_usd')),
         )
     except (TypeError, ValueError) as error:
-        return jsonify({"error": str(error)}), 400
+        current_app.logger.info("Invalid model sale request: %s", error)
+        return jsonify({
+            "error": "Check the selected asset, sale quantity, and USD price before modeling this sale."
+        }), 400
 
     return jsonify(payload)
 

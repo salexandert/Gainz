@@ -20,11 +20,7 @@ The launcher opens a small desktop window with the local web address, usually:
 http://127.0.0.1:5000/
 ```
 
-On first run, Gainz creates a local admin account. If you did not set `GAINZ_ADMIN_PASSWORD`, the generated password is written to:
-
-```text
-instance/first_run_credentials.txt
-```
+On first run, Gainz asks you to create a local admin account in the browser. The password is hashed into the local database and is not written to a plaintext credentials file.
 
 ![Gainz home page after opening the local app]({{ '/assets/screenshots/gainz-home.png' | relative_url }})
 {: .screenshot-frame }
