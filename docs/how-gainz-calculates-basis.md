@@ -61,6 +61,13 @@ If a receive is really an acquisition, it may need to be converted to a buy with
 
 The IRS digital assets page says that transferring digital assets between wallets or accounts you own or control is generally not a reportable digital asset transaction unless you paid a transaction fee with digital assets. It also says sales, exchanges, payments, transfer fees, and transfers of ownership or financial interest are digital asset transactions. See the [IRS digital assets page](https://www.irs.gov/filing/digital-assets) for the current federal framing.
 
+Gainz treats send and receive rows as classification questions. The Holdings & Accounting page shows a Transfer Classification Review table for the selected asset:
+
+- A nearby same-quantity send and receive can be a clue for an owner transfer, but the user still needs source records to confirm it.
+- A send without a matching receive may indicate an owner transfer to a wallet that has not been imported, or it may be a documented disposal, fee, gift, loss, or other ownership transfer.
+- A receive without a matching send may indicate a buy from another exchange, income, rewards, gift, or a transfer from an unimported wallet.
+- Classification changes should be based on records, not on making the reconciliation number look better.
+
 ## Loss Review
 
 Gainz can mark a lot for loss review when source records show an asset may be lost, stolen, abandoned, or otherwise no longer owned. This is a documentation step, not a filing conclusion.

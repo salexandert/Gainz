@@ -311,6 +311,12 @@
     margin: 16px 0;
 }
 
+#holdings_classification_review_datatable td {
+    max-width: 320px;
+    vertical-align: top;
+    white-space: normal;
+}
+
 .holdings-readiness-grid {
     display: grid;
     gap: 12px;

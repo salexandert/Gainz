@@ -199,6 +199,10 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual("1.1", breakdown["summary"]["imported_net"])
         self.assertIn("Buys 2 - sells 0.25 = 1.75 BTC", breakdown["summary"]["expected_formula"])
         self.assertIn("Expected 1.75 - declared 0.5 = 1.25 BTC", breakdown["summary"]["difference_formula"])
+        self.assertEqual(2, len(breakdown["classification_rows"]))
+        self.assertEqual("Needs classification", breakdown["classification_rows"][0][5])
+        self.assertIn("No nearby same-quantity receive", breakdown["classification_rows"][0][7])
+        self.assertEqual("Needs source/basis", breakdown["classification_rows"][1][5])
         self.assertEqual([
             "2024",
             3,
@@ -228,6 +232,21 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual("0", breakdown["transaction_rows"][2][5])
         self.assertEqual("-0.75", breakdown["transaction_rows"][2][7])
         self.assertEqual("1", breakdown["transaction_rows"][2][8])
+
+    def test_holdings_difference_breakdown_flags_possible_owner_transfer(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Send("ETH", 1.5, datetime.datetime(2024, 3, 1), 2500, "exchange_a.csv"),
+            Receive("ETH", 1.5, datetime.datetime(2024, 3, 3), "exchange_b.csv", 2500),
+        ]
+
+        breakdown = get_holdings_difference_breakdown(transactions, "ETH")
+
+        self.assertEqual(2, len(breakdown["classification_rows"]))
+        self.assertEqual("Possible owner transfer", breakdown["classification_rows"][0][5])
+        self.assertIn("Nearby receive found 1.5", breakdown["classification_rows"][0][7])
+        self.assertEqual("Possible owner transfer", breakdown["classification_rows"][1][5])
+        self.assertIn("Nearby send found 1.5", breakdown["classification_rows"][1][7])
 
     def test_auto_link_preview_reports_failures_without_creating_links(self):
         buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "test")

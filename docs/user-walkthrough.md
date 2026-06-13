@@ -115,6 +115,15 @@ Gainz compares:
 
 If the status is `Needs Review`, review missing buys, missing disposals, sends, receives, gifts, income, losses, or conversions.
 
+Use **Transfer Classification Review** for the selected asset. It shows send and receive rows as questions to answer:
+
+- Did this send go to another wallet or exchange you own, or did it leave your ownership?
+- Did this receive come from another account you own, or was it a buy, income, reward, gift, or other acquisition?
+- Is there a nearby same-quantity send/receive pair that may be an owner transfer?
+- What source record supports the classification?
+
+Keep owner transfers as transfers. Record a documented disposal or basis-supported acquisition only when source records support it.
+
 ![Gainz Holdings and Accounting walkthrough]({{ '/assets/screenshots/gainz-holdings-accounting.png' | relative_url }})
 {: .screenshot-frame }
 

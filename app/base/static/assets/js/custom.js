@@ -376,6 +376,7 @@ $(document).ready(function() {
 
     var holdingsDifferenceYearlyTable = null;
     var holdingsDifferenceTransactionsTable = null;
+    var holdingsClassificationReviewTable = null;
 
     function holdingsParseQuantity(value) {
         if (value === undefined || value === null || value === 'N/A') {
@@ -474,6 +475,10 @@ $(document).ready(function() {
         $('#holdings_difference_transaction_count').text('0 transactions');
         $('#holdings_breakdown_buys, #holdings_breakdown_sells, #holdings_breakdown_sends, #holdings_breakdown_receives, #holdings_breakdown_imported_net').text('--');
 
+        if (holdingsClassificationReviewTable) {
+            holdingsClassificationReviewTable.clear().draw();
+        }
+
         if (holdingsDifferenceYearlyTable) {
             holdingsDifferenceYearlyTable.clear().draw();
         }
@@ -489,6 +494,10 @@ $(document).ready(function() {
         $('#holdings_difference_declared_formula, #holdings_difference_transfer_formula, #holdings_difference_interpretation').text('');
         $('#holdings_difference_transaction_count').text('Loading');
         $('#holdings_breakdown_buys, #holdings_breakdown_sells, #holdings_breakdown_sends, #holdings_breakdown_receives, #holdings_breakdown_imported_net').text('--');
+
+        if (holdingsClassificationReviewTable) {
+            holdingsClassificationReviewTable.clear().draw();
+        }
 
         if (holdingsDifferenceYearlyTable) {
             holdingsDifferenceYearlyTable.clear().draw();
@@ -517,6 +526,11 @@ $(document).ready(function() {
             .removeClass('status-matched status-verified status-needs-declared-holdings status-mismatch status-needs-review status-unlinked-sales')
             .addClass(holdingsStatusClass(summary.status))
             .text(transactionCount + ' transaction' + (transactionCount == 1 ? '' : 's'));
+
+        if (holdingsClassificationReviewTable) {
+            holdingsClassificationReviewTable.clear();
+            holdingsClassificationReviewTable.rows.add(data.classification_rows || []).draw();
+        }
 
         if (holdingsDifferenceYearlyTable) {
             holdingsDifferenceYearlyTable.clear();
@@ -690,7 +704,7 @@ $(document).ready(function() {
         $('#holdings_expected_from_activity').text(holdingsFormatQuantity(expectedHoldings));
         $('#holdings_unlinked_sales').text(holdingsFormatQuantity(soldUnlinked));
         $('#holdings_quantity').attr('placeholder', 'Current holding for ' + asset);
-        $('#convert_text').text('Use these tools only when supported by source records. If you know the missing transaction, adding the actual transaction is preferable to automatic reclassification.');
+        $('#convert_text').text('Use these tools only when supported by source records. If you know the missing transaction, adding the actual transaction is preferable to automatic classification. Self-transfers should stay as transfers.');
 
         if (holdings === null) {
             $('#holdings_declared_current').text('--');
@@ -757,6 +771,28 @@ $(document).ready(function() {
     holdingsDifferenceYearlyTable = $('#holdings_difference_yearly_datatable').DataTable({
         "pageLength": 10,
         "order": [[ 0, "asc" ]],
+    });
+
+    holdingsClassificationReviewTable = $('#holdings_classification_review_datatable').DataTable({
+        "pageLength": 10,
+        "order": [[ 0, "asc" ]],
+        "columnDefs": [
+            {
+                "targets": 5,
+                "render": function(data, type) {
+                    if (type !== 'display') {
+                        return data;
+                    }
+
+                    var status = String(data || '');
+                    var className = status.toLowerCase().indexOf('possible') >= 0
+                        ? 'status-unlinked-sales'
+                        : 'status-needs-review';
+
+                    return '<span class="gainz-status-badge ' + className + '">' + status + '</span>';
+                }
+            }
+        ],
     });
 
     holdingsDifferenceTransactionsTable = $('#holdings_difference_transactions_datatable').DataTable({

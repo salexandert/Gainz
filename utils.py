@@ -1391,6 +1391,119 @@ def _holdings_delta_for_imported_net(trans):
     return 0.0
 
 
+def _holdings_days_between(left, right):
+    left_dt = comparable_datetime(left)
+    right_dt = comparable_datetime(right)
+
+    if hasattr(left_dt, "__sub__") and hasattr(right_dt, "__sub__"):
+        try:
+            return abs((left_dt - right_dt).days)
+        except Exception:
+            return None
+
+    return None
+
+
+def _holdings_quantity_match(left_quantity, right_quantity):
+    left = abs(float(left_quantity or 0.0))
+    right = abs(float(right_quantity or 0.0))
+    absolute_delta = abs(left - right)
+
+    if absolute_delta <= 0.00000001:
+        return True
+
+    larger = max(left, right, 0.00000001)
+    return absolute_delta / larger <= 0.001
+
+
+def _holdings_transfer_match(trans, candidates):
+    best_match = None
+    best_days = None
+
+    for candidate in candidates:
+        if not _holdings_quantity_match(trans.quantity, candidate.quantity):
+            continue
+
+        days = _holdings_days_between(trans.time_stamp, candidate.time_stamp)
+        if days is None or days > 14:
+            continue
+
+        if best_days is None or days < best_days:
+            best_match = candidate
+            best_days = days
+
+    return best_match, best_days
+
+
+def _holdings_classification_review_rows(asset_transactions):
+    sends = [trans for trans in asset_transactions if trans.trans_type == "send"]
+    receives = [trans for trans in asset_transactions if trans.trans_type == "receive"]
+    rows = []
+
+    for trans in asset_transactions:
+        if trans.trans_type not in ("send", "receive"):
+            continue
+
+        if trans.trans_type == "send":
+            match, days = _holdings_transfer_match(trans, receives)
+            if match:
+                status = "Possible owner transfer"
+                question = "Did this leave one account you own and appear in another account you own?"
+                clues = (
+                    f"Nearby receive found {format_quantity(match.quantity)} on "
+                    f"{_format_report_datetime(match.time_stamp)} from {_holdings_source_name(match.source)}"
+                    f" ({days} day{'s' if days != 1 else ''} apart)."
+                )
+                next_action = (
+                    "If it was your own wallet/exchange transfer, leave it as a transfer. "
+                    "If it was a sale, exchange, payment, fee, gift, or other ownership transfer, record a documented disposal."
+                )
+            else:
+                status = "Needs classification"
+                question = "Did this send go to your own wallet, or did it leave your ownership?"
+                clues = "No nearby same-quantity receive was found in imported records."
+                next_action = (
+                    "Find the destination record. Import the receiving source or leave notes for an owner transfer; "
+                    "record a documented disposal only when source records show ownership changed."
+                )
+        else:
+            match, days = _holdings_transfer_match(trans, sends)
+            if match:
+                status = "Possible owner transfer"
+                question = "Is this the receiving side of a transfer from your own wallet or exchange?"
+                clues = (
+                    f"Nearby send found {format_quantity(match.quantity)} on "
+                    f"{_format_report_datetime(match.time_stamp)} from {_holdings_source_name(match.source)}"
+                    f" ({days} day{'s' if days != 1 else ''} apart)."
+                )
+                next_action = (
+                    "If it came from your own wallet/exchange, leave it as a transfer. "
+                    "If it was a buy, income, reward, gift, or outside acquisition, add or classify the basis-supported transaction."
+                )
+            else:
+                status = "Needs source/basis"
+                question = "Was this an owner transfer, a buy from another exchange, income, reward, gift, or another acquisition?"
+                clues = "No nearby same-quantity send was found in imported records."
+                next_action = (
+                    "Identify the source. Import the matching exchange/wallet file, add the missing buy, "
+                    "or classify the receive as a documented buy only when basis records support it."
+                )
+
+        rows.append([
+            _format_report_datetime(trans.time_stamp),
+            trans.trans_type.title(),
+            format_quantity(trans.quantity),
+            currency(trans.usd_total),
+            _holdings_source_name(trans.source),
+            status,
+            question,
+            clues,
+            next_action,
+        ])
+
+    return rows
+
+
 def _holdings_reconciliation_interpretation(reconciliation):
     difference = reconciliation["difference"]
     asset = reconciliation["asset"]
@@ -1538,6 +1651,7 @@ def get_holdings_difference_breakdown(transactions, asset):
         },
         "yearly_rows": yearly_rows,
         "transaction_rows": transaction_rows,
+        "classification_rows": _holdings_classification_review_rows(asset_transactions),
     }
 
 

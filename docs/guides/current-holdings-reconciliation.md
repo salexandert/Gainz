@@ -27,12 +27,25 @@ A difference can point to missing buys, missing sells, transfers between wallets
 
 Sends are not automatically sales. A send to another account you own or control should remain a transfer. A send supported by records showing a sale, exchange, payment, fee, gift, or other transfer of ownership may need to be recorded as a taxable disposal. A possible lost, stolen, abandoned, or worthless lot should be marked for review and discussed with a qualified tax professional before relying on generated reports.
 
+Receives are not automatically buys. A receive can be the other side of an owner transfer, a buy from another exchange, income, rewards, a gift, a transfer from a wallet that was not imported yet, or another acquisition that needs basis support.
+
+## Transfer Classification Review
+
+Holdings & Accounting includes a **Transfer Classification Review** table for the selected asset. It lists send and receive rows separately from buys and sells because the CSV row type does not prove intent.
+
+Use the table this way:
+
+- If a send and receive have a nearby matching quantity, treat that as a clue for a possible owner transfer, then confirm with wallet/exchange records.
+- If a send has no matching receive, find the destination. It may be an owner wallet that needs another source file, or it may be a documented taxable disposal, fee, gift, loss, or other ownership transfer.
+- If a receive has no matching send, identify the source. It may be an owner transfer from an unimported wallet, a buy on another exchange, income, rewards, a gift, or another acquisition needing basis.
+- Do not classify a row just to make the difference disappear. Add/import the missing source record when you have it; use optional classification tools only when documentation supports the treatment.
+
 ## Review Workflow
 
 1. Import every exchange and wallet file you can obtain.
 2. Open **Holdings & Accounting** and declare the amount you currently hold for each asset.
 3. Click an asset marked **Needs Review** to inspect the selected asset workbench.
-4. Review import warnings, unlinked sales, and available lots.
+4. Review import warnings, unlinked sales, available lots, and the Transfer Classification Review table.
 5. Add missing source files or supported manual entries when you have records for them.
 6. Use optional classification tools only when documentation supports the treatment.
 7. Run basis linking again, then refresh reconciliation.
