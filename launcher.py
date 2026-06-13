@@ -1,6 +1,5 @@
 import os
 import queue
-import socket
 import sys
 import threading
 import time
@@ -10,6 +9,7 @@ from tkinter import messagebox, ttk
 from urllib.request import urlopen
 
 from app_version import APP_VERSION
+from port_guard import require_port_available
 from single_instance import SingleInstanceLock
 
 APP_NAME = "Gainz"
@@ -28,16 +28,11 @@ def app_base_dir():
 
 def find_available_port(preferred_port=DEFAULT_PORT):
     configured_port = os.environ.get("GAINZ_PORT")
-    if configured_port:
-        return int(configured_port)
+    port = int(configured_port) if configured_port else preferred_port
 
-    for port in range(preferred_port, preferred_port + 20):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.settimeout(0.2)
-            if sock.connect_ex((DEFAULT_HOST, port)) != 0:
-                return port
+    require_port_available(DEFAULT_HOST, port)
+    return port
 
-    raise RuntimeError("No local port is available for Gainz.")
 
 
 def server_url(port):
@@ -87,7 +82,7 @@ def start_gainz_server(port, error_queue):
 
 
 class GainzLauncher(tk.Tk):
-    def __init__(self, instance_lock):
+    def __init__(self, instance_lock, port=None):
         super().__init__()
         self.instance_lock = instance_lock
         self.title(f"{APP_NAME} {APP_VERSION}")
@@ -97,7 +92,7 @@ class GainzLauncher(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self.close_app)
 
         os.chdir(app_base_dir())
-        self.port = find_available_port()
+        self.port = port if port is not None else find_available_port()
         self.url = server_url(self.port)
         self.health_url = health_url(self.port)
         self.instance_lock.write_info(port=self.port, url=self.url, status="starting")
@@ -230,7 +225,17 @@ def main():
         root.destroy()
         return
 
-    launcher = GainzLauncher(instance_lock)
+    try:
+        port = find_available_port()
+    except RuntimeError as exc:
+        instance_lock.release()
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror(APP_NAME, str(exc))
+        root.destroy()
+        return
+
+    launcher = GainzLauncher(instance_lock, port=port)
     launcher.mainloop()
 
 

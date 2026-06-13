@@ -551,17 +551,81 @@ $(document).ready(function() {
         });
     }
 
-    function holdingsLoadRow(rowData) {
-        $('#holdings_save_message').hide().text('');
-        holdingsRenderSelection(rowData);
+    function holdingsSetReadinessBadge(status) {
+        $('#holdings_readiness_badge')
+            .removeClass('status-matched status-verified status-needs-declared-holdings status-mismatch status-needs-review status-unlinked-sales')
+            .addClass(holdingsStatusClass(status))
+            .text(status);
+    }
 
+    function holdingsSetReadinessMessage(message, level) {
+        var className = level == 'success' ? 'alert-success' : (level == 'warning' ? 'alert-warning' : 'alert-info');
+        $('#holdings_readiness_message')
+            .removeClass('alert-info alert-warning alert-success')
+            .addClass(className)
+            .text(message);
+    }
+
+    function holdingsRenderReadiness(rowData, precheckData) {
         if (!rowData) {
-            $('#auto_actions_datatable').DataTable().clear().draw();
-            holdingsClearDifferenceBreakdown();
+            $('#holdings_readiness_asset, #holdings_readiness_holdings, #holdings_readiness_unlinked, #holdings_readiness_difference').text('--');
+            $('#holdings_run_fifo_button').prop('disabled', true).text('Run FIFO Auto Link for Selected Asset');
+            holdingsSetReadinessBadge('Select asset');
+            holdingsSetReadinessMessage('Select an asset to see the next review step.', 'info');
             return;
         }
 
-        holdingsLoadDifferenceBreakdown(rowData);
+        var asset = rowData[0];
+        var buys = holdingsParseQuantity(rowData[1]) || 0;
+        var sells = holdingsParseQuantity(rowData[2]) || 0;
+        var soldUnlinked = holdingsParseQuantity(rowData[3]) || 0;
+        var declaredHoldings = holdingsParseQuantity(rowData[8]);
+        var expectedHoldings = buys - sells;
+        var difference = declaredHoldings === null ? null : expectedHoldings - declaredHoldings;
+        var tolerance = 0.00000001;
+
+        $('#holdings_readiness_asset').text(asset);
+        $('#holdings_readiness_holdings').text(declaredHoldings === null ? 'Not declared' : holdingsFormatQuantity(declaredHoldings));
+        $('#holdings_readiness_unlinked').text(holdingsFormatQuantity(soldUnlinked));
+        $('#holdings_readiness_difference').text(difference === null ? '--' : holdingsFormatQuantity(difference));
+        $('#holdings_run_fifo_button').prop('disabled', soldUnlinked <= tolerance).text('Run FIFO Auto Link for Selected Asset');
+
+        if (declaredHoldings === null) {
+            holdingsSetReadinessBadge('Needs declared holdings');
+            holdingsSetReadinessMessage('Enter the amount of ' + asset + ' you currently hold, then save it before reviewing links or exports.', 'info');
+            return;
+        }
+
+        if (soldUnlinked > tolerance) {
+            holdingsSetReadinessBadge('Unlinked sales');
+            holdingsSetReadinessMessage(asset + ' has sales without complete basis links. Run FIFO Auto Link for this asset or review links manually before using generated reports.', 'warning');
+            return;
+        }
+
+        if (difference !== null && Math.abs(difference) > tolerance) {
+            holdingsSetReadinessBadge('Needs Review');
+            if (difference > 0) {
+                holdingsSetReadinessMessage('Imported buys and sells imply more ' + asset + ' than declared. Review the timeline for missing disposals, sends, losses, or other records before using generated reports.', 'warning');
+            } else {
+                holdingsSetReadinessMessage('Declared holdings are higher than imported buys and sells explain. Review missing acquisitions, income, gifts, transfers, or external records before using generated reports.', 'warning');
+            }
+            return;
+        }
+
+        holdingsSetReadinessBadge('Verified');
+        holdingsSetReadinessMessage(asset + ' has declared holdings, no unlinked sales, and no quantity difference in Gainz. Review supporting reports on Stats & Charts, then Export when ready.', 'success');
+    }
+
+    function holdingsLoadPrecheck(rowData) {
+        var precheckTable = $('#auto_actions_datatable').DataTable();
+
+        if (!rowData) {
+            precheckTable.clear().draw();
+            holdingsRenderReadiness(null, null);
+            return;
+        }
+
+        precheckTable.clear().draw();
 
         $.ajax({
             type: "POST",
@@ -572,11 +636,30 @@ $(document).ready(function() {
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
-
-                $('#auto_actions_datatable').DataTable().clear();
-                $('#auto_actions_datatable').DataTable().rows.add(data['auto_suggestions']).draw();
+                precheckTable.clear();
+                precheckTable.rows.add(data['auto_suggestions'] || []).draw();
+                holdingsRenderReadiness(rowData, data);
+            },
+            error: function () {
+                holdingsRenderReadiness(rowData, null);
             },
         });
+    }
+
+    function holdingsLoadRow(rowData) {
+        $('#holdings_save_message').hide().text('');
+        holdingsRenderSelection(rowData);
+
+        if (!rowData) {
+            $('#auto_actions_datatable').DataTable().clear().draw();
+            holdingsClearDifferenceBreakdown();
+            holdingsRenderReadiness(null, null);
+            return;
+        }
+
+        holdingsRenderReadiness(rowData, null);
+        holdingsLoadDifferenceBreakdown(rowData);
+        holdingsLoadPrecheck(rowData);
     }
 
     function holdingsRenderSelection(rowData) {
@@ -641,6 +724,21 @@ $(document).ready(function() {
         "columnDefs": [
             { "width": "5%", "targets": 0 },
             { "width": "20%", "targets": 2},
+            {
+                "targets": 2,
+                "render": function(data, type) {
+                    if (type !== 'display') {
+                        return data;
+                    }
+
+                    var status = String(data || '');
+                    var className = status.toLowerCase() == 'passed' || status.toLowerCase() == 'complete'
+                        ? 'status-verified'
+                        : 'status-needs-review';
+
+                    return '<span class="gainz-status-badge ' + className + '">' + status + '</span>';
+                }
+            },
             // {
             //     "targets": [ 3,4 ],
             //     "visible": false,
@@ -821,6 +919,7 @@ $(document).ready(function() {
 
                 holdingsRenderSelection(updatedRow || rowData);
                 holdingsLoadDifferenceBreakdown(updatedRow || rowData);
+                holdingsLoadPrecheck(updatedRow || rowData);
                 $('#holdings_quantity').focus().select();
                 $('#holdings_save_message').text(data['message'] || 'Declared holdings saved.').show();
             },
@@ -829,6 +928,46 @@ $(document).ready(function() {
             },
             complete: function () {
                 saveButton.prop('disabled', false).text('Save Declared Holdings');
+            },
+        });
+    });
+
+    $("#holdings_run_fifo_button").click(function(){
+        var rowData = holdingsSelectedAssetRow();
+        var button = $(this);
+        var asset = rowData ? rowData[0] : null;
+
+        if (!rowData) {
+            holdingsSetReadinessMessage('Select an asset before running FIFO Auto Link.', 'warning');
+            return;
+        }
+
+        if (!window.confirm('Run FIFO Auto Link for ' + asset + '? Gainz will create basis links for review and save a new revision if links are added.')) {
+            return;
+        }
+
+        button.prop('disabled', true).text('Linking...');
+        holdingsSetReadinessMessage('Running FIFO Auto Link for ' + asset + '...', 'info');
+
+        $.ajax({
+            type: "POST",
+            url: "/auto_link/auto_link_asset",
+            data: JSON.stringify({
+                'algo': 'fifo',
+                'asset': rowData,
+                'year': 'All Time'
+              }),
+            dataType: "json",
+            contentType: 'application/json',
+            success: function (data) {
+                holdingsSetReadinessMessage(data || 'FIFO Auto Link complete. Refreshing review data...', 'success');
+                window.setTimeout(function () {
+                    location.reload();
+                }, 900);
+            },
+            error: function () {
+                holdingsSetReadinessMessage('FIFO Auto Link could not run. Review source records or use Auto Link manually.', 'warning');
+                button.prop('disabled', false).text('Run FIFO Auto Link for Selected Asset');
             },
         });
     });

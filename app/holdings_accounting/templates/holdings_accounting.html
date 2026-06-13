@@ -271,17 +271,60 @@
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
-        <h4 class="card-title">Step 4: Link Readiness</h4>
-        <p class="card-category">After selecting an asset, Gainz checks whether sells have enough available basis candidates.</p>
-        <table id="auto_actions_datatable" class="table table-striped table-bordered" style="width:100%">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Description</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-        </table>
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start">
+          <div>
+            <h4 class="card-title">Step 4: Review Readiness</h4>
+            <p class="card-category">Use the selected asset status to decide whether to add holdings, create basis links, review source records, or move to Stats and Export.</p>
+          </div>
+          <span id="holdings_readiness_badge" class="gainz-status-badge status-needs-declared-holdings">Select asset</span>
+        </div>
+
+        <div class="holdings-readiness-grid">
+          <div class="holdings-readiness-item">
+            <span>Selected Asset</span>
+            <strong id="holdings_readiness_asset">--</strong>
+          </div>
+          <div class="holdings-readiness-item">
+            <span>Declared Holdings</span>
+            <strong id="holdings_readiness_holdings">--</strong>
+          </div>
+          <div class="holdings-readiness-item">
+            <span>Unlinked Sales</span>
+            <strong id="holdings_readiness_unlinked">--</strong>
+          </div>
+          <div class="holdings-readiness-item">
+            <span>Quantity Difference</span>
+            <strong id="holdings_readiness_difference">--</strong>
+          </div>
+        </div>
+
+        <div id="holdings_readiness_message" class="alert alert-info" role="status">
+          Select an asset to see the next review step.
+        </div>
+
+        <div class="holdings-readiness-actions">
+          <button type="button" id="holdings_run_fifo_button" class="btn btn-primary" disabled>Run FIFO Auto Link for Selected Asset</button>
+          <a class="btn btn-outline-primary" href="/stats">Open Stats & Charts</a>
+          <a class="btn btn-outline-secondary" href="/export">Open Export</a>
+        </div>
+
+        <div class="holdings-readiness-details">
+          <a data-toggle="collapse" href="#holdings_precheck_details" aria-expanded="false" aria-controls="holdings_precheck_details">
+            Technical pre-check details
+          </a>
+          <div id="holdings_precheck_details" class="collapse">
+            <p class="card-category mt-3">These checks explain whether imported buys can cover imported sells. Use them as diagnostics, not as filing advice.</p>
+            <table id="auto_actions_datatable" class="table table-striped table-bordered" style="width:100%">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Description</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </div>

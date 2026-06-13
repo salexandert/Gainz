@@ -1,9 +1,12 @@
 import unittest
 import tempfile
+import socket
+from unittest.mock import patch
 
 from app import create_app
 from configs.config import config_dict
-from launcher import health_url, server_url
+from launcher import find_available_port, health_url, server_url
+from port_guard import require_port_available
 from single_instance import SingleInstanceLock
 
 
@@ -28,6 +31,9 @@ class LauncherStartupTests(unittest.TestCase):
         self.assertIn("Change Password", rendered_nav)
         self.assertIn("/logout", rendered_nav)
         self.assertIn("Logout", rendered_nav)
+        self.assertIn("/holdings_accounting", rendered_nav)
+        self.assertNotIn("Search...", rendered_nav)
+        self.assertNotIn("nc-layout-11", rendered_nav)
 
     def test_holdings_workbench_title_has_asset_update_hook(self):
         app = create_app(config_dict["Debug"], selenium=True)
@@ -47,6 +53,10 @@ class LauncherStartupTests(unittest.TestCase):
 
         self.assertIn('id="holdings_workbench_title"', rendered_page)
         self.assertIn("Step 3 Asset Workbench", rendered_page)
+        self.assertIn("Step 4: Review Readiness", rendered_page)
+        self.assertIn('id="holdings_readiness_badge"', rendered_page)
+        self.assertIn('id="holdings_run_fifo_button"', rendered_page)
+        self.assertIn("Technical pre-check details", rendered_page)
 
     def test_launcher_health_url_uses_local_server_url(self):
         self.assertEqual("http://127.0.0.1:5000", server_url(5000))
@@ -69,6 +79,25 @@ class LauncherStartupTests(unittest.TestCase):
             finally:
                 first.release()
                 second.release()
+
+    def test_port_guard_refuses_occupied_port(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind(("127.0.0.1", 0))
+            sock.listen(1)
+            occupied_port = sock.getsockname()[1]
+
+            with self.assertRaises(RuntimeError):
+                require_port_available("127.0.0.1", occupied_port)
+
+    def test_launcher_refuses_configured_occupied_port(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind(("127.0.0.1", 0))
+            sock.listen(1)
+            occupied_port = sock.getsockname()[1]
+
+            with patch.dict("os.environ", {"GAINZ_PORT": str(occupied_port)}):
+                with self.assertRaises(RuntimeError):
+                    find_available_port()
 
 
 if __name__ == "__main__":

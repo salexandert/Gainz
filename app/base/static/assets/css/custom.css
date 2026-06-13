@@ -311,6 +311,46 @@
     margin: 16px 0;
 }
 
+.holdings-readiness-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    margin: 18px 0;
+}
+
+.holdings-readiness-item {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+
+.holdings-readiness-item span {
+    color: #6c757d;
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.holdings-readiness-item strong {
+    color: #252422;
+    display: inline-block;
+    font-size: 20px;
+    margin-top: 4px;
+}
+
+.holdings-readiness-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 14px 0;
+}
+
+.holdings-readiness-details {
+    margin-top: 10px;
+}
+
 .holdings-hidden-legacy {
     display: none;
 }

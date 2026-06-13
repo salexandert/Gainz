@@ -6,10 +6,14 @@ import sys
 import os
 import webbrowser
 
+from port_guard import require_port_available
 from single_instance import SingleInstanceLock
 
 
 get_config_mode = os.environ.get("GENTELELLA_CONFIG_MODE", "Debug")
+_runtime_host = os.environ.get("GAINZ_HOST", "127.0.0.1")
+_runtime_port = int(os.environ.get("GAINZ_PORT", "5000"))
+_runtime_url = f"http://{_runtime_host}:{_runtime_port}"
 _single_instance_lock = None
 
 if __name__ == "__main__":
@@ -25,6 +29,19 @@ if __name__ == "__main__":
         except Exception:
             pass
         sys.exit(0)
+
+    try:
+        require_port_available(_runtime_host, _runtime_port)
+    except RuntimeError as exc:
+        _single_instance_lock.write_info(
+            port=_runtime_port,
+            url=_runtime_url,
+            status="blocked",
+            error=str(exc),
+        )
+        _single_instance_lock.release()
+        print(str(exc))
+        sys.exit(1)
 
 try:
     config_mode = config_dict[get_config_mode.capitalize()]
@@ -63,9 +80,23 @@ parsers_logger = logging.getLogger('parsers')
 parsers_logger.setLevel(logging.DEBUG)
 
 if __name__ == "__main__":
-    host = os.environ.get("GAINZ_HOST", "127.0.0.1")
-    port = int(os.environ.get("GAINZ_PORT", "5000"))
-    url = f"http://{host}:{port}"
+    host = _runtime_host
+    port = _runtime_port
+    url = _runtime_url
+    try:
+        require_port_available(host, port)
+    except RuntimeError as exc:
+        if _single_instance_lock:
+            _single_instance_lock.write_info(
+                port=port,
+                url=url,
+                status="blocked",
+                error=str(exc),
+            )
+            _single_instance_lock.release()
+        print(str(exc))
+        sys.exit(1)
+
     if _single_instance_lock:
         _single_instance_lock.write_info(port=port, url=url, status="running")
     debug_enabled = os.environ.get("GAINZ_FLASK_DEBUG", "").lower() in (
