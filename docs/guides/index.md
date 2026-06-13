@@ -5,7 +5,12 @@ description: Practical Gainz guides for Cash App, Coinbase, Coinbase Convert, lo
 
 # Crypto Tax Reconciliation Guides
 
-Use these guides when you are trying to turn exchange CSVs into reviewable crypto tax evidence. Gainz runs locally, so the workflow is built around importing files, checking warnings, linking basis, reconciling holdings, and packaging the result for review.
+Use these guides when you are trying to turn exchange CSVs into reviewable crypto tax evidence. Start with the learning path if cost basis, proceeds, or missing basis are still fuzzy. Then move into imports, warnings, basis linking, holdings reconciliation, and audit packet review.
+
+## Start Here
+
+- [Crypto cost basis learning path](crypto-cost-basis-learning/)
+- [How Gainz calculates basis](../how-gainz-calculates-basis/)
 
 ## Import Guides
 
@@ -29,4 +34,3 @@ Use these guides when you are trying to turn exchange CSVs into reviewable crypt
 
 - [Download Gainz for Windows](../download/)
 - [Using Gainz from import to audit packet](../user-walkthrough/)
-- [How Gainz calculates basis](../how-gainz-calculates-basis/)

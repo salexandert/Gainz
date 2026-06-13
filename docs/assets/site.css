@@ -195,6 +195,45 @@ nav a {
   gap: 1rem;
 }
 
+.section-intro {
+  max-width: 760px;
+  color: var(--muted);
+}
+
+.process-list {
+  display: grid;
+  gap: .75rem;
+  padding-left: 0;
+  list-style: none;
+  counter-reset: process;
+}
+
+.process-list li {
+  position: relative;
+  padding: .9rem 1rem .9rem 3.2rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  counter-increment: process;
+}
+
+.process-list li::before {
+  position: absolute;
+  top: .9rem;
+  left: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  background: var(--accent-dark);
+  color: #fff;
+  content: counter(process);
+  font-size: .82rem;
+  font-weight: 800;
+}
+
 .card {
   padding: 1rem;
   border: 1px solid var(--line);

@@ -11,8 +11,8 @@ schema_type: SoftwareApplication
     <p>Turn messy crypto exports into linked basis, Form 8949-style rows, current holdings reconciliation, and an audit packet you can review with a qualified tax professional.</p>
     <div class="button-row">
       <a class="button" href="{{ '/download/' | relative_url }}">Download Gainz for Windows</a>
+      <a class="button-secondary" href="{{ '/guides/crypto-cost-basis-learning/' | relative_url }}">Learn cost basis</a>
       <a class="button-secondary" href="{{ '/user-walkthrough/' | relative_url }}">Start the walkthrough</a>
-      <a class="button-secondary" href="{{ '/guides/crypto-form-8949-audit-packet/' | relative_url }}">See audit packet guide</a>
     </div>
   </div>
   <aside class="hero-visual" aria-label="Gainz trust summary">
@@ -24,6 +24,18 @@ schema_type: SoftwareApplication
       <div class="metric"><span>Data</span><strong>Stays on your machine</strong></div>
     </div>
   </aside>
+</section>
+
+<section class="section-band">
+  <h2>Learn First, Then Reconcile</h2>
+  <p class="section-intro">Gainz is most useful when you understand the cost-basis question before importing files. Start with the concept, then move into records, reconciliation, and review.</p>
+  <ol class="process-list">
+    <li><strong>Learn cost basis.</strong> Understand proceeds, basis, gains, missing basis, and why crypto records often split across platforms.</li>
+    <li><strong>Collect source files.</strong> Export exchange CSVs, wallet records, current holdings, and prior-year evidence before trusting totals.</li>
+    <li><strong>Use Gainz locally.</strong> Import files, review warnings, link sells to buys, and reconcile current holdings.</li>
+    <li><strong>Package for review.</strong> Generate an audit packet with Form 8949-style rows, totals, source manifests, and reconciliation status.</li>
+  </ol>
+  <p><a class="button-secondary" href="{{ '/guides/crypto-cost-basis-learning/' | relative_url }}">Open the cost basis learning path</a></p>
 </section>
 
 <section class="section-band">
@@ -50,6 +62,7 @@ These pages target the moments where people are stuck with exchange exports, mis
 
 <ul class="guide-list">
   <li><a href="{{ '/guides/' | relative_url }}">Browse all crypto tax reconciliation guides</a></li>
+  <li><a href="{{ '/guides/crypto-cost-basis-learning/' | relative_url }}">Learn crypto cost basis before importing data</a></li>
   <li><a href="{{ '/guides/cash-app-bitcoin-tax-csv/' | relative_url }}">How to use a Cash App Bitcoin tax CSV in Gainz</a></li>
   <li><a href="{{ '/guides/coinbase-crypto-tax-csv/' | relative_url }}">How to import Coinbase crypto tax CSV files</a></li>
   <li><a href="{{ '/guides/coinbase-convert-crypto-tax/' | relative_url }}">How Gainz handles Coinbase Convert rows</a></li>

@@ -1,5 +1,7 @@
 # How Gainz Calculates Basis
 
+If you are new to cost basis, start with the [crypto cost basis learning path]({{ '/guides/crypto-cost-basis-learning/' | relative_url }}). It explains the user flow before getting into Gainz-specific mechanics.
+
 Gainz models imported crypto activity as four transaction types:
 
 - `buy`: creates cost basis.
@@ -25,6 +27,8 @@ Gainz supports several lot-selection strategies:
 - Min Gain Long: favors long-term lots when applicable.
 
 The selected method determines which buy lot supplies cost basis for each sell.
+
+For general education, the [Gordon Law crypto cost basis guide](https://gordonlaw.com/learn/crypto-cost-basis/) is a helpful plain-language overview of cost basis concepts. For official federal tax framing, review the [IRS virtual currency FAQs](https://www.irs.gov/individuals/international-taxpayers/frequently-asked-questions-on-virtual-currency-transactions) and discuss your specific facts with a qualified tax professional.
 
 ## Proceeds, Basis, and Gain
 
