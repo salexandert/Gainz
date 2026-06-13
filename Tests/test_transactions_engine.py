@@ -17,7 +17,9 @@ from utils import (
     get_current_holdings_lot_table_data,
     get_holdings_difference_breakdown,
     get_multi_asset_holdings_reconciliation_table_data,
+    get_stats_table_data_range,
     get_tax_filing_alignment_summary,
+    get_transactions_date_range,
     get_unrealized_chart_data,
 )
 
@@ -95,6 +97,35 @@ class TransactionsEngineTests(unittest.TestCase):
 
         self.assertEqual({"BTC"}, transactions.assets)
         self.assertEqual(2, len(transactions.transactions))
+
+    def test_stats_date_range_handles_empty_transactions(self):
+        transactions = empty_transactions()
+
+        date_range = get_transactions_date_range(
+            transactions,
+            {"start_date": "", "end_date": ""},
+        )
+        stats = get_stats_table_data_range(transactions, date_range)
+
+        self.assertIsNone(date_range["start_date"])
+        self.assertIsNone(date_range["end_date"])
+        self.assertEqual([], stats)
+
+    def test_stats_all_time_range_includes_transactions(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange"),
+        ]
+
+        date_range = get_transactions_date_range(
+            transactions,
+            {"start_date": "", "end_date": ""},
+        )
+        stats = get_stats_table_data_range(transactions, date_range)
+
+        self.assertEqual(1, len(stats))
+        self.assertEqual("BTC", stats[0]["symbol"])
+        self.assertEqual("1", stats[0]["total_purchased_quantity"])
 
     def test_current_holdings_lots_show_remaining_basis_by_acquisition_date(self):
         transactions = empty_transactions()

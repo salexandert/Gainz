@@ -944,49 +944,28 @@ def get_linkable_table_data(transactions, trans1_obj):
 def get_stats_table_data_range(transactions, date_range=None):
     # Stats Table Generation with date range
 
-    if date_range:
+    date_range = date_range or {}
 
-        start_date = date_range['start_date']
-        end_date = date_range['end_date']
-
-        # Ensure start_date and end_date are offset-naive
-        if start_date.tzinfo is not None:
-            start_date = start_date.replace(tzinfo=None)
-        if end_date.tzinfo is not None:
-            end_date = end_date.replace(tzinfo=None)
-
-        # Filter Transactions to date range
-        filtered_transactions = []
-        for trans in transactions:
-            trans_time_stamp = trans.time_stamp
-            # Ensure trans_time_stamp is offset-naive
-            if trans_time_stamp.tzinfo is not None:
-                trans_time_stamp = trans_time_stamp.replace(tzinfo=None)
-
-            if start_date and not end_date:
-                if trans_time_stamp >= start_date:
-                    filtered_transactions.append(trans)
-
-            elif not start_date and end_date:
-                if trans_time_stamp <= end_date:
-                    filtered_transactions.append(trans)
-
-            elif start_date and end_date:
-                if trans_time_stamp >= start_date and trans_time_stamp <= end_date:
-                    filtered_transactions.append(trans)
+    # Filter Transactions to date range. A missing start/end means "unbounded",
+    # which is what an empty data set returns for All Time.
+    filtered_transactions = [
+        trans
+        for trans in transactions
+        if _date_in_range(trans.time_stamp, date_range)
+    ]
 
 
-        # Get links
-        links = set([
-                link
-                for trans in filtered_transactions
-                for link in trans.links
-                ])
+    # Get links
+    links = set([
+            link
+            for trans in filtered_transactions
+            for link in trans.links
+            ])
 
 
-        stats_table_data = []
+    stats_table_data = []
 
-        for asset in transactions.assets:
+    for asset in transactions.assets:
 
             total_purchased_quantity = 0.0
             total_purchased_unlinked_quantity = 0.0

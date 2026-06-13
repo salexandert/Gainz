@@ -171,6 +171,17 @@ if (window.Dropzone) {
     Dropzone.options.uploadCsvForm = {
         maxFilesize: 20,
         acceptedFiles: ".csv",
+        dictDefaultMessage: "Click or drop files here to upload",
+        previewTemplate: [
+            '<div class="dz-preview dz-file-preview gainz-upload-preview">',
+            '  <div class="dz-details">',
+            '    <span class="dz-size" data-dz-size></span>',
+            '    <span class="dz-filename" data-dz-name></span>',
+            '  </div>',
+            '  <div class="dz-progress"><span class="dz-upload" data-dz-uploadprogress></span></div>',
+            '  <div class="dz-error-message"><span data-dz-errormessage></span></div>',
+            '</div>'
+        ].join(''),
         init: function () {
             this.on("sending", function (file, xhr, formData) {
                 var reviewColumns = $("#import_review_columns_before_import").is(":checked") ? "1" : "0";
