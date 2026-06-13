@@ -29,7 +29,7 @@ Always review outputs with a qualified tax professional before filing.
 - Click-by-click app walkthrough: [docs/user-walkthrough.md](docs/user-walkthrough.md)
 - Crypto cost basis learning guide: [docs/guides/crypto-cost-basis-learning.md](docs/guides/crypto-cost-basis-learning.md)
 
-The website and GitHub repository are maintained separately. The website should point visitors to the GitHub Wiki for the visual walkthrough, while the repository keeps the longer Markdown guides in `docs/`.
+The `docs/` folder is the public documentation source of truth. The website is built from `docs/`, and the GitHub Wiki is a generated hub that points back to the current docs so the public surfaces do not drift apart.
 
 ## Supported Inputs
 
@@ -137,17 +137,17 @@ The audit packet includes the Excel workbook, Form 8949 detail CSVs, Form 8949 t
 
 ## Screenshots And Wiki
 
-The GitHub wiki includes a visual walkthrough with screenshots captured from synthetic demo data:
+The GitHub wiki is generated from `docs/` and links to the current website walkthrough and guides:
 
 - [Gainz wiki walkthrough](https://github.com/salexandert/Gainz/wiki)
 
-These screenshots are meant to show the first-run workflow without exposing private transaction history.
+Public screenshots are captured from synthetic demo data so they can show the first-run workflow without exposing private transaction history.
 
 Current public screenshots live under `docs/assets/screenshots/`, including the blank batch manual entry table used on the website and walkthrough.
 
 ## Public Site And SEO
 
-The public website is live at <https://cryptogainz.store>. The temporary Netlify URL is <https://gainzstore.netlify.app/> while DNS and caches settle.
+The public website is live at <https://cryptogainz.store>. The site is built from the same `docs/` Markdown used by the repository, so most public documentation changes should start there.
 
 The `docs/` folder remains the source for project guides and SEO-oriented documentation. It includes:
 
@@ -158,6 +158,8 @@ The `docs/` folder remains the source for project guides and SEO-oriented docume
 The public docs focus on specific reconciliation problems such as Cash App CSVs, Coinbase imports, Coinbase Convert rows, Form 8949 audit packets, and current holdings review.
 
 The website also includes a public learning path for crypto cost basis that links to external educational material and then routes users into the Gainz import, reconciliation, and audit packet workflow.
+
+For contributor workflow details, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Analytics And Discovery
 

@@ -1,0 +1,8 @@
+[build]
+  command = "bundle exec jekyll build --source docs --destination _site"
+  publish = "_site"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
