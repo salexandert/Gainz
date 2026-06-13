@@ -1,0 +1,4 @@
+ID,Timestamp,Transaction Type,Asset,Quantity Transacted,Price Currency,Price at Transaction,Subtotal,Total (inclusive of fees and/or spread),Fees and/or Spread,Notes
+demo-cb-001,2023-01-10 12:00:00 UTC,Buy,ETH,2.0,USD,$1200.00,$2400.00,$2420.00,$20.00,Bought 2 ETH
+demo-cb-002,2023-07-01 12:00:00 UTC,Buy,ETH,1.0,USD,$1800.00,$1800.00,$1815.00,$15.00,Bought 1 ETH
+demo-cb-003,2024-03-20 12:00:00 UTC,Sell,ETH,-1.5,USD,$3000.00,$4500.00,$4460.00,$40.00,Sold 1.5 ETH

@@ -41,6 +41,8 @@ build/
 develop-eggs/
 dist/
 downloads/
+!docs/assets/downloads/
+!docs/assets/downloads/**
 eggs/
 .eggs/
 lib/
@@ -169,6 +171,16 @@ cython_debug/
 # App Data
 saves/
 Exports/
+exports/
 CSVs/
+*.csv
+!demo_data/*.csv
 App Test Data/
-
+uploads/
+logs/
+reconciliation/
+quarantine/
+audit_packet_*/
+audit_packets/
+*.sqlite
+scripts/release_version.env

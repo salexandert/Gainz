@@ -70,21 +70,34 @@ def setting_password():
 @blueprint.route('/change_password', methods=['GET', 'POST'])
 @login_required
 def change_password():
-    admin_user = current_app.config['ADMIN']['username']
-    if current_user.username == admin_user:  
-        return 'please change admin password from server'
-    else:
-        form = change_password_Form(request.form)
-        if 'Change' in request.form:
-            user = User.query.filter_by(username=current_user.username).first()
-            if user.checkpw(request.form['origin_password']):
-                if request.form['new_password'] == request.form['new_password2']:
-                    user.password = user.hashpw(request.form['new_password'])
-                    user.db_commit()
-                    status = "Change Password Success !"
-                else:
-                    status = "Both New Password is Not Equal !"
-            else:
-                status = "Origin Password Error !"
-            return render_template('change_password.html', form = form, status = status)
-        return render_template('change_password.html', form = form, status = '')
+    form = change_password_Form(request.form)
+    if request.method == 'POST':
+        user = User.query.filter_by(username=current_user.username).first()
+        current_password = request.form.get('origin_password', '')
+        new_password = request.form.get('new_password', '')
+        confirmed_password = request.form.get('new_password2', '')
+
+        status_type = 'danger'
+        if not user:
+            status = "Could not find the signed-in account. Please log out and sign back in."
+        elif not user.checkpw(current_password):
+            status = "Current password does not match."
+        elif not new_password:
+            status = "Enter a new password."
+        elif len(new_password) < 8:
+            status = "Use at least 8 characters for the new password."
+        elif new_password != confirmed_password:
+            status = "New password and confirmation do not match."
+        else:
+            user.password = user.hashpw(new_password)
+            user.db_commit()
+            status = "Password updated successfully."
+            status_type = 'success'
+
+        return render_template(
+            'change_password.html',
+            form=form,
+            status=status,
+            status_type=status_type,
+        )
+    return render_template('change_password.html', form=form, status='', status_type='')

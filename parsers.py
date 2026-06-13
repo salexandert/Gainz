@@ -1,8 +1,10 @@
 # This module will handle parsing-related functions.
 
+import csv
 import pandas as pd
 import dateutil
 import os
+import re
 from openpyxl import load_workbook
 from dateutil import parser
 from dateutil.tz import gettz
@@ -15,7 +17,564 @@ tzinfos = {
     # Add other timezones as needed
 }
 
-def detect_csv_format(file_path):
+COLUMN_ALIASES = {
+    'date': [
+        'date',
+        'timestamp',
+        'time',
+        'datetime',
+        'date time',
+        'transaction date',
+        'transaction time',
+        'transaction timestamp',
+        'posted date',
+        'created at',
+        'created date',
+        'date utc',
+        'timestamp utc',
+    ],
+    'transaction_id': [
+        'id',
+        'transaction id',
+        'transaction identifier',
+        'tx id',
+        'txid',
+        'trade id',
+        'order id',
+        'reference id',
+    ],
+    'transaction_type': [
+        'transaction type',
+        'type',
+        'activity',
+        'activity type',
+        'action',
+        'operation',
+        'event type',
+        'transaction',
+        'description',
+    ],
+    'asset_type': [
+        'asset type',
+        'asset',
+        'asset symbol',
+        'asset ticker',
+        'crypto asset',
+        'crypto',
+        'cryptocurrency',
+        'coin',
+        'coin symbol',
+        'token',
+        'token symbol',
+        'symbol',
+        'ticker',
+        'base currency',
+        'primary currency',
+        'currency',
+    ],
+    'asset_amount': [
+        'asset amount',
+        'asset quantity',
+        'quantity transacted',
+        'quantity',
+        'qty',
+        'crypto amount',
+        'crypto quantity',
+        'coin amount',
+        'coin quantity',
+        'token amount',
+        'token quantity',
+        'amount transacted',
+        'transaction quantity',
+        'units',
+        'shares',
+    ],
+    'asset_price': [
+        'asset price',
+        'price at transaction',
+        'price',
+        'spot price',
+        'spot price usd',
+        'asset price usd',
+        'price per unit',
+        'unit price',
+        'execution price',
+        'average price',
+        'market price',
+        'usd spot',
+    ],
+    'price_currency': [
+        'price currency',
+        'spot price currency',
+        'asset price currency',
+        'currency price',
+        'fiat currency',
+    ],
+    'fiat_amount': [
+        'amount',
+        'fiat amount',
+        'cash amount',
+        'usd amount',
+        'value',
+        'transaction value',
+        'gross amount',
+    ],
+    'net_amount': [
+        'net amount',
+        'net',
+        'net value',
+        'net proceeds',
+        'settled amount',
+    ],
+    'fee': [
+        'fee',
+        'fees',
+        'fees and or spread',
+        'fee spread',
+        'commission',
+        'network fee',
+    ],
+    'subtotal': [
+        'subtotal',
+        'subtotal not including fees',
+        'subtotal amount',
+        'pre fee total',
+        'pre fee amount',
+    ],
+    'total': [
+        'total inclusive of fees and or spread',
+        'total',
+        'total amount',
+        'total value',
+        'amount usd',
+        'net total',
+    ],
+    'notes': [
+        'notes',
+        'note',
+        'memo',
+        'details',
+        'detail',
+        'description',
+        'comment',
+    ],
+}
+
+TRANSACTION_TYPE_KEYWORDS = {
+    'Buy': ['buy', 'bought', 'purchase', 'purchased', 'acquire', 'acquired', 'acquisition'],
+    'Sell': ['sell', 'sold', 'sale', 'cash out'],
+    'Send': ['send', 'sent', 'withdrawal', 'withdraw', 'transfer out', 'outgoing'],
+    'Receive': ['receive', 'received', 'deposit', 'incoming', 'reward', 'staking', 'interest', 'airdrop'],
+}
+
+ASSET_NAME_ALIASES = {
+    'bitcoin': 'BTC',
+    'btc': 'BTC',
+    'ethereum': 'ETH',
+    'ether': 'ETH',
+    'eth': 'ETH',
+    'litecoin': 'LTC',
+    'ltc': 'LTC',
+    'bitcoin cash': 'BCH',
+    'bch': 'BCH',
+    'dogecoin': 'DOGE',
+    'doge': 'DOGE',
+    'solana': 'SOL',
+    'sol': 'SOL',
+    'cardano': 'ADA',
+    'ada': 'ADA',
+    'polygon': 'MATIC',
+    'matic': 'MATIC',
+    'avalanche': 'AVAX',
+    'avax': 'AVAX',
+    'chainlink': 'LINK',
+    'link': 'LINK',
+    'usd coin': 'USDC',
+    'usdc': 'USDC',
+    'tether': 'USDT',
+    'usdt': 'USDT',
+}
+
+FIAT_ASSET_SYMBOLS = {'USD', 'US DOLLAR', 'US DOLLARS', 'DOLLAR', 'DOLLARS', '$'}
+STANDARD_IMPORT_COLUMNS = {'Asset Type', 'Asset Amount', 'Date', 'Asset Price', 'Transaction Type'}
+REQUIRED_IMPORT_FIELDS = ['date', 'transaction_type', 'asset_type', 'asset_amount']
+PRICING_IMPORT_FIELDS = ['asset_price', 'subtotal', 'total', 'net_amount', 'fiat_amount']
+IMPORT_MAPPING_FIELDS = [
+    {'field': 'date', 'label': 'Date/time', 'required': True},
+    {'field': 'transaction_type', 'label': 'Transaction type', 'required': True},
+    {'field': 'asset_type', 'label': 'Asset symbol', 'required': True},
+    {'field': 'asset_amount', 'label': 'Asset quantity', 'required': True},
+    {'field': 'asset_price', 'label': 'USD spot price per unit', 'required': False},
+    {'field': 'fiat_amount', 'label': 'Total USD value', 'required': False},
+    {'field': 'notes', 'label': 'Notes/details', 'required': False},
+]
+
+
+def parse_quantity_value(value):
+    if pd.isna(value):
+        return 0.0
+
+    match = re.search(r'-?\d+(?:\.\d+)?', str(value).replace(',', ''))
+    if not match:
+        return 0.0
+
+    return float(match.group(0))
+
+
+def parse_money_value(value):
+    if pd.isna(value):
+        return 0.0
+
+    text = str(value).replace('$', '').replace(',', '').strip()
+    if text in ('', 'nan'):
+        return 0.0
+
+    match = re.search(r'-?\d+(?:\.\d+)?', text)
+    if not match:
+        return 0.0
+
+    return float(match.group(0))
+
+
+def normalize_column_name(value):
+    text = str(value).lstrip('\ufeff').strip().lower()
+    text = re.sub(r'[^a-z0-9]+', ' ', text)
+    return re.sub(r'\s+', ' ', text).strip()
+
+
+def _matches_header_heuristic(field, normalized_header):
+    parts = set(normalized_header.split())
+
+    if field == 'date':
+        return ('date' in parts or 'time' in parts) and 'updated' not in parts
+    if field == 'transaction_type':
+        return (
+            'type' in parts
+            and ('transaction' in parts or 'activity' in parts or 'event' in parts or 'operation' in parts)
+        )
+    if field == 'asset_type':
+        return 'asset' in parts and bool(parts & {'type', 'symbol', 'ticker', 'currency', 'coin', 'token'})
+    if field == 'asset_amount':
+        return (
+            'quantity' in parts
+            or 'qty' in parts
+            or (bool(parts & {'asset', 'crypto', 'coin', 'token'}) and 'amount' in parts)
+        )
+    if field == 'asset_price':
+        return 'price' in parts and 'currency' not in parts
+    if field == 'fee':
+        return 'fee' in parts or 'fees' in parts
+    if field == 'notes':
+        return bool(parts & {'note', 'notes', 'memo', 'detail', 'details', 'comment'})
+    if field == 'subtotal':
+        return 'subtotal' in parts
+    if field == 'total':
+        return 'total' in parts and 'subtotal' not in parts
+    if field == 'net_amount':
+        return 'net' in parts and 'amount' in parts
+    if field == 'fiat_amount':
+        return 'amount' in parts and not bool(parts & {'asset', 'crypto', 'coin', 'token'})
+
+    return False
+
+
+def _actual_column_name(columns, selected_column):
+    selected_normalized = normalize_column_name(selected_column)
+
+    for column in columns:
+        if column == selected_column or normalize_column_name(column) == selected_normalized:
+            return column
+
+    return None
+
+
+def build_column_lookup(columns, column_mapping=None):
+    normalized_columns = [(column, normalize_column_name(column)) for column in columns]
+    lookup = {}
+    used_columns = set()
+
+    if column_mapping:
+        for field, selected_column in column_mapping.items():
+            if field not in COLUMN_ALIASES or not selected_column:
+                continue
+
+            actual_column = _actual_column_name(columns, selected_column)
+            if actual_column is not None:
+                lookup[field] = actual_column
+                used_columns.add(actual_column)
+
+    for field, aliases in COLUMN_ALIASES.items():
+        if field in lookup:
+            continue
+
+        normalized_aliases = [normalize_column_name(alias) for alias in aliases]
+        for alias in normalized_aliases:
+            match = next(
+                (
+                    column
+                    for column, normalized_column in normalized_columns
+                    if column not in used_columns and normalized_column == alias
+                ),
+                None,
+            )
+            if match is not None:
+                lookup[field] = match
+                used_columns.add(match)
+                break
+
+    for field in COLUMN_ALIASES:
+        if field in lookup:
+            continue
+
+        match = next(
+            (
+                column
+                for column, normalized_column in normalized_columns
+                if column not in used_columns and _matches_header_heuristic(field, normalized_column)
+            ),
+            None,
+        )
+        if match is not None:
+            lookup[field] = match
+            used_columns.add(match)
+
+    return lookup
+
+
+def get_import_column_status(columns, column_mapping=None):
+    column_lookup = build_column_lookup(columns, column_mapping=column_mapping)
+    missing_required = [
+        field
+        for field in REQUIRED_IMPORT_FIELDS
+        if field not in column_lookup
+    ]
+    has_pricing = any(field in column_lookup for field in PRICING_IMPORT_FIELDS)
+
+    return {
+        'can_import': len(missing_required) == 0,
+        'missing_required': missing_required,
+        'has_pricing': has_pricing,
+        'column_lookup': column_lookup,
+        'score': len(REQUIRED_IMPORT_FIELDS) - len(missing_required) + (1 if has_pricing else 0),
+    }
+
+
+def build_column_mapping_suggestions(columns):
+    column_lookup = build_column_lookup(columns)
+    suggestions = {}
+
+    for field_config in IMPORT_MAPPING_FIELDS:
+        field = field_config['field']
+        suggestions[field] = column_lookup.get(field, '')
+
+    if not suggestions.get('fiat_amount'):
+        for pricing_field in ('total', 'subtotal', 'net_amount', 'fiat_amount'):
+            if pricing_field in column_lookup:
+                suggestions['fiat_amount'] = column_lookup[pricing_field]
+                break
+
+    return suggestions
+
+
+def get_import_mapping_fields():
+    return [field.copy() for field in IMPORT_MAPPING_FIELDS]
+
+
+def read_csv_columns(file_path, header_row=1):
+    skiprows = max(int(header_row or 1) - 1, 0)
+    return pd.read_csv(file_path, skiprows=skiprows, nrows=0).columns.tolist()
+
+
+def _scan_csv_header_rows(file_path, max_rows=12):
+    candidates = []
+
+    with open(file_path, newline='', encoding='utf-8-sig', errors='replace') as file:
+        reader = csv.reader(file)
+
+        for row_number, row in enumerate(reader, start=1):
+            if row_number > max_rows:
+                break
+
+            cleaned_row = [cell.strip() for cell in row]
+            if not any(cleaned_row):
+                continue
+
+            status = get_import_column_status(cleaned_row)
+            candidates.append({
+                'row_number': row_number,
+                'score': status['score'],
+                'can_import': status['can_import'],
+                'has_pricing': status['has_pricing'],
+                'missing_required': status['missing_required'],
+                'columns': cleaned_row,
+            })
+
+    candidates.sort(
+        key=lambda candidate: (
+            candidate['can_import'],
+            candidate['has_pricing'],
+            candidate['score'],
+            -candidate['row_number'],
+        ),
+        reverse=True,
+    )
+    return candidates
+
+
+def _csv_preview_rows(file_path, header_row=1, data_start_row=None, max_rows=5):
+    try:
+        df = pd.read_csv(file_path, skiprows=max(int(header_row or 1) - 1, 0), nrows=50)
+    except Exception:
+        return []
+
+    data_start_row = int(data_start_row or (int(header_row or 1) + 1))
+    rows_to_skip = max(data_start_row - int(header_row or 1) - 1, 0)
+    if rows_to_skip:
+        df = df.iloc[rows_to_skip:]
+
+    df = df.head(max_rows).fillna("")
+    return [
+        {str(column): str(value) for column, value in row.items()}
+        for row in df.to_dict(orient='records')
+    ]
+
+
+def analyze_csv_import(file_path, header_row=None, column_mapping=None, data_start_row=None):
+    if header_row is None:
+        candidates = _scan_csv_header_rows(file_path)
+        best_candidate = candidates[0] if candidates else {'row_number': 1}
+        header_row = best_candidate.get('row_number', 1)
+    else:
+        candidates = _scan_csv_header_rows(file_path)
+
+    data_start_row = int(data_start_row or (int(header_row or 1) + 1))
+    columns = read_csv_columns(file_path, header_row=header_row)
+    status = get_import_column_status(columns, column_mapping=column_mapping)
+
+    return {
+        'can_import': status['can_import'],
+        'has_pricing': status['has_pricing'],
+        'header_row': int(header_row or 1),
+        'data_start_row': data_start_row,
+        'columns': columns,
+        'suggested_mapping': build_column_mapping_suggestions(columns),
+        'mapping_fields': get_import_mapping_fields(),
+        'missing_required': status['missing_required'],
+        'header_candidates': candidates[:5],
+        'sample_rows': _csv_preview_rows(
+            file_path,
+            header_row=header_row,
+            data_start_row=data_start_row,
+        ),
+    }
+
+
+def get_row_value(row, column_lookup, field, default=None):
+    column = column_lookup.get(field)
+    if column is None:
+        return default
+
+    value = row.get(column, default)
+    if pd.isna(value):
+        return default
+
+    return value
+
+
+def normalize_asset_symbol(value):
+    if pd.isna(value):
+        return ''
+
+    text = str(value).strip()
+    if not text:
+        return ''
+
+    parenthetical = re.search(r'\(([A-Za-z0-9]{2,12})\)', text)
+    if parenthetical:
+        return parenthetical.group(1).upper()
+
+    normalized = normalize_column_name(text)
+    if normalized in ASSET_NAME_ALIASES:
+        return ASSET_NAME_ALIASES[normalized]
+
+    upper = text.upper().strip()
+    if upper.endswith('-USD') or upper.endswith('/USD'):
+        upper = upper[:-4]
+
+    return re.sub(r'[^A-Z0-9]+', '', upper.split()[0])
+
+
+def standardize_transaction_type(value):
+    text = str(value).strip()
+    normalized = normalize_column_name(text)
+
+    for standard_type, keywords in TRANSACTION_TYPE_KEYWORDS.items():
+        if any(keyword in normalized for keyword in keywords):
+            return standard_type
+
+    return text
+
+
+def derive_asset_price(row, column_lookup, quantity):
+    direct_price = parse_money_value(get_row_value(row, column_lookup, 'asset_price'))
+    if direct_price:
+        return direct_price
+
+    for field in ('subtotal', 'total', 'net_amount', 'fiat_amount'):
+        total_value = abs(parse_money_value(get_row_value(row, column_lookup, field)))
+        if total_value and quantity:
+            return total_value / abs(quantity)
+
+    return 0.0
+
+
+def _standard_row_from_lookup(row, column_lookup):
+    quantity = parse_quantity_value(get_row_value(row, column_lookup, 'asset_amount'))
+
+    return {
+        'Asset Type': normalize_asset_symbol(get_row_value(row, column_lookup, 'asset_type')),
+        'Transaction Type': standardize_transaction_type(get_row_value(row, column_lookup, 'transaction_type', '')),
+        'Asset Amount': abs(quantity) if quantity < 0 else quantity,
+        'Date': get_row_value(row, column_lookup, 'date'),
+        'Asset Price': derive_asset_price(row, column_lookup, quantity),
+    }
+
+
+def transform_generic_to_standard(df, column_mapping=None):
+    column_lookup = build_column_lookup(df.columns, column_mapping=column_mapping)
+    required_fields = {'date', 'transaction_type', 'asset_type', 'asset_amount'}
+
+    if not required_fields.issubset(column_lookup):
+        return df
+
+    result_df = pd.DataFrame([_standard_row_from_lookup(row, column_lookup) for _, row in df.iterrows()])
+    result_df = result_df[
+        result_df['Asset Type'].notna()
+        & (result_df['Asset Type'] != '')
+        & ~result_df['Asset Type'].isin(FIAT_ASSET_SYMBOLS)
+    ]
+
+    return result_df
+
+
+def parse_coinbase_convert_note(note):
+    match = re.search(
+        r'Converted\s+([0-9,]+(?:\.\d+)?)\s+([A-Za-z0-9]+)\s+to\s+([0-9,]+(?:\.\d+)?)\s+([A-Za-z0-9]+)',
+        str(note),
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+
+    return {
+        'from_quantity': parse_quantity_value(match.group(1)),
+        'from_asset': match.group(2).upper(),
+        'to_quantity': parse_quantity_value(match.group(3)),
+        'to_asset': match.group(4).upper(),
+    }
+
+
+def detect_csv_format(file_path, header_row=1):
     """
     Detects the CSV format by examining the header row.
     
@@ -26,33 +585,41 @@ def detect_csv_format(file_path):
         str: 'cashapp', 'coinbase', or 'unknown'
     """
     try:
-        # Read just the header row
-        header = pd.read_csv(file_path, nrows=0).columns.tolist()
-        
-        # Check for Cash App format (case-insensitive comparison)
-        cash_app_headers = ['date', 'transaction id', 'transaction type', 'currency', 
-                           'amount', 'asset type', 'asset price', 'asset amount']
-        
-        # Check for Coinbase format (case-insensitive comparison)
-        coinbase_headers = ['timestamp', 'transaction type', 'asset', 
-                           'quantity transacted', 'price currency', 'price at transaction']
-        
-        # Convert headers to lowercase for case-insensitive comparison
-        header_lower = [h.lower() for h in header]
-        
-        # Check if most of the expected Cash App headers are present
-        cash_app_match = sum(1 for h in cash_app_headers if h in header_lower)
-        coinbase_match = sum(1 for h in coinbase_headers if h in header_lower)
-        
-        if cash_app_match >= 5:  # At least 5 matching headers
+        header = read_csv_columns(file_path, header_row=header_row)
+        column_lookup = build_column_lookup(header)
+        normalized_headers = {normalize_column_name(header_name) for header_name in header}
+        filename_hint = normalize_column_name(os.path.basename(file_path))
+
+        common_fields = ['date', 'transaction_type', 'asset_type', 'asset_amount', 'asset_price']
+        cash_app_markers = {'transaction id', 'net amount', 'asset type', 'asset amount'}
+        coinbase_markers = {
+            'quantity transacted',
+            'price currency',
+            'price at transaction',
+            'total inclusive of fees and or spread',
+            'notes',
+        }
+
+        cash_app_match = sum(1 for field in common_fields if field in column_lookup)
+        cash_app_match += sum(1 for marker in cash_app_markers if marker in normalized_headers)
+        coinbase_match = sum(1 for field in common_fields if field in column_lookup)
+        coinbase_match += sum(1 for marker in coinbase_markers if marker in normalized_headers)
+
+        if 'cash app' in filename_hint or 'cashapp' in filename_hint:
+            cash_app_match += 2
+        if 'coinbase' in filename_hint:
+            coinbase_match += 2
+
+        if cash_app_match >= 6 and cash_app_match >= coinbase_match:
             return 'cashapp'
-        elif coinbase_match >= 4:  # At least 4 matching headers
+        elif coinbase_match >= 6:
             return 'coinbase'
         else:
             return 'unknown'
     except Exception as e:
         print(f"Error detecting CSV format: {e}")
         return 'unknown'
+
 
 def transform_cashapp_to_standard(df):
     """
@@ -64,35 +631,18 @@ def transform_cashapp_to_standard(df):
     Returns:
         DataFrame: Transformed dataframe with standardized column names
     """
-    result_df = pd.DataFrame()
-    
-    # Map Cash App CSV columns to standard columns
-    result_df['Asset Type'] = df['Asset Type']
-    
-    # Process Transaction Type
-    result_df['Transaction Type'] = df['Transaction Type'].apply(
-        lambda x: 'Buy' if 'buy' in str(x).lower() else
-                 'Sell' if 'sell' in str(x).lower() else
-                 'Send' if 'sent' in str(x).lower() else
-                 'Receive' if 'received' in str(x).lower() or 'deposit' in str(x).lower() else x
-    )
+    column_lookup = build_column_lookup(df.columns)
+    result_df = pd.DataFrame([_standard_row_from_lookup(row, column_lookup) for _, row in df.iterrows()])
 
-    # Process Asset Amount - ensure sell/send values are positive
-    result_df['Asset Amount'] = df.apply(
-        lambda row: abs(float(row['Asset Amount'])) if pd.notna(row['Asset Amount']) and 
-                    (('sell' in str(row['Transaction Type']).lower()) or 
-                     ('sent' in str(row['Transaction Type']).lower()))
-                    else row['Asset Amount'], 
-        axis=1
-    )
-    
-    result_df['Date'] = df['Date']
-    result_df['Asset Price'] = df['Asset Price']
-    
-    # Filter out rows with empty Asset Type (non-crypto transactions)
-    result_df = result_df[result_df['Asset Type'].notna() & (result_df['Asset Type'] != '')]
-    
+    # Filter out rows with empty Asset Type or fiat-only activity.
+    result_df = result_df[
+        result_df['Asset Type'].notna()
+        & (result_df['Asset Type'] != '')
+        & ~result_df['Asset Type'].isin(FIAT_ASSET_SYMBOLS)
+    ]
+
     return result_df
+
 
 def transform_coinbase_to_standard(df):
     """
@@ -104,43 +654,64 @@ def transform_coinbase_to_standard(df):
     Returns:
         DataFrame: Transformed dataframe with standardized column names
     """
-    result_df = pd.DataFrame()
-    
-    # Map Coinbase CSV columns to standard columns
-    result_df['Asset Type'] = df['Asset']
-    
-    # Process Transaction Type
-    result_df['Transaction Type'] = df['Transaction Type'].apply(
-        lambda x: 'Buy' if 'buy' in str(x).lower() else
-                 'Sell' if 'sell' in str(x).lower() else
-                 'Send' if 'send' in str(x).lower() or 'withdraw' in str(x).lower() else
-                 'Receive' if 'receive' in str(x).lower() or 'deposit' in str(x).lower() or 'reward' in str(x).lower() or 'staking' in str(x).lower() else x
-    )
-    
-    # Process Asset Amount - ensure sell/send values are positive
-    result_df['Asset Amount'] = df.apply(
-        lambda row: abs(float(row['Quantity Transacted'])) if pd.notna(row['Quantity Transacted']) and
-                   (('sell' in str(row['Transaction Type']).lower()) or 
-                    ('send' in str(row['Transaction Type']).lower()) or
-                    ('withdraw' in str(row['Transaction Type']).lower()) or
-                    float(str(row['Quantity Transacted']).replace(',', '')) < 0)
-                   else row['Quantity Transacted'],
-        axis=1
-    )
-    
-    result_df['Date'] = df['Timestamp']
-    
-    # Process Price at Transaction (remove $ and spaces)
-    result_df['Asset Price'] = df['Price at Transaction'].apply(
-        lambda x: str(x).replace('$', '').replace(' ', '') if pd.notna(x) else '0'
-    )
-    
-    # Filter out rows with empty Asset Type (non-crypto transactions)
-    result_df = result_df[result_df['Asset Type'].notna() & (result_df['Asset Type'] != '')]
-    
-    return result_df
+    rows = []
+    column_lookup = build_column_lookup(df.columns)
 
-def import_transactions(file_path, transactions):
+    for _, row in df.iterrows():
+        asset = normalize_asset_symbol(get_row_value(row, column_lookup, 'asset_type'))
+        trans_type = str(get_row_value(row, column_lookup, 'transaction_type', ''))
+        trans_type_lower = trans_type.lower()
+        timestamp = get_row_value(row, column_lookup, 'date')
+        quantity = parse_quantity_value(get_row_value(row, column_lookup, 'asset_amount'))
+        asset_price = derive_asset_price(row, column_lookup, quantity)
+
+        if 'convert' in trans_type_lower:
+            convert = parse_coinbase_convert_note(get_row_value(row, column_lookup, 'notes'))
+            if convert:
+                conversion_total = (
+                    parse_money_value(get_row_value(row, column_lookup, 'total'))
+                    or parse_money_value(get_row_value(row, column_lookup, 'subtotal'))
+                    or (convert['from_quantity'] * asset_price)
+                )
+
+                sell_spot = conversion_total / convert['from_quantity'] if convert['from_quantity'] else asset_price
+                buy_spot = conversion_total / convert['to_quantity'] if convert['to_quantity'] else 0.0
+
+                rows.append({
+                    'Asset Type': convert['from_asset'],
+                    'Transaction Type': 'Sell',
+                    'Asset Amount': abs(convert['from_quantity']),
+                    'Date': timestamp,
+                    'Asset Price': sell_spot,
+                })
+                rows.append({
+                    'Asset Type': convert['to_asset'],
+                    'Transaction Type': 'Buy',
+                    'Asset Amount': abs(convert['to_quantity']),
+                    'Date': timestamp,
+                    'Asset Price': buy_spot,
+                })
+                continue
+
+        standard_type = standardize_transaction_type(trans_type)
+
+        if pd.isna(asset) or asset == '' or asset in FIAT_ASSET_SYMBOLS:
+            continue
+
+        if standard_type in ('Sell', 'Send') or quantity < 0:
+            quantity = abs(quantity)
+
+        rows.append({
+            'Asset Type': asset,
+            'Transaction Type': standard_type,
+            'Asset Amount': quantity,
+            'Date': timestamp,
+            'Asset Price': asset_price,
+        })
+
+    return pd.DataFrame(rows)
+
+def import_transactions(file_path, transactions, header_row=1, column_mapping=None, data_start_row=None):
     """
     Imports transactions from a given file path and adds them to the Transactions object.
     Prevents duplicate imports by checking for existing transactions with the same attributes.
@@ -149,13 +720,15 @@ def import_transactions(file_path, transactions):
     Args:
         file_path (str): The path to the file containing transaction data.
         transactions (Transactions): The Transactions object to update.
+        header_row (int): 1-based row number containing CSV headers.
+        column_mapping (dict): Optional canonical field to CSV column mapping.
+        data_start_row (int): 1-based row number where data begins. Defaults to the row after headers.
 
     Returns:
         tuple: (imported_count, skipped_count) Count of transactions imported and skipped due to duplicates.
     """
-    from decimal import Decimal, getcontext    # Set precision for comparing float values
+    from decimal import Decimal
     import logging
-    getcontext().prec = 10
     
     # Function to check if a transaction is duplicate
     def is_duplicate(new_trans, existing_transactions, tolerance=1e-6):
@@ -203,68 +776,104 @@ def import_transactions(file_path, transactions):
         return False
 
     try:
+        import_warnings = []
+
         # Detect the CSV format
-        csv_format = detect_csv_format(file_path)
+        csv_format = detect_csv_format(file_path, header_row=header_row)
         print(f"Detected CSV format: {csv_format}")
-        
+
         # Read the CSV file
-        raw_df = pd.read_csv(file_path)
-        
+        header_row = int(header_row or 1)
+        data_start_row = int(data_start_row or (header_row + 1))
+        raw_df = pd.read_csv(file_path, skiprows=max(header_row - 1, 0))
+        rows_to_skip = max(data_start_row - header_row - 1, 0)
+        if rows_to_skip:
+            raw_df = raw_df.iloc[rows_to_skip:].reset_index(drop=True)
+
         # Transform to standard format based on detected format
-        if csv_format == 'cashapp':
+        if column_mapping:
+            trans_df = transform_generic_to_standard(raw_df, column_mapping=column_mapping)
+        elif csv_format == 'cashapp':
             trans_df = transform_cashapp_to_standard(raw_df)
         elif csv_format == 'coinbase':
             trans_df = transform_coinbase_to_standard(raw_df)
         else:
-            # Try to use original format as a fallback
-            trans_df = raw_df
-            print("Warning: Unknown CSV format. Attempting to process as-is.")
-        
+            trans_df = transform_generic_to_standard(raw_df)
+            if trans_df is raw_df:
+                print("Warning: Unknown CSV format. Attempting to process as-is.")
+
+        missing_standard_columns = STANDARD_IMPORT_COLUMNS - set(trans_df.columns)
+        if missing_standard_columns:
+            warning = (
+                f"Could not identify required columns in {os.path.basename(file_path)}. "
+                "Use the import column mapper to choose Date/time, Transaction type, "
+                "Asset symbol, Asset quantity, and a USD spot price or total USD value."
+            )
+            print(f"Warning: {warning}")
+            import_warnings.append(warning)
+            existing_warnings = getattr(transactions, 'import_warnings', [])
+            transactions.import_warnings = existing_warnings + import_warnings
+            transactions.last_import_result = {
+                "file_path": file_path,
+                "imported_count": 0,
+                "skipped_count": 0,
+                "warnings": import_warnings,
+            }
+            return (0, 0)
+
         transactions_added = False
         imported_count = 0
         skipped_count = 0
-        
-        for _, row in trans_df.iterrows():
+
+        for row_number, (_, row) in enumerate(trans_df.iterrows(), start=data_start_row):
             try:
-                symbol = row['Asset Type']
-                quantity = float(row['Asset Amount'])
+                symbol = normalize_asset_symbol(row['Asset Type'])
+                if not symbol or symbol in FIAT_ASSET_SYMBOLS:
+                    warning = (
+                        f"Skipped row {row_number} from {os.path.basename(file_path)}: "
+                        f"missing or non-crypto asset '{row['Asset Type']}'"
+                    )
+                    print(f"Warning: {warning}")
+                    import_warnings.append(warning)
+                    continue
+
+                quantity = parse_quantity_value(row['Asset Amount'])
                 time_stamp = parser.parse(row['Date'], tzinfos=tzinfos)
-                usd_spot = row['Asset Price']
+                usd_spot = parse_money_value(row['Asset Price'])
 
-                # Ensure usd_spot is a string before calling replace
-                if isinstance(usd_spot, float):
-                    usd_spot = str(usd_spot)
-
-                usd_spot = float(usd_spot.replace('$', '').replace(',', ''))
-                
                 # Ensure trans_type is a string before calling lower()
                 trans_type = row['Transaction Type']
                 if not isinstance(trans_type, str):
                     trans_type = str(trans_type)
-                trans_type = trans_type.lower()
+                trans_type = normalize_column_name(trans_type)
 
-                # Define keyword mappings for more flexible transaction type matching
-                buy_keywords = ['buy', 'purchase']
-                sell_keywords = ['sell', 'sale']
-                send_keywords = ['send', 'withdrawal', 'withdraw']
-                receive_keywords = ['receive', 'deposit', 'incoming', 'reward', 'staking']
-                
                 # Create temporary transaction object for duplicate checking
                 temp_trans = None
-                
+
                 # Use a more flexible approach to check transaction type
-                if any(keyword in trans_type for keyword in buy_keywords):
+                if any(keyword in trans_type for keyword in TRANSACTION_TYPE_KEYWORDS['Buy']):
                     temp_trans = Buy(symbol=symbol, quantity=quantity, time_stamp=time_stamp, usd_spot=usd_spot, source=file_path)
-                elif any(keyword in trans_type for keyword in sell_keywords):
+                elif any(keyword in trans_type for keyword in TRANSACTION_TYPE_KEYWORDS['Sell']):
                     temp_trans = Sell(symbol=symbol, quantity=quantity, time_stamp=time_stamp, usd_spot=usd_spot, source=file_path)
-                elif any(keyword in trans_type for keyword in send_keywords):
-                    temp_trans = Send(symbol=symbol, quantity=quantity, time_stamp=time_stamp, usd_spot=usd_spot, source=file_path)                
-                elif any(keyword in trans_type for keyword in receive_keywords):
+                elif any(keyword in trans_type for keyword in TRANSACTION_TYPE_KEYWORDS['Send']):
+                    temp_trans = Send(symbol=symbol, quantity=quantity, time_stamp=time_stamp, usd_spot=usd_spot, source=file_path)
+                elif any(keyword in trans_type for keyword in TRANSACTION_TYPE_KEYWORDS['Receive']):
                     temp_trans = Receive(symbol=symbol, quantity=quantity, time_stamp=time_stamp, usd_spot=usd_spot, source=file_path)
                 else:
-                    print(f"Warning: Unrecognized transaction type '{row['Transaction Type']}' - skipping record")
+                    warning = (
+                        f"Skipped row {row_number} from {os.path.basename(file_path)}: "
+                        f"unrecognized transaction type '{row['Transaction Type']}'"
+                    )
+                    print(f"Warning: {warning}")
+                    import_warnings.append(warning)
                     continue
-                
+
+                if usd_spot == 0:
+                    import_warnings.append(
+                        f"Imported row {row_number} from {os.path.basename(file_path)} with $0 USD spot price. "
+                        "Map a USD spot price or total USD value column if this is not intentional."
+                    )
+
                 # Check for duplicates before adding
                 if is_duplicate(temp_trans, transactions.transactions):
                     # Use logger instead of print
@@ -277,11 +886,25 @@ def import_transactions(file_path, transactions):
                     transactions_added = True
                     imported_count += 1
             except KeyError as ke:
-                print(f"Error processing row: Missing required column - {ke}")
+                warning = f"Skipped row {row_number} from {os.path.basename(file_path)}: missing required column {ke}"
+                print(f"Error processing row: {warning}")
+                import_warnings.append(warning)
                 continue
             except Exception as e:
-                print(f"Error processing row: {e}")
+                warning = f"Skipped row {row_number} from {os.path.basename(file_path)}: {e}"
+                print(f"Error processing row: {warning}")
+                import_warnings.append(warning)
                 continue
+
+        existing_warnings = getattr(transactions, 'import_warnings', [])
+        transactions.import_warnings = existing_warnings + import_warnings
+        transactions.last_import_result = {
+            "file_path": file_path,
+            "imported_count": imported_count,
+            "skipped_count": skipped_count,
+            "warnings": import_warnings,
+        }
+
           # Save transactions if any were added
         if transactions_added:
             description = f"Imported from {os.path.basename(file_path)}"
@@ -297,9 +920,18 @@ def import_transactions(file_path, transactions):
             logger = logging.getLogger('parsers')
             logger.info("No transactions were added from the file.")
             logger.info(f"Skipped {skipped_count} duplicate transactions")
-            
+
         return (imported_count, skipped_count)
             
     except Exception as e:
         print(f"Error importing transactions: {e}")
+        warning = f"Could not import {os.path.basename(file_path)}: {e}"
+        existing_warnings = getattr(transactions, 'import_warnings', [])
+        transactions.import_warnings = existing_warnings + [warning]
+        transactions.last_import_result = {
+            "file_path": file_path,
+            "imported_count": 0,
+            "skipped_count": 0,
+            "warnings": [warning],
+        }
         return (0, 0)

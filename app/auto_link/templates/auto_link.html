@@ -12,7 +12,7 @@
 <div class="row">
   <div class="col-md-12">
     <div class="card">
-      <div class="card-body">      
+      <div class="card-body">
         <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
           <h4 class="card-title">Step 5: Auto Link</h4>
           <div class="card card-plain">
@@ -24,9 +24,9 @@
             </div>
             <div id="collapse_1" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
               <div class="card-body">
-                Use this page to create links between buys and sells using different alogo's.
+                Use this page to create reviewable basis links between buys and sells using the method you want Gainz to model. Confirm the method against your records or with a qualified tax professional.
 
-                <br> 
+                <br>
               </div>
             </div>
           </div>
@@ -36,7 +36,33 @@
   </div>
 </div>
 <!-- /Page Description and Instructions -->
-  
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Guided first pass</h5>
+        <p class="card-category">Run FIFO across every asset with unlinked sales for the selected year. This creates basis links for review and saves a new revision when links are added.</p>
+        <div class="form-group row left align">
+          <label class="control-label col-md-3 col-sm-3">Year</label>
+          <div class="col-md-4 col-sm-4">
+            <select value="" id="auto_link_year_dropdown" class="form-control">
+              {% for year in years %}
+                <option> {{ year }} </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+          <div>
+            <span id="auto_link_all_result" class="d-block text-muted">Use this after imports, then review Stats & Charts and holdings reconciliation.</span>
+          </div>
+          <button id="auto_link_all_fifo" type="button" class="btn btn-primary mt-2 mt-md-0" data-url="{{ url_for('auto_link_blueprint.auto_link_all_fifo') }}">Run FIFO Auto Link For All Assets</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- All Asset Stats Table -->
 <div class="row">
   <div class="col-md-12">
@@ -51,10 +77,10 @@
               </a>
             </div>
             <div id="collapse_2" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
-              
+
               <!-- Card Body -->
               <div class="card-body ">
-                        
+
                 <table id="al_stats_datatable" class="table table-striped table-bordered" style="width:100%">
                   <thead>
                       <tr>
@@ -82,12 +108,12 @@
                       <td>{{ row['total_sold_usd']  }}</td>
                       <td>{{ row['total_profit_loss']  }}</td>
                     </tr>
-                
+
                     {% endfor %}
-              
+
                   </tbody>
                 </table>
-              
+
               </div>
               <!-- /Card Body -->
             </div>
@@ -98,10 +124,10 @@
   </div>
 </div>
 <!-- All Asset Stats Table End -->
-            
 
 
-<!-- Auto Link Options HODL  -->
+
+<!-- Auto Link Options Holdings  -->
 <div class="row">
   <div class="col-md-12">
     <div class="card">
@@ -109,38 +135,25 @@
         <h5 class="card-title">Auto Link Options</h5>
       </div>
 
-              
+
       <!-- Card Body -->
       <div class="card-body ">
-                
-                
-        <p class="welcome-text" id='al_options'> Select a row from Stats Table to Populate
+
+
+        <p class="welcome-text" id='al_options'> Select an asset row above, then choose a linking method.
 
         </p>
         <p class="welcome-text">
-          <br> First in First Out
-          <br> &nbsp &nbsp &nbsp &nbsp &nbsp - Start Using Oldest Buys First
-          <br> First in Last Out
-          <br>  &nbsp &nbsp &nbsp &nbsp &nbsp - Start Using Newest Buys First
-          <br> MIN GAIN LONG
-          <br>  &nbsp &nbsp &nbsp &nbsp &nbsp - Use buys older than a year with lowest cost basis
+          <br> FIFO
+          <br> &nbsp &nbsp &nbsp &nbsp &nbsp - Use oldest available buys first.
+          <br> FILO
+          <br>  &nbsp &nbsp &nbsp &nbsp &nbsp - Use newest available buys first.
+          <br> Min Gain Long
+          <br>  &nbsp &nbsp &nbsp &nbsp &nbsp - Prefer long-term lots for comparison under your selected method.
+          <br> Min Gain
+          <br>  &nbsp &nbsp &nbsp &nbsp &nbsp - Prefer higher-basis lots for comparison under your selected method.
         </p>
 
-        <div class="form-group row left align">
-          <label class="control-label col-md-3 col-sm-3 ">Optionally Select a year to autolink, otherwise link all years</label>
-          <div class="col-md-4 col-sm-4">
-            <select value="" id='auto_link_year_dropdown' class="form-control">
-              
-              {% for year in years %}
-                
-                  <option> {{ year }} </option>
-              
-              {% endfor %}
-            
-            </select>
-          </div>
-        </div>  
-        
         <button type="button" id="link_w_fifo" class="btn btn-success">FIFO</button>
         <button type="button" id="link_w_filo" class="btn btn-success">FILO</button>
         <button type="button" id="min_gain_long" class="btn btn-success">Min Gain Long</button>
@@ -154,7 +167,7 @@
     </div>
   </div>
 </div>
-<!-- /Auto Link Options HODL -->
+<!-- /Auto Link Options Holdings -->
 
 
 
