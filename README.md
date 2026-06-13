@@ -70,6 +70,10 @@ python run.py
 
 On first run, Gainz asks you to create a local admin account in the browser. The password is hashed into the local database and is not written to a plaintext credentials file.
 
+If you forget the local password, click **Reset Password** in the launcher. It resets the configured local admin account to the temporary password `gainz-local-reset` so you can sign in and set a new password from the gear menu. From a source checkout, you can also run `python .\scripts\reset_admin_password.py` or double-click `reset_password.bat`.
+
+The Gainz password gates the local browser UI. It does not encrypt imported CSVs, XLSX saves, exports, or audit packets, which remain normal local files. See [Reset your local Gainz password](docs/guides/local-password-reset.md).
+
 Set these environment variables to pre-create the first local admin account instead:
 
 ```powershell
@@ -133,6 +137,7 @@ The audit packet includes the Excel workbook, Form 8949 detail CSVs, Form 8949 t
 - [What to give your CPA checklist](docs/guides/crypto-cpa-checklist.md)
 - [Coinbase missing cost basis troubleshooting](docs/guides/coinbase-missing-cost-basis.md)
 - [Current holdings reconciliation explainer](docs/guides/current-holdings-reconciliation.md)
+- [Reset your local Gainz password](docs/guides/local-password-reset.md)
 - [Support Gainz](docs/donations.md)
 
 ## Screenshots And Wiki

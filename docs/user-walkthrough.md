@@ -22,6 +22,8 @@ http://127.0.0.1:5000/
 
 On first run, Gainz asks you to create a local admin account in the browser. The password is hashed into the local database and is not written to a plaintext credentials file.
 
+If you forget the local password, use **Reset Password** in the launcher. The local password gates the browser UI; it does not encrypt imported CSVs, XLSX saves, exports, or audit packets. See [Reset Your Local Gainz Password]({{ '/guides/local-password-reset/' | relative_url }}).
+
 ![Gainz home page after opening the local app]({{ '/assets/screenshots/gainz-home.png' | relative_url }})
 {: .screenshot-frame }
 

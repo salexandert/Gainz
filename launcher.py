@@ -9,6 +9,7 @@ from tkinter import messagebox, ttk
 from urllib.request import urlopen
 
 from app_version import APP_VERSION
+from password_reset import DOCUMENTED_RESET_PHRASE, reset_admin_password
 from port_guard import require_port_available
 from single_instance import SingleInstanceLock
 
@@ -86,7 +87,7 @@ class GainzLauncher(tk.Tk):
         super().__init__()
         self.instance_lock = instance_lock
         self.title(f"{APP_NAME} {APP_VERSION}")
-        self.geometry("520x320")
+        self.geometry("560x350")
         self.resizable(False, False)
         self.configure(padx=24, pady=22)
         self.protocol("WM_DELETE_WINDOW", self.close_app)
@@ -145,6 +146,7 @@ class GainzLauncher(tk.Tk):
         self.open_button.pack(side="left")
 
         ttk.Button(button_frame, text="Copy Link", command=self.copy_link).pack(side="left", padx=(8, 0))
+        ttk.Button(button_frame, text="Reset Password", command=self.reset_password).pack(side="left", padx=(8, 0))
         ttk.Button(button_frame, text="Donate", command=self.open_support).pack(side="left", padx=(8, 0))
         ttk.Button(button_frame, text="Quit", command=self.close_app).pack(side="right")
 
@@ -192,6 +194,40 @@ class GainzLauncher(tk.Tk):
 
     def open_support(self):
         webbrowser.open(self.support_url)
+
+    def reset_password(self):
+        confirmed = messagebox.askyesno(
+            APP_NAME,
+            "Reset the local admin password to the temporary default?\n\n"
+            "This only changes the Gainz browser login. It does not encrypt or "
+            "protect local CSV, XLSX, save, export, or audit packet files.",
+        )
+        if not confirmed:
+            return
+
+        try:
+            result = reset_admin_password(password=DOCUMENTED_RESET_PHRASE)
+        except Exception as exc:
+            messagebox.showerror(
+                APP_NAME,
+                "Gainz could not reset the local password.\n\n"
+                f"{exc}\n\n"
+                "Close Gainz first if the local database is busy, then try again.",
+            )
+            return
+
+        action = "created" if result.created else "reset"
+        self.credentials_text.set(
+            f"Local admin password {action}. Username: {result.username}. "
+            "Sign in with the temporary reset password, then change it from the gear menu."
+        )
+        messagebox.showinfo(
+            APP_NAME,
+            f"Gainz local admin password {action}.\n\n"
+            f"Username: {result.username}\n"
+            f"Temporary password: {DOCUMENTED_RESET_PHRASE}\n\n"
+            "Sign in locally, then use the gear menu > Change Password.",
+        )
 
     def close_app(self):
         self.instance_lock.release()

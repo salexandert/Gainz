@@ -9,6 +9,7 @@ from app.base.models import User
 from app.extensions import db
 from configs.config import config_dict
 from launcher import find_available_port, health_url, server_url
+from password_reset import DOCUMENTED_RESET_PHRASE, reset_admin_password
 from port_guard import require_port_available
 from single_instance import SingleInstanceLock
 
@@ -137,6 +138,75 @@ class LauncherStartupTests(unittest.TestCase):
 
             with app.app_context():
                 self.assertEqual(1, User.query.count())
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_password_reset_updates_existing_local_admin(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class PasswordResetTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+                ADMIN = {
+                    "username": "admin",
+                    "email": "admin@local.gainz",
+                    "password": "",
+                }
+
+            app = create_app(PasswordResetTestConfig, selenium=True)
+
+            with app.app_context():
+                db.create_all()
+                User(username="admin", email="admin@local.gainz", password="old-password").add_to_db()
+                db.session.remove()
+                db.engine.dispose()
+
+            result = reset_admin_password(
+                password=DOCUMENTED_RESET_PHRASE,
+                config_class=PasswordResetTestConfig,
+            )
+
+            self.assertFalse(result.created)
+            self.assertEqual("admin", result.username)
+
+            verify_app = create_app(PasswordResetTestConfig, selenium=True)
+            with verify_app.app_context():
+                user = User.query.filter_by(username="admin").first()
+                self.assertIsNotNone(user)
+                self.assertTrue(user.checkpw(DOCUMENTED_RESET_PHRASE))
+                self.assertFalse(user.checkpw("old-password"))
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_password_reset_creates_missing_local_admin(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class PasswordResetCreateConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+                ADMIN = {
+                    "username": "admin",
+                    "email": "admin@local.gainz",
+                    "password": "",
+                }
+
+            result = reset_admin_password(
+                password=DOCUMENTED_RESET_PHRASE,
+                config_class=PasswordResetCreateConfig,
+            )
+
+            self.assertTrue(result.created)
+            self.assertEqual("admin", result.username)
+
+            verify_app = create_app(PasswordResetCreateConfig, selenium=True)
+            with verify_app.app_context():
+                user = User.query.filter_by(username="admin").first()
+                self.assertIsNotNone(user)
+                self.assertTrue(user.checkpw(DOCUMENTED_RESET_PHRASE))
                 db.drop_all()
                 db.session.remove()
                 db.engine.dispose()

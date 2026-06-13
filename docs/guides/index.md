@@ -29,6 +29,7 @@ Use these guides when you are trying to turn exchange CSVs into reviewable crypt
 
 - [Coinbase missing cost basis troubleshooting](coinbase-missing-cost-basis/)
 - [Current crypto holdings reconciliation](current-holdings-reconciliation/)
+- [Reset your local Gainz password](local-password-reset/)
 
 ## Product Walkthrough
 

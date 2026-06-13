@@ -79,6 +79,7 @@ These pages target the moments where people are stuck with exchange exports, mis
   <li><a href="{{ '/guides/sample-crypto-audit-packet/' | relative_url }}">Download a synthetic crypto audit packet sample</a></li>
   <li><a href="{{ '/guides/crypto-cpa-checklist/' | relative_url }}">What to give your CPA for crypto CSV reconciliation</a></li>
   <li><a href="{{ '/guides/local-crypto-tax-software/' | relative_url }}">Why local crypto tax software matters for private tax data</a></li>
+  <li><a href="{{ '/guides/local-password-reset/' | relative_url }}">How to reset your local Gainz password</a></li>
 </ul>
 
 ## Download
