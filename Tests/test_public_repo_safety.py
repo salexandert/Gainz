@@ -116,6 +116,11 @@ def test_generated_wiki_pages_use_public_docs(tmp_path):
         path.read_text(encoding="utf-8") for path in sorted(output_dir.glob("*.md"))
     )
     assert "https://cryptogainz.store" in combined_text
+    assert (
+        "https://raw.githubusercontent.com/salexandert/Gainz/main/docs/assets/screenshots/gainz-manual-batch-entry.png"
+        in combined_text
+    )
+    assert "https://cryptogainz.store/assets/screenshots/" not in combined_text
     assert "Using Gainz From Import To Audit Packet" in combined_text
     assert "Crypto Tax Reconciliation Guides" in combined_text
     assert "generated from docs/" in combined_text

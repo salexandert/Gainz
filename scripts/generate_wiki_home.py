@@ -7,6 +7,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_ROOT = REPO_ROOT / "docs"
 DEFAULT_SITE_URL = "https://cryptogainz.store"
 REPO_URL = "https://github.com/salexandert/Gainz"
+RAW_REPO_URL = "https://raw.githubusercontent.com/salexandert/Gainz/main"
 
 ROOT_DOCS = [
     "download.md",
@@ -126,7 +127,14 @@ def _site_url_for(path, site_url):
 
 
 def _asset_url(asset_path, site_url):
-    return f"{site_url.rstrip('/')}/assets/{asset_path.lstrip('/')}"
+    return f"{RAW_REPO_URL}/docs/assets/{asset_path.lstrip('/')}"
+
+
+def _relative_url(path, site_url):
+    if path.startswith("/assets/"):
+        return f"{RAW_REPO_URL}/docs{path}"
+
+    return f"{site_url.rstrip('/')}{path}"
 
 
 def _screenshot_url(filename, site_url):
@@ -159,7 +167,7 @@ def _generated_header(page_name):
 def _render_jekyll_markdown(text, site_url):
     def relative_url_replacement(match):
         path = match.group(1).strip()
-        return f"{site_url.rstrip('/')}{path}"
+        return _relative_url(path, site_url)
 
     text = re.sub(
         r"\{\{\s*['\"]([^'\"]+)['\"]\s*\|\s*relative_url\s*\}\}",
