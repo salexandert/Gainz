@@ -25,7 +25,7 @@
             <div id="collapse_1" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
               <div class="card-body">
                 Use this page to manually add, delete, and review transaction classifications. Add any buys or sells that were not imported from CSV.
-                <br> Reclassify sends, receives, or lost lots only when source records support that classification.
+                <br> Classify sends, receives, or possible losses only when source records support that treatment. Self-transfers should not be recorded as disposals.
                 <br>
                 <br>
 
@@ -261,7 +261,7 @@
                   </thead>  
                 </table>
                 <button type="button" id="buys_delete_button" class="btn btn-danger">Delete</button>
-                <button type="button" id="buys_convert_button" class="btn btn-warning">Reclassify as Documented Loss</button>
+                <button type="button" id="buys_convert_button" class="btn btn-warning">Mark Loss for Review</button>
               </div>
               <!-- /Card Body -->
             </div>
@@ -306,7 +306,7 @@
                     </tr>
                   </thead>  
                 </table>
-                <button type="button" id="send_convert_button" class="btn btn-warning">Reclassify as Documented Sale</button>
+                <button type="button" id="send_convert_button" class="btn btn-warning">Record Documented Disposal</button>
               
               </div>
               <!-- /Card Body -->

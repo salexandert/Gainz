@@ -483,7 +483,8 @@ class TransactionsEngineTests(unittest.TestCase):
 
         sells = [trans for trans in transactions if trans.trans_type == "sell"]
         sends = [trans for trans in transactions if trans.trans_type == "send"]
-        self.assertIn("Reclassified 2.0 SOL", message)
+        self.assertIn("Recorded 2.0 SOL", message)
+        self.assertIn("taxable disposal", message)
         self.assertEqual(1, len(sells))
         self.assertEqual(1, len(sends))
         self.assertAlmostEqual(2, sells[0].quantity)

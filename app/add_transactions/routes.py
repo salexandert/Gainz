@@ -220,16 +220,16 @@ def buy_convert():
                                     input_time_stamp=trans_obj.time_stamp, 
                                     input_usd_spot=trans_obj.usd_spot, 
                                     input_usd_total=trans_obj.usd_total, 
-                                    reason="Reclassified documented buy lot as lost",
+                                    reason="Marked documented buy lot for loss review",
                                     source=f"{trans_obj.source} Reclassified in Gainz App")
 
             transactions.conversions.append(conversion)
             
             transactions.transactions.remove(trans_obj)
 
-            transactions.save(description=f"Reclassified documented {symbol} buy lot as lost")
+            transactions.save(description=f"Marked documented {symbol} buy lot for loss review")
 
-            return jsonify(f'Reclassified documented buy lot as lost for review: {trans_obj.name}')
+            return jsonify(f'Marked documented buy lot for loss review: {trans_obj.name}')
 
 
 @blueprint.route('/receive_convert',  methods=['POST'])
@@ -301,7 +301,7 @@ def send_convert():
 
     if send_obj is not None:
 
-            sell = Sell(symbol=symbol, quantity=send_obj.quantity, time_stamp=send_obj.time_stamp, usd_spot=send_obj.usd_spot, source="Gainz App documented send sale")
+            sell = Sell(symbol=symbol, quantity=send_obj.quantity, time_stamp=send_obj.time_stamp, usd_spot=send_obj.usd_spot, source="Gainz App documented taxable disposal")
                 
             conversion = Conversion(input_trans_type='send', 
                                     output_trans_type='sell', 
@@ -310,7 +310,7 @@ def send_convert():
                                     input_time_stamp=send_obj.time_stamp, 
                                     input_usd_spot=send_obj.usd_spot, 
                                     input_usd_total=send_obj.usd_total, 
-                                    reason="Reclassified documented send as sell",
+                                    reason="Recorded documented send as taxable disposal",
                                     source=f"{send_obj.source} Reclassified in Gainz App")
 
             transactions.conversions.append(conversion)
@@ -319,8 +319,8 @@ def send_convert():
 
             transactions.transactions.remove(send_obj)
 
-            transactions.save(description=f"Reclassified documented {symbol} send as sell")
+            transactions.save(description=f"Recorded documented {symbol} send as taxable disposal")
 
-            return jsonify(f'Reclassified documented send as sell for review: {send_obj.name}')
+            return jsonify(f'Recorded documented send as taxable disposal for review: {send_obj.name}')
 
 

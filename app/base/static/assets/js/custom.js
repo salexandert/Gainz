@@ -714,7 +714,7 @@ $(document).ready(function() {
             holdingsSetBadge('Unlinked sales');
         } else if (difference > 0) {
             $('#holdings_next_action').text('The calculated net from imported buys and sells is higher than declared ' + asset + '. Review source records for missing disposals, transfers, losses, or other activity before using generated reports.');
-            $('#convert_text').text('Gainz can help reclassify known sends or lost lots, but only use this when supported by documentation.');
+            $('#convert_text').text('Gainz can record documented taxable disposals or mark possible losses for review. Use this only with source records; self-transfers should stay as transfers.');
             holdingsSetBadge('Needs Review');
         } else {
             $('#holdings_next_action').text('Declared holdings are higher than imported buys and sells currently explain. Review missing acquisitions, income, gifts, transfers, or other records that may need basis support.');

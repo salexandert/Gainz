@@ -25,6 +25,8 @@ Current holdings reconciliation answers a plain question: does the activity you 
 
 A difference can point to missing buys, missing sells, transfers between wallets, receives, sends, conversions, rewards, losses, unsupported CSV rows, or records from another platform. The number is not automatically wrong and it is not automatically taxable. It is a signal that the record set needs review.
 
+Sends are not automatically sales. A send to another account you own or control should remain a transfer. A send supported by records showing a sale, exchange, payment, fee, gift, or other transfer of ownership may need to be recorded as a taxable disposal. A possible lost, stolen, abandoned, or worthless lot should be marked for review and discussed with a qualified tax professional before relying on generated reports.
+
 ## Review Workflow
 
 1. Import every exchange and wallet file you can obtain.
@@ -32,8 +34,9 @@ A difference can point to missing buys, missing sells, transfers between wallets
 3. Click an asset marked **Needs Review** to inspect the selected asset workbench.
 4. Review import warnings, unlinked sales, and available lots.
 5. Add missing source files or supported manual entries when you have records for them.
-6. Run basis linking again, then refresh reconciliation.
-7. Generate an audit packet only after unresolved items are understood and documented.
+6. Use optional classification tools only when documentation supports the treatment.
+7. Run basis linking again, then refresh reconciliation.
+8. Generate an audit packet only after unresolved items are understood and documented.
 
 <div class="note-box">
   Gainz is documentation support. It helps you see where records agree or disagree, but it does not provide tax, legal, or financial advice.

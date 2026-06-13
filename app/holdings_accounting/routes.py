@@ -61,9 +61,9 @@ def holdings_accounting():
 
         transactions.convert_sends_to_sells(asset=asset, current_holdings=holdings)
 
-        transactions.save(description="Reclassified documented sends as sells")
+        transactions.save(description="Recorded documented sends as taxable disposals")
 
-        return jsonify("Reclassified documented sends as sells for review.")
+        return jsonify("Recorded documented sends as taxable disposals for review.")
 
 
     return render_template(
@@ -169,7 +169,7 @@ def sends_to_sells():
     amount_to_convert = float(request.json['quantity'])
 
     result_str = transactions.convert_sends_to_sells(asset=asset, amount_to_convert=amount_to_convert)
-    transactions.save(description="Reclassified documented sends as sells")
+    transactions.save(description="Recorded documented sends as taxable disposals")
 
     return jsonify(result_str)
 
@@ -188,9 +188,9 @@ def buys_to_lost():
 
     transactions.convert_buys_to_lost(asset=asset, amount=amount)
 
-    transactions.save(description="Reclassified documented buy lots as lost")
+    transactions.save(description="Marked documented buy lots for loss review")
 
-    return jsonify("Reclassified documented buy lots as lost for review.")
+    return jsonify("Marked documented buy lots for loss review. Review tax treatment before relying on generated reports.")
 
 
 @blueprint.route('/receive_to_buy', methods=['POST'])

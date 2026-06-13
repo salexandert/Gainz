@@ -1039,18 +1039,18 @@ class Transactions:
                 quantity=quantity,
                 time_stamp=send.time_stamp,
                 usd_spot=send.usd_spot,
-                source="Gainz App documented send sale",
+                source="Gainz App documented taxable disposal",
             )
 
             self.transactions.append(sell)
-            self._record_conversion(send, quantity, 'sell', 'Reclassified documented send as sell')
+            self._record_conversion(send, quantity, 'sell', 'Recorded documented send as taxable disposal')
             self._reduce_transaction_quantity(send, quantity)
 
             amount_remaining -= quantity
             converted_quantity += quantity
             converted_count += 1
 
-        return f"Reclassified {converted_quantity} {asset} from {converted_count} send transaction(s) as sell transaction(s) for review."
+        return f"Recorded {converted_quantity} {asset} from {converted_count} send transaction(s) as taxable disposal transaction(s) for review."
 
     def convert_buys_to_lost(self, asset, amount):
         amount_remaining = max(float(amount), 0.0)
@@ -1068,14 +1068,14 @@ class Transactions:
                 break
 
             quantity = min(buy.unlinked_quantity, amount_remaining)
-            self._record_conversion(buy, quantity, 'lost', 'Reclassified documented buy lot as lost')
+            self._record_conversion(buy, quantity, 'lost', 'Marked documented buy lot for loss review')
             self._reduce_transaction_quantity(buy, quantity)
 
             amount_remaining -= quantity
             converted_quantity += quantity
             converted_count += 1
 
-        return f"Reclassified {converted_quantity} {asset} from {converted_count} buy transaction(s) as lost lots for review."
+        return f"Marked {converted_quantity} {asset} from {converted_count} buy transaction(s) for loss review."
 
     def convert_receives_to_buys(self, asset, amount_to_convert):
         amount_remaining = max(float(amount_to_convert), 0.0)

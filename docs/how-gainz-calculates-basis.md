@@ -57,7 +57,15 @@ Excel exports split Form 8949-style output by year and holding period.
 
 Sends and receives are not automatically taxable in Gainz. They are evidence that assets moved in or out of the visible transaction set.
 
-If a receive is really an acquisition, it may need to be converted to a buy with basis. If a send is really a disposal, gift, loss, or conversion, it may need to be converted to the appropriate transaction type.
+If a receive is really an acquisition, it may need to be converted to a buy with basis. If a send is really a documented sale, exchange, payment, fee, gift, or other transfer of ownership, it may need to be recorded as a taxable disposal. If the send was only a transfer between accounts you own or control, it should stay as a transfer and should not be recorded as a disposal.
+
+The IRS digital assets page says that transferring digital assets between wallets or accounts you own or control is generally not a reportable digital asset transaction unless you paid a transaction fee with digital assets. It also says sales, exchanges, payments, transfer fees, and transfers of ownership or financial interest are digital asset transactions. See the [IRS digital assets page](https://www.irs.gov/filing/digital-assets) for the current federal framing.
+
+## Loss Review
+
+Gainz can mark a lot for loss review when source records show an asset may be lost, stolen, abandoned, or otherwise no longer owned. This is a documentation step, not a filing conclusion.
+
+Loss treatment depends on the facts. The [Taxpayer Advocate Service digital asset loss guide](https://www.taxpayeradvocate.irs.gov/news/tax-tips/tas-tax-tip-when-can-you-deduct-digital-asset-investment-losses/2023/10/) explains that frozen accounts, bankruptcy, worthless assets, abandonment, and theft can have different tax treatment. [IRS Topic 515](https://www.irs.gov/taxtopics/tc515) explains that theft losses must meet specific requirements and may be reported on Form 4684 when allowed. Review loss items with a qualified tax professional before relying on them in generated reports.
 
 ## Audit Packets
 
