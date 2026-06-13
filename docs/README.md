@@ -1,6 +1,6 @@
 # Gainz Docs
 
-This folder is the source of truth for public Gainz documentation. The public website is built from these Markdown files, and the GitHub Wiki home page is generated as a hub that points back to the current docs.
+This folder is the source of truth for public Gainz documentation. The public website is built from these Markdown files, and the GitHub Wiki pages are generated from the same docs with inline synthetic screenshots.
 
 Start here:
 
@@ -20,4 +20,4 @@ Focused guides:
 - [What to give your CPA](guides/crypto-cpa-checklist.md)
 - [Synthetic sample audit packet](guides/sample-crypto-audit-packet.md)
 
-For the visual screenshot walkthrough, start with [Using Gainz from import to audit packet](user-walkthrough.md). The [GitHub Wiki](https://github.com/salexandert/Gainz/wiki) points back to the current public docs.
+For the visual screenshot walkthrough, start with [Using Gainz from import to audit packet](user-walkthrough.md). The [GitHub Wiki](https://github.com/salexandert/Gainz/wiki) is regenerated from these docs so the wiki, website, and repository stay aligned.

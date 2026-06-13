@@ -137,13 +137,15 @@ The audit packet includes the Excel workbook, Form 8949 detail CSVs, Form 8949 t
 
 ## Screenshots And Wiki
 
-The GitHub wiki is generated from `docs/` and links to the current website walkthrough and guides:
+The GitHub wiki is generated from `docs/` and includes an inline screenshot walkthrough, guide index, and docs publishing flow:
 
 - [Gainz wiki walkthrough](https://github.com/salexandert/Gainz/wiki)
 
 Public screenshots are captured from synthetic demo data so they can show the first-run workflow without exposing private transaction history.
 
 Current public screenshots live under `docs/assets/screenshots/`, including the blank batch manual entry table used on the website and walkthrough.
+
+When a product change affects public documentation, update `docs/` first. Netlify builds the website from those files, and the wiki sync workflow regenerates the GitHub Wiki from the same source.
 
 ## Public Site And SEO
 

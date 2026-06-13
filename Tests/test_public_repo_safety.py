@@ -89,28 +89,44 @@ def test_public_text_files_do_not_reference_private_local_data():
     assert offenders == []
 
 
-def test_generated_wiki_home_uses_public_docs(tmp_path):
-    output_path = tmp_path / "Home.md"
+def test_generated_wiki_pages_use_public_docs(tmp_path):
+    output_dir = tmp_path / "wiki"
     subprocess.run(
         [
             sys.executable,
             "scripts/generate_wiki_home.py",
-            "--output",
-            str(output_path),
+            "--output-dir",
+            str(output_dir),
         ],
         check=True,
         capture_output=True,
         text=True,
     )
 
-    text = output_path.read_text(encoding="utf-8")
-    assert "https://cryptogainz.store" in text
-    assert "Using Gainz From Import To Audit Packet" in text
-    assert "Crypto Tax Reconciliation Guides" in text
-    assert "generated from docs/" in text
+    expected_pages = {
+        "Home.md",
+        "Using-Gainz-From-Import-To-Audit-Packet.md",
+        "Guides.md",
+        "Docs-And-Website-Publishing.md",
+    }
+    generated_pages = {path.name for path in output_dir.glob("*.md")}
+    assert generated_pages == expected_pages
+
+    combined_text = "\n".join(
+        path.read_text(encoding="utf-8") for path in sorted(output_dir.glob("*.md"))
+    )
+    assert "https://cryptogainz.store" in combined_text
+    assert "Using Gainz From Import To Audit Packet" in combined_text
+    assert "Crypto Tax Reconciliation Guides" in combined_text
+    assert "generated from docs/" in combined_text
+    assert "gainz-home.png" in combined_text
+    assert "Docs And Website Publishing" in combined_text
+    assert "relative_url" not in combined_text
+    assert "{{" not in combined_text
+    assert "Step-1:-Import-CSV" not in combined_text
 
     for marker in SENSITIVE_TEXT_MARKERS:
-        assert marker not in text
+        assert marker not in combined_text
 
-    assert "C:\\" not in text
-    assert "OneDrive" not in text
+    assert "C:\\" not in combined_text
+    assert "OneDrive" not in combined_text

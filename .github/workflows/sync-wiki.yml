@@ -24,10 +24,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Generate wiki home page
-        run: python scripts/generate_wiki_home.py --output build/wiki/Home.md
+      - name: Generate wiki pages
+        run: python scripts/generate_wiki_home.py --output-dir build/wiki
 
-      - name: Push generated page to wiki
+      - name: Push generated pages to wiki
         env:
           WIKI_TOKEN: ${{ secrets.WIKI_PUSH_TOKEN || github.token }}
           WIKI_REPO: ${{ github.repository }}.wiki.git
@@ -36,16 +36,17 @@ jobs:
           set -euo pipefail
 
           git clone "https://x-access-token:${WIKI_TOKEN}@github.com/${WIKI_REPO}" wiki
-          cp build/wiki/Home.md wiki/Home.md
+          find wiki -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp build/wiki/*.md wiki/
 
           cd wiki
-          if git diff --quiet -- Home.md; then
+          git add -A
+          if git diff --cached --quiet; then
             echo "Wiki already matches generated docs hub."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Home.md
           git commit -m "Sync wiki from docs"
           git push
