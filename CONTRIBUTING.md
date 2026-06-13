@@ -12,7 +12,7 @@ When a product improvement changes the user flow, update the relevant Markdown p
 - `docs/guides/*.md` for focused import, reconciliation, audit packet, CPA, and troubleshooting guides.
 - `docs/assets/screenshots/` for synthetic screenshots that are safe to publish.
 
-The website is built from `docs/`. The GitHub Wiki home page is generated from `docs/` by `scripts/generate_wiki_home.py` and synced by `.github/workflows/sync-wiki.yml`.
+The website is built from `docs/`. Netlify can deploy the site from this repo using `netlify.toml`; `.github/workflows/pages.yml` validates that the docs site builds. The GitHub Wiki home page is generated from `docs/` by `scripts/generate_wiki_home.py` and synced by `.github/workflows/sync-wiki.yml`.
 
 Do not hand-maintain a second long-form copy of the same walkthrough in the wiki or website. The wiki should act as a generated hub that points to the current public docs.
 

@@ -1,4 +1,4 @@
-name: Publish GitHub Pages
+name: Build Docs Site
 
 on:
   push:
@@ -6,16 +6,16 @@ on:
       - main
     paths:
       - "docs/**"
+      - "Gemfile"
+      - "netlify.toml"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: docs-site-build
   cancel-in-progress: false
 
 jobs:
@@ -25,27 +25,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@v1
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
         with:
-          source: ./docs
-          destination: ./_site
+          ruby-version: "3.3"
+          bundler-cache: true
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Build docs site
+        run: bundle exec jekyll build --source docs --destination _site
+
+      - name: Upload docs artifact
+        uses: actions/upload-artifact@v4
         with:
-          path: ./_site
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          name: docs-site
+          path: _site
