@@ -21,6 +21,16 @@ Gainz is best understood as a **local-first crypto tax audit packet tool**. It d
 
 Always review outputs with a qualified tax professional before filing.
 
+## Where To Start
+
+- Website: <https://cryptogainz.store>
+- GitHub Wiki walkthrough: <https://github.com/salexandert/Gainz/wiki>
+- Repo docs and guides: [docs/](docs/)
+- Click-by-click app walkthrough: [docs/user-walkthrough.md](docs/user-walkthrough.md)
+- Crypto cost basis learning guide: [docs/guides/crypto-cost-basis-learning.md](docs/guides/crypto-cost-basis-learning.md)
+
+The website and GitHub repository are maintained separately. The website should point visitors to the GitHub Wiki for the visual walkthrough, while the repository keeps the longer Markdown guides in `docs/`.
+
 ## Supported Inputs
 
 Gainz currently includes parsers or workflows for:

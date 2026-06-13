@@ -76,6 +76,8 @@ def test_public_text_files_do_not_reference_private_local_data():
         if path == "Tests/test_public_repo_safety.py":
             continue
         file_path = Path(path)
+        if not file_path.exists():
+            continue
         if file_path.suffix.lower() not in searchable_suffixes:
             continue
         text = file_path.read_text(encoding="utf-8", errors="ignore")
