@@ -29,9 +29,11 @@ Gainz currently includes parsers or workflows for:
 - Coinbase CSV exports
 - Coinbase Pro / GDAX fills
 - Kraken/custom imports through the template workflow
-- Manual transaction entry
+- Batch manual transaction entry for source-backed buys and sells that were not imported from a CSV
 
 The Cash App, Coinbase, and generic CSV import path recognizes common header aliases such as `Transaction Date`, `Activity Type`, `Crypto Quantity`, `Token Symbol`, `Spot Price USD`, and `Transaction Value`, so small export format changes are less likely to break imports.
+
+If automatic detection cannot identify the needed columns, Gainz can pause for column review so the user can choose the header row and map the required fields.
 
 See `demo_data/` for small sample files that are safe to use for testing.
 
@@ -83,12 +85,13 @@ Unzip the package and open `Gainz.exe` on Windows or `Gainz.app` on macOS. The l
 
 ## Common Workflow
 
-1. Import transaction CSVs.
-2. Review imported buys, sells, sends, and receives.
-3. Run auto-linking for an asset and year.
-4. Resolve unlinked sells or unexplained holdings.
-5. Export the Excel report.
-6. Generate an audit packet from the Export page.
+1. Learn the cost-basis question and collect source files.
+2. Import transaction CSVs in **Import & Manage Data**.
+3. Add source-backed manual rows in the batch table when a CSV is missing known buys or sells.
+4. Review imported buys, sells, sends, receives, warnings, and data sources.
+5. Link sells to earlier buys, usually starting with FIFO for a first review pass.
+6. Declare current holdings and resolve review items.
+7. Export the Excel report and audit packet from the Export page.
 
 For a complete click-by-click guide, see [Using Gainz from import to audit packet](docs/user-walkthrough.md).
 
@@ -117,6 +120,7 @@ The audit packet includes the Excel workbook, Form 8949 detail CSVs, Form 8949 t
 
 - Official website: <https://cryptogainz.store>
 - [Public site and guide hub](docs/index.md)
+- [Crypto cost basis learning path](docs/guides/crypto-cost-basis-learning.md)
 - [Using Gainz from import to audit packet](docs/user-walkthrough.md)
 - [How Gainz calculates basis](docs/how-gainz-calculates-basis.md)
 - [Synthetic crypto audit packet sample](docs/guides/sample-crypto-audit-packet.md)
@@ -133,6 +137,8 @@ The GitHub wiki includes a visual walkthrough with screenshots captured from syn
 
 These screenshots are meant to show the first-run workflow without exposing private transaction history.
 
+Current public screenshots live under `docs/assets/screenshots/`, including the blank batch manual entry table used on the website and walkthrough.
+
 ## Public Site And SEO
 
 The public website is live at <https://cryptogainz.store>. The temporary Netlify URL is <https://gainzstore.netlify.app/> while DNS and caches settle.
@@ -144,6 +150,8 @@ The `docs/` folder remains the source for project guides and SEO-oriented docume
 - Page titles, meta descriptions, canonical URLs, Open Graph metadata, a crawler-friendly sitemap, and `robots.txt`.
 
 The public docs focus on specific reconciliation problems such as Cash App CSVs, Coinbase imports, Coinbase Convert rows, Form 8949 audit packets, and current holdings review.
+
+The website also includes a public learning path for crypto cost basis that links to external educational material and then routes users into the Gainz import, reconciliation, and audit packet workflow.
 
 ## Analytics And Discovery
 

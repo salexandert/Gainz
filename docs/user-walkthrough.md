@@ -4,6 +4,8 @@ This walkthrough shows the intended end-to-end Gainz workflow. Use the demo CSVs
 
 Gainz runs locally. Imported files, generated saves, exports, and audit packets stay on your computer unless you choose to share them.
 
+If cost basis is new to you, start with the [crypto cost basis learning path]({{ '/guides/crypto-cost-basis-learning/' | relative_url }}), then return here for the click-by-click Gainz flow.
+
 ## 1. Start Gainz
 
 From source:
@@ -42,11 +44,16 @@ Supported workflows currently include:
 - Coinbase Convert rows
 - Coinbase Pro / GDAX fills
 - Kraken/custom template imports
-- Manual transaction entry
+- Batch manual transaction entry
 
 File names help Gainz detect the parser. Use names that include terms such as `cash_app`, `coinbase`, `coinbase_pro`, `gdax`, or `kraken`.
 
 Gainz also recognizes common column-name variations. For example, headers like `Transaction Date`, `Activity Type`, `Crypto Quantity`, `Token Symbol`, `Spot Price USD`, and `Transaction Value` can be mapped into the import fields even when an exchange changes its export wording. If the columns are too unusual, Gainz will ask for the header row and let you choose the Date/time, Transaction type, Asset symbol, Asset quantity, and USD price/value columns.
+
+If a CSV is missing known buys or sells, use **Add Manual Transactions** on the same page. Enter as many rows as needed, leave unused rows blank, and submit the batch. Gainz saves the batch as one revision with source `Gainz App Manual Add`.
+
+![Gainz manual transaction batch entry table]({{ '/assets/screenshots/gainz-manual-batch-entry.png' | relative_url }})
+{: .screenshot-frame }
 
 For a safe test run, upload:
 

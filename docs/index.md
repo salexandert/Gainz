@@ -56,6 +56,13 @@ schema_type: SoftwareApplication
   </div>
 </section>
 
+<section>
+  <h2>Fill Gaps With Source-Backed Manual Entries</h2>
+  <p>When a CSV misses a known buy or sell, Gainz now supports batch manual entry. Add several supported records at once, leave unused rows blank, and save the batch as one revision for review.</p>
+  <img class="screenshot-frame" src="{{ '/assets/screenshots/gainz-manual-batch-entry.png' | relative_url }}" alt="Gainz manual transaction batch entry table">
+  <p><a class="button-secondary" href="{{ '/user-walkthrough/#2-import-transaction-files' | relative_url }}">See where this fits in the walkthrough</a></p>
+</section>
+
 ## Guides For Real Search Problems
 
 These pages target the moments where people are stuck with exchange exports, missing basis, or audit documentation.

@@ -60,6 +60,11 @@ Gainz is built for the middle of the workflow: turning raw transaction files int
   </div>
 </div>
 
+If a known source record is missing from a CSV, use **Import & Manage Data** to add supported manual transactions in a batch. Blank rows are ignored, and the batch is saved as one revision so the change can be reviewed later.
+
+![Gainz manual transaction batch entry table]({{ '/assets/screenshots/gainz-manual-batch-entry.png' | relative_url }})
+{: .screenshot-frame }
+
 ## Common Reasons Basis Is Missing
 
 - The sale is imported, but the original buy was on another exchange.
