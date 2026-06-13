@@ -235,6 +235,13 @@ def _public_import_result(result):
     return public_result
 
 
+def _import_error_response(action):
+    current_app.logger.exception("Import failed while handling %s.", action)
+    return jsonify({
+        "error": "Gainz could not complete that import. Review the file format and try again."
+    }), 400
+
+
 def _remove_data_source(transactions, source):
     source = str(source or "")
     original_transactions = list(getattr(transactions, "transactions", []))
@@ -308,11 +315,14 @@ def import_wizard():
             file = request.files['file']
             if file and file.filename:
                 review_columns = request.form.get("review_columns") in ("1", "true", "on", "yes")
-                result = ImportService(current_app.config['UPLOAD_FOLDER']).import_upload(
-                    file,
-                    transactions,
-                    review_columns=review_columns,
-                )
+                try:
+                    result = ImportService(current_app.config['UPLOAD_FOLDER']).import_upload(
+                        file,
+                        transactions,
+                        review_columns=review_columns,
+                    )
+                except Exception:
+                    return _import_error_response("uploaded CSV")
                 if result.get("mapping_required"):
                     session["pending_import_file_path"] = result["file_path"]
                 return jsonify(_public_import_result(result))
@@ -419,13 +429,16 @@ def mapped_import():
     column_mapping = data.get("column_mapping") or {}
 
     transactions = current_app.config['transactions']
-    result = ImportService(current_app.config['UPLOAD_FOLDER']).import_mapped_file(
-        file_path,
-        transactions,
-        header_row=header_row,
-        column_mapping=column_mapping,
-        data_start_row=data_start_row,
-    )
+    try:
+        result = ImportService(current_app.config['UPLOAD_FOLDER']).import_mapped_file(
+            file_path,
+            transactions,
+            header_row=header_row,
+            column_mapping=column_mapping,
+            data_start_row=data_start_row,
+        )
+    except Exception:
+        return _import_error_response("mapped CSV")
 
     if not result.get("mapping_required"):
         session.pop("pending_import_file_path", None)
@@ -437,10 +450,13 @@ def mapped_import():
 @login_required
 def import_demo_data():
     transactions = current_app.config['transactions']
-    result = ImportService(current_app.config['UPLOAD_FOLDER']).import_demo_data(
-        transactions,
-        repo_root=current_app.root_path + "/..",
-    )
+    try:
+        result = ImportService(current_app.config['UPLOAD_FOLDER']).import_demo_data(
+            transactions,
+            repo_root=current_app.root_path + "/..",
+        )
+    except Exception:
+        return _import_error_response("demo data")
     return jsonify(_public_import_result(result))
 
 

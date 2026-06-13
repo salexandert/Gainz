@@ -144,6 +144,28 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertNotIn("file_path", result["files"][0])
         self.assertEqual("cash_app_sample.csv", result["files"][0]["filename"])
 
+    def test_import_route_errors_do_not_expose_exception_details(self):
+        app = create_app(config_dict["Debug"], selenium=True)
+        app.config.update(
+            WTF_CSRF_ENABLED=False,
+            transactions=empty_transactions(),
+            UPLOAD_FOLDER="uploads",
+        )
+
+        with app.test_request_context("/import_transactions/demo", method="POST"):
+            with patch.object(
+                import_routes.ImportService,
+                "import_demo_data",
+                side_effect=RuntimeError(r"C:\private\secret.csv"),
+            ):
+                response, status_code = import_routes.import_demo_data.__wrapped__()
+
+        data = response.get_json()
+        self.assertEqual(400, status_code)
+        self.assertIn("could not complete", data["error"])
+        self.assertNotIn("secret.csv", data["error"])
+        self.assertNotIn("C:\\", data["error"])
+
     def test_manual_batch_rows_skip_blanks_and_build_transactions(self):
         form_data = MultiDict([
             ("manual_type[]", "buy"),
