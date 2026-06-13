@@ -424,6 +424,29 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual("receive", transactions.transactions[0].trans_type)
         self.assertEqual(100.0, transactions.transactions[0].usd_spot)
 
+    def test_import_warnings_do_not_expose_parser_exception_details(self):
+        transactions = empty_transactions()
+        csv_text = "\n".join([
+            "Created At,Operation,Token Symbol,Token Quantity,Transaction Value",
+            "not a date,Receive,SOL,3.5,$350.00",
+            "2024-02-15 09:00:00 UTC,Send,SOL,1.0,$125.00",
+        ])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "wallet_export_bad_row.csv"
+            upload_dir = Path(temp_dir) / "uploads"
+            source.write_text(csv_text, encoding="utf-8")
+            result = ImportService(upload_dir).import_upload(FileUpload(source), transactions)
+
+        self.assertEqual(1, result["imported_count"])
+        self.assertEqual(1, len(result["warnings"]))
+        warning = result["warnings"][0]
+        self.assertIn("could not parse this row", warning)
+        self.assertIn("wallet_export_bad_row.csv", warning)
+        self.assertNotIn("Unknown string format", warning)
+        self.assertNotIn("not a date", warning)
+        self.assertNotIn(str(source.parent), warning)
+
     def test_import_service_returns_mapping_prompt_for_unknown_columns(self):
         transactions = empty_transactions()
         csv_text = "\n".join([

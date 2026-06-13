@@ -1,6 +1,7 @@
 # This module will handle parsing-related functions.
 
 import csv
+import logging
 import pandas as pd
 import dateutil
 import os
@@ -9,6 +10,8 @@ from openpyxl import load_workbook
 from dateutil import parser
 from dateutil.tz import gettz
 from transaction import Buy, Sell, Send, Receive
+
+parsers_logger = logging.getLogger('parsers')
 
 # Define timezone mappings for dateutil.parser
 tzinfos = {
@@ -616,8 +619,8 @@ def detect_csv_format(file_path, header_row=1):
             return 'coinbase'
         else:
             return 'unknown'
-    except Exception as e:
-        print(f"Error detecting CSV format: {e}")
+    except Exception:
+        parsers_logger.exception("Could not detect CSV format for %s.", os.path.basename(file_path))
         return 'unknown'
 
 
@@ -885,14 +888,21 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
                     transactions.transactions.append(temp_trans)
                     transactions_added = True
                     imported_count += 1
-            except KeyError as ke:
-                warning = f"Skipped row {row_number} from {os.path.basename(file_path)}: missing required column {ke}"
-                print(f"Error processing row: {warning}")
+            except KeyError:
+                warning = (
+                    f"Skipped row {row_number} from {os.path.basename(file_path)}: "
+                    "missing one of the required import columns."
+                )
+                parsers_logger.exception("Import row is missing a required column.")
                 import_warnings.append(warning)
                 continue
-            except Exception as e:
-                warning = f"Skipped row {row_number} from {os.path.basename(file_path)}: {e}"
-                print(f"Error processing row: {warning}")
+            except Exception:
+                warning = (
+                    f"Skipped row {row_number} from {os.path.basename(file_path)}: "
+                    "Gainz could not parse this row. Check date, transaction type, "
+                    "asset quantity, and USD value."
+                )
+                parsers_logger.exception("Import row could not be parsed.")
                 import_warnings.append(warning)
                 continue
 
@@ -923,9 +933,12 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
 
         return (imported_count, skipped_count)
             
-    except Exception as e:
-        print(f"Error importing transactions: {e}")
-        warning = f"Could not import {os.path.basename(file_path)}: {e}"
+    except Exception:
+        parsers_logger.exception("Could not import transactions from %s.", os.path.basename(file_path))
+        warning = (
+            f"Could not import {os.path.basename(file_path)}. Check that the file is a "
+            "readable CSV and use the column mapper if the headers are unusual."
+        )
         existing_warnings = getattr(transactions, 'import_warnings', [])
         transactions.import_warnings = existing_warnings + [warning]
         transactions.last_import_result = {
