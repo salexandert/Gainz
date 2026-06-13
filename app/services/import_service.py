@@ -54,6 +54,17 @@ class ImportService:
         if not analysis["can_import"]:
             return self._mapping_required_result(file_path, analysis)
 
+        if not analysis["has_pricing"]:
+            return self._mapping_required_result(
+                file_path,
+                analysis,
+                (
+                    "Column review needed. Gainz found transaction columns but not a "
+                    "USD spot price or total USD value column. Map a USD value column "
+                    "before importing."
+                ),
+            )
+
         clear_import_warnings_for_source(transactions, filename)
         imported_count, skipped_count = import_transactions(
             file_path,
@@ -159,7 +170,11 @@ class ImportService:
             "imported_count": 0,
             "skipped_count": 0,
             "warnings": [
-                message or "Gainz could not identify the required import columns. Choose the header row and map the columns below."
+                message or (
+                    "Column review needed. Gainz could not confidently identify the "
+                    "required import columns. Choose the header row and map the "
+                    "columns below."
+                )
             ],
             "mapping_required": True,
             "mapping": analysis,

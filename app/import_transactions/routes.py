@@ -239,7 +239,10 @@ def _public_import_result(result):
             public_files.append(public_item)
         public_result["files"] = public_files
 
-    public_result["warning_rows"] = import_warning_review_rows(public_result.get("warnings", []))
+    if public_result.get("mapping_required"):
+        public_result["warning_rows"] = []
+    else:
+        public_result["warning_rows"] = import_warning_review_rows(public_result.get("warnings", []))
 
     return public_result
 

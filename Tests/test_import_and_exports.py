@@ -164,6 +164,37 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("coinbase.csv", rendered_page)
         self.assertIn("Suggested next action", rendered_page)
 
+    def test_import_page_renders_column_review_workflow(self):
+        app = create_app(config_dict["Debug"], selenium=True)
+        app.config.update(WTF_CSRF_ENABLED=False)
+
+        with app.test_request_context("/import_transactions/"):
+            rendered_page = app.jinja_env.get_template(
+                "import_transactions.html"
+            ).render(
+                manual_trans=import_routes.ManualTransaction(),
+                current_holdings=import_routes.CurrentHoldings(),
+                save_summary={
+                    "revision": 0,
+                    "save_count": 0,
+                    "recent_saves": [],
+                },
+                data_summary={
+                    "transaction_count": 0,
+                    "asset_count": 0,
+                    "source_count": 0,
+                    "link_count": 0,
+                    "sources": [],
+                    "import_warnings": [],
+                    "import_warning_rows": [],
+                    "type_counts": {},
+                },
+            )
+
+        self.assertIn('id="import_column_mapper"', rendered_page)
+        self.assertIn("Column review needed", rendered_page)
+        self.assertIn("Choose Header And Columns", rendered_page)
+
     def test_public_import_result_strips_server_paths(self):
         result = _public_import_result({
             "file_path": r"C:\private\uploads\transactions.csv",
@@ -185,6 +216,20 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual("cash_app_sample.csv", result["files"][0]["filename"])
         self.assertEqual("transactions.csv", result["warning_rows"][0]["source"])
         self.assertEqual("12", result["warning_rows"][0]["row"])
+
+    def test_public_mapping_prompt_does_not_create_warning_rows(self):
+        result = _public_import_result({
+            "file_path": r"C:\private\uploads\cash_app_report.csv",
+            "imported_count": 0,
+            "skipped_count": 0,
+            "warnings": [
+                "Column review needed. Gainz could not confidently identify the required import columns."
+            ],
+            "mapping_required": True,
+        })
+
+        self.assertEqual("cash_app_report.csv", result["filename"])
+        self.assertEqual([], result["warning_rows"])
 
     def test_import_route_errors_do_not_expose_exception_details(self):
         app = create_app(config_dict["Debug"], selenium=True)
@@ -456,6 +501,24 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual(1, result["mapping"]["header_row"])
         self.assertEqual(2, result["mapping"]["data_start_row"])
         self.assertTrue(result["mapping"]["sample_rows"])
+
+    def test_import_service_requests_mapping_when_pricing_column_missing(self):
+        transactions = empty_transactions()
+        csv_text = "\n".join([
+            "Created At,Operation,Token Symbol,Token Quantity",
+            "2024-02-01 09:00:00 UTC,Receive,SOL,3.5",
+        ])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "wallet_export_without_usd.csv"
+            upload_dir = Path(temp_dir) / "uploads"
+            source.write_text(csv_text, encoding="utf-8")
+            result = ImportService(upload_dir).import_upload(FileUpload(source), transactions)
+
+        self.assertTrue(result["mapping_required"])
+        self.assertIn("USD", result["warnings"][0])
+        self.assertEqual(0, result["imported_count"])
+        self.assertEqual([], transactions.transactions)
 
     def test_import_service_imports_mapped_csv_with_later_data_start_row(self):
         transactions = empty_transactions()

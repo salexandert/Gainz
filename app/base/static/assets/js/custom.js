@@ -41,6 +41,27 @@ function gainzShowImportResult(result, fileName, alertClass) {
             warnings,
             warningRows
         );
+    } else {
+        $("#import_warning_workflow").hide();
+    }
+}
+
+function gainzShowColumnReviewResult(result) {
+    var warnings = result.warnings || [];
+    var message = warnings.join(" ") || "Column review needed. Choose the header row and map the columns below.";
+
+    $("#import_warning_workflow").hide();
+    $("#import_upload_result")
+        .removeClass("alert-danger alert-info alert-warning")
+        .addClass("alert-warning")
+        .text(message)
+        .show();
+
+    gainzRenderColumnMapper(result.mapping);
+
+    var mapper = $("#import_column_mapper");
+    if (mapper.length) {
+        $("html, body").animate({ scrollTop: mapper.offset().top - 90 }, 250);
     }
 }
 
@@ -250,7 +271,7 @@ function gainzRenderColumnMapper(mapping) {
             .show();
     } else if (!mapping.has_pricing) {
         warningBox
-            .text("No USD price or total value column was detected. Gainz can import the rows, but generated reports will need review.")
+            .text("No USD price or total value column was detected. Map one if the source includes it. If the file truly has no USD values, imported reports will need review.")
             .show();
     } else {
         warningBox.hide();
@@ -307,12 +328,7 @@ if (window.Dropzone) {
                 }
 
                 if (result.mapping_required) {
-                    $("#import_upload_result")
-                        .removeClass("alert-danger alert-info alert-warning")
-                        .addClass("alert-warning")
-                        .text((result.warnings || []).join(" "))
-                        .show();
-                    gainzRenderColumnMapper(result.mapping);
+                    gainzShowColumnReviewResult(result);
                     return;
                 }
 
@@ -409,12 +425,7 @@ $(document).ready(function () {
             })
         }).done(function (result) {
             if (result.mapping_required) {
-                $("#import_upload_result")
-                    .removeClass("alert-danger alert-info alert-warning")
-                    .addClass("alert-warning")
-                    .text((result.warnings || []).join(" "))
-                    .show();
-                gainzRenderColumnMapper(result.mapping);
+                gainzShowColumnReviewResult(result);
                 return;
             }
 

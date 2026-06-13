@@ -480,11 +480,6 @@
     margin-bottom: 10px;
 }
 
-.import-warning-steps {
-    margin: 8px 0 12px;
-    padding-left: 20px;
-}
-
 .import-warning-table {
     background: #fff;
     margin-bottom: 0;
@@ -498,6 +493,14 @@
 
 .import-warning-table .import-warning-action {
     min-width: 260px;
+}
+
+.column-review-panel {
+    color: #252422;
+}
+
+.column-review-panel p {
+    color: #4f5962;
 }
 
 .holdings-hidden-legacy {

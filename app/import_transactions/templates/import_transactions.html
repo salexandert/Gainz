@@ -144,20 +144,14 @@
             <div>
               <strong>Import warnings need review.</strong>
               <p class="mb-2">
-                Some rows were skipped or imported with missing values. Resolve these before relying on generated reports or audit packets.
+                Some rows were skipped or imported with assumptions. Review these before using generated reports or audit packets.
               </p>
             </div>
             <div class="import-warning-actions">
-              <a class="btn btn-sm btn-outline-primary" href="#import_review_columns_before_import">Enable column review</a>
               <a class="btn btn-sm btn-outline-primary" href="#manual-transactions">Add manual rows</a>
               <a class="btn btn-sm btn-outline-primary" href="#import_data_sources_table">Review sources</a>
             </div>
           </div>
-          <ol class="import-warning-steps">
-            <li>Open the source file and check the row shown below.</li>
-            <li>If Gainz missed columns, remove the source and re-import with column review enabled.</li>
-            <li>If the row belongs in the record but the source cannot be fixed, add a manual transaction backed by the source row.</li>
-          </ol>
           <div class="table-responsive">
             <table id="import_warning_workflow_table" class="table table-sm table-striped import-warning-table">
               <thead>
@@ -199,8 +193,12 @@
           style="display: none;"
         >
           <hr>
-          <h5>Map CSV Columns</h5>
-          <p class="text-muted">Choose the row that contains headers, confirm where transaction rows begin, then match your CSV columns to the fields Gainz needs.</p>
+          <div class="column-review-panel alert alert-warning" role="alert">
+            <strong>Column review needed.</strong>
+            <p class="mb-0">Gainz was not confident enough to import this CSV automatically. Choose the header row, preview the columns, map the fields, then import.</p>
+          </div>
+          <h5>Choose Header And Columns</h5>
+          <p class="text-muted">Select the row that contains headers, confirm where transaction rows begin, then match your CSV columns to the fields Gainz needs.</p>
           <div class="row align-items-end">
             <div class="col-md-3">
               <label for="import_header_row">Header row</label>
