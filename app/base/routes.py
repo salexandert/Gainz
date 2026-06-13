@@ -1,3 +1,5 @@
+from urllib.parse import urlparse
+
 from flask import abort, current_app, render_template, redirect, request, url_for
 from flask_login import (
     current_user,
@@ -44,6 +46,22 @@ def _is_local_request():
     return request.remote_addr in ("127.0.0.1", "::1", "localhost")
 
 
+def _is_safe_next_url(target):
+    if not target:
+        return False
+
+    parsed = urlparse(target)
+    return not parsed.scheme and not parsed.netloc and target.startswith("/")
+
+
+def _safe_login_redirect(default_endpoint='home_blueprint.index'):
+    next_url = request.args.get('next')
+    if _is_safe_next_url(next_url):
+        return next_url
+
+    return url_for(default_endpoint)
+
+
 @blueprint.route('/login', methods=['GET', 'POST'])
 def login():
     login_form = LoginForm(request.form)
@@ -73,7 +91,7 @@ def login():
                 user = User(username=username, email=email, password=password)
                 user.add_to_db()
                 login_user(user)
-                return redirect(url_for('home_blueprint.index'))
+                return redirect(_safe_login_redirect())
 
         return render_template(
             'login/login.html',
@@ -88,7 +106,7 @@ def login():
         if user:
             if user.checkpw(request.form['password']):
                 login_user(user)
-                return redirect(url_for('home_blueprint.index'))
+                return redirect(_safe_login_redirect())
             else:
                 status = 'Password Error !'
         else:
@@ -96,7 +114,7 @@ def login():
         return render_template('login/login.html', login_form=login_form, create_form=create_form, status=status)
 
     if current_user.is_authenticated:
-        return redirect(url_for('home_blueprint.index'))
+        return redirect(_safe_login_redirect())
     return render_template('login/login.html', login_form=login_form, create_form=create_form, status='')
    
 @blueprint.route('/logout')
@@ -119,7 +137,8 @@ def shutdown():
 
 @login_manager.unauthorized_handler
 def unauthorized_handler():
-    return render_template('errors/page_403.html'), 403
+    next_url = request.full_path.rstrip('?') if request.query_string else request.path
+    return redirect(url_for('base_blueprint.login', next=next_url))
 
 
 @blueprint.errorhandler(403)

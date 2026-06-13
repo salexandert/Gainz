@@ -2,6 +2,7 @@ import unittest
 import tempfile
 import socket
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 from unittest.mock import patch
 
 from app import create_app
@@ -138,6 +139,100 @@ class LauncherStartupTests(unittest.TestCase):
 
             with app.app_context():
                 self.assertEqual(1, User.query.count())
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_protected_page_redirects_to_login_instead_of_403(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class AuthRedirectTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+                ADMIN = {
+                    "username": "admin",
+                    "email": "admin@local.gainz",
+                    "password": "",
+                }
+
+            app = create_app(AuthRedirectTestConfig)
+
+            with app.test_client() as client:
+                response = client.get("/stats/")
+
+            self.assertEqual(302, response.status_code)
+            location = urlparse(response.headers["Location"])
+            self.assertEqual("/login", location.path)
+            self.assertEqual(["/stats/"], parse_qs(location.query)["next"])
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_login_returns_to_safe_next_page(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class AuthRedirectTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+                ADMIN = {
+                    "username": "admin",
+                    "email": "admin@local.gainz",
+                    "password": "local-password",
+                }
+
+            app = create_app(AuthRedirectTestConfig)
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/login?next=/stats/",
+                    data={
+                        "username": "admin",
+                        "password": "local-password",
+                        "login": "1",
+                    },
+                )
+
+            self.assertEqual(302, response.status_code)
+            self.assertEqual("/stats/", urlparse(response.headers["Location"]).path)
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_login_ignores_external_next_url(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class AuthRedirectTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+                ADMIN = {
+                    "username": "admin",
+                    "email": "admin@local.gainz",
+                    "password": "local-password",
+                }
+
+            app = create_app(AuthRedirectTestConfig)
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/login?next=https://example.com/phishing",
+                    data={
+                        "username": "admin",
+                        "password": "local-password",
+                        "login": "1",
+                    },
+                )
+
+            self.assertEqual(302, response.status_code)
+            self.assertEqual("/home/", urlparse(response.headers["Location"]).path)
+
+            with app.app_context():
                 db.drop_all()
                 db.session.remove()
                 db.engine.dispose()
