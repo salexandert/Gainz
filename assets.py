@@ -3,13 +3,13 @@ import math
 
 class Asset:
 
-    def __init__(self, symbol, hodl=None) -> None:
+    def __init__(self, symbol, holdings=None) -> None:
 
         self.symbol = symbol
-        if hodl is None:
-            self.hodl = None
-        elif math.isnan(hodl):
-            self.hodl=None
+        if holdings is None:
+            self.holdings = None
+        elif math.isnan(holdings):
+            self.holdings=None
         else:
-            self.hodl = hodl
-        
+            self.holdings = holdings
+

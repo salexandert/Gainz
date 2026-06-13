@@ -12,7 +12,7 @@
 <div class="row">
   <div class="col-md-12">
     <div class="card">
-      <div class="card-body">      
+      <div class="card-body">
         <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
           <h4 class="card-title">Step 6: Export to Excel</h4>
           <div class="card card-plain">
@@ -24,8 +24,8 @@
             </div>
             <div id="collapseOne" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
               <div class="card-body">
-                Use this page to export all data to a human readable excel. Sheets for 8949 Short/Long by year along with many others are included.  
-                
+                Use this page to export a human-readable workbook and audit packet for review. Form 8949-style Short/Long sheets by year are included when basis links exist.
+
               </div>
             </div>
           </div>
@@ -35,6 +35,86 @@
   </div>
 </div>
 <!-- /Page Description and Instructions -->
+
+<!-- Audit Readiness -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between align-items-start">
+          <div>
+            <h4 class="card-title">Audit Packet Review Status</h4>
+            <p class="card-category">Items to review before export</p>
+          </div>
+          <span class="gainz-status-badge {{ audit_readiness.status_class }}">{{ audit_readiness.status }}</span>
+        </div>
+
+        <div class="audit-readiness-grid">
+          <div class="audit-readiness-item">
+            <span>8949 Rows</span>
+            <strong>{{ audit_readiness.metrics.form_8949_rows }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>8949 Gain/Loss</span>
+            <strong>{{ audit_readiness.metrics.form_8949_gain_loss }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Unlinked Sales</span>
+            <strong>{{ audit_readiness.metrics.assets_with_unlinked_sales }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Holdings Needed</span>
+            <strong>{{ audit_readiness.metrics.assets_needing_holdings }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Needs Review</span>
+            <strong>{{ audit_readiness.metrics.assets_with_mismatches }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Warnings</span>
+            <strong>{{ audit_readiness.metrics.import_warnings }}</strong>
+          </div>
+        </div>
+
+        <div class="audit-next-action">
+          <strong>Review guidance:</strong> {{ audit_readiness.next_action }}
+        </div>
+
+        {% if audit_readiness.blockers %}
+        <div class="alert alert-warning" role="alert">
+          <strong>Review before using this packet:</strong>
+          <ul class="mb-0">
+            {% for blocker in audit_readiness.blockers %}
+            <li>{{ blocker }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        {% if audit_readiness.warnings %}
+        <div class="alert alert-info" role="alert">
+          <strong>Review:</strong>
+          <ul class="mb-0">
+            {% for warning in audit_readiness.warnings %}
+            <li>{{ warning }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        <div class="audit-packet-list">
+          <h6>Audit packet includes</h6>
+          <ul>
+            {% for item in audit_readiness.packet_includes %}
+            <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Audit Readiness -->
 
 
 <!-- All Asset Stats Table -->
@@ -51,7 +131,7 @@
               </a>
             </div>
             <div id="collapseOne" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
-              
+
               <!-- Card Body -->
               <div class="card-body ">
                 <table id="exportpage_stats_datatable" class="table table-striped table-bordered" style="width:100%">
@@ -65,7 +145,7 @@
                         <th>Purchased in USD</th>
                         <th>Sold in USD</th>
                         <th>Profit</th>
-                        <th>HODL</th>
+                        <th>Holdings</th>
                       </tr>
                     </thead>
 
@@ -81,13 +161,13 @@
                       <td>{{ row['total_purchased_usd'] }}</td>
                       <td>{{ row['total_sold_usd']  }}</td>
                       <td>{{ row['total_profit_loss']  }}</td>
-                      <td>{{ row['hodl'] }}</td>
+                      <td>{{ row['holdings'] }}</td>
                     </tr>
-                
+
                     {% endfor %}
-              
+
                   </tbody>
-            
+
                 </table>
               </div>
               <!-- /Card Body -->
@@ -99,7 +179,7 @@
   </div>
 </div>
 <!-- All Asset Stats Table End -->
-  
+
 
 
 
@@ -117,14 +197,15 @@
               </a>
             </div>
             <div id="collapseOne" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
-              
+
               <!-- Card Body -->
-              <div class="card-body ">     
+              <div class="card-body ">
                 <p id="export_button_text"></p>
                 <button type="button" id="export_button" class="btn btn-success">Export</button>
+                <button type="button" id="audit_packet_button" class="btn btn-info">Generate Audit Packet</button>
               </div>
               <!-- /Card Body -->
-              
+
             </div>
           </div>
         </div>

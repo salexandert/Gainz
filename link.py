@@ -24,7 +24,7 @@ class Link:
         if self.transactions[0].trans_type == 'buy' and self.transactions[1].trans_type == 'sell':
             self.buy = self.trans1
             self.sell = self.trans2
-        
+
         elif self.transactions[0].trans_type == 'sell' and self.transactions[1].trans_type == 'buy':
             self.buy = self.trans2
             self.sell = self.trans1
@@ -58,12 +58,12 @@ class Link:
 
 
     @property
-    def hodl_duration(self):
-        hodl_time =  self.sell.time_stamp - self.buy.time_stamp
+    def holding_duration(self):
+        holding_time =  self.sell.time_stamp - self.buy.time_stamp
 
-        return hodl_time
-    
-    
+        return holding_time
+
+
 
     @property
     def proceeds(self):

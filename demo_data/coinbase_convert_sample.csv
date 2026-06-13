@@ -1,0 +1,2 @@
+ID,Timestamp,Transaction Type,Asset,Quantity Transacted,Price Currency,Price at Transaction,Subtotal,Total (inclusive of fees and/or spread),Fees and/or Spread,Notes
+demo-cb-convert-001,2023-08-01 12:00:00 UTC,Convert,ETH,0.5,USD,$4000.00,$2000.00,$2000.00,$0.00,Converted 0.5 ETH to 0.02 BTC

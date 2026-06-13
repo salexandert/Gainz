@@ -1,0 +1,212 @@
+{% extends "base_site.html" %}
+
+{% block title %} Tax Filing Review {% endblock title %}
+
+{% block stylesheets %}
+  {{ super() }}
+{% endblock stylesheets %}
+
+{% block content %}
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between align-items-start">
+          <div>
+            <h4 class="card-title">Tax Filing Review</h4>
+            <p class="card-category">Compare Gainz's calculated Form 8949-style totals with the totals you recorded on prior-year filings.</p>
+          </div>
+          <span class="gainz-status-badge {{ alignment.overall_status_class }}">{{ alignment.overall_status }}</span>
+        </div>
+
+        <div class="audit-readiness-grid">
+          <div class="audit-readiness-item">
+            <span>Years</span>
+            <strong>{{ alignment.metrics.years }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Aligned</span>
+            <strong>{{ alignment.metrics.aligned_years }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Need Review</span>
+            <strong>{{ alignment.metrics.years_needing_review }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Filed Totals</span>
+            <strong>{{ alignment.metrics.declared_years }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Payment Records</span>
+            <strong>{{ alignment.metrics.payment_records }}</strong>
+          </div>
+        </div>
+
+        <div class="audit-next-action">
+          <strong>Review guidance:</strong> {{ alignment.next_action }}
+        </div>
+
+        <p class="text-muted mb-0">
+          Gainz compares calculated proceeds, cost basis, and gain/loss against the figures you enter, using a ${{ "%.2f"|format(alignment.tolerance) }} tolerance for filing-rounding differences. This is documentation support only, not tax, legal, or financial advice.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if saved_year %}
+<div class="row">
+  <div class="col-md-12">
+    <div class="alert alert-success" role="alert">
+      Saved filed totals and payment record notes for {{ saved_year }}.
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Record Filed Totals</h5>
+        <p class="text-muted">Enter the totals from your filed return or tax software, plus a reference to the filing/payment evidence you keep outside Gainz.</p>
+        <form method="POST" action="{{ url_for('tax_filing_review_blueprint.save_tax_year_record') }}">
+          <div class="row">
+            <div class="col-md-2">
+              <label for="tax_year">Year<span class="required">*</span></label>
+              <input id="tax_year" name="year" type="number" min="2009" max="2100" step="1" class="form-control" list="tax_year_options" required>
+              <datalist id="tax_year_options">
+                {% for year in available_years %}
+                <option value="{{ year }}"></option>
+                {% endfor %}
+              </datalist>
+            </div>
+            <div class="col-md-2">
+              <label for="reported_proceeds">Reported Proceeds<span class="required">*</span></label>
+              <input id="reported_proceeds" name="reported_proceeds" type="number" step="0.01" class="form-control" required>
+            </div>
+            <div class="col-md-2">
+              <label for="reported_cost_basis">Reported Cost Basis<span class="required">*</span></label>
+              <input id="reported_cost_basis" name="reported_cost_basis" type="number" step="0.01" class="form-control" required>
+            </div>
+            <div class="col-md-2">
+              <label for="reported_gain_loss">Reported Gain/Loss<span class="required">*</span></label>
+              <input id="reported_gain_loss" name="reported_gain_loss" type="number" step="0.01" class="form-control" required>
+            </div>
+            <div class="col-md-2">
+              <label for="tax_paid">Tax Paid</label>
+              <input id="tax_paid" name="tax_paid" type="number" step="0.01" class="form-control" placeholder="0.00">
+            </div>
+            <div class="col-md-2">
+              <label for="filing_status">Filing Status</label>
+              <select id="filing_status" name="filing_status" class="form-control">
+                <option value="Filed">Filed</option>
+                <option value="Amended filed">Amended filed</option>
+                <option value="Estimated / draft">Estimated / draft</option>
+                <option value="Not filed">Not filed</option>
+              </select>
+            </div>
+          </div>
+          <div class="row mt-3">
+            <div class="col-md-5">
+              <label for="evidence_reference">Evidence Reference</label>
+              <input id="evidence_reference" name="evidence_reference" type="text" class="form-control" placeholder="Example: 2024 return PDF, payment confirmation, CPA folder">
+            </div>
+            <div class="col-md-5">
+              <label for="tax_notes">Notes</label>
+              <input id="tax_notes" name="notes" type="text" class="form-control" placeholder="Optional filing context">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button type="submit" class="btn btn-success btn-block">Save Review Record</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Year Alignment</h5>
+        <p class="text-muted">A year can align only after basis links are complete and filed totals are recorded.</p>
+        <div class="table-responsive">
+          <table id="tax_filing_alignment_table" class="table table-striped table-bordered" style="width:100%">
+            <thead>
+              <tr>
+                <th>Year</th>
+                <th>Status</th>
+                <th>8949 Rows</th>
+                <th>Gainz Gain/Loss</th>
+                <th>Filed Gain/Loss</th>
+                <th>Difference</th>
+                <th>Gainz Proceeds</th>
+                <th>Filed Proceeds</th>
+                <th>Gainz Cost Basis</th>
+                <th>Filed Cost Basis</th>
+                <th>Tax Paid</th>
+                <th>Evidence</th>
+                <th>Next Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in alignment.rows %}
+              <tr>
+                <td>{{ row.year }}</td>
+                <td><span class="gainz-status-badge {{ row.status_class }}">{{ row.status }}</span></td>
+                <td>{{ row.calculated_rows }}</td>
+                <td>{{ row.calculated_gain_loss_display }}</td>
+                <td>{{ row.reported_gain_loss_display or "Not recorded" }}</td>
+                <td>{{ row.difference_gain_loss_display or "N/A" }}</td>
+                <td>{{ row.calculated_proceeds_display }}</td>
+                <td>{{ row.reported_proceeds_display or "Not recorded" }}</td>
+                <td>{{ row.calculated_cost_basis_display }}</td>
+                <td>{{ row.reported_cost_basis_display or "Not recorded" }}</td>
+                <td>{{ row.tax_paid_display or "Not recorded" }}</td>
+                <td>{{ row.evidence_reference or "Not recorded" }}</td>
+                <td>{{ row.next_action }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="13" class="text-muted">No sell activity or filed tax records are available yet.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">What To Review Next</h5>
+        <div class="row">
+          <div class="col-md-4">
+            <p><strong>Totals differ:</strong> compare the filed return, Form 8949 attachment, and Gainz export for that year.</p>
+          </div>
+          <div class="col-md-4">
+            <p><strong>Basis review needed:</strong> finish Auto Link or inspect sells before comparing filed totals.</p>
+          </div>
+          <div class="col-md-4">
+            <p><strong>Payment not recorded:</strong> enter the paid amount or explain why no separate crypto payment was due.</p>
+          </div>
+        </div>
+        <a class="btn btn-sm btn-outline-primary" href="/stats">Open Stats & Charts</a>
+        <a class="btn btn-sm btn-outline-secondary" href="/export">Generate Audit Packet</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}
+
+{% block javascripts %}
+  {{ super() }}
+{% endblock javascripts %}

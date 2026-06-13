@@ -2,13 +2,13 @@
 
 <!-- sidebar menu -->
 <div class="logo">
-  <a href="http://cryptogainz.store" class="simple-text logo-mini">
+  <a href="/home" class="simple-text logo-mini">
     <div class="logo-image-small">
       <img src="{{ url_for('static', filename='/assets/img/gainz_logo.jpg') }}">
     </div>
     <!-- <p>CT</p> -->
   </a>
-  <a href="http://cryptogainz.store" class="simple-text logo-normal">
+  <a href="/home" class="simple-text logo-normal">
     Gainz!
     <!-- <div class="logo-image-big">
       <img src="../assets/img/logo-big.png">
@@ -24,27 +24,15 @@
       </a>
     </li>
     <li>
-      <a href="/import_transactions">
+      <a href="/import_transactions/">
         <i class="nc-icon nc-cloud-upload-94"></i>
-        <p>Import Transactions</p>
+        <p>Import & Manage Data</p>
       </a>
     </li>
     <li>
-      <a href="/add_transactions">
-        <i class="nc-icon nc-money-coins"></i>
-        <p>Add & Manage Transactions</p>
-      </a>
-    </li>
-    <li>
-      <a href="/add_links">
-        <i class="nc-icon nc-vector"></i>
-        <p>Add & Manage Links</p>
-      </a>
-    </li>
-    <li>
-      <a href="/hodl_accounting">
+      <a href="/holdings_accounting">
         <i class="nc-icon nc-ruler-pencil"></i>
-        <p>HODL & Accounting</p>
+        <p>Holdings & Accounting</p>
       </a>
     </li>
     <li>
@@ -60,15 +48,15 @@
       </a>
     </li>
     <li>
-      <a href="/model">
-        <i class="nc-icon nc-credit-card"></i>
-        <p>Model Sell</p>
+      <a href="/tax_filing_review/">
+        <i class="nc-icon nc-paper"></i>
+        <p>Tax Filing Review</p>
       </a>
     </li>
     <li>
-      <a href="/history">
-        <i class="nc-icon nc-hat-3"></i>
-        <p>History</p>
+      <a href="/model">
+        <i class="nc-icon nc-credit-card"></i>
+        <p>Model Sell</p>
       </a>
     </li>
     <li>
@@ -77,9 +65,34 @@
         <p>Export</p>
       </a>
     </li>
-  
+    <li>
+      <a href="/history/">
+        <i class="nc-icon nc-hat-3"></i>
+        <p>Revision History</p>
+      </a>
+    </li>
+    <li>
+      <a href="/add_links">
+        <i class="nc-icon nc-vector"></i>
+        <p>Add & Manage Links</p>
+      </a>
+    </li>
+    {% if support_url %}
+    <li>
+      <a href="{{ support_url }}" target="_blank" rel="noopener noreferrer">
+        <i class="nc-icon nc-favourite-28"></i>
+        <p>Support Gainz</p>
+      </a>
+    </li>
+    {% endif %}
+    {% if store_url %}
+    <li>
+      <a href="{{ store_url }}" target="_blank" rel="noopener noreferrer">
+        <i class="nc-icon nc-world-2"></i>
+        <p>Gainz Website</p>
+      </a>
+    </li>
+    {% endif %}
+
   </ul>
 </div>
-
-
-

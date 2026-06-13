@@ -1,6 +1,8 @@
 from link import Link
 import itertools
 import math
+import uuid
+from decimal import Decimal, ROUND_CEILING
 
 def round_decimals_up(number: float, decimals: int = 9):
     """
@@ -13,20 +15,31 @@ def round_decimals_up(number: float, decimals: int = 9):
     elif decimals == 0:
         return math.ceil(number)
 
-    factor = 10 ** decimals
-    return math.ceil(number * factor) / factor
+    quantizer = Decimal("1").scaleb(-decimals)
+    return float(Decimal(str(number)).quantize(quantizer, rounding=ROUND_CEILING))
 
 class Transaction:
     newid = itertools.count()
     
-    def __init__(self, symbol: str, quantity: float, usd_spot: float, trans_type: str, time_stamp: str, source: str, linked_transactions=[]) -> None:
+    def __init__(
+        self,
+        symbol: str,
+        quantity: float,
+        usd_spot: float,
+        trans_type: str,
+        time_stamp: str,
+        source: str,
+        linked_transactions=None,
+        uid=None,
+    ) -> None:
         self.id = next(Transaction.newid)
+        self.uid = str(uid) if uid else str(uuid.uuid4())
         self.quantity = float(quantity) if not math.isnan(quantity) else 0.0
         self.name = f"{time_stamp} {self.quantity}"
         self.trans_type = trans_type
         self.time_stamp = time_stamp
         self.links = []
-        self.linked_transactions = linked_transactions
+        self.linked_transactions = linked_transactions or []
         self.multi_link = False
         self.symbol = symbol.upper() if isinstance(symbol, str) else str(symbol).upper()
         self.usd_spot = float(usd_spot) if not math.isnan(usd_spot) else 0.0
@@ -149,19 +162,19 @@ class Transaction:
         self.linked_transactions = linked_transactions
 
 class Buy(Transaction):
-    def __init__(self, symbol, quantity, time_stamp, usd_spot, source, trans_type='buy', linked_transactions=[]):
-        super().__init__(symbol=symbol, quantity=quantity, usd_spot=usd_spot, source=source, time_stamp=time_stamp, trans_type=trans_type, linked_transactions=linked_transactions)
+    def __init__(self, symbol, quantity, time_stamp, usd_spot, source, trans_type='buy', linked_transactions=None, uid=None):
+        super().__init__(symbol=symbol, quantity=quantity, usd_spot=usd_spot, source=source, time_stamp=time_stamp, trans_type=trans_type, linked_transactions=linked_transactions, uid=uid)
 
 class Sell(Transaction):
-    def __init__(self, symbol, quantity, time_stamp, usd_spot, source, trans_type='sell', linked_transactions=[]):
-        super().__init__(symbol=symbol, usd_spot=usd_spot, source=source, quantity=quantity, time_stamp=time_stamp, trans_type=trans_type, linked_transactions=linked_transactions)
+    def __init__(self, symbol, quantity, time_stamp, usd_spot, source, trans_type='sell', linked_transactions=None, uid=None):
+        super().__init__(symbol=symbol, usd_spot=usd_spot, source=source, quantity=quantity, time_stamp=time_stamp, trans_type=trans_type, linked_transactions=linked_transactions, uid=uid)
 
 class Send(Transaction):
-    def __init__(self, symbol, quantity, time_stamp, usd_spot, source, trans_type='send', linked_transactions=[]):
-        super().__init__(symbol=symbol, quantity=quantity, usd_spot=usd_spot, source=source, time_stamp=time_stamp, trans_type=trans_type, linked_transactions=linked_transactions)
+    def __init__(self, symbol, quantity, time_stamp, usd_spot, source, trans_type='send', linked_transactions=None, uid=None):
+        super().__init__(symbol=symbol, quantity=quantity, usd_spot=usd_spot, source=source, time_stamp=time_stamp, trans_type=trans_type, linked_transactions=linked_transactions, uid=uid)
 
 class Receive(Transaction):
-    def __init__(self, symbol, quantity, time_stamp, source, usd_spot, trans_type='receive', linked_transactions=[]):
-        super().__init__(symbol=symbol, usd_spot=usd_spot, quantity=quantity, time_stamp=time_stamp, source=source, trans_type=trans_type, linked_transactions=linked_transactions)
+    def __init__(self, symbol, quantity, time_stamp, source, usd_spot, trans_type='receive', linked_transactions=None, uid=None):
+        super().__init__(symbol=symbol, usd_spot=usd_spot, quantity=quantity, time_stamp=time_stamp, source=source, trans_type=trans_type, linked_transactions=linked_transactions, uid=uid)
 
 

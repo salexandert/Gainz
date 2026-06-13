@@ -1,0 +1,178 @@
+name: Build Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_tag=""
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            expected_tag="${GITHUB_REF_NAME}"
+          fi
+          python scripts/validate_release_version.py --expected-tag "$expected_tag"
+          source scripts/release_version.env
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  windows:
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller pytest
+
+      - name: Verify tests
+        run: python -m pytest Tests
+
+      - name: Remove test-only packaging dependencies
+        run: pip uninstall -y pytest
+
+      - name: Build Windows package
+        shell: pwsh
+        run: .\scripts\build_windows_exe.ps1
+
+      - name: Verify Windows release artifacts
+        run: python scripts/test_release_artifacts.py --platform windows --version "${{ needs.validate.outputs.version }}"
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gainz-Windows-v${{ needs.validate.outputs.version }}
+          path: |
+            dist/Gainz-Windows.zip
+            dist/Gainz-Windows.zip.sha256
+            dist/Gainz-Windows-v${{ needs.validate.outputs.version }}.zip
+            dist/Gainz-Windows-v${{ needs.validate.outputs.version }}.zip.sha256
+
+  macos:
+    needs: validate
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller pytest
+
+      - name: Verify tests
+        run: python -m pytest Tests
+
+      - name: Remove test-only packaging dependencies
+        run: pip uninstall -y pytest
+
+      - name: Build macOS package
+        run: bash scripts/build_macos_app.sh
+
+      - name: Verify macOS release artifacts
+        run: python scripts/test_release_artifacts.py --platform macos --version "${{ needs.validate.outputs.version }}"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gainz-macOS-v${{ needs.validate.outputs.version }}
+          path: |
+            dist/Gainz-macOS.zip
+            dist/Gainz-macOS.zip.sha256
+            dist/Gainz-macOS-v${{ needs.validate.outputs.version }}.zip
+            dist/Gainz-macOS-v${{ needs.validate.outputs.version }}.zip.sha256
+
+  publish:
+    needs:
+      - validate
+      - windows
+      - macos
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Create release notes
+        shell: bash
+        run: |
+          cat > release_notes.md <<EOF
+          # Gainz ${{ needs.validate.outputs.version }}
+
+          Gainz is a local-first crypto tax audit packet and reconciliation tool.
+
+          ## Downloads
+
+          - Windows: download \`Gainz-Windows.zip\`, unzip it, and double-click \`Gainz.exe\`.
+          - macOS: download \`Gainz-macOS.zip\`, unzip it, and open \`Gainz.app\`.
+
+          Windows may show a SmartScreen warning and macOS may show an unidentified developer warning because these early builds are not code-signed yet. Only run releases downloaded from this repository or cryptogainz.store.
+
+          ## Verification
+
+          SHA-256 checksum files are attached next to each zip.
+
+          ## Important
+
+          Gainz is documentation support. It is not tax, legal, or financial advice. Review outputs with a qualified tax professional before filing.
+          EOF
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GAINZ_TAG: ${{ needs.validate.outputs.tag }}
+        shell: bash
+        run: |
+          gh release create "$GAINZ_TAG" \
+            --repo "${{ github.repository }}" \
+            release-artifacts/Gainz-Windows.zip \
+            release-artifacts/Gainz-Windows.zip.sha256 \
+            "release-artifacts/Gainz-Windows-v${{ needs.validate.outputs.version }}.zip" \
+            "release-artifacts/Gainz-Windows-v${{ needs.validate.outputs.version }}.zip.sha256" \
+            release-artifacts/Gainz-macOS.zip \
+            release-artifacts/Gainz-macOS.zip.sha256 \
+            "release-artifacts/Gainz-macOS-v${{ needs.validate.outputs.version }}.zip" \
+            "release-artifacts/Gainz-macOS-v${{ needs.validate.outputs.version }}.zip.sha256" \
+            --title "Gainz ${{ needs.validate.outputs.version }}" \
+            --notes-file release_notes.md

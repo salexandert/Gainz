@@ -1,6 +1,639 @@
+function gainzFormatImportResult(result, fileName) {
+    var warnings = result.warnings || [];
+    var sourceName = fileName || result.filename || "uploaded file";
+    var message = "Imported " + (result.imported_count || 0) + " row(s)";
 
-// HODL Accounting 
+    if (result.files && result.files.length) {
+        sourceName = result.files.length + " demo file(s)";
+    }
+
+    message += " from " + sourceName + ".";
+    message += " Skipped " + (result.skipped_count || 0) + " row(s).";
+
+    if (result.header_row_used && result.header_row_used > 1) {
+        message += " Used header row " + result.header_row_used + ".";
+    }
+
+    if (warnings.length > 0) {
+        message += " Review " + warnings.length + " warning(s) on Stats & Charts.";
+    } else {
+        message += " Next: import more files, then run Auto Link or open Holdings & Accounting.";
+    }
+
+    return message;
+}
+
+function gainzShowImportResult(result, fileName, alertClass) {
+    $("#import_upload_result")
+        .removeClass("alert-danger alert-info alert-warning")
+        .addClass(alertClass || "alert-info")
+        .text(gainzFormatImportResult(result, fileName))
+        .show();
+}
+
+function gainzBuildColumnSelect(field, columns, selectedColumn) {
+    var fieldName = field.field;
+    var select = $('<select class="form-control import-mapping-select"></select>');
+
+    select.attr("data-field", fieldName);
+    select.append($('<option value="">Do not use</option>'));
+
+    (columns || []).forEach(function (column) {
+        var option = $("<option></option>").attr("value", column).text(column);
+        if (column === selectedColumn) {
+            option.attr("selected", "selected");
+        }
+        select.append(option);
+    });
+
+    return select;
+}
+
+function gainzRenderHeaderCandidates(candidates) {
+    var container = $("#import_header_candidates");
+    container.empty();
+
+    if (!candidates || candidates.length === 0) {
+        return;
+    }
+
+    container.append($('<p class="text-muted mb-2"></p>').text("Possible header rows"));
+
+    candidates.slice(0, 4).forEach(function (candidate) {
+        var previewColumns = (candidate.columns || []).slice(0, 5).join(" | ");
+        var button = $('<button type="button" class="btn btn-outline-secondary btn-sm mr-2 mb-2 import-header-candidate"></button>');
+        button.attr("data-header-row", candidate.row_number);
+        button.text("Row " + candidate.row_number + ": " + previewColumns);
+        container.append(button);
+    });
+}
+
+function gainzRenderSampleRows(sampleRows) {
+    var container = $("#import_sample_rows");
+    container.empty();
+
+    if (!sampleRows || sampleRows.length === 0) {
+        return;
+    }
+
+    var columns = Object.keys(sampleRows[0] || {});
+    if (columns.length === 0) {
+        return;
+    }
+
+    container.append($('<p class="text-muted mb-2"></p>').text("Sample rows Gainz will import"));
+
+    var table = $('<table class="table table-sm table-striped table-bordered"></table>');
+    var thead = $("<thead></thead>");
+    var headerRow = $("<tr></tr>");
+    columns.forEach(function (column) {
+        headerRow.append($("<th></th>").text(column));
+    });
+    thead.append(headerRow);
+    table.append(thead);
+
+    var tbody = $("<tbody></tbody>");
+    sampleRows.forEach(function (sampleRow) {
+        var row = $("<tr></tr>");
+        columns.forEach(function (column) {
+            row.append($("<td></td>").text(sampleRow[column] == null ? "" : sampleRow[column]));
+        });
+        tbody.append(row);
+    });
+    table.append(tbody);
+    container.append(table);
+}
+
+function gainzRenderColumnMapper(mapping) {
+    if (!mapping) {
+        return;
+    }
+
+    var mapper = $("#import_column_mapper");
+    var fieldsContainer = $("#import_mapping_fields");
+    var warningBox = $("#import_mapping_warning");
+    var columns = mapping.columns || [];
+    var suggestions = mapping.suggested_mapping || {};
+    var missing = mapping.missing_required || [];
+    var headerRow = parseInt(mapping.header_row || 1, 10);
+    var dataStartRow = parseInt(mapping.data_start_row || (headerRow + 1), 10);
+
+    $("#import_header_row").val(headerRow);
+    $("#import_data_start_row").val(dataStartRow);
+    fieldsContainer.empty();
+    gainzRenderHeaderCandidates(mapping.header_candidates || []);
+
+    (mapping.mapping_fields || []).forEach(function (field) {
+        var selectedColumn = suggestions[field.field] || "";
+        var wrapper = $('<div class="col-md-4 mb-3"></div>');
+        var label = $("<label></label>").text(field.label + (field.required ? " *" : ""));
+        wrapper.append(label);
+        wrapper.append(gainzBuildColumnSelect(field, columns, selectedColumn));
+        fieldsContainer.append(wrapper);
+    });
+
+    if (missing.length > 0) {
+        warningBox
+            .text("Missing required fields: " + missing.join(", ") + ".")
+            .show();
+    } else if (!mapping.has_pricing) {
+        warningBox
+            .text("No USD price or total value column was detected. Gainz can import the rows, but generated reports will need review.")
+            .show();
+    } else {
+        warningBox.hide();
+    }
+
+    gainzRenderSampleRows(mapping.sample_rows || []);
+    mapper.show();
+}
+
+function gainzCollectColumnMapping() {
+    var mapping = {};
+
+    $(".import-mapping-select").each(function () {
+        var field = $(this).data("field");
+        var value = $(this).val();
+
+        if (value) {
+            mapping[field] = value;
+        }
+    });
+
+    return mapping;
+}
+
+if (window.Dropzone) {
+    Dropzone.options.uploadCsvForm = {
+        maxFilesize: 20,
+        acceptedFiles: ".csv",
+        init: function () {
+            this.on("sending", function (file, xhr, formData) {
+                var reviewColumns = $("#import_review_columns_before_import").is(":checked") ? "1" : "0";
+                formData.append("review_columns", reviewColumns);
+            });
+
+            this.on("success", function (file, response) {
+                var result = response || {};
+                if (typeof result === "string") {
+                    try {
+                        result = JSON.parse(result);
+                    } catch (e) {
+                        result = {};
+                    }
+                }
+
+                if (result.mapping_required) {
+                    $("#import_upload_result")
+                        .removeClass("alert-danger alert-info")
+                        .addClass("alert-warning")
+                        .text((result.warnings || []).join(" "))
+                        .show();
+                    gainzRenderColumnMapper(result.mapping);
+                    return;
+                }
+
+                $("#import_column_mapper").hide();
+                gainzShowImportResult(result, file.name || "uploaded file", "alert-info");
+            });
+
+            this.on("error", function (file, response) {
+                var message = "Import failed for " + (file.name || "uploaded file") + ".";
+                if (response) {
+                    message += " " + String(response);
+                }
+
+                $("#import_upload_result")
+                    .removeClass("alert-info")
+                    .addClass("alert-danger")
+                    .text(message)
+                    .show();
+            });
+        }
+    };
+}
+
+$(document).ready(function () {
+    $("#import_demo_data_button").on("click", function () {
+        var button = $(this);
+        var demoUrl = button.data("demo-url");
+
+        button.prop("disabled", true).text("Loading Demo Data...");
+
+        $.post(demoUrl)
+            .done(function (result) {
+                $("#import_column_mapper").hide();
+                gainzShowImportResult(result, "demo data", "alert-info");
+            })
+            .fail(function (xhr) {
+                var message = "Demo import failed.";
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    message += " " + xhr.responseJSON.error;
+                }
+                $("#import_upload_result")
+                    .removeClass("alert-info alert-warning")
+                    .addClass("alert-danger")
+                    .text(message)
+                    .show();
+            })
+            .always(function () {
+                button.prop("disabled", false).text("Try Demo Data");
+            });
+    });
+
+    $(document).on("click", ".import-header-candidate", function () {
+        var headerRow = parseInt($(this).data("header-row"), 10) || 1;
+        $("#import_header_row").val(headerRow);
+        $("#import_data_start_row").val(headerRow + 1);
+        $("#import_preview_mapping_button").trigger("click");
+    });
+
+    $("#import_preview_mapping_button").on("click", function () {
+        var mapper = $("#import_column_mapper");
+        var previewUrl = mapper.data("preview-url");
+
+        $.ajax({
+            url: previewUrl,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({
+                header_row: $("#import_header_row").val(),
+                data_start_row: $("#import_data_start_row").val()
+            })
+        }).done(function (result) {
+            gainzRenderColumnMapper(result.mapping);
+        }).fail(function (xhr) {
+            var message = "Could not preview that header row.";
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                message += " " + xhr.responseJSON.error;
+            }
+            $("#import_mapping_warning").text(message).show();
+        });
+    });
+
+    $("#import_submit_mapping_button").on("click", function () {
+        var mapper = $("#import_column_mapper");
+        var importUrl = mapper.data("import-url");
+
+        $.ajax({
+            url: importUrl,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({
+                header_row: $("#import_header_row").val(),
+                data_start_row: $("#import_data_start_row").val(),
+                column_mapping: gainzCollectColumnMapping()
+            })
+        }).done(function (result) {
+            if (result.mapping_required) {
+                $("#import_upload_result")
+                    .removeClass("alert-danger alert-info")
+                    .addClass("alert-warning")
+                    .text((result.warnings || []).join(" "))
+                    .show();
+                gainzRenderColumnMapper(result.mapping);
+                return;
+            }
+
+            mapper.hide();
+            gainzShowImportResult(result, "mapped CSV", "alert-info");
+        }).fail(function (xhr) {
+            var message = "Mapped import failed.";
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                message += " " + xhr.responseJSON.error;
+            }
+            $("#import_upload_result")
+                .removeClass("alert-info alert-warning")
+                .addClass("alert-danger")
+                .text(message)
+                .show();
+        });
+    });
+
+    $(".remove-data-source-button").on("click", function () {
+        var button = $(this);
+        var table = $("#import_data_sources_table");
+        var removeUrl = table.data("remove-url");
+        var source = button.data("source");
+        var sourceName = button.data("source-name") || "this source";
+        var sourceCount = button.data("source-count") || 0;
+        var resultBox = $("#data_source_action_result");
+        var confirmation = [
+            "Remove " + sourceCount + " transaction(s) from " + sourceName + " in the current data set?",
+            "",
+            "Gainz will save a new revision. Prior revisions stay available in History.",
+            "The original CSV file will not be deleted from disk."
+        ].join("\n");
+
+        if (!window.confirm(confirmation)) {
+            return;
+        }
+
+        button.prop("disabled", true).text("Removing...");
+        resultBox
+            .removeClass("alert-danger alert-info alert-success")
+            .addClass("alert-info")
+            .text("Removing data source and saving a new revision...")
+            .show();
+
+        $.ajax({
+            url: removeUrl,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ source: source })
+        }).done(function (result) {
+            resultBox
+                .removeClass("alert-info alert-danger")
+                .addClass("alert-success")
+                .text(result.message || "Data source removed and new revision saved.");
+            window.setTimeout(function () {
+                window.location.reload();
+            }, 900);
+        }).fail(function (xhr) {
+            var message = "Could not remove that data source.";
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                message += " " + xhr.responseJSON.error;
+            }
+            resultBox
+                .removeClass("alert-info alert-success")
+                .addClass("alert-danger")
+                .text(message)
+                .show();
+            button.prop("disabled", false).text("Remove from Current Data");
+        });
+    });
+});
+
+// Holdings & Accounting
 $(document).ready(function() {
+    if ($('#eh_stats_datatable').length == 0) {
+        return;
+    }
+
+    var holdingsDifferenceYearlyTable = null;
+    var holdingsDifferenceTransactionsTable = null;
+
+    function holdingsParseQuantity(value) {
+        if (value === undefined || value === null || value === 'N/A') {
+            return null;
+        }
+
+        var parsed = Number(String(value).replace('$', '').replace(/,/g, '').trim());
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function holdingsFormatQuantity(value) {
+        if (value === null || value === undefined || !Number.isFinite(value)) {
+            return '--';
+        }
+
+        return value.toFixed(8).replace(/0+$/, '').replace(/\.$/, '') || '0';
+    }
+
+    function holdingsStatusClass(status) {
+        return 'status-' + String(status || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    function holdingsSetBadge(status) {
+        var badge = $('#holdings_status_badge');
+        var className = holdingsStatusClass(status);
+        badge
+            .removeClass('status-matched status-verified status-needs-declared-holdings status-mismatch status-needs-review status-unlinked-sales')
+            .addClass(className)
+            .text(status);
+    }
+
+    function holdingsSetSummary(summary) {
+        if (!summary) {
+            return;
+        }
+
+        $('#holdings_summary_asset_count').text(summary.asset_count);
+        $('#holdings_summary_need_holdings').text(summary.assets_needing_holdings);
+        $('#holdings_summary_matched').text(summary.assets_matched);
+        $('#holdings_summary_mismatch').text(summary.assets_with_mismatch);
+    }
+
+    function holdingsRowStatus(rowData) {
+        if (!rowData) {
+            return 'unknown';
+        }
+
+        var buys = holdingsParseQuantity(rowData[1]) || 0;
+        var sells = holdingsParseQuantity(rowData[2]) || 0;
+        var soldUnlinked = holdingsParseQuantity(rowData[3]) || 0;
+        var holdings = holdingsParseQuantity(rowData[8]);
+
+        if (holdings === null) {
+            return 'needs';
+        }
+
+        if (soldUnlinked > 0.00000001) {
+            return 'unlinked';
+        }
+
+        if (Math.abs((buys - sells) - holdings) <= 0.00000001) {
+            return 'matched';
+        }
+
+        return 'mismatch';
+    }
+
+    function holdingsRowsSet(rows) {
+        if (!rows) {
+            return;
+        }
+
+        table.clear();
+        table.rows.add(rows).draw();
+    }
+
+    function holdingsSelectedAssetRow() {
+        return table.row({selected:true}).data();
+    }
+
+    function holdingsScrollTo(selector) {
+        var target = $(selector);
+        if (target.length == 0) {
+            return;
+        }
+
+        $('html, body').animate({
+            scrollTop: Math.max(target.offset().top - 90, 0)
+        }, 250);
+    }
+
+    function holdingsClearDifferenceBreakdown() {
+        $('#holdings_difference_breakdown').hide();
+        $('#holdings_difference_formula').text('Select an asset to see how the difference was calculated.');
+        $('#holdings_difference_declared_formula, #holdings_difference_transfer_formula, #holdings_difference_interpretation').text('');
+        $('#holdings_difference_transaction_count').text('0 transactions');
+        $('#holdings_breakdown_buys, #holdings_breakdown_sells, #holdings_breakdown_sends, #holdings_breakdown_receives, #holdings_breakdown_imported_net').text('--');
+
+        if (holdingsDifferenceYearlyTable) {
+            holdingsDifferenceYearlyTable.clear().draw();
+        }
+
+        if (holdingsDifferenceTransactionsTable) {
+            holdingsDifferenceTransactionsTable.clear().draw();
+        }
+    }
+
+    function holdingsShowDifferenceLoading(rowData) {
+        $('#holdings_difference_breakdown').show();
+        $('#holdings_difference_formula').text('Loading ' + rowData[0] + ' timeline...');
+        $('#holdings_difference_declared_formula, #holdings_difference_transfer_formula, #holdings_difference_interpretation').text('');
+        $('#holdings_difference_transaction_count').text('Loading');
+        $('#holdings_breakdown_buys, #holdings_breakdown_sells, #holdings_breakdown_sends, #holdings_breakdown_receives, #holdings_breakdown_imported_net').text('--');
+
+        if (holdingsDifferenceYearlyTable) {
+            holdingsDifferenceYearlyTable.clear().draw();
+        }
+
+        if (holdingsDifferenceTransactionsTable) {
+            holdingsDifferenceTransactionsTable.clear().draw();
+        }
+    }
+
+    function holdingsRenderDifferenceBreakdown(data) {
+        var summary = data && data.summary ? data.summary : {};
+        var transactionCount = summary.transaction_count || 0;
+
+        $('#holdings_difference_breakdown').show();
+        $('#holdings_difference_formula').text(summary.expected_formula || 'No activity found for this asset.');
+        $('#holdings_difference_declared_formula').text(summary.difference_formula || '');
+        $('#holdings_difference_transfer_formula').text(summary.transfer_formula || '');
+        $('#holdings_difference_interpretation').text(summary.interpretation || '');
+        $('#holdings_breakdown_buys').text(summary.buy_quantity || '--');
+        $('#holdings_breakdown_sells').text(summary.sell_quantity || '--');
+        $('#holdings_breakdown_sends').text(summary.send_quantity || '--');
+        $('#holdings_breakdown_receives').text(summary.receive_quantity || '--');
+        $('#holdings_breakdown_imported_net').text(summary.imported_net || '--');
+        $('#holdings_difference_transaction_count')
+            .removeClass('status-matched status-verified status-needs-declared-holdings status-mismatch status-needs-review status-unlinked-sales')
+            .addClass(holdingsStatusClass(summary.status))
+            .text(transactionCount + ' transaction' + (transactionCount == 1 ? '' : 's'));
+
+        if (holdingsDifferenceYearlyTable) {
+            holdingsDifferenceYearlyTable.clear();
+            holdingsDifferenceYearlyTable.rows.add(data.yearly_rows || []).draw();
+        }
+
+        if (holdingsDifferenceTransactionsTable) {
+            holdingsDifferenceTransactionsTable.clear();
+            holdingsDifferenceTransactionsTable.rows.add(data.transaction_rows || []).draw();
+        }
+    }
+
+    function holdingsLoadDifferenceBreakdown(rowData) {
+        if (!rowData) {
+            holdingsClearDifferenceBreakdown();
+            return;
+        }
+
+        holdingsShowDifferenceLoading(rowData);
+
+        $.ajax({
+            type: "POST",
+            url: "/holdings_accounting/difference_breakdown",
+            data: JSON.stringify({
+                'asset': rowData
+              }),
+            dataType: "json",
+            contentType: 'application/json',
+            success: function (data) {
+                holdingsRenderDifferenceBreakdown(data);
+            },
+            error: function () {
+                $('#holdings_difference_formula').text('Could not load the transaction timeline for this asset.');
+                $('#holdings_difference_transaction_count').text('Error');
+            },
+        });
+    }
+
+    function holdingsLoadRow(rowData) {
+        $('#holdings_save_message').hide().text('');
+        holdingsRenderSelection(rowData);
+
+        if (!rowData) {
+            $('#auto_actions_datatable').DataTable().clear().draw();
+            holdingsClearDifferenceBreakdown();
+            return;
+        }
+
+        holdingsLoadDifferenceBreakdown(rowData);
+
+        $.ajax({
+            type: "POST",
+            url: "/auto_link/auto_link_pre_check",
+            data: JSON.stringify({
+                'row_data': rowData
+              }),
+            dataType: "json",
+            contentType: 'application/json',
+            success: function (data) {
+
+                $('#auto_actions_datatable').DataTable().clear();
+                $('#auto_actions_datatable').DataTable().rows.add(data['auto_suggestions']).draw();
+            },
+        });
+    }
+
+    function holdingsRenderSelection(rowData) {
+        if (!rowData) {
+            $('#holdings_workbench_title').text('Step 3 Asset Workbench');
+            $('#holdings_selected_asset').text('Select an asset above to begin.');
+            $('#holdings_expected_from_activity, #holdings_declared_current, #holdings_difference, #holdings_unlinked_sales').text('--');
+            $('#holdings_next_action').text('Pick an asset to see the next action.');
+            $('#holdings_quantity').attr('placeholder', 'Select an asset first').val('');
+            holdingsSetBadge('Needs asset');
+            holdingsClearDifferenceBreakdown();
+            return;
+        }
+
+        var asset = rowData[0];
+        var buys = holdingsParseQuantity(rowData[1]) || 0;
+        var sells = holdingsParseQuantity(rowData[2]) || 0;
+        var soldUnlinked = holdingsParseQuantity(rowData[3]) || 0;
+        var holdings = holdingsParseQuantity(rowData[8]);
+        var expectedHoldings = buys - sells;
+
+        $('#holdings_workbench_title').text('Step 3 ' + asset + ' Workbench');
+        $('#holdings_selected_asset').text(asset + ' selected');
+        $('#holdings_expected_from_activity').text(holdingsFormatQuantity(expectedHoldings));
+        $('#holdings_unlinked_sales').text(holdingsFormatQuantity(soldUnlinked));
+        $('#holdings_quantity').attr('placeholder', 'Current holding for ' + asset);
+        $('#convert_text').text('Use these tools only when supported by source records. If you know the missing transaction, adding the actual transaction is preferable to automatic reclassification.');
+
+        if (holdings === null) {
+            $('#holdings_declared_current').text('--');
+            $('#holdings_difference').text('--');
+            $('#holdings_quantity').val('');
+            $('#holdings_next_action').text('Enter the amount of ' + asset + ' you want Gainz to use for reconciliation. Keep source records for the amount entered.');
+            holdingsSetBadge('Needs declared holdings');
+            return;
+        }
+
+        var difference = expectedHoldings - holdings;
+        $('#holdings_declared_current').text(holdingsFormatQuantity(holdings));
+        $('#holdings_difference').text(holdingsFormatQuantity(difference));
+        $('#holdings_quantity').val(holdingsFormatQuantity(holdings));
+
+        if (Math.abs(difference) <= 0.00000001 && soldUnlinked <= 0.00000001) {
+            $('#holdings_next_action').text(asset + ' has no quantity difference from imported buys and sells. Review source records, lots, and basis links before using generated reports.');
+            holdingsSetBadge('Verified');
+        } else if (soldUnlinked > 0.00000001) {
+            $('#holdings_next_action').text(asset + ' still has unlinked sales. Run Auto Link or manually review links before using generated reports.');
+            holdingsSetBadge('Unlinked sales');
+        } else if (difference > 0) {
+            $('#holdings_next_action').text('The calculated net from imported buys and sells is higher than declared ' + asset + '. Review source records for missing disposals, transfers, losses, or other activity before using generated reports.');
+            $('#convert_text').text('Gainz can help reclassify known sends or lost lots, but only use this when supported by documentation.');
+            holdingsSetBadge('Needs Review');
+        } else {
+            $('#holdings_next_action').text('Declared holdings are higher than imported buys and sells currently explain. Review missing acquisitions, income, gifts, transfers, or other records that may need basis support.');
+            holdingsSetBadge('Needs Review');
+        }
+    }
 
     $('#auto_actions_datatable').DataTable({
         "pageLength": 25,
@@ -19,90 +652,101 @@ $(document).ready(function() {
         },
     });
 
+    holdingsDifferenceYearlyTable = $('#holdings_difference_yearly_datatable').DataTable({
+        "pageLength": 10,
+        "order": [[ 0, "asc" ]],
+    });
+
+    holdingsDifferenceTransactionsTable = $('#holdings_difference_transactions_datatable').DataTable({
+        "pageLength": 25,
+        "order": [[ 0, "asc" ]],
+    });
+
+    var activeHoldingsFilter = 'all';
+
     var table = $('#eh_stats_datatable').DataTable({
         select: {
             style: 'single'
         },
     });
 
-    $('#eh_stats_datatable tbody').on( 'click', 'tr', function () {
-        console.log( table.row( this ).data() );
-
-
-        var asset = table.row( this ).data()[0]
-        var buys = table.row( this ).data()[1]
-        var sells = table.row( this ).data()[2]
-        var sent = table.row( this ).data()[3]
-        var hodl = table.row( this ).data()[8]
-        
-        var needs_classification = buys - sells
-        var min_hodl = buys - sent
-        var hodl_text = $('#eh_options').text('')
-        var convert_text = $('#convert_text').text('')
-        var Sold_or_Lost = buys - hodl
-        var expected_hodl = buys - sells
-        var hodl_difference = expected_hodl - hodl
-        
-        if (hodl == "N/A") {
-        
-            hodl_text.append(asset + ' Selected')
-            hodl_text.append("<br>Buys: " + buys + " - Sells: " + sells + " = Needs_Classification: " + needs_classification)
-            
-            if (needs_classification < 0) { 
-                hodl_text.append("<br>Looks like you have more sells than buys. You can add buys manually or import additonal from CSV.")
-                
-             }
-
-            if (min_hodl >= 0) {
-                hodl_text.append("<br>If Converting Sends to Sells minimum HODL is " + min_hodl)
-            }
-
-        } else {
-            $("#submit_hodl_button").text("Change HODL")
-
-            hodl_text.append(asset + ' Selected')
-            hodl_text.append("<br><br>Buys " + buys + " - Sells " + sells + " = Expected HODL of " + expected_hodl)
-            hodl_text.append("<br><br>Expected HODL " + expected_hodl + " - HODL" + hodl + " = a difference of " + hodl_difference)
-            if (hodl_difference > 0) 
-                { 
-                    hodl_text.append("<br><br> Since the difference is positive it indicates you may have sold this amount on other exchanges, traded for goods or services (sold), or lost.")
-                    hodl_text.append("<br> If you know what transactions are missing its best to add them on the add and manage transactions page. ")
-                    hodl_text.append("<br> Otherwise you may use the options below to automatically convert the earliest sends into sells or buys into lost")
-                    hodl_text.append("<br> This also many be done manually on the add and manage transactions page")
-                    
-                    convert_text.append("We can account for " + hodl_difference + " by converting any combination of the below. <br><br>")
-                    convert_text.append(sent + " Sends to Sells <br>")
-                    // convert_text.append(received + " Received to Buys <br>")
-                    convert_text.append(buys + " Buys to Lost <br>")
-                } 
-            else {
-                    hodl_text.append("<br><br> Since the difference is negative it indicates you may have acquired this amount from other sources.")
-                    hodl_text.append("<br> If you know what transactions are missing its best to add them on the add and manage transactions page. ")
-                    hodl_text.append("<br> Otherwise you may convert the receives into buys. This needs to be done manually on the add and manage transactions page")
-
-                }
-            
-            
-
-
+    $.fn.dataTable.ext.search.push(function(settings, rowData) {
+        if (settings.nTable.id !== 'eh_stats_datatable') {
+            return true;
         }
 
-        $.ajax({
-            type: "POST",
-            url: "/auto_link/auto_link_pre_check",
-            data: JSON.stringify({
-                'row_data': table.row( this ).data()
-              }),  
-            dataType: "json",
-            contentType: 'application/json',
-            success: function (data) {
-                
-                $('#auto_actions_datatable').DataTable().clear();
-                $('#auto_actions_datatable').DataTable().rows.add(data['auto_suggestions']).draw();
-            },   
-        });
+        if (activeHoldingsFilter == 'all') {
+            return true;
+        }
 
+        return holdingsRowStatus(rowData) == activeHoldingsFilter;
     });
+
+    function holdingsApplySummaryFilter(filterName, options) {
+        options = options || {};
+        activeHoldingsFilter = filterName || 'all';
+        $('.holdings-progress-action')
+            .removeClass('active')
+            .attr('aria-pressed', 'false');
+        $('.holdings-progress-action[data-holdings-filter="' + activeHoldingsFilter + '"]')
+            .addClass('active')
+            .attr('aria-pressed', 'true');
+
+        table.search('').draw();
+
+        var labels = {
+            all: {
+                message: 'Showing all assets. Select any row to declare holdings or review the current next action.',
+                scroll: '#eh_stats_datatable'
+            },
+            needs: {
+                message: 'Showing assets that still need declared holdings. Select one, enter what you currently hold, then save.',
+                scroll: '#eh_stats_datatable'
+            },
+            matched: {
+                message: 'Showing verified assets. These have no quantity difference in Gainz. Use Stats & Charts or Export to review the supporting reports.',
+                scroll: '#eh_stats_datatable'
+            },
+            mismatch: {
+                message: 'Showing assets that need review because declared holdings and imported buys/sells differ. Select one to review possible missing records or unsupported classifications.',
+                scroll: '#eh_stats_datatable'
+            }
+        };
+        var label = labels[activeHoldingsFilter] || labels.all;
+        var visibleRows = table.rows({ filter: 'applied' }).data();
+
+        $('#holdings_summary_action').text(
+            label.message + ' ' + visibleRows.length + ' asset' + (visibleRows.length == 1 ? '' : 's') + ' shown.'
+        );
+
+        if (visibleRows.length > 0 && activeHoldingsFilter != 'all') {
+            table.rows().deselect();
+            var firstVisibleRow = visibleRows[0];
+            table.rows(function(index, rowData) {
+                return rowData && firstVisibleRow && rowData[0] == firstVisibleRow[0];
+            }).select();
+            holdingsLoadRow(firstVisibleRow);
+            if (!options.skipScroll) {
+                holdingsScrollTo('#holdings_selected_asset');
+            }
+        } else {
+            table.rows().deselect();
+            holdingsLoadRow(null);
+            if (!options.skipScroll) {
+                holdingsScrollTo(label.scroll);
+            }
+        }
+    }
+
+    $('.holdings-progress-action').on('click', function() {
+        holdingsApplySummaryFilter($(this).data('holdings-filter'));
+    });
+
+    $('#eh_stats_datatable tbody').on( 'click', 'tr', function () {
+        holdingsLoadRow(table.row(this).data());
+    });
+
+    holdingsApplySummaryFilter('all', { skipScroll: true });
 
     $("#auto_action_button").click(function(){
 
@@ -110,11 +754,11 @@ $(document).ready(function() {
 
         $.ajax({
             type: "POST",
-            url: "/hodl_accounting/auto_actions",
+            url: "/holdings_accounting/auto_actions",
             data: JSON.stringify({
                 'table_data': $('#auto_actions_datatable').DataTable().rows( {selected:true} ).data(),
                 'asset': $('#add_transactions_stats_datatable').DataTable().row( {selected:true} ).data(),
-              }),  
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
@@ -125,42 +769,84 @@ $(document).ready(function() {
 
                 }
 
-            },   
+            },
         });
     });
 
 
-    $("#submit_hodl_button").click(function(){
+    $("#submit_holdings_button").click(function(){
+        var rowData = holdingsSelectedAssetRow();
+        var quantity = $('#holdings_quantity').val();
+        var saveButton = $(this);
+
+        if (!rowData) {
+            alert("Select an asset first.");
+            return;
+        }
+
+        if (!quantity) {
+            alert("Enter the current holdings quantity first.");
+            return;
+        }
+
+        $('#holdings_save_message').hide().text('');
+        saveButton.prop('disabled', true).text('Saving...');
 
         $.ajax({
             type: "POST",
-            url: "/hodl_accounting/hodl_info",
+            url: "/holdings_accounting/holdings_info",
             data: JSON.stringify({
-                'quantity': $('#hodl_quantity').val(),
-                'asset': $('#eh_stats_datatable').DataTable().row( {selected:true} ).data()
-              }),  
+                'quantity': quantity,
+                'asset': rowData
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
-                location.reload()
-            },   
+                holdingsRowsSet(data['stats_table_rows']);
+                holdingsSetSummary(data['holdings_summary']);
+                var updatedRow = null;
+                var rows = table.rows().data();
+                for (var i = 0; i < rows.length; i++) {
+                    if (rows[i] && rows[i][0] == rowData[0]) {
+                        updatedRow = rows[i];
+                        break;
+                    }
+                }
+
+                if (updatedRow) {
+                    table.rows(function(index, data) {
+                        return data && data[0] == updatedRow[0];
+                    }).select();
+                }
+
+                holdingsRenderSelection(updatedRow || rowData);
+                holdingsLoadDifferenceBreakdown(updatedRow || rowData);
+                $('#holdings_quantity').focus().select();
+                $('#holdings_save_message').text(data['message'] || 'Declared holdings saved.').show();
+            },
+            error: function () {
+                alert("Declared holdings could not be saved. Please try again.");
+            },
+            complete: function () {
+                saveButton.prop('disabled', false).text('Save Declared Holdings');
+            },
         });
     });
 
     $("#sends_to_sells_button").click(function(){
         $.ajax({
             type: "POST",
-            url: "/hodl_accounting/sends_to_sells",
+            url: "/holdings_accounting/sends_to_sells",
             data: JSON.stringify({
                 'quantity': $('#convert_quantity').val(),
                 'asset': $('#eh_stats_datatable').DataTable().row( {selected:true} ).data()
-              }),  
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
                 alert(data)
                 location.reload()
-            },   
+            },
         });
     });
 
@@ -168,16 +854,16 @@ $(document).ready(function() {
 
         $.ajax({
             type: "POST",
-            url: "/hodl_accounting/receive_to_buy",
+            url: "/holdings_accounting/receive_to_buy",
             data: JSON.stringify({
                 'quantity': $('#convert_quantity').val(),
                 'asset': $('#eh_stats_datatable').DataTable().row( {selected:true} ).data()
-              }),  
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
                 location.reload()
-            },   
+            },
         });
     });
 
@@ -185,16 +871,16 @@ $(document).ready(function() {
 
         $.ajax({
             type: "POST",
-            url: "/hodl_accounting/buys_to_lost",
+            url: "/holdings_accounting/buys_to_lost",
             data: JSON.stringify({
                 'quantity': $('#convert_quantity').val(),
                 'asset': $('#eh_stats_datatable').DataTable().row( {selected:true} ).data()
-              }),  
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
                 location.reload()
-            },   
+            },
         });
     });
 
@@ -211,22 +897,22 @@ $(document).ready(function() {
 
 
     // $('#al_stats_datatable tbody').on( 'click', 'tr', function () {
-        
- 
+
+
     //     $.ajax({
     //         type: "POST",
     //         url: "/auto_link/auto_link_pre_check",
     //         data: JSON.stringify({
     //             'row_data': table.row( this ).data()
-    //           }),  
+    //           }),
 
     //         contentType: 'application/json',
     //         success: function (data) {
     //             console.log(data)
 
     //             $('#al_options').html(data['message'])
-            
-    //         },   
+
+    //         },
     //     });
 
     // } );
@@ -239,13 +925,13 @@ $(document).ready(function() {
                 'algo': 'min_gain_long',
                 'asset': $('#al_stats_datatable').DataTable().row( {selected:true} ).data(),
                 'year': $('#auto_link_year_dropdown').find(":selected").val()
-              }),  
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
                 alert(data)
                 location.reload()
-            },   
+            },
         });
 
     });
@@ -258,13 +944,13 @@ $(document).ready(function() {
                 'algo': 'min_gain',
                 'asset': $('#al_stats_datatable').DataTable().row( {selected:true} ).data(),
                 'year': $('#auto_link_year_dropdown').find(":selected").val()
-              }),  
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
                 alert(data)
                 location.reload()
-            },   
+            },
         });
 
     });
@@ -277,13 +963,13 @@ $(document).ready(function() {
                 'algo': 'fifo',
                 'asset': $('#al_stats_datatable').DataTable().row( {selected:true} ).data(),
                 'year': $('#auto_link_year_dropdown').find(":selected").val()
-              }),  
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
                 alert(data)
                 location.reload()
-            },   
+            },
         });
 
     });
@@ -296,13 +982,13 @@ $(document).ready(function() {
                 'algo': 'filo',
                 'asset': $('#al_stats_datatable').DataTable().row( {selected:true} ).data(),
                 'year': $('#auto_link_year_dropdown').find(":selected").val()
-              }),  
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
                 alert(data)
                 location.reload()
-            },   
+            },
         });
     });
 
@@ -313,6 +999,433 @@ $(document).ready(function() {
 
 // stats page code
 $(document).ready(function() {
+
+    function setStatsReconciliationWarning(status) {
+        if (status && status.message) {
+            $('#stats_reconciliation_warning_text').text(status.message);
+            $('#stats_reconciliation_warning').show();
+        } else {
+            $('#stats_reconciliation_warning').hide();
+        }
+    }
+
+    function setStatsImportWarnings(warnings) {
+        var warningList = $('#stats_import_warnings_list');
+        warningList.empty();
+
+        if (warnings && warnings.length > 0) {
+            warnings.forEach(function(warning) {
+                warningList.append($('<li>').text(warning));
+            });
+            $('#stats_import_warnings').show();
+        } else {
+            $('#stats_import_warnings').hide();
+        }
+    }
+
+    function statusClassName(status) {
+        var normalizedStatus = String(status || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        return 'status-' + normalizedStatus;
+    }
+
+    function statusBadgeHtml(status) {
+        if (!status) {
+            return '';
+        }
+
+        return '<span class="gainz-status-badge ' + statusClassName(status) + '">' + status + '</span>';
+    }
+
+    function setStatsSummary(summary) {
+        if (!summary) {
+            return;
+        }
+
+        $('#stats_summary_reconciliation')
+            .text(summary.reconciliation)
+            .removeClass('status-matched status-verified status-needs-declared-holdings status-mismatch status-needs-review status-unlinked-sales')
+            .addClass(summary.reconciliation_class || statusClassName(summary.reconciliation));
+        $('#stats_summary_assets_needing_holdings').text(summary.assets_needing_holdings);
+        $('#stats_summary_assets_with_mismatches').text(summary.assets_with_mismatches);
+        $('#stats_summary_import_warnings').text(summary.import_warnings);
+        $('#stats_summary_unlinked_sales').text(summary.unlinked_sales);
+        setStatsAutoFixPanel(summary);
+    }
+
+    function setStatsAutoFixPanel(summary) {
+        if (summary && Number(summary.unlinked_sales || 0) > 0) {
+            $('#stats_auto_fix_panel').show();
+        } else {
+            $('#stats_auto_fix_panel').hide();
+        }
+    }
+
+    function setAllHoldingsReconciliation(rows) {
+        if (!$.fn.DataTable.isDataTable('#statspage_all_holdings_reconciliation_datatable')) {
+            return;
+        }
+
+        $('#statspage_all_holdings_reconciliation_datatable').DataTable().clear();
+        $('#statspage_all_holdings_reconciliation_datatable').DataTable().rows.add(rows || []).draw();
+    }
+
+    var formatter = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+    });
+
+    var myChart = null;
+    var selectedStatsRowData = null;
+    var activeStatsAssetFilter = 'all';
+
+    function chartCurrency(value) {
+        return formatter.format(Number(value || 0));
+    }
+
+    function statsParseQuantity(value) {
+        if (value === undefined || value === null || value === 'N/A') {
+            return null;
+        }
+
+        var parsed = Number(String(value).replace('$', '').replace(/,/g, '').trim());
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function statsRegexEscape(value) {
+        return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function resetGainzChart(message) {
+        if (myChart != null) {
+            myChart.destroy();
+            myChart = null;
+        }
+
+        $('#gainz_chart_subtitle').text('Select an asset');
+        $('#gainz_chart_empty_state').text(message || 'Select an asset to view current-lot unrealized gain or loss.').show();
+    }
+
+    function renderGainzChart(returnData, selectedAsset) {
+        var chartData = returnData['unrealized_chart_data'] || [];
+        var currentSpot = Number(returnData['chart_current_usd_spot'] || 0);
+        var canvas = document.getElementById("gainzChart");
+
+        if (myChart != null) {
+            myChart.destroy();
+            myChart = null;
+        }
+
+        if (currentSpot > 0) {
+            $('#stats_usd_spot').val(currentSpot.toFixed(2));
+            $('#gainz_chart_subtitle').text(selectedAsset + ' at ' + chartCurrency(currentSpot) + ' USD spot');
+        } else {
+            $('#gainz_chart_subtitle').text(selectedAsset);
+        }
+
+        if (!canvas || chartData.length == 0) {
+            $('#gainz_chart_empty_state').text('No current lots are available for this asset.').show();
+            return;
+        }
+
+        if (typeof Chart === 'undefined') {
+            $('#gainz_chart_empty_state').text('Chart library did not load.').show();
+            return;
+        }
+
+        $('#gainz_chart_empty_state').hide();
+
+        var ctx = canvas.getContext("2d");
+        var pointColors = chartData.map(function(point) {
+            return Number(point.y) >= 0 ? "#2dce89" : "#f5365c";
+        });
+
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: "Unrealized Gain/Loss",
+                    borderColor: "#1f8ef1",
+                    backgroundColor: "rgba(31, 142, 241, 0.08)",
+                    pointBackgroundColor: pointColors,
+                    pointBorderColor: pointColors,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    fill: true,
+                    borderWidth: 2,
+                    data: chartData
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                responsive: true,
+                elements: {
+                    line: {
+                        tension: 0.08
+                    }
+                },
+                legend: {
+                    display: false
+                },
+                tooltips: {
+                    callbacks: {
+                        label: function(tooltipItem, data) {
+                            var point = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
+                            return [
+                                "Gain/Loss: " + point.gain_loss,
+                                "Quantity: " + point.quantity,
+                                "USD Spot: " + point.usd_spot,
+                                "Cost Basis: " + point.cost_basis,
+                                "Current Value: " + point.current_value
+                            ];
+                        }
+                    }
+                },
+                scales: {
+                    xAxes: [{
+                        type: "time",
+                        distribution: "series",
+                        time: {
+                            unit: 'month',
+                            tooltipFormat: 'll'
+                        },
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Date Acquired'
+                        }
+                    }],
+                    yAxes: [{
+                        ticks: {
+                            beginAtZero: false,
+                            callback: function(value) {
+                                return chartCurrency(value);
+                            }
+                        },
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Unrealized Gain/Loss'
+                        },
+                        gridLines: {
+                            drawBorder: false,
+                            zeroLineColor: "rgba(0,0,0,0.25)",
+                            color: 'rgba(0,0,0,0.05)'
+                        }
+                    }]
+                }
+            }
+        });
+    }
+
+    function loadSelectedStatsAsset(rowData, currentUsdSpot) {
+        if (!rowData) {
+            resetGainzChart('Select an asset to view current-lot unrealized gain or loss.');
+            return;
+        }
+
+        selectedStatsRowData = rowData;
+
+        $.ajax({
+            type: "POST",
+            url: "/stats/selected_asset",
+            data: JSON.stringify({
+                'row_data': rowData,
+                'start_date': $("#start_date").length ? $("#start_date").datetimepicker().val() : '',
+                'end_date': $("#end_date").length ? $("#end_date").datetimepicker().val() : '',
+                'year': $('#stats_page_year_dropdown').find(":selected").val(),
+                'current_usd_spot': currentUsdSpot || ''
+            }),
+            contentType: 'application/json',
+            success: function (return_data) {
+                $('#statspage_detailed_datatable').DataTable().clear();
+                $('#statspage_detailed_datatable').DataTable().rows.add(return_data['detailed_stats'] || []).draw();
+
+                $('#statspage_sells_datatable').DataTable().clear();
+                $('#statspage_sells_datatable').DataTable().rows.add(return_data['sells_table_data'] || return_data['sells'] || []).draw();
+
+                $('#statspage_holdings_reconciliation_datatable').DataTable().clear();
+                $('#statspage_holdings_reconciliation_datatable').DataTable().rows.add(return_data['holdings_reconciliation_data'] || []).draw();
+
+                $('#statspage_holdings_lots_datatable').DataTable().clear();
+                $('#statspage_holdings_lots_datatable').DataTable().rows.add(return_data['holdings_lot_table_data'] || []).draw();
+
+                var selectedAsset = rowData[0];
+
+                $('#s8949_table').DataTable().clear();
+                $('#s8949_table').DataTable().rows.add(return_data['s8949_table_data'] || []).draw();
+
+                $('#l8949_table').DataTable().clear();
+                $('#l8949_table').DataTable().rows.add(return_data['l8949_table_data'] || []).draw();
+
+                setStatsReconciliationWarning(return_data['reconciliation_status']);
+                setStatsImportWarnings(return_data['import_warnings']);
+                setStatsSummary(return_data['stats_summary']);
+                setAllHoldingsReconciliation(return_data['holdings_reconciliation_table_data']);
+                $('#collapse_sales, #collapse_8949_long, #collapse_8949_short').collapse('show');
+                renderGainzChart(return_data, selectedAsset);
+            },
+        });
+    }
+
+    function getStatsRowForAsset(asset) {
+        var statsRows = table.rows().data();
+
+        for (var i = 0; i < statsRows.length; i++) {
+            if (statsRows[i] && statsRows[i][0] == asset) {
+                return statsRows[i];
+            }
+        }
+
+        return null;
+    }
+
+    function statsScrollTo(selector) {
+        var target = $(selector);
+        if (target.length == 0) {
+            return;
+        }
+
+        $('html, body').animate({
+            scrollTop: Math.max(target.offset().top - 90, 0)
+        }, 250);
+    }
+
+    function statsSetSummaryAction(actionName) {
+        $('.stats-summary-action')
+            .removeClass('active')
+            .attr('aria-pressed', 'false');
+        $('.stats-summary-action[data-stats-summary-action="' + actionName + '"]')
+            .addClass('active')
+            .attr('aria-pressed', 'true');
+    }
+
+    function statsShowSummaryMessage(message) {
+        $('#stats_summary_action').text(message).show();
+    }
+
+    function statsClearAssetFilter() {
+        activeStatsAssetFilter = 'all';
+        if ($.fn.DataTable.isDataTable('#statspage_stats_datatable')) {
+            table.search('').draw();
+        }
+    }
+
+    function statsClearHoldingsFilter() {
+        holdingsReconciliationTable.search('');
+        holdingsReconciliationTable.columns().search('').draw();
+    }
+
+    function statsSelectFirstVisibleAsset() {
+        var visibleRows = table.rows({ filter: 'applied' }).data();
+        table.rows().deselect();
+
+        if (visibleRows.length == 0) {
+            return 0;
+        }
+
+        var firstVisibleRow = visibleRows[0];
+        table.rows(function(index, rowData) {
+            return rowData && firstVisibleRow && rowData[0] == firstVisibleRow[0];
+        }).select();
+        loadSelectedStatsAsset(firstVisibleRow, $('#stats_usd_spot').val());
+
+        return visibleRows.length;
+    }
+
+    function statsFocusHoldingsRows(statuses, emptyMessage, populatedMessage) {
+        statsClearAssetFilter();
+        statsClearHoldingsFilter();
+
+        if (statuses && statuses.length > 0) {
+            var statusRegex = '^(' + statuses.map(statsRegexEscape).join('|') + ')$';
+            holdingsReconciliationTable.column(6).search(statusRegex, true, false).draw();
+        } else {
+            holdingsReconciliationTable.draw();
+        }
+
+        $('#collapse_portfolio_holdings_reconciliation').collapse('show');
+
+        var visibleRows = holdingsReconciliationTable.rows({ filter: 'applied' }).data();
+        holdingsReconciliationTable.rows().deselect();
+
+        if (visibleRows.length > 0) {
+            var firstRow = visibleRows[0];
+            holdingsReconciliationTable.rows(function(index, rowData) {
+                return rowData && firstRow && rowData[0] == firstRow[0];
+            }).select();
+
+            var statsRow = getStatsRowForAsset(firstRow[0]);
+            if (statsRow) {
+                loadSelectedStatsAsset(statsRow, $('#stats_usd_spot').val());
+            }
+
+            statsShowSummaryMessage(populatedMessage + ' ' + visibleRows.length + ' asset' + (visibleRows.length == 1 ? '' : 's') + ' shown.');
+        } else {
+            statsShowSummaryMessage(emptyMessage);
+        }
+
+        statsScrollTo('#statspage_all_holdings_reconciliation_datatable');
+    }
+
+    function statsFocusImportWarnings() {
+        statsClearAssetFilter();
+        statsClearHoldingsFilter();
+
+        if ($('#stats_import_warnings').is(':visible')) {
+            statsShowSummaryMessage('Showing import warnings that need review before using generated reports.');
+            statsScrollTo('#stats_import_warnings');
+        } else {
+            statsShowSummaryMessage('No import warnings are currently reported for this save.');
+            statsScrollTo('#stats_summary_band');
+        }
+    }
+
+    function statsFocusUnlinkedSales() {
+        activeStatsAssetFilter = 'unlinked-sales';
+        statsClearHoldingsFilter();
+        table.search('').draw();
+
+        var visibleRows = statsSelectFirstVisibleAsset();
+        $('#collapse_sales').collapse('show');
+
+        if ($('#stats_auto_fix_panel').is(':visible')) {
+            statsScrollTo('#stats_auto_fix_panel');
+        } else {
+            statsScrollTo('#statspage_stats_datatable');
+        }
+
+        if (visibleRows > 0) {
+            statsShowSummaryMessage('Showing assets with unlinked sales. ' + visibleRows + ' asset' + (visibleRows == 1 ? '' : 's') + ' shown; run FIFO Auto Link or inspect the selected asset.');
+        } else {
+            statsShowSummaryMessage('No assets currently have unlinked sales.');
+        }
+    }
+
+    function statsHandleSummaryClick(actionName) {
+        statsSetSummaryAction(actionName);
+
+        if (actionName == 'reconciliation') {
+            statsFocusHoldingsRows(
+                ['Needs Review', 'Needs declared holdings', 'Unlinked sales'],
+                'Reconciliation is ready; all holdings rows are verified.',
+                'Showing holdings rows keeping reconciliation from ready.'
+            );
+        } else if (actionName == 'assets-needing-holdings') {
+            statsFocusHoldingsRows(
+                ['Needs declared holdings'],
+                'No assets need declared holdings right now.',
+                'Showing assets that still need declared holdings.'
+            );
+        } else if (actionName == 'needs-review') {
+            statsFocusHoldingsRows(
+                ['Needs Review', 'Unlinked sales'],
+                'No holdings rows need review right now.',
+                'Showing holdings rows that need review.'
+            );
+        } else if (actionName == 'import-warnings') {
+            statsFocusImportWarnings();
+        } else if (actionName == 'unlinked-sales') {
+            statsFocusUnlinkedSales();
+        }
+    }
 
 
     if ($(".datetimepicker").length != 0) {
@@ -330,7 +1443,7 @@ $(document).ready(function() {
           }
         });
       }
-    
+
 
 
     // on start_date change
@@ -343,22 +1456,22 @@ $(document).ready(function() {
             data: JSON.stringify({
                 'start_date': $("#start_date").datetimepicker().val(),
                 'end_date': $("#end_date").datetimepicker().val()
-                }),  
+                }),
 
             contentType: 'application/json',
             success: function (data) {
                 // console.log(data)
-                
+
                 $('#statspage_stats_datatable').DataTable().clear();
                 $('#statspage_stats_datatable').DataTable().rows.add(data['stats_table_rows']).draw();
 
                 $('#stats_table_title').text('All Asset Stats for ' + data['date_range']['start_date'] + ' - ' + data['date_range']['end_date'])
                 $('#detailed_stats_title').text('Detailed Asset Stats for ' + data['date_range']['start_date'] + ' - ' + data['date_range']['end_date'])
 
-            },   
+            },
         });
     });
-                        
+
 
     // on end_date change
     $("#end_date").datetimepicker().on('dp.change', function(ev){
@@ -369,19 +1482,19 @@ $(document).ready(function() {
             data: JSON.stringify({
                 'start_date': $("#start_date").datetimepicker().val(),
                 'end_date': $("#end_date").datetimepicker().val()
-                }),  
+                }),
 
             contentType: 'application/json',
             success: function (data) {
                 // console.log(data)
-                
+
                 $('#statspage_stats_datatable').DataTable().clear();
                 $('#statspage_stats_datatable').DataTable().rows.add(data['stats_table_rows']).draw();
 
                 $('#stats_table_title').text('All Asset Stats for ' + data['date_range']['start_date'] + ' - ' + data['date_range']['end_date'])
                 $('#detailed_stats_title').text('Detailed Asset Stats for ' + data['date_range']['start_date'] + ' - ' + data['date_range']['end_date'])
 
-            },   
+            },
         });
     });
 
@@ -391,6 +1504,18 @@ $(document).ready(function() {
         select: {
             style: 'single'
         },
+    });
+
+    $.fn.dataTable.ext.search.push(function(settings, rowData) {
+        if (settings.nTable.id !== 'statspage_stats_datatable') {
+            return true;
+        }
+
+        if (activeStatsAssetFilter == 'unlinked-sales') {
+            return (statsParseQuantity(rowData[3]) || 0) > 0.00000001;
+        }
+
+        return true;
     });
 
     $('#statspage_detailed_datatable').DataTable({
@@ -411,7 +1536,19 @@ $(document).ready(function() {
             style: 'single'
         },
     });
-    
+
+    $('#s8949_table').DataTable({
+        select: {
+            style: 'single'
+        },
+    });
+
+    $('#l8949_table').DataTable({
+        select: {
+            style: 'single'
+        },
+    });
+
 
     $('#statspage_buys_datatable').DataTable({
         select: {
@@ -419,321 +1556,161 @@ $(document).ready(function() {
         },
     });
 
-    $("#stats_usd_spot").on('change', function(){
-        
-        $.ajax({
-            type: "POST",
-            url: "/stats/selected_asset",
-            data: JSON.stringify({
-                'row_data': table.row( {selected:true}).data(),
-                'start_date': $("#start_date").datetimepicker().val(),
-                'end_date': $("#end_date").datetimepicker().val(),
-                'year': $('#stats_page_year_dropdown').find(":selected").val(),
-                'current_usd_spot': $(this).val()
-                }),  
-
-            contentType: 'application/json',
-            success: function (return_data) {
-
-                // console.log(return_data)
-                
-                $('#statspage_detailed_datatable').DataTable().clear();
-                $('#statspage_detailed_datatable').DataTable().rows.add(return_data['detailed_stats']).draw();
-                                
-                if (myChart!=null) {myChart.destroy();}
-
-                var ctx = document.getElementById("gainzChart").getContext("2d");
-
-                chartColor = "#FFFFFF";
-                gradientStroke = ctx.createLinearGradient(500, 0, 100, 0);
-                gradientStroke.addColorStop(0, '#80b6f4');
-                gradientStroke.addColorStop(1, chartColor);
-            
-                gradientFill = ctx.createLinearGradient(0, 170, 0, 50);
-                gradientFill.addColorStop(0, "rgba(128, 182, 244, 0)");
-                gradientFill.addColorStop(1, "rgba(249, 99, 59, 0.40)");
-
-                myChart = new Chart(ctx, {
-                  type: 'line',
-                  data: {
-                    datasets: [
-                        {
-                            label: "Value",
-                            borderColor: "#6bd098",
-                            fill: false,
-                            borderWidth: 3,
-                            data: return_data['unrealized_chart_data']
-                        },
-                    ]
-                },
-                  options: {
-                    elements: {
-                        line: {
-                            tension: 0.08
-                        }
-                    },
-                    tooltips: {
-                        callbacks: {
-                            label: function(tooltipItem, data) {
-                                var value = data.datasets[tooltipItem.datasetIndex].label || '';
-                                if (value) { value += ': '; }
-                                value += formatter.format(tooltipItem.yLabel)
-
-                                var quantity = "Quantity: " 
-                                quantity += data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index]['quantity']
-                                
-                                var usd_spot = "USD Spot: "
-                                usd_spot += data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index]['usd_spot']
-
-                                var cost_baisis = "Cost Baisis: "
-                                cost_baisis += data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index]['cost_baisis']
-
-                                var gain_loss = "Gain/Loss: "
-                                gain_loss += data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index]['gain_loss']
-                        
-                                return [value, quantity, usd_spot, cost_baisis, gain_loss];
-                            }
-                        }
-                      },
-
-
-                    responsive: true,
-                    title:      {
-                        display: false,
-                        text:    "Gainz Chart"
-                    },
-                    scales: {
-                        
-                        xAxes: [{
-                            type: "time",
-                            time: {
-                                unit: 'month',
-                                tooltipFormat: 'll'
-                            },
-                            scaleLabel: {
-                                display:     true,
-                                labelString: 'Date'
-                            },
-                            
-                        }],
-                        
-                        yAxes: [{
-                            ticks: {
-                                beginAtZero: false,
-                                callback: function(value, index, values) {
-                                  if(parseInt(value) >= 1000){
-                                    return '$' + value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-                                  } else {
-                                    return '$' + value;
-                                  }
-                                }
-                            },
-
-                            scaleLabel: {
-                                display:     true,
-                                labelString: 'Value (Quantity * USD Spot)'
-                            },
-
-                              gridLines: {
-                                drawBorder: false,
-                                zeroLineColor: "transparent",
-                                color: 'rgba(255,255,255,0.05)'
-                              }
-                        }]
+    $('#statspage_holdings_reconciliation_datatable').DataTable({
+        "pageLength": 25,
+        "searching": false,
+        "paging": false,
+        "info": false,
+        "ordering": false,
+        "columnDefs": [
+            {
+                "targets": 1,
+                "render": function(data, type, row) {
+                    if (type !== 'display' || !row || row[0] !== 'Status') {
+                        return data;
                     }
+
+                    return statusBadgeHtml(data);
                 }
-                });
-                    
-            },   
-        });
-
-        
-
+            }
+        ],
+        select: {
+            style: 'single'
+        },
     });
 
+    var holdingsReconciliationTable = $('#statspage_all_holdings_reconciliation_datatable').DataTable({
+        "pageLength": 25,
+        "order": [[ 0, "asc" ]],
+        "columnDefs": [
+            {
+                "targets": 6,
+                "render": function(data, type) {
+                    if (type !== 'display') {
+                        return data;
+                    }
 
-    var formatter = new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-      
-        // These options are needed to round to whole numbers if that's what you want.
-        //minimumFractionDigits: 0, // (this suffices for whole numbers, but will print 2500.10 as $2,500.1)
-        //maximumFractionDigits: 0, // (causes 2500.99 to be printed as $2,501)
-      });
+                    return statusBadgeHtml(data);
+                }
+            }
+        ],
+        select: {
+            style: 'single'
+        },
+    });
 
+    $('.stats-summary-action').on('click', function() {
+        statsHandleSummaryClick($(this).data('stats-summary-action'));
+    });
 
-    // Init Charts
-    var myChart=null;
+    $("#stats_auto_fix_safe_button").click(function(){
+        var button = $(this);
+        var selectedAsset = selectedStatsRowData ? selectedStatsRowData[0] : null;
 
+        $('#stats_auto_fix_result').removeClass('text-danger').text('');
+        button.prop('disabled', true).text('Linking...');
 
+        $.ajax({
+            type: "POST",
+            url: "/stats/auto_fix_safe",
+            data: JSON.stringify({
+                'year': $('#stats_page_year_dropdown').find(":selected").val()
+            }),
+            dataType: "json",
+            contentType: 'application/json',
+            success: function (data) {
+                table.clear();
+                table.rows.add(data['stats_table_rows'] || []).draw();
+                setStatsReconciliationWarning(data['reconciliation_status']);
+                setStatsImportWarnings(data['import_warnings']);
+                setStatsSummary(data['stats_summary']);
+                setAllHoldingsReconciliation(data['holdings_reconciliation_table_data']);
+                $('#stats_auto_fix_result').text(data['message'] || 'FIFO auto-link complete. Review the generated links.');
+                $('#stats_auto_fix_panel').show();
+
+                if (selectedAsset) {
+                    var refreshedSelectedRow = getStatsRowForAsset(selectedAsset);
+                    if (refreshedSelectedRow) {
+                        loadSelectedStatsAsset(refreshedSelectedRow, $('#stats_usd_spot').val());
+                    }
+                }
+            },
+            error: function () {
+                $('#stats_auto_fix_result')
+                    .addClass('text-danger')
+                    .text('FIFO auto-link could not run. Please try Auto Link or review the data manually.');
+            },
+            complete: function () {
+                button.prop('disabled', false).text('Run FIFO Auto Link');
+            },
+        });
+    });
+
+    $('#statspage_holdings_lots_datatable').DataTable({
+        "pageLength": 25,
+        "order": [[ 2, "asc" ]],
+        select: {
+            style: 'single'
+        },
+    });
+
+    $("#stats_usd_spot").on('change', function(){
+        loadSelectedStatsAsset(selectedStatsRowData || table.row({selected:true}).data(), $(this).val());
+    });
 
 
     $('#stats_page_year_dropdown').on('change', function() {
 
         // console.log($(this).find(":selected").val())
-    
+
         $.ajax({
             type: "POST",
             url: "/stats/date_range",
             data: JSON.stringify({
                 'year': $(this).find(":selected").val(),
-              }),  
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
                 // console.log(data)
-    
+
                 $('#statspage_stats_datatable').DataTable().clear();
                 $('#statspage_stats_datatable').DataTable().rows.add(data['stats_table_rows']).draw();
-    
-            },   
+                setStatsReconciliationWarning(data['reconciliation_status']);
+                setStatsImportWarnings(data['import_warnings']);
+                setAllHoldingsReconciliation(data['holdings_reconciliation_table_data']);
+                $('#statspage_detailed_datatable').DataTable().clear().draw();
+                $('#statspage_sells_datatable').DataTable().clear().draw();
+                $('#statspage_holdings_lots_datatable').DataTable().clear().draw();
+                $('#statspage_holdings_reconciliation_datatable').DataTable().clear().draw();
+                $('#s8949_table').DataTable().clear().draw();
+                $('#l8949_table').DataTable().clear().draw();
+                setStatsSummary(data['stats_summary']);
+                $('#collapse_sales, #collapse_8949_long, #collapse_8949_short').collapse('hide');
+                $('#stats_usd_spot').val('');
+                selectedStatsRowData = null;
+                resetGainzChart();
+
+            },
         });
-    
+
     });
 
     $('#statspage_stats_datatable tbody').on( 'click', 'tr', function () {
-        // console.log( table.row( this ).data() );
+        loadSelectedStatsAsset(table.row(this).data(), $('#stats_usd_spot').val());
+    } );
 
-        $.ajax({
-            type: "POST",
-            url: "/stats/selected_asset",
-            data: JSON.stringify({
-                'row_data': table.row( this ).data(),
-                'start_date': $("#start_date").datetimepicker().val(),
-                'end_date': $("#end_date").datetimepicker().val(),
-                'year': $('#stats_page_year_dropdown').find(":selected").val(),
-                }),  
+    $('#statspage_all_holdings_reconciliation_datatable tbody').on( 'click', 'tr', function () {
+        var reconciliationRow = holdingsReconciliationTable.row(this).data();
 
-            contentType: 'application/json',
-            success: function (return_data) {
+        if (!reconciliationRow) {
+            return;
+        }
 
-                // console.log(return_data)
-                
-                $('#statspage_detailed_datatable').DataTable().clear();
-                $('#statspage_detailed_datatable').DataTable().rows.add(return_data['detailed_stats']).draw();
-
-                $('#statspage_sells_datatable').DataTable().clear();
-                $('#statspage_sells_datatable').DataTable().rows.add(return_data['sells_table_data']).draw();
-                
-                
-                $('#s8949_table').DataTable().clear();
-                $('#s8949_table').DataTable().rows.add(return_data['s8949_table_data']).draw();
-
-                $('#l8949_table').DataTable().clear();
-                $('#l8949_table').DataTable().rows.add(return_data['l8949_table_data']).draw();
-
-                // $('#statspage_buys_datatable').DataTable().clear();
-                // $('#statspage_buys_datatable').DataTable().rows.add(return_data['buys']).draw();
-
-                
-                if (myChart!=null) {myChart.destroy();}
-
-                var ctx = document.getElementById("gainzChart").getContext("2d");
-
-                chartColor = "#FFFFFF";
-                gradientStroke = ctx.createLinearGradient(500, 0, 100, 0);
-                gradientStroke.addColorStop(0, '#80b6f4');
-                gradientStroke.addColorStop(1, chartColor);
-            
-                gradientFill = ctx.createLinearGradient(0, 170, 0, 50);
-                gradientFill.addColorStop(0, "rgba(128, 182, 244, 0)");
-                gradientFill.addColorStop(1, "rgba(249, 99, 59, 0.40)");
-
-                myChart = new Chart(ctx, {
-                  type: 'line',
-                  data: {
-                    datasets: [
-                            {
-                                label: "Value",
-                                borderColor: "#6bd098",
-                                fill: false,
-                                borderWidth: 3,
-                                data: return_data['unrealized_chart_data']
-                            },
-                        ]
-                    },
-                  options: {
-                    elements: {
-                        line: {
-                            tension: 0.08
-                        }
-                    },
-                    tooltips: {
-                        callbacks: {
-                            label: function(tooltipItem, data) {
-                                var value = data.datasets[tooltipItem.datasetIndex].label || '';
-                                if (value) { value += ': '; }
-                                value += formatter.format(tooltipItem.yLabel)
-
-                                var quantity = "Quantity: " 
-                                quantity += data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index]['quantity']
-                                
-                                var usd_spot = "USD Spot: "
-                                usd_spot += data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index]['usd_spot']
-
-                                var cost_baisis = "Cost Baisis: "
-                                cost_baisis += data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index]['cost_baisis']
-
-                                var gain_loss = "Gain/Loss: "
-                                gain_loss += data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index]['gain_loss']
-                        
-                                return [value, quantity, usd_spot, cost_baisis, gain_loss];
-                            }
-                        }
-                      },
-
-
-                    responsive: true,
-                    title:      {
-                        display: false,
-                        text:    "Gainz Chart"
-                    },
-                    scales: {
-                        
-                        xAxes: [{
-                            type: "time",
-                            time: {
-                                unit: 'month',
-                                tooltipFormat: 'll'
-                            },
-                            scaleLabel: {
-                                display:     true,
-                                labelString: 'Date'
-                            },
-                            
-                        }],
-                        
-                        yAxes: [{
-                            ticks: {
-                                beginAtZero: false,
-                                callback: function(value, index, values) {
-                                  if(parseInt(value) >= 1000){
-                                    return '$' + value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-                                  } else {
-                                    return '$' + value;
-                                  }
-                                }
-                            },
-
-                            scaleLabel: {
-                                display:     true,
-                                labelString: 'Value (Quantity * USD Spot)'
-                            },
-
-                              gridLines: {
-                                drawBorder: false,
-                                zeroLineColor: "transparent",
-                                color: 'rgba(255,255,255,0.05)'
-                              }
-                        }]
-                    }
-                }
-                });
-
-
-                    
-            },   
-        });
+        var statsRow = getStatsRowForAsset(reconciliationRow[0]);
+        if (statsRow) {
+            loadSelectedStatsAsset(statsRow, $('#stats_usd_spot').val());
+        }
     } );
 
 
@@ -744,170 +1721,34 @@ $(document).ready(function() {
 
 // history page code
 $(document).ready(function() {
+    if ($('#historypage_datatable').length === 0) {
+        return;
+    }
 
-    // init tables
-    var table = $('#historypage_datatable').DataTable({
-        select: {
-            style: 'multi'
-        },
+    $('#historypage_datatable').DataTable({
+        order: [],
+        pageLength: 25
     });
 
-    $('#historypage_stats_datatable').DataTable({
-        select: {
-            style: 'single'
-        },
-    });
-    
-    
-    $('#historypage_detailed_datatable').DataTable({
-        "pageLength": 50,
-        select: {
-            style: 'single'
-        },
-    });
+    $('.history-restore-form').on('submit', function() {
+        var button = $(this).find('button[type="submit"]');
+        var revision = button.data('revision') || 'this revision';
+        var description = button.data('description') || '';
+        var message = [
+            'Restore revision ' + revision + ' as the latest Gainz revision?',
+            '',
+            description,
+            '',
+            'This will not delete newer saves. Gainz will create a new revision from the selected save.'
+        ].join('\n');
 
-
-    table.on('select', function(e, dt, type, indexes) {
-        
-
-        //If two rows are selected
-        if ($('#historypage_datatable').DataTable().rows( {selected:true} ).count() == 2) {
-            console.log('two rows selected')
-
-            $.ajax({
-                type: "POST",
-                url: "/history/compare_selected",
-                data: JSON.stringify({
-                    'row_data': $('#historypage_datatable').DataTable().rows( {selected:true} ).data(),
-                    }),  
-    
-                contentType: 'application/json',
-                success: function (data) { 
-                    console.log(data)
-                    $('#historypage_stats_datatable').DataTable().clear();
-                }
-
-            });
-    
-        //If one row is selected
-        } else {
-            console.log('Single Row is selected')
-            $.ajax({
-                type: "POST",
-                url: "/history/selected_save",
-                data: JSON.stringify({
-                    'row_data': $('#historypage_datatable').DataTable().row( {selected:true} ).data(),
-                    }),  
-    
-                contentType: 'application/json',
-                success: function (data) {
-    
-                    console.log(data)
-                    var names = data['column_names']
-    
-                    // Check if the DataTable is initialized
-                    if ($.fn.DataTable.isDataTable('#historypage_stats_datatable')) {
-                        // Get the DataTable instance
-                        var table = $('#historypage_stats_datatable').DataTable();
-    
-                        // Loop over the list of names
-                        for (var i = 0; i < names.length; i++) {
-                            // Check if the column exists
-                            if (i < table.columns().count()) {
-                                // Update the column title
-                                table.column(i).header().innerHTML = names[i];
-                            } else {
-                                console.log('Column ' + i + ' does not exist');
-                            }
-                        }
-    
-                        // Redraw the table to reflect the changes
-                        table.columns.adjust().draw();
-                    } else {
-                        console.log('DataTable is not initialized');
-                    }
-    
-                    $('#historypage_stats_datatable').DataTable().clear();
-                    $('#historypage_stats_datatable').DataTable().rows.add(data['rows']).draw();
-                    
-                        
-                },   
-            });
+        if (!window.confirm(message)) {
+            return false;
         }
 
+        button.prop('disabled', true).text('Restoring...');
+        return true;
     });
-
-    
-    $("#load_button").click(function(){
-        $.ajax({
-            type: "POST",
-            url: "/history/load",
-            data: JSON.stringify({
-                'data': $('#history_datatable').DataTable().row( {selected:true} ).data(),
-                
-              }),  
-            dataType: "json",
-            contentType: 'application/json',
-            success: function (data) {
-                location.reload()
-            },   
-        });
-    });
-
-
-    $("#revert_button").click(function(){
-
-        $.ajax({
-            type: "POST",
-            url: "/history/revert",
-            data: JSON.stringify({
-                'data': $('#history_datatable').DataTable().row( {selected:true} ).data(),
-                
-              }),  
-            dataType: "json",
-            contentType: 'application/json',
-            success: function (data) {
-                location.reload()
-
-            },   
-        });
-    });
-
-    $("#delete_button").click(function(){
-
-        $.ajax({
-            type: "POST",
-            url: "/history/delete",
-            data: JSON.stringify({
-                'data': $('#history_datatable').DataTable().row( {selected:true} ).data(),
-                
-              }),  
-            dataType: "json",
-            contentType: 'application/json',
-            success: function (data) {
-                location.reload()
-            },   
-        });
-    });
-
-    $("#save_button").click(function(){
-
-        $.ajax({
-            type: "POST",
-            url: "/history/save",
-            data: JSON.stringify({
-                'data': $('#history_datatable').DataTable().row( {selected:true} ).data(),
-                
-              }),  
-            dataType: "json",
-            contentType: 'application/json',
-            success: function (data) {
-                location.reload()
-            },   
-        });
-    });
-
-
 } );
 
 // export page code
@@ -929,32 +1770,55 @@ $(document).ready(function() {
     //             'row_data': table.row( this ).data(),
     //             'start_date': $('#export_datepicker').data('daterangepicker')['startDate'],
     //             'end_date': $('#export_datepicker').data('daterangepicker')['endDate']
-    //             }),  
+    //             }),
 
     //         contentType: 'application/json',
     //         success: function (data) {
 
     //             console.log(data)
-                
+
     //             $('#statspage_detailed_datatable').DataTable().clear();
     //             $('#statspage_detailed_datatable').DataTable().rows.add(data['detailed_stats']).draw();
-    //         },   
+    //         },
     //     });
     // } );
 
 
     $("#export_button").click(function(){
+        $('#export_button_text').text('Creating Excel export...');
         $.ajax({
             type: "POST",
             url: "/export/save",
             data: JSON.stringify({
-                'data': $('#exportpage_stats_datatable').DataTable().row( {selected:true} ).data(),      
-              }),  
+                'data': $('#exportpage_stats_datatable').DataTable().row( {selected:true} ).data(),
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
+                $('#export_button_text').text("Export saved to " + data);
                 alert("Saving Export as " + data)
-            },   
+            },
+            error: function (xhr) {
+                $('#export_button_text').text("Export failed. Check the app log for details.");
+            },
+        });
+    });
+
+    $("#audit_packet_button").click(function(){
+        $('#export_button_text').text('Generating audit packet...');
+        $.ajax({
+            type: "POST",
+            url: "/export/audit_packet",
+            data: JSON.stringify({}),
+            dataType: "json",
+            contentType: 'application/json',
+            success: function (data) {
+                $('#export_button_text').text("Audit packet saved to " + data);
+                alert("Audit packet saved to " + data)
+            },
+            error: function (xhr) {
+                $('#export_button_text').text("Audit packet failed. Check the readiness blockers and app log, then try again.");
+            },
         });
     });
 
@@ -965,8 +1829,8 @@ $(document).ready(function() {
 
 // Add and Manage Links Page
 $(document).ready(function() {
-    
-    
+
+
     $('#addlinks_stats_datatable').DataTable({
         select: {
             style: 'single'
@@ -996,8 +1860,8 @@ $(document).ready(function() {
             style: 'multiple'
         },
     });
-   
-    
+
+
     $('#checkbox_unlinked').on('click', function() {
 
         if ($('#addlinks_stats_datatable').DataTable().row( {selected:true} ).length > 0 ) {
@@ -1010,21 +1874,21 @@ $(document).ready(function() {
                     'start_date': '',
                     'end_date': '',
                     'unlinked_remaining': $('#checkbox_unlinked').is(':checked')
-                    }),  
+                    }),
 
                 contentType: 'application/json',
                 success: function (data) {
 
                     // console.log(data)
-                    
-                    
+
+
                     $('#addlinks_sells_datatable').DataTable().clear();
                     $('#addlinks_sells_datatable').DataTable().rows.add(data['sells']).draw();
 
                     $('#add_links_all_links_datatable').DataTable().clear();
                     $('#add_links_all_links_datatable').DataTable().rows.add(data['all_links']).draw();
 
-                },   
+                },
             });
 
         }
@@ -1042,22 +1906,22 @@ $(document).ready(function() {
                 'start_date': '',
                 'end_date': '',
                 'unlinked_remaining': $('#checkbox_unlinked').is(':checked')
-                }),  
+                }),
 
             contentType: 'application/json',
             success: function (data) {
 
                 // console.log(data)
-                
-                
+
+
                 $('#addlinks_sells_datatable').DataTable().clear();
                 $('#addlinks_sells_datatable').DataTable().rows.add(data['sells']).draw();
 
                 $('#add_links_all_links_datatable').DataTable().clear();
                 $('#add_links_all_links_datatable').DataTable().rows.add(data['all_links']).draw();
 
-                    
-            },   
+
+            },
         });
 
     });
@@ -1066,32 +1930,32 @@ $(document).ready(function() {
 
     $('#addlinks_sells_datatable tbody').on( 'click', 'tr', function () {
         console.log( $('#addlinks_sells_datatable').DataTable().row( this ).data() );
- 
+
         $.ajax({
             type: "POST",
             url: "/add_links/linkable_data",
             data: JSON.stringify({
-                'row_data': $('#addlinks_sells_datatable').DataTable().row( this ).data() 
-              }),  
+                'row_data': $('#addlinks_sells_datatable').DataTable().row( this ).data()
+              }),
 
             contentType: 'application/json',
             success: function (data) {
                 // console.log(data)
 
                 batch_data = data
-                
+
                 $('#add_links_batch_options').children().remove()
 
                 $('#linked_datatable').DataTable().clear();
                 $('#linked_datatable').DataTable().rows.add(data['linked']).draw();
-                
+
                 $('#linkable_datatable').DataTable().clear();
                 $('#linkable_datatable').DataTable().rows.add(data['linkable']).draw();
 
                 $('#unlinkable_datatable').DataTable().clear();
                 $('#unlinkable_datatable').DataTable().rows.add(data['unlinkable']).draw();
 
-             
+
 
                 if (data['min_links_batch'].length > 0) {$('#add_links_batch_options').append('<option>Min Links</option>')}
                 if (data['min_gain_batch'].length > 0) {$('#add_links_batch_options').append('<option>Min Gain</option>')}
@@ -1111,25 +1975,25 @@ $(document).ready(function() {
                 $('#all_linkable_buys_datatable').DataTable().clear();
                 $('#all_linkable_buys_datatable').DataTable().rows.add(batch_data['all_linkable_buys_datatable']).draw();
 
-                $('#model_quantity').val(data['potential_sale_quantity']) 
+                $('#model_quantity').val(data['potential_sale_quantity'])
 
                 $('#total_in_usd').val(data['total_in_usd'])
-                
-                
-            },   
+
+
+            },
         });
     } );
 
 
     $('#add_links_batch_options').on('change', function() {
         // alert( $(this).find(":selected").val() );
-        
+
         if ($(this).find(":selected").val() == 'Min Links') {
 
             $('#add_links_batches_datatable').DataTable().clear();
             $('#add_links_batches_datatable').DataTable().rows.add(batch_data['min_links_batch']).draw();
             $('#add_links_batch_text').html(batch_data['min_links_batch_text']);
-        
+
         } else if ($(this).find(":selected").val() == 'Min Gain') {
 
             $('#add_links_batches_datatable').DataTable().clear();
@@ -1147,21 +2011,21 @@ $(document).ready(function() {
             $('#add_links_batches_datatable').DataTable().clear();
             $('#add_links_batches_datatable').DataTable().rows.add(batch_data['min_gain_short_batch']).draw();
             $('#add_links_batch_text').html(batch_data['min_gain_short_batch_text']);
-        
+
         } else if ($(this).find(":selected").val() == 'Max Gain') {
-            
+
             $('#add_links_batches_datatable').DataTable().clear();
             $('#add_links_batches_datatable').DataTable().rows.add(batch_data['max_gain_batch']).draw();
             $('#add_links_batch_text').html(batch_data['max_gain_batch_text']);
-    
+
         } else if ($(this).find(":selected").val() == 'Max Gain Long') {
-                
+
             $('#add_links_batches_datatable').DataTable().clear();
             $('#add_links_batches_datatable').DataTable().rows.add(batch_data['max_gain_long_batch']).draw();
             $('#add_links_batch_text').html(batch_data['max_gain_long_batch_text']);
 
         } else if ($(this).find(":selected").val() == 'Max Gain Short') {
-                    
+
             $('#add_links_batches_datatable').DataTable().clear();
             $('#add_links_batches_datatable').DataTable().rows.add(batch_data['max_gain_short_batch']).draw();
             $('#add_links_batch_text').html(batch_data['max_gain_short_batch_text']);
@@ -1179,8 +2043,8 @@ $(document).ready(function() {
             data: JSON.stringify({
                 'sell_data': $('#addlinks_sells_datatable').DataTable().row( {selected:true} ).data(),
                 'buy_data': $('#linkable_datatable').DataTable().row( {selected:true} ).data(),
-                
-              }),  
+
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
@@ -1188,7 +2052,7 @@ $(document).ready(function() {
                 $('#sells_datatable').DataTable().clear();
                 $('#sells_datatable').DataTable().rows.add(data).draw();
                 location.reload()
-            },   
+            },
         });
     });
 
@@ -1201,14 +2065,14 @@ $(document).ready(function() {
             data: JSON.stringify({
                 'sell_data': $('#addlinks_sells_datatable').DataTable().row( {selected:true} ).data(),
                 'buy_data': $('#add_links_batches_datatable').DataTable().rows().data(),
-                
-              }),  
+
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
                 alert("Posting a new link!")
                 location.reload()
-            },   
+            },
         });
     });
 
@@ -1225,13 +2089,13 @@ $(document).ready(function() {
                 'links': $('#linked_datatable').DataTable().rows( {selected:true} ).data(),
                 'symbol': $('#addlinks_sells_datatable').DataTable().row( {selected:true} ).data()[1],
                 'sell_time_stamp': $('#addlinks_sells_datatable').DataTable().row( {selected:true} ).data()[2]
-              }),  
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
                 alert("Deleting link(s)!")
                 location.reload()
-            },   
+            },
         });
 
     });
@@ -1247,13 +2111,13 @@ $(document).ready(function() {
             url: "/add_links/delete_link",
             data: JSON.stringify({
                 'links': $('#add_links_all_links_datatable').DataTable().rows( {selected:true} ).data(),
-              }),  
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
                 alert("Deleting link(s)!")
                 location.reload()
-            },   
+            },
         });
 
     });
@@ -1262,7 +2126,7 @@ $(document).ready(function() {
 } );
 
 
-// Import Transactions Page
+// Import & Manage Data Page
 
 $(document).ready(function() {
 
@@ -1312,7 +2176,7 @@ function showSwal(type, title, text) {
           },
           buttonsStyling: false
         })
-  
+
         swalWithBootstrapButtons.fire({
           title: title,
           text: text,
@@ -1342,13 +2206,13 @@ function showSwal(type, title, text) {
       }
 }
 
-    
 
 
-// Add and Manage Transactions Page
+
+// Add Manual Transactions Page
 $(document).ready(function() {
 
-    
+
     $('#add_transactions_stats_datatable').DataTable({
         "pageLength": 25,
         select: {
@@ -1385,26 +2249,26 @@ $(document).ready(function() {
     });
 
 
-    
+
 
     $('#add_transactions_stats_datatable tbody').on( 'click', 'tr', function () {
-        
+
         $.ajax({
             type: "POST",
-            url: "/add_transactions/add_transactions_selected_asset",
+            url: "/import_data/add_transactions_selected_asset",
             data: JSON.stringify({
                 'row_data':  $('#add_transactions_stats_datatable').DataTable().row( this ).data(),
                 'unlinked_remaining': $('#manage_trans_buys_checkbox_unlinked').is(':checked')
-                }),  
+                }),
 
             contentType: 'application/json',
             success: function (data) {
 
                 // console.log(data)
-               
+
                 $('#add_transactions_sells_datatable').DataTable().clear();
                 $('#add_transactions_sells_datatable').DataTable().rows.add(data['sells']).draw();
-                
+
                 $('#add_transactions_buys_datatable').DataTable().clear();
                 $('#add_transactions_buys_datatable').DataTable().rows.add(data['buys']).draw();
 
@@ -1413,11 +2277,11 @@ $(document).ready(function() {
 
                 $('#add_transactions_receive_datatable').DataTable().clear();
                 $('#add_transactions_receive_datatable').DataTable().rows.add(data['receives']).draw();
-                
 
-                
-                    
-            },   
+
+
+
+            },
         });
     } );
 
@@ -1426,23 +2290,23 @@ $(document).ready(function() {
     $("#sells_delete_button").click(function(){
         $.ajax({
             type: "POST",
-            url: "/add_transactions/delete_transactions",
+            url: "/import_data/delete_transactions",
             data: JSON.stringify({
                 'row_data': $('#add_transactions_sells_datatable').DataTable().row( {selected:true} ).data(),
                 'asset': $('#add_transactions_stats_datatable').DataTable().row( {selected:true} ).data(),
                 'type': 'sell'
-              }),  
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
                 alert(data)
                 location.reload()
-            },   
+            },
         });
     });
 
     $('#manage_trans_buys_checkbox_unlinked').on('click', function() {
-       
+
         var json_data = {
             'row_data':  $('#add_transactions_stats_datatable').DataTable().row( {selected:true} ).data(),
             'unlinked_remaining': $('#manage_trans_buys_checkbox_unlinked').is(':checked'),
@@ -1455,17 +2319,17 @@ $(document).ready(function() {
 
         $.ajax({
             type: "POST",
-            url: "/add_transactions/add_transactions_selected_asset",
-            data: JSON.stringify(json_data),  
+            url: "/import_data/add_transactions_selected_asset",
+            data: JSON.stringify(json_data),
 
             contentType: 'application/json',
             success: function (data) {
 
                 console.log(data)
-                
+
                 $('#add_transactions_sells_datatable').DataTable().clear();
                 $('#add_transactions_sells_datatable').DataTable().rows.add(data['sells']).draw();
-                
+
                 $('#add_transactions_buys_datatable').DataTable().clear();
                 $('#add_transactions_buys_datatable').DataTable().rows.add(data['buys']).draw();
 
@@ -1474,7 +2338,7 @@ $(document).ready(function() {
 
                 $('#add_transactions_receive_datatable').DataTable().clear();
                 $('#add_transactions_receive_datatable').DataTable().rows.add(data['receives']).draw();
-            },   
+            },
         });
 
     });
@@ -1482,24 +2346,24 @@ $(document).ready(function() {
     $("#manage_transactions_usd_spot").on('change', function(){
 
         // console.log($(this).val())
-        
+
         $.ajax({
             type: "POST",
-            url: "/add_transactions/add_transactions_selected_asset",
+            url: "/import_data/add_transactions_selected_asset",
             data: JSON.stringify({
                 'row_data':  $('#add_transactions_stats_datatable').DataTable().row( {selected:true} ).data(),
                 'unlinked_remaining': $('#manage_trans_buys_checkbox_unlinked').is(':checked'),
                 'usd_spot': $(this).val()
-                }),  
+                }),
 
             contentType: 'application/json',
             success: function (data) {
 
                 console.log(data)
-                
+
                 $('#add_transactions_sells_datatable').DataTable().clear();
                 $('#add_transactions_sells_datatable').DataTable().rows.add(data['sells']).draw();
-                
+
                 $('#add_transactions_buys_datatable').DataTable().clear();
                 $('#add_transactions_buys_datatable').DataTable().rows.add(data['buys']).draw();
 
@@ -1508,10 +2372,10 @@ $(document).ready(function() {
 
                 $('#add_transactions_receive_datatable').DataTable().clear();
                 $('#add_transactions_receive_datatable').DataTable().rows.add(data['receives']).draw();
-                
 
-                    
-            },   
+
+
+            },
         });
 
     });
@@ -1519,66 +2383,66 @@ $(document).ready(function() {
     $("#buys_delete_button").click(function(){
         $.ajax({
             type: "POST",
-            url: "/add_transactions/delete_transactions",
+            url: "/import_data/delete_transactions",
             data: JSON.stringify({
                 'row_data': $('#add_transactions_buys_datatable').DataTable().row( {selected:true} ).data(),
                 'asset': $('#add_transactions_stats_datatable').DataTable().row( {selected:true} ).data(),
                 'type': 'buy'
-              }),  
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
                 alert(data)
                 location.reload()
-            },   
+            },
         });
     });
 
     $("#buys_convert_button").click(function(){
         $.ajax({
             type: "POST",
-            url: "/add_transactions/buy_convert",
+            url: "/import_data/buy_convert",
             data: JSON.stringify({
                 'row_data': $('#add_transactions_buys_datatable').DataTable().row( {selected:true} ).data(),
-              }),  
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
                 alert(data)
                 location.reload()
-            },   
+            },
         });
     });
 
     $("#receive_convert_button").click(function(){
         $.ajax({
             type: "POST",
-            url: "/add_transactions/receive_convert",
+            url: "/import_data/receive_convert",
             data: JSON.stringify({
                 'table_data': $('#add_transactions_receive_datatable').DataTable().rows( {selected:true} ).data(),
-              }),  
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
                 alert(data)
                 location.reload()
-            },   
+            },
         });
     });
 
     $("#send_convert_button").click(function(){
         $.ajax({
             type: "POST",
-            url: "/add_transactions/send_convert",
+            url: "/import_data/send_convert",
             data: JSON.stringify({
                 'row_data': $('#add_transactions_sends_datatable').DataTable().row( {selected:true} ).data(),
-              }),  
+              }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
                 alert(data)
                 location.reload()
-            },   
+            },
         });
     });
 
@@ -1590,131 +2454,150 @@ $(document).ready(function() {
 // Model Page
 $(document).ready(function() {
 
-    $('#model_stats_datatable').DataTable({
+    var modelStatsTable = $('#model_stats_datatable').DataTable({
         select: {
             style: 'single'
         },
     });
 
-    $('#all_linkable_buys_datatable').DataTable({
+    var allModelLotsTable = $('#all_linkable_buys_datatable').DataTable({
         select: {
             style: 'single'
         },
     });
 
-    var batch_data = {}
+    var modelBatchTable = $('#model_batches_datatable').DataTable({
+        "pageLength": 25,
+        select: {
+            style: 'single'
+        },
+    });
+
+    var batch_data = {};
+    var selectedModelRow = null;
+
+    function modelSetWarnings(warnings) {
+        var warningBox = $('#model_warnings');
+        warningBox.empty();
+
+        if (warnings && warnings.length > 0) {
+            warnings.forEach(function(warning) {
+                warningBox.append($('<div>').text(warning));
+            });
+            warningBox.show();
+        } else {
+            warningBox.hide();
+        }
+    }
+
+    function modelRenderBatch(batchKey) {
+        if (!batch_data || !batch_data.batches_by_key) {
+            return;
+        }
+
+        var batch = batch_data.batches_by_key[batchKey];
+        if (!batch) {
+            modelBatchTable.clear().draw();
+            return;
+        }
+
+        var summary = batch.summary || {};
+        $('#model_summary_method').text(batch.label || 'FIFO');
+        $('#model_summary_quantity').text(summary.quantity_display || '--');
+        $('#model_summary_proceeds').text(summary.proceeds_display || '--');
+        $('#model_summary_cost_basis').text(summary.cost_basis_display || '--');
+        $('#model_summary_gain_loss').text(summary.gain_loss_display || '--');
+        $('#model_summary_long').text((summary.long_quantity_display || '0') + ' / ' + (summary.long_gain_loss_display || '$0.00'));
+        $('#model_summary_short').text((summary.short_quantity_display || '0') + ' / ' + (summary.short_gain_loss_display || '$0.00'));
+
+        modelBatchTable.clear();
+        modelBatchTable.rows.add(batch.rows || []).draw();
+        $('#model_result_panel').show();
+    }
 
     $('#model_stats_datatable tbody').on( 'click', 'tr', function () {
+        selectedModelRow = modelStatsTable.row(this).data();
         $('#model_submit').prop('disabled', false);
+        if (selectedModelRow) {
+            $('#model_selected_asset').text(selectedModelRow[0] + ' selected');
+        }
     });
 
     $('#model_submit').on('click', function () {
+        if (!selectedModelRow) {
+            alert('Select an asset first.');
+            return;
+        }
+
+        var button = $(this);
+        button.prop('disabled', true).text('Modeling...');
 
         $.ajax({
             type: "POST",
             url: "/model/selected_asset",
             data: JSON.stringify({
-                'row_data': $('#model_stats_datatable').DataTable().row( {selected:true} ).data(),
+                'row_data': selectedModelRow,
                 'usd_spot': $('#model_usd_spot').val(),
                 'quantity': $('#model_quantity').val(),
                 'total_in_usd': $('#total_in_usd').val()
-                }),  
-
+                }),
+            dataType: "json",
             contentType: 'application/json',
             success: function (data) {
+                batch_data = data;
 
-                console.log(data)
+                $('#model_batch_options').children().remove();
+                (data.batch_options || []).forEach(function(option) {
+                    var label = option.label;
+                    if (option.key == data.default_batch_key) {
+                        label = label + ' (Default)';
+                    }
+                    $('#model_batch_options').append(
+                        $('<option>').val(option.key).text(label)
+                    );
+                });
 
-                batch_data = data
+                $('#model_quantity').val(data.potential_sale_quantity_display || data.potential_sale_quantity);
+                $('#total_in_usd').val(data.total_in_usd);
+                allModelLotsTable.clear();
+                allModelLotsTable.rows.add(data.all_linkable_buys_datatable || []).draw();
+                modelSetWarnings(data.warnings);
 
-                $('#model_batch_options').children().remove()
-
-                if (data['min_links_batch'].length > 0) {$('#model_batch_options').append('<option>Min Links</option>')}
-                if (data['min_gain_batch'].length > 0) {$('#model_batch_options').append('<option>Min Gain</option>')}
-                if (data['min_gain_long_batch'].length > 0) {$('#model_batch_options').append('<option>Min Gain Long</option>')}
-                if (data['min_gain_short_batch'].length > 0) {$('#model_batch_options').append('<option>Min Gain Short</option>')}
-
-                if (data['max_gain_batch'].length > 0) {$('#model_batch_options').append('<option>Max Gain</option>')}
-                if (data['max_gain_long_batch'].length > 0) {$('#model_batch_options').append('<option>Max Gain Long</option>')}
-                if (data['max_gain_short_batch'].length > 0) {$('#model_batch_options').append('<option>Max Gain Short</option>')}
-
-                if (data['max_gain_long_batch'].length > 0) { $('#model_batch_options').val('Max Gain Long').change() }
-                else if (data['max_gain_batch'].length > 0) { $('#model_batch_options').val('Max Gain').change() }
-                else if (data['min_links_batch'].length > 0) {  $('#model_batch_options').val('Min Links').change()  }
-                else { $('#model_batch_options').val('') }
-
-
-                $('#linked_datatable').DataTable().clear();
-                $('#linked_datatable').DataTable().rows.add(batch_data['linked']).draw();
-
-                $('#linked_datatable').DataTable().clear();
-                $('#linked_datatable').DataTable().rows.add(batch_data['linked']).draw();
-
-                $('#model_quantity').val(data['potential_sale_quantity']) 
-
-                $('#total_in_usd').val(data['total_in_usd'])
-                
-                
-            },   
+                if (data.default_batch_key) {
+                    $('#model_batch_options').val(data.default_batch_key);
+                    modelRenderBatch(data.default_batch_key);
+                } else {
+                    modelBatchTable.clear().draw();
+                    $('#model_result_panel').hide();
+                    modelSetWarnings(['No current lots are available to model this sale.']);
+                }
+            },
+            error: function (xhr) {
+                var message = 'Model sale could not run. Check the asset, sale amount, and USD spot.';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    message = xhr.responseJSON.error;
+                }
+                modelSetWarnings([message]);
+            },
+            complete: function () {
+                button.prop('disabled', false).text('Model FIFO Sale');
+            },
         });
     } );
 
 
     $('#model_batch_options').on('change', function() {
-        // alert( $(this).find(":selected").val() );
-        
-        if ($(this).find(":selected").val() == 'Min Links') {
-
-            $('#model_batches_datatable').DataTable().clear();
-            $('#model_batches_datatable').DataTable().rows.add(batch_data['min_links_batch']).draw();
-            $('#model_batch_text').html(batch_data['min_links_batch_text']);
-        
-        } else if ($(this).find(":selected").val() == 'Min Gain') {
-
-            $('#model_batches_datatable').DataTable().clear();
-            $('#model_batches_datatable').DataTable().rows.add(batch_data['min_gain_batch']).draw();
-            $('#model_batch_text').html(batch_data['min_gain_batch_text']);
-
-        } else if ($(this).find(":selected").val() == 'Min Gain Long') {
-
-            $('#model_batches_datatable').DataTable().clear();
-            $('#model_batches_datatable').DataTable().rows.add(batch_data['min_gain_long_batch']).draw();
-            $('#model_batch_text').html(batch_data['min_gain_long_batch_text']);
-
-        } else if ($(this).find(":selected").val() == 'Min Gain Short') {
-
-            $('#model_batches_datatable').DataTable().clear();
-            $('#model_batches_datatable').DataTable().rows.add(batch_data['min_gain_short_batch']).draw();
-            $('#model_batch_text').html(batch_data['min_gain_short_batch_text']);
-        
-        } else if ($(this).find(":selected").val() == 'Max Gain') {
-            
-            $('#model_batches_datatable').DataTable().clear();
-            $('#model_batches_datatable').DataTable().rows.add(batch_data['max_gain_batch']).draw();
-            $('#model_batch_text').html(batch_data['max_gain_batch_text']);
-    
-        } else if ($(this).find(":selected").val() == 'Max Gain Long') {
-                
-            $('#model_batches_datatable').DataTable().clear();
-            $('#model_batches_datatable').DataTable().rows.add(batch_data['max_gain_long_batch']).draw();
-            $('#model_batch_text').html(batch_data['max_gain_long_batch_text']);
-
-        } else if ($(this).find(":selected").val() == 'Max Gain Short') {
-                    
-            $('#model_batches_datatable').DataTable().clear();
-            $('#model_batches_datatable').DataTable().rows.add(batch_data['max_gain_short_batch']).draw();
-            $('#model_batch_text').html(batch_data['max_gain_short_batch_text']);
-        }
+        modelRenderBatch($(this).find(":selected").val());
 
      });
 
 
 
-    
 
 
 
-    
+
+
 
 
 
