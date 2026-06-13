@@ -11,7 +11,7 @@ schema_type: SoftwareApplication
     <p>Turn messy crypto exports into linked basis, Form 8949-style rows, current holdings reconciliation, and an audit packet you can review with a qualified tax professional.</p>
     <div class="button-row">
       <a class="button" href="{{ '/download/' | relative_url }}">Download Gainz for Windows</a>
-      <a class="button-secondary" href="{{ '/guides/crypto-cost-basis-learning/' | relative_url }}">Learn cost basis</a>
+      <a class="button-secondary" href="{{ '/guides/' | relative_url }}">Read the docs</a>
       <a class="button-secondary" href="{{ '/user-walkthrough/' | relative_url }}">Start the walkthrough</a>
     </div>
   </div>
