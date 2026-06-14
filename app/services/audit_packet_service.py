@@ -9,6 +9,10 @@ from pathlib import Path
 from app.services.export_service import ExportService
 from app.services.import_warning_service import import_warning_review_rows
 from app.services.source_overlap_service import detect_source_overlaps
+from app.services.tax_evidence_service import (
+    get_tax_evidence_inventory_summary,
+    tax_evidence_type_label,
+)
 from utils import (
     FORM_8949_COLUMNS,
     format_quantity,
@@ -87,9 +91,12 @@ class AuditPacketService:
                 )
             )
 
+        manifest_rows.extend(self._copy_tax_evidence_files(packet_dir, transactions))
+
         self._write_methodology(packet_dir, transactions)
         self._write_tax_reports(packet_dir, transactions)
         self._write_tax_filing_alignment(packet_dir, transactions)
+        self._write_tax_evidence_inventory(packet_dir, transactions)
         self._write_holdings_reports(packet_dir, transactions)
         self._write_import_warnings(packet_dir, transactions)
         self._write_source_overlap_review(packet_dir, transactions)
@@ -106,6 +113,60 @@ class AuditPacketService:
             if source and os.path.exists(str(source)):
                 sources.add(str(source))
         return sorted(sources)
+
+    def _copy_tax_evidence_files(self, packet_dir, transactions):
+        rows = []
+        evidence_dir = packet_dir / "02_source_files" / "tax_evidence"
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+
+        for record in getattr(transactions, "tax_evidence_records", []) or []:
+            evidence_path = str(record.get("evidence_path") or "")
+            evidence_type = tax_evidence_type_label(record.get("evidence_type"))
+            role = f"Tax evidence for {record.get('year') or 'unassigned year'}: {evidence_type}"
+
+            if not evidence_path:
+                rows.append({
+                    "category": "tax_evidence",
+                    "role": role,
+                    "status": "REFERENCE",
+                    "source_path": record.get("evidence_label", ""),
+                    "packet_relative_path": "",
+                    "source_sha256": "",
+                    "packet_sha256": "",
+                    "size_bytes": "",
+                    "last_write_time": "",
+                })
+                continue
+
+            source_path = Path(evidence_path)
+            if not source_path.exists() or not source_path.is_file():
+                rows.append({
+                    "category": "tax_evidence",
+                    "role": role,
+                    "status": "MISSING",
+                    "source_path": str(source_path),
+                    "packet_relative_path": "",
+                    "source_sha256": "",
+                    "packet_sha256": "",
+                    "size_bytes": "",
+                    "last_write_time": "",
+                })
+                continue
+
+            destination = self._unique_destination(evidence_dir, source_path.name)
+            shutil.copy2(source_path, destination)
+            rows.append(
+                self._manifest_row(
+                    source_path=source_path,
+                    packet_path=destination,
+                    packet_dir=packet_dir,
+                    category="tax_evidence",
+                    role=role,
+                    status="COPIED",
+                )
+            )
+
+        return rows
 
     def _manifest_row(self, source_path, packet_path, packet_dir, category, role, status):
         source_path = Path(source_path)
@@ -232,6 +293,59 @@ class AuditPacketService:
 
         (packet_dir / "03_manifests" / "tax_filing_alignment.json").write_text(
             json.dumps(alignment, indent=2),
+            encoding="utf-8",
+        )
+
+    def _write_tax_evidence_inventory(self, packet_dir, transactions):
+        alignment = get_tax_filing_alignment_summary(transactions)
+        inventory = get_tax_evidence_inventory_summary(transactions, alignment)
+        with open(packet_dir / "01_reports" / "tax_evidence_inventory.csv", "w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(
+                file,
+                fieldnames=[
+                    "year",
+                    "calculated_totals",
+                    "filed_return_evidence",
+                    "payment_evidence",
+                    "crypto_total_evidence",
+                    "status",
+                    "what_gainz_found",
+                    "what_gainz_needs",
+                    "next_action",
+                ],
+            )
+            writer.writeheader()
+            for row in inventory["rows"]:
+                writer.writerow({
+                    "year": row["year"],
+                    "calculated_totals": row["calculated_totals"],
+                    "filed_return_evidence": row["filed_return_evidence"],
+                    "payment_evidence": row["payment_evidence"],
+                    "crypto_total_evidence": row["crypto_total_evidence"],
+                    "status": row["status"],
+                    "what_gainz_found": row["what_gainz_found"],
+                    "what_gainz_needs": row["what_gainz_needs"],
+                    "next_action": row["next_action"],
+                })
+
+        with open(packet_dir / "01_reports" / "tax_evidence_items.csv", "w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(
+                file,
+                fieldnames=["year", "evidence_type", "evidence_label", "evidence_path", "notes", "updated_at"],
+            )
+            writer.writeheader()
+            for record in inventory["evidence_records"]:
+                writer.writerow({
+                    "year": record.get("year") or "",
+                    "evidence_type": record["evidence_type_label"],
+                    "evidence_label": record.get("evidence_label", ""),
+                    "evidence_path": record.get("evidence_path", ""),
+                    "notes": record.get("notes", ""),
+                    "updated_at": record.get("updated_at", ""),
+                })
+
+        (packet_dir / "03_manifests" / "tax_evidence_inventory.json").write_text(
+            json.dumps(inventory, indent=2),
             encoding="utf-8",
         )
 
@@ -418,6 +532,7 @@ class AuditPacketService:
             "manifest_entries": len(manifest_rows),
             "form_8949_totals": form_8949_totals,
             "tax_filing_alignment": get_tax_filing_alignment_summary(transactions),
+            "tax_evidence_inventory": get_tax_evidence_inventory_summary(transactions),
             "holdings_reconciliation_rows": len(get_multi_asset_holdings_reconciliation_table_data(transactions)),
             "import_warning_count": len(getattr(transactions, "import_warnings", []) or []),
             "unresolved_import_warning_count": readiness["metrics"]["unresolved_import_warnings"],

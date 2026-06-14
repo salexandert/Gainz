@@ -46,6 +46,7 @@ def empty_transactions():
     transactions.import_warning_reviews = []
     transactions.basis_review_notes = []
     transactions.tax_year_records = []
+    transactions.tax_evidence_records = []
     transactions.view = ""
     transactions.transactions = []
     transactions.save = lambda description=None: None
@@ -976,6 +977,9 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertTrue((packet_path / "01_reports" / "import_warnings.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "source_overlap_review.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "tax_filing_alignment.csv").exists())
+            self.assertTrue((packet_path / "01_reports" / "tax_evidence_inventory.csv").exists())
+            self.assertTrue((packet_path / "01_reports" / "tax_evidence_items.csv").exists())
+            self.assertTrue((packet_path / "03_manifests" / "tax_evidence_inventory.json").exists())
             self.assertEqual(1, len(list((packet_path / "01_reports").glob("*.xlsx"))))
             self.assertEqual(1, len(list((packet_path / "02_source_files").glob("*.csv"))))
 
@@ -1004,6 +1008,7 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual(200, summary["form_8949_totals"]["total"]["gain_loss"])
             self.assertEqual(1, summary["import_warning_count"])
             self.assertEqual("Aligned", summary["tax_filing_alignment"]["overall_status"])
+            self.assertIn("tax_evidence_inventory", summary)
 
 
 if __name__ == "__main__":

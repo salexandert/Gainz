@@ -1,5 +1,6 @@
 import os
 import zipfile
+import hashlib
 from openpyxl import load_workbook
 import pandas as pd
 from conversion import Conversion
@@ -19,6 +20,15 @@ TAX_YEAR_RECORD_COLUMNS = [
     "tax_paid",
     "filing_status",
     "evidence_reference",
+    "notes",
+    "updated_at",
+]
+TAX_EVIDENCE_RECORD_COLUMNS = [
+    "evidence_id",
+    "year",
+    "evidence_type",
+    "evidence_label",
+    "evidence_path",
     "notes",
     "updated_at",
 ]
@@ -97,6 +107,7 @@ class Transactions:
         self.import_warning_reviews = []
         self.basis_review_notes = []
         self.tax_year_records = []
+        self.tax_evidence_records = []
 
         if view is not None:
             self.transactions = self.load(view)
@@ -236,6 +247,7 @@ class Transactions:
         self.import_warning_reviews = self._load_import_warning_reviews(workbook)
         self.basis_review_notes = self._load_basis_review_notes(workbook)
         self.tax_year_records = self._load_tax_year_records(workbook)
+        self.tax_evidence_records = self._load_tax_evidence_records(workbook)
 
         # Read Previously saved data into pandas df - Transactions
         trans_df = pd.read_excel(filename, sheet_name='All Transactions', converters = {'my_str_column': list})
@@ -464,6 +476,51 @@ class Transactions:
 
         return records
 
+    def _load_tax_evidence_records(self, workbook):
+        records = self._load_records_sheet(
+            workbook,
+            "Tax Evidence Records",
+            TAX_EVIDENCE_RECORD_COLUMNS,
+        )
+        normalized_records = []
+        for record in records:
+            year = record.get("year")
+            if year not in (None, ""):
+                try:
+                    year = int(float(year))
+                except (TypeError, ValueError):
+                    year = None
+
+            evidence_type = _string_or_empty(record.get("evidence_type")) or "other"
+            evidence_label = _string_or_empty(record.get("evidence_label"))
+            evidence_path = _string_or_empty(record.get("evidence_path"))
+            notes = _string_or_empty(record.get("notes"))
+            evidence_id = _string_or_empty(record.get("evidence_id")) or self._tax_evidence_id(
+                year,
+                evidence_type,
+                evidence_label,
+                evidence_path,
+            )
+            normalized_records.append({
+                "evidence_id": evidence_id,
+                "year": year,
+                "evidence_type": evidence_type,
+                "evidence_label": evidence_label,
+                "evidence_path": evidence_path,
+                "notes": notes,
+                "updated_at": _string_or_empty(record.get("updated_at")),
+            })
+
+        normalized_records.sort(
+            key=lambda record: (
+                -(record["year"] or 0),
+                record["evidence_type"],
+                record["evidence_label"],
+                record["evidence_path"],
+            )
+        )
+        return normalized_records
+
     def _load_import_warning_reviews(self, workbook):
         return self._load_records_sheet(
             workbook,
@@ -614,6 +671,61 @@ class Transactions:
         self.tax_year_records = records
         return record
 
+    def _tax_evidence_id(self, year, evidence_type, evidence_label, evidence_path):
+        identity = "|".join([
+            str(year or ""),
+            str(evidence_type or ""),
+            os.path.normcase(os.path.abspath(str(evidence_path or ""))) if evidence_path else "",
+            str(evidence_label or ""),
+        ])
+        return hashlib.sha256(identity.encode("utf-8")).hexdigest()[:16]
+
+    def set_tax_evidence_record(
+        self,
+        year=None,
+        evidence_type="other",
+        evidence_label="",
+        evidence_path="",
+        notes="",
+        evidence_id=None,
+    ):
+        if year in (None, ""):
+            normalized_year = None
+        else:
+            normalized_year = int(year)
+
+        record = {
+            "evidence_id": evidence_id or self._tax_evidence_id(
+                normalized_year,
+                evidence_type,
+                evidence_label,
+                evidence_path,
+            ),
+            "year": normalized_year,
+            "evidence_type": evidence_type or "other",
+            "evidence_label": evidence_label or "",
+            "evidence_path": evidence_path or "",
+            "notes": notes or "",
+            "updated_at": strftime("%Y-%m-%d %H:%M:%S"),
+        }
+
+        records = [
+            existing
+            for existing in getattr(self, "tax_evidence_records", []) or []
+            if str(existing.get("evidence_id")) != record["evidence_id"]
+        ]
+        records.append(record)
+        records.sort(
+            key=lambda item: (
+                -(item["year"] or 0),
+                item["evidence_type"],
+                item["evidence_label"],
+                item["evidence_path"],
+            )
+        )
+        self.tax_evidence_records = records
+        return record
+
     def save(self, description=None):
         save_as_filename = os.path.join(basedir, "saves", f"saved_{strftime('Y%Y-M%m-D%d_H%H-M%M-S%S')}.xlsx")
 
@@ -648,6 +760,10 @@ class Transactions:
             getattr(self, "tax_year_records", []),
             columns=TAX_YEAR_RECORD_COLUMNS,
         )
+        tax_evidence_records_df = pd.DataFrame(
+            getattr(self, "tax_evidence_records", []),
+            columns=TAX_EVIDENCE_RECORD_COLUMNS,
+        )
 
         # Extract all links to ensure they're saved properly
         links_data = []
@@ -673,6 +789,7 @@ class Transactions:
             import_warning_reviews_df.to_excel(writer, sheet_name="Import Warning Reviews", index=False)
             basis_review_notes_df.to_excel(writer, sheet_name="Basis Review Notes", index=False)
             tax_year_records_df.to_excel(writer, sheet_name="Tax Year Records", index=False)
+            tax_evidence_records_df.to_excel(writer, sheet_name="Tax Evidence Records", index=False)
 
         # Open file to add description and update revision number
         workbook = load_workbook(filename=save_as_filename)

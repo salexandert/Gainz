@@ -46,6 +46,12 @@ def _source_overlap_rows(transactions):
     return detect_source_overlaps(transactions)
 
 
+def _tax_evidence_inventory_summary(transactions, tax_alignment=None):
+    from app.services.tax_evidence_service import get_tax_evidence_inventory_summary
+
+    return get_tax_evidence_inventory_summary(transactions, alignment=tax_alignment)
+
+
 def format_quantity(quantity, decimals=8):
     """Format crypto quantities without exposing floating-point noise."""
     if isinstance(quantity, str):
@@ -604,7 +610,20 @@ def _missing_holdings_explanation_records(holdings_rows):
     return records
 
 
-def _missing_filed_total_records(tax_alignment):
+def _missing_filed_total_records(tax_alignment, tax_evidence_inventory=None):
+    if tax_evidence_inventory is not None:
+        return [
+            {
+                "year": row["year"],
+                "status": row["status"],
+                "status_class": row["status_class"],
+                "message": row["next_action"],
+                "what_gainz_found": row["what_gainz_found"],
+                "what_gainz_needs": row["what_gainz_needs"],
+            }
+            for row in tax_evidence_inventory["review_rows"]
+        ]
+
     return [
         {
             "year": row["year"],
@@ -628,6 +647,7 @@ def _reconciliation_checklist(
     unresolved_warning_rows,
     source_overlap_rows,
     tax_alignment,
+    tax_evidence_inventory,
     draft_acknowledged=False,
 ):
     current_holdings_entered = not any(row[6] == "Needs declared holdings" for row in holdings_rows)
@@ -635,7 +655,7 @@ def _reconciliation_checklist(
     import_warnings_reviewed = len(unresolved_warning_rows) == 0
     source_overlaps_reviewed = len(source_overlap_rows) == 0
     missing_basis_reviewed = len(missing_basis_rows) == 0
-    filed_totals_entered = tax_alignment["metrics"]["years_needing_review"] == 0
+    tax_evidence_reviewed = tax_evidence_inventory["metrics"]["years_needing_review"] == 0
 
     return [
         {
@@ -664,9 +684,9 @@ def _reconciliation_checklist(
             "detail": "No missing acquisition basis remains." if missing_basis_reviewed else "Some sales still need earlier acquisition basis or user research.",
         },
         {
-            "label": "Filed totals entered",
-            "complete": filed_totals_entered,
-            "detail": "Filed totals align with generated reports." if filed_totals_entered else "Record filed proceeds, basis, gain/loss, and tax paid in Tax Filing Review.",
+            "label": "Tax evidence inventory reviewed",
+            "complete": tax_evidence_reviewed,
+            "detail": "Year-level tax evidence is ready for review." if tax_evidence_reviewed else "Review filed returns, crypto totals, payment evidence, and zero/not-applicable confirmations by year.",
         },
         {
             "label": "Draft export acknowledged",
@@ -690,6 +710,7 @@ def get_audit_readiness_summary(transactions):
     missing_basis_rows = get_missing_basis_review_rows(transactions)
     source_overlap_rows = _source_overlap_rows(transactions)
     tax_alignment = get_tax_filing_alignment_summary(transactions)
+    tax_evidence_inventory = _tax_evidence_inventory_summary(transactions, tax_alignment)
 
     assets_with_unlinked_sales = [
         row["symbol"]
@@ -757,10 +778,10 @@ def get_audit_readiness_summary(transactions):
     if form_8949_totals["total"]["rows"] == 0 and any(row.get("num_sells", 0) > 0 for row in stats_rows):
         blockers.append("Sells exist, but no linked Form 8949-style rows can be generated yet.")
 
-    filed_total_records = _missing_filed_total_records(tax_alignment)
+    filed_total_records = _missing_filed_total_records(tax_alignment, tax_evidence_inventory)
     if filed_total_records:
         blockers.append(
-            "Record filed totals or payment evidence for: "
+            "Review tax evidence inventory for: "
             + ", ".join(str(row["year"]) for row in filed_total_records)
         )
 
@@ -779,7 +800,7 @@ def get_audit_readiness_summary(transactions):
         if source_overlap_rows:
             missing_parts.append("review of possible overlapping source files")
         if filed_total_records:
-            missing_parts.append("filed totals/payment evidence")
+            missing_parts.append("year-level tax evidence inventory")
 
         next_action = (
             "You are missing " + ", ".join(missing_parts) + "."
@@ -810,6 +831,7 @@ def get_audit_readiness_summary(transactions):
             "current_holdings": _missing_current_holdings_records(holdings_rows),
             "holdings_explanations": _missing_holdings_explanation_records(holdings_rows),
             "filed_totals": filed_total_records,
+            "tax_evidence": tax_evidence_inventory["review_rows"],
             "source_overlaps": source_overlap_rows,
         },
         "checklist": _reconciliation_checklist(
@@ -819,6 +841,7 @@ def get_audit_readiness_summary(transactions):
             unresolved_warning_rows,
             source_overlap_rows,
             tax_alignment,
+            tax_evidence_inventory,
         ),
         "metrics": {
             "transactions": len(getattr(transactions, "transactions", [])),
@@ -831,6 +854,8 @@ def get_audit_readiness_summary(transactions):
             "unresolved_import_warnings": len(unresolved_warning_rows),
             "missing_basis_rows": len(missing_basis_rows),
             "source_overlaps": len(source_overlap_rows),
+            "tax_evidence_years_needing_review": tax_evidence_inventory["metrics"]["years_needing_review"],
+            "tax_evidence_items": tax_evidence_inventory["metrics"]["evidence_items"],
             "form_8949_rows": form_8949_totals["total"]["rows"],
             "form_8949_proceeds": currency(form_8949_totals["total"]["proceeds"]),
             "form_8949_cost_basis": currency(form_8949_totals["total"]["cost_basis"]),
@@ -842,12 +867,14 @@ def get_audit_readiness_summary(transactions):
             "Form 8949 short-term and long-term detail CSVs",
             "Form 8949 totals CSV and JSON",
             "Tax filing review CSV and JSON",
+            "Tax evidence inventory CSV and JSON",
             "Holdings reconciliation CSV",
             "Current holdings lots CSV",
             "Import warnings CSV with review decisions",
             "Missing basis review CSV",
             "Source overlap review CSV",
             "Copied source files when still available on disk",
+            "Copied tax evidence files when evidence paths are available on disk",
             "Evidence manifest, packet inventory, and SHA-256 hashes",
             "Methodology memo",
         ],

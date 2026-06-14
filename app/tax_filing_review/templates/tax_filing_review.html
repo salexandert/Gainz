@@ -41,14 +41,22 @@
             <span>Payment Records</span>
             <strong>{{ alignment.metrics.payment_records }}</strong>
           </div>
+          <div class="audit-readiness-item">
+            <span>Evidence Items</span>
+            <strong>{{ evidence_inventory.metrics.evidence_items }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Inventory Review</span>
+            <strong>{{ evidence_inventory.metrics.years_needing_review }}</strong>
+          </div>
         </div>
 
         <div class="audit-next-action">
-          <strong>Review guidance:</strong> {{ alignment.next_action }}
+          <strong>Review guidance:</strong> {{ evidence_inventory.next_action }}
         </div>
 
         <p class="text-muted mb-0">
-          Gainz compares calculated proceeds, cost basis, and gain/loss against the figures you enter, using a ${{ "%.2f"|format(alignment.tolerance) }} tolerance for filing-rounding differences. This is documentation support only, not tax, legal, or financial advice.
+          Gainz separates calculated transaction totals, filed totals you record, local evidence references, payment evidence, and user confirmations. This is documentation support only, not tax, legal, or financial advice.
         </p>
       </div>
     </div>
@@ -64,6 +72,157 @@
   </div>
 </div>
 {% endif %}
+
+{% if saved_evidence is not none %}
+<div class="row">
+  <div class="col-md-12">
+    <div class="alert alert-success" role="alert">
+      Tax evidence inventory updated. {{ saved_evidence }} item{% if saved_evidence != "1" %}s{% endif %} added or refreshed.
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Tax Evidence Inventory</h5>
+        <p class="text-muted">
+          Add filed returns, Form 8949, Schedule D, payment receipts, crypto workbooks, broker forms, transaction CSVs, estimates, or zero/not-applicable confirmations. Gainz classifies filenames and notes, but does not read or interpret tax PDFs.
+        </p>
+
+        <div class="row">
+          <div class="col-md-6">
+            <form method="POST" action="{{ url_for('tax_filing_review_blueprint.scan_tax_evidence_folder') }}">
+              <label for="evidence_folder">Scan Local Evidence Folder</label>
+              <div class="input-group">
+                <input id="evidence_folder" name="evidence_folder" type="text" class="form-control" placeholder="Example: local Taxes folder path">
+                <div class="input-group-append">
+                  <button type="submit" class="btn btn-info">Scan Folder</button>
+                </div>
+              </div>
+              <div class="form-check mt-2">
+                <label class="form-check-label">
+                  <input class="form-check-input" type="checkbox" name="recursive" value="1" checked>
+                  Include subfolders
+                  <span class="form-check-sign"></span>
+                </label>
+              </div>
+            </form>
+          </div>
+          <div class="col-md-6">
+            <form method="POST" action="{{ url_for('tax_filing_review_blueprint.save_tax_evidence_record') }}" enctype="multipart/form-data">
+              <div class="row">
+                <div class="col-md-3">
+                  <label for="evidence_year">Year</label>
+                  <input id="evidence_year" name="evidence_year" type="number" min="2009" max="2100" step="1" class="form-control" placeholder="Auto">
+                </div>
+                <div class="col-md-4">
+                  <label for="evidence_type">Type</label>
+                  <select id="evidence_type" name="evidence_type" class="form-control">
+                    {% for value, label in evidence_type_choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-5">
+                  <label for="evidence_file">Upload Local Copy</label>
+                  <input id="evidence_file" name="evidence_file" type="file" class="form-control">
+                </div>
+              </div>
+              <div class="row mt-3">
+                <div class="col-md-7">
+                  <label for="tax_evidence_reference">Path Or Reference</label>
+                  <input id="tax_evidence_reference" name="evidence_reference" type="text" class="form-control" placeholder="Example: 2023 filed return PDF or local file path">
+                </div>
+                <div class="col-md-3">
+                  <label for="evidence_notes">Notes</label>
+                  <input id="evidence_notes" name="evidence_notes" type="text" class="form-control" placeholder="Example: virtual currency yes">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                  <button type="submit" class="btn btn-success btn-block">Add Evidence</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="audit-packet-list">
+          <h6>What Gainz Found / What Gainz Needs</h6>
+          <div class="table-responsive">
+            <table id="tax_evidence_inventory_table" class="table table-striped table-bordered" style="width:100%">
+              <thead>
+                <tr>
+                  <th>Year</th>
+                  <th>Gainz Calculated Totals</th>
+                  <th>Filed Return Evidence</th>
+                  <th>Payment Evidence</th>
+                  <th>Crypto Totals Evidence</th>
+                  <th>Status</th>
+                  <th>What Gainz Found</th>
+                  <th>What Gainz Needs</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in evidence_inventory.rows %}
+                <tr>
+                  <td>{{ row.year }}</td>
+                  <td>{{ row.calculated_totals }}</td>
+                  <td>{{ row.filed_return_evidence }}</td>
+                  <td>{{ row.payment_evidence }}</td>
+                  <td>{{ row.crypto_total_evidence }}</td>
+                  <td><span class="gainz-status-badge {{ row.status_class }}">{{ row.status }}</span></td>
+                  <td>{{ row.what_gainz_found }}</td>
+                  <td>{{ row.what_gainz_needs }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="8" class="text-muted">No calculated tax years or tax evidence records are available yet.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="audit-packet-list">
+          <h6>Evidence Items</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-striped">
+              <thead>
+                <tr>
+                  <th>Year</th>
+                  <th>Type</th>
+                  <th>Label</th>
+                  <th>Path</th>
+                  <th>Notes</th>
+                  <th>Updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for record in evidence_inventory.evidence_records %}
+                <tr>
+                  <td>{{ record.year or "Unassigned" }}</td>
+                  <td>{{ record.evidence_type_label }}</td>
+                  <td>{{ record.evidence_label }}</td>
+                  <td>{{ record.evidence_path or "Reference only" }}</td>
+                  <td>{{ record.notes }}</td>
+                  <td>{{ record.updated_at }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="6" class="text-muted">No tax evidence items have been recorded yet.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="row">
   <div class="col-md-12">

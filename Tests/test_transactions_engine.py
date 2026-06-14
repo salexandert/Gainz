@@ -8,6 +8,10 @@ import transactions as transactions_module
 from app.auto_link.routes import _preview_auto_link_failures
 from app.model.routes import _model_sale_payload
 from app.services.auto_link_service import AutoLinkService
+from app.services.tax_evidence_service import (
+    classify_tax_evidence,
+    get_tax_evidence_inventory_summary,
+)
 from app.stats.routes import _auto_fix_safe_issues
 from openpyxl import Workbook
 from transaction import Buy, Receive, Sell, Send
@@ -35,6 +39,7 @@ def empty_transactions():
     transactions.import_warning_reviews = []
     transactions.basis_review_notes = []
     transactions.tax_year_records = []
+    transactions.tax_evidence_records = []
     transactions.view = ""
     transactions.transactions = []
     transactions.saved_descriptions = []
@@ -348,6 +353,58 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual("Needs basis review", alignment["rows"][0]["status"])
         self.assertEqual(1, alignment["rows"][0]["unlinked_sell_count"])
 
+    def test_tax_evidence_inventory_classifies_filenames_and_specific_year_statuses(self):
+        transactions = empty_transactions()
+        buy = Buy("BTC", 1, datetime.datetime(2023, 1, 1), 100, "exchange")
+        sell = Sell("BTC", 1, datetime.datetime(2023, 6, 1), 300, "exchange")
+        sell.link_transaction(buy, 1)
+        transactions.transactions = [buy, sell]
+        transactions.set_tax_year_record(
+            2023,
+            reported_proceeds=300,
+            reported_cost_basis=100,
+            reported_gain_loss=200,
+            tax_paid=50,
+            filing_status="Filed",
+        )
+        transactions.set_tax_evidence_record(
+            year=2023,
+            evidence_type=classify_tax_evidence("2023_filed_return.pdf"),
+            evidence_label="2023_filed_return.pdf",
+        )
+        transactions.set_tax_evidence_record(
+            year=2023,
+            evidence_type=classify_tax_evidence("2023_payment_confirmation.pdf"),
+            evidence_label="2023_payment_confirmation.pdf",
+        )
+        transactions.set_tax_evidence_record(
+            year=2022,
+            evidence_type=classify_tax_evidence("2022_crypto_tax_workbook.xlsx"),
+            evidence_label="2022_crypto_tax_workbook.xlsx",
+        )
+        transactions.set_tax_evidence_record(
+            year=2020,
+            evidence_type=classify_tax_evidence("2020_filed_return.pdf"),
+            evidence_label="2020_filed_return.pdf",
+            notes="Virtual currency yes, crypto totals not found.",
+        )
+        transactions.set_tax_evidence_record(
+            year=2025,
+            evidence_type=classify_tax_evidence("2025_estimate_only.xlsx"),
+            evidence_label="2025_estimate_only.xlsx",
+        )
+
+        inventory = get_tax_evidence_inventory_summary(transactions)
+        statuses = {row["year"]: row["status"] for row in inventory["rows"]}
+
+        self.assertEqual("Ready", statuses[2023])
+        self.assertEqual("Workbook totals found, filed return missing", statuses[2022])
+        self.assertEqual("Return found, crypto totals not found", statuses[2020])
+        self.assertEqual("Estimate only", statuses[2025])
+        self.assertEqual(3, inventory["metrics"]["years_needing_review"])
+        needs_by_year = {row["year"]: row["what_gainz_needs"] for row in inventory["rows"]}
+        self.assertIn("2022: upload/record the filed return PDF", needs_by_year[2022])
+
     def test_tax_year_records_round_trip_through_save_file(self):
         original_basedir = transactions_module.basedir
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -379,6 +436,37 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual(300.0, record["reported_proceeds"])
         self.assertEqual(50.0, record["tax_paid"])
         self.assertEqual("2024 return", record["evidence_reference"])
+
+    def test_tax_evidence_records_round_trip_through_save_file(self):
+        original_basedir = transactions_module.basedir
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            (temp_path / "saves").mkdir()
+            transactions = empty_transactions()
+            transactions.save = Transactions.save.__get__(transactions, Transactions)
+            transactions.transactions = [
+                Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange")
+            ]
+            transactions.set_tax_evidence_record(
+                year=2024,
+                evidence_type="payment_receipt",
+                evidence_label="2024 payment receipt",
+                evidence_path=str(temp_path / "payment.pdf"),
+                notes="Proof of payment kept locally.",
+            )
+
+            try:
+                transactions_module.basedir = str(temp_path)
+                save_path = transactions.save(description="Tax evidence record test")
+                loaded = Transactions(save_path)
+            finally:
+                transactions_module.basedir = original_basedir
+
+        self.assertEqual(1, len(loaded.tax_evidence_records))
+        record = loaded.tax_evidence_records[0]
+        self.assertEqual(2024, record["year"])
+        self.assertEqual("payment_receipt", record["evidence_type"])
+        self.assertEqual("2024 payment receipt", record["evidence_label"])
 
     def test_review_decisions_round_trip_through_save_file(self):
         original_basedir = transactions_module.basedir
@@ -436,6 +524,25 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertTrue(any("Missing acquisition basis" in blocker for blocker in readiness["blockers"]))
         self.assertEqual(1, readiness["metrics"]["missing_basis_rows"])
         self.assertIn("BTC sale on 2024-02-01", readiness["missing_records"]["basis"][0]["message"])
+
+    def test_audit_readiness_names_tax_evidence_inventory_blockers(self):
+        transactions = empty_transactions()
+        transactions.set_tax_evidence_record(
+            year=2024,
+            evidence_type="crypto_workbook",
+            evidence_label="2024 crypto workbook",
+        )
+
+        readiness = get_audit_readiness_summary(transactions)
+
+        self.assertFalse(readiness["is_ready"])
+        self.assertEqual(1, readiness["metrics"]["tax_evidence_years_needing_review"])
+        self.assertIn("Review tax evidence inventory for: 2024", readiness["blockers"])
+        self.assertEqual(
+            "Workbook totals found, filed return missing",
+            readiness["missing_records"]["filed_totals"][0]["status"],
+        )
+
 
     def test_audit_readiness_is_ready_when_links_holdings_and_filed_totals_match(self):
         transactions = empty_transactions()

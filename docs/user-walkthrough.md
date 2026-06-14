@@ -154,6 +154,12 @@ The current-lot estimate explains which remaining acquisition lots support curre
 
 ## 7. Review Audit Packet Status
 
+Open **Tax Filing Review** before generating the packet.
+
+Use **Tax Evidence Inventory** to scan a local tax evidence folder or add one item at a time. Gainz classifies filenames and notes as filed returns, Form 8949, Schedule D, payment receipts, crypto workbooks, broker forms, transaction CSVs, estimates, or zero/not-applicable confirmations. The inventory separates calculated totals from filed totals, payment evidence, and user notes.
+
+Review **What Gainz Found / What Gainz Needs**. Each year should say whether the evidence is ready or whether the missing item is specific, such as filed totals, filed return evidence, payment evidence, crypto totals evidence, estimate-only evidence, or a zero/not-applicable confirmation.
+
 Open **Export**.
 
 The **Audit Packet Review Status** panel summarizes whether the packet is ready for review:
@@ -166,10 +172,11 @@ The **Audit Packet Review Status** panel summarizes whether the packet is ready 
 - Holdings review items.
 - Import warnings and review decisions.
 - Possible overlapping source files.
+- Tax evidence inventory items.
 - Missing acquisition basis before sales.
 - Review guidance.
 
-If the status is `Not ready`, review the listed blockers before using the packet. Gainz should tell you whether the blockers are missing basis before sales, current-holdings gaps, unreviewed import warnings, missing filed totals, or draft-only research items.
+If the status is `Not ready`, review the listed blockers before using the packet. Gainz should tell you whether the blockers are missing basis before sales, current-holdings gaps, unreviewed import warnings, overlapping source files, missing tax evidence, or draft-only research items.
 
 ![Gainz Export audit readiness panel]({{ '/assets/screenshots/gainz-export-audit-readiness.png' | relative_url }})
 {: .screenshot-frame }
@@ -186,12 +193,15 @@ The audit packet includes:
 - Excel workbook with transactions, stats, links, sales, and 8949 sheets.
 - Form 8949 short-term and long-term detail CSVs.
 - Form 8949 totals CSV and JSON.
+- Tax filing review CSV and JSON.
+- Tax evidence inventory CSV and JSON.
 - Holdings reconciliation CSV.
 - Current holdings lots CSV.
 - Import warnings CSV with review decisions.
 - Missing basis review CSV.
 - Source overlap review CSV.
 - Source files copied into the packet when they are still available on disk.
+- Tax evidence files copied into the packet when evidence paths are available on disk.
 - Evidence manifest.
 - Packet inventory.
 - SHA-256 hashes.

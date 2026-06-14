@@ -78,6 +78,10 @@
             <span>Source Overlaps</span>
             <strong>{{ audit_readiness.metrics.source_overlaps }}</strong>
           </div>
+          <div class="audit-readiness-item">
+            <span>Tax Evidence</span>
+            <strong>{{ audit_readiness.metrics.tax_evidence_years_needing_review }}</strong>
+          </div>
         </div>
 
         <div class="audit-next-action">
@@ -249,12 +253,29 @@
 
         {% if audit_readiness.missing_records.filed_totals %}
         <div class="audit-packet-list">
-          <h6>Filed totals and payment records</h6>
-          <ul>
-            {% for row in audit_readiness.missing_records.filed_totals %}
-            <li>{{ row.message }}</li>
-            {% endfor %}
-          </ul>
+          <h6>Tax evidence inventory</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-striped">
+              <thead>
+                <tr>
+                  <th>Year</th>
+                  <th>Status</th>
+                  <th>What Gainz Found</th>
+                  <th>What Gainz Needs</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in audit_readiness.missing_records.filed_totals %}
+                <tr>
+                  <td>{{ row.year }}</td>
+                  <td><span class="gainz-status-badge {{ row.status_class }}">{{ row.status }}</span></td>
+                  <td>{{ row.what_gainz_found }}</td>
+                  <td>{{ row.what_gainz_needs }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
           <a class="btn btn-sm btn-outline-primary" href="{{ url_for('tax_filing_review_blueprint.index') }}">Open Tax Filing Review</a>
         </div>
         {% endif %}
