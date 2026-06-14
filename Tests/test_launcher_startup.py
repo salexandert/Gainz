@@ -9,7 +9,7 @@ from app import create_app
 from app.base.models import User
 from app.extensions import db
 from configs.config import config_dict
-from launcher import find_available_port, health_url, server_url
+from launcher import credentials_file_path, find_available_port, health_url, server_url
 from password_reset import DOCUMENTED_RESET_PHRASE, reset_admin_password
 from port_guard import require_port_available
 from single_instance import SingleInstanceLock
@@ -66,6 +66,12 @@ class LauncherStartupTests(unittest.TestCase):
     def test_launcher_health_url_uses_local_server_url(self):
         self.assertEqual("http://127.0.0.1:5000", server_url(5000))
         self.assertEqual("http://127.0.0.1:5000/healthz", health_url(5000))
+
+    def test_launcher_credentials_path_points_to_instance_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            expected_path = Path(temp_dir) / "instance" / "first_run_credentials.txt"
+
+            self.assertEqual(str(expected_path), credentials_file_path(temp_dir))
 
     def test_single_instance_lock_blocks_competing_gainz_process(self):
         with tempfile.TemporaryDirectory() as temp_dir:

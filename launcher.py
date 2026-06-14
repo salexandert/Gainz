@@ -48,6 +48,10 @@ def support_url():
     return os.environ.get("GAINZ_SUPPORT_URL", DEFAULT_SUPPORT_URL)
 
 
+def credentials_file_path(base_dir=None):
+    return os.path.join(base_dir or app_base_dir(), "instance", "first_run_credentials.txt")
+
+
 def wait_for_lock_info(instance_lock, timeout=3):
     deadline = time.time() + timeout
     info = instance_lock.read_info()
@@ -107,6 +111,7 @@ class GainzLauncher(tk.Tk):
         )
         self.heading_text = tk.StringVar(value=f"Gainz {APP_VERSION} is starting")
         self.url_text = tk.StringVar(value=self.url)
+        self.credentials_path = credentials_file_path()
         self.credentials_text = tk.StringVar(value=self.credentials_message())
 
         self.build_ui()
@@ -114,6 +119,9 @@ class GainzLauncher(tk.Tk):
         self.after(250, self.check_startup)
 
     def credentials_message(self):
+        if os.path.exists(getattr(self, "credentials_path", "")):
+            return f"First-run credentials, when needed, are saved at:\n{self.credentials_path}"
+
         return "First run: create a local admin account in the browser. No Gainz account data leaves this computer."
 
     def build_ui(self):
@@ -136,8 +144,15 @@ class GainzLauncher(tk.Tk):
         url_value = ttk.Entry(url_frame, textvariable=self.url_text)
         url_value.pack(fill="x", pady=(4, 0))
 
-        credentials = ttk.Label(self, textvariable=self.credentials_text, wraplength=460)
-        credentials.pack(anchor="w", pady=(12, 0))
+        credentials_frame = ttk.Frame(self)
+        credentials_frame.pack(fill="x", pady=(12, 0))
+        credentials = ttk.Label(credentials_frame, textvariable=self.credentials_text, wraplength=350)
+        credentials.pack(side="left", fill="x", expand=True, anchor="w")
+        ttk.Button(
+            credentials_frame,
+            text="Copy Password Path",
+            command=self.copy_credentials_path,
+        ).pack(side="right", padx=(8, 0), anchor="n")
 
         button_frame = ttk.Frame(self)
         button_frame.pack(fill="x", side="bottom", pady=(18, 0))
@@ -191,6 +206,11 @@ class GainzLauncher(tk.Tk):
         self.clipboard_clear()
         self.clipboard_append(self.url)
         self.status.set("Link copied. Gainz is running.")
+
+    def copy_credentials_path(self):
+        self.clipboard_clear()
+        self.clipboard_append(self.credentials_path)
+        self.status.set("Password path copied.")
 
     def open_support(self):
         webbrowser.open(self.support_url)
