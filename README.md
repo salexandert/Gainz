@@ -93,6 +93,8 @@ Public desktop packages are published through GitHub Releases:
 
 Unzip the package and open `Gainz.exe` on Windows or `Gainz.app` on macOS. The launcher starts the local server, shows the web interface link, and keeps your transaction data on your machine.
 
+Windows may show a Microsoft Defender SmartScreen warning while Gainz is young and unsigned. Before clicking through that warning, verify that you downloaded Gainz from the official website or GitHub Releases and compare the SHA-256 checksum. See [Windows SmartScreen Warning For Gainz](docs/guides/windows-smartscreen.md).
+
 ## Common Workflow
 
 1. Learn the cost-basis question and collect source files.

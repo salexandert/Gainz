@@ -17,6 +17,7 @@ Focused guides:
 - [Coinbase missing cost basis troubleshooting](guides/coinbase-missing-cost-basis.md)
 - [Current holdings reconciliation](guides/current-holdings-reconciliation.md)
 - [Reset your local Gainz password](guides/local-password-reset.md)
+- [Windows SmartScreen warning for Gainz](guides/windows-smartscreen.md)
 - [Form 8949 audit packet guide](guides/crypto-form-8949-audit-packet.md)
 - [What to give your CPA](guides/crypto-cpa-checklist.md)
 - [Synthetic sample audit packet](guides/sample-crypto-audit-packet.md)
