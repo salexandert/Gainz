@@ -36,16 +36,11 @@
           {% for step in home_progress.steps %}
           <a
             href="{{ step.url }}"
-            class="gainz-home-flow-step is-{{ step.state }}"
-            {% if step.state in ['current', 'review', 'ready'] %}aria-current="step"{% endif %}
+            class="gainz-home-flow-step{% if step.state == 'complete' %} is-complete{% endif %}"
           >
-            <span class="gainz-home-flow-number">{{ step.number }}</span>
-            <div class="gainz-home-flow-heading">
-              <strong>{{ step.title }}</strong>
-              <small>{{ step.status }}</small>
-            </div>
+            <span>{{ step.number }}</span>
+            <strong>{{ step.title }}</strong>
             <p>{{ step.description }}</p>
-            <div class="gainz-home-flow-detail">{{ step.detail }}</div>
           </a>
           {% endfor %}
         </div>

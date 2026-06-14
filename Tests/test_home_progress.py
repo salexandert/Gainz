@@ -22,6 +22,17 @@ def progress_for(transactions):
         return _home_progress(transactions)
 
 
+def render_home_page(transactions):
+    app = create_app(config_dict["Debug"], selenium=True)
+    with app.test_request_context("/home/"):
+        return app.jinja_env.get_template("home.html").render(
+            home_progress=_home_progress(transactions),
+            store_url=None,
+            support_url=None,
+            btc_receive_address=None,
+        )
+
+
 def step_named(progress, title):
     return next(step for step in progress["steps"] if step["title"] == title)
 
@@ -98,6 +109,29 @@ class HomeProgressTests(unittest.TestCase):
         self.assertEqual("complete", step_named(progress, "Declare Holdings")["state"])
         self.assertEqual("complete", step_named(progress, "Reconcile")["state"])
         self.assertEqual("ready", step_named(progress, "Review & Export")["state"])
+
+    def test_home_page_keeps_simple_cards_and_only_marks_completed_steps(self):
+        transactions = empty_transactions()
+        transactions.transactions.append(
+            Buy(
+                symbol="BTC",
+                quantity=1,
+                time_stamp=datetime.datetime(2024, 1, 1),
+                usd_spot=100,
+                source="test.csv",
+            )
+        )
+        transactions.set_holdings("BTC", 1)
+
+        rendered = render_home_page(transactions)
+
+        self.assertIn("Load exchange CSVs or demo data.", rendered)
+        self.assertIn("Review missing activity before using reports.", rendered)
+        self.assertNotIn("gainz-home-flow-heading", rendered)
+        self.assertNotIn("gainz-home-flow-detail", rendered)
+        self.assertNotIn("Start by importing source files.", rendered)
+        self.assertNotIn("is-ready", rendered)
+        self.assertEqual(3, rendered.count("gainz-home-flow-step is-complete"))
 
 
 if __name__ == "__main__":
