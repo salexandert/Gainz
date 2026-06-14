@@ -3,9 +3,11 @@ import csv
 import json
 import tempfile
 import unittest
+import warnings
 from pathlib import Path
 from unittest.mock import patch
 
+from dateutil.parser import UnknownTimezoneWarning
 from openpyxl import load_workbook
 
 from app import create_app
@@ -465,6 +467,30 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual([], result["warnings"])
         self.assertEqual(["receive", "send"], [t.trans_type for t in transactions.transactions])
         self.assertEqual([100.0, 125.0], [t.usd_spot for t in transactions.transactions])
+
+    def test_import_service_handles_eastern_timezone_abbreviations_without_warning(self):
+        transactions = empty_transactions()
+        csv_text = "\n".join([
+            "Created At,Operation,Token Symbol,Token Quantity,Transaction Value",
+            "2019-02-01 09:00:00 EST,Receive,BTC,0.1,$350.00",
+            "2019-08-15 14:30:00 EDT,Send,BTC,0.05,$250.00",
+        ])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "wallet_export_eastern_time.csv"
+            upload_dir = Path(temp_dir) / "uploads"
+            source.write_text(csv_text, encoding="utf-8")
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                result = ImportService(upload_dir).import_upload(FileUpload(source), transactions)
+
+        unknown_timezone_warnings = [
+            warning for warning in caught
+            if issubclass(warning.category, UnknownTimezoneWarning)
+        ]
+        self.assertEqual([], unknown_timezone_warnings)
+        self.assertEqual(2, result["imported_count"])
+        self.assertEqual(["receive", "send"], [t.trans_type for t in transactions.transactions])
 
     def test_import_service_finds_header_row_after_preamble(self):
         transactions = empty_transactions()

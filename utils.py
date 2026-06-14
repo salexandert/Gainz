@@ -6,17 +6,12 @@ import datetime
 import os
 import math
 from decimal import Decimal, ROUND_FLOOR
-from dateutil import parser
-from dateutil.tz import gettz
+from date_parsing import GAINZ_TZINFOS, parse_gainz_datetime
 
 os.environ['REQUESTS_CA_BUNDLE'] = "certifi/cacert.pem"
 
 # Define the timezone information
-tzinfos = {
-    'PDT': gettz('America/Los_Angeles'),
-    'PST': gettz('America/Los_Angeles'),
-    # Add other timezones as needed
-}
+tzinfos = GAINZ_TZINFOS
 
 FIAT_ASSET_SYMBOLS = {"USD"}
 FORM_8949_COLUMNS = [
@@ -1969,7 +1964,7 @@ def get_trans_obj_from_table_data(transactions, symbol, trans_type, quantity, ti
 
             else:
                 trans2_time_stamp = trans.time_stamp.to_pydatetime()
-                time_stamp = parser.parse(time_stamp, tzinfos=tzinfos)
+                time_stamp = parse_gainz_datetime(time_stamp)
                 trans2_time_stamp = trans2_time_stamp.replace(tzinfo=tzutc())
                 # trans2_time_stamp = trans2_time_stamp.replace(microsecond=0)
 

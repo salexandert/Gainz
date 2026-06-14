@@ -14,8 +14,7 @@ from conversion import Conversion
 
 from wtforms.fields import DateTimeLocalField
 from utils import *
-
-import dateutil.parser
+from date_parsing import parse_gainz_datetime
 
 
 class Search(FlaskForm):
@@ -198,7 +197,7 @@ def link_button():
     # Get Sell Object 
     symbol = sell_data[1]
     sell_time_stamp_str = sell_data[2]
-    sell_time_stamp = dateutil.parser.parse(sell_time_stamp_str)
+    sell_time_stamp = parse_gainz_datetime(sell_time_stamp_str)
     sell_quantity = sell_data[3]
     sell_usd_spot = sell_data[5]
 
@@ -207,7 +206,7 @@ def link_button():
     
     # Get Buy Object
     buy_time_stamp_str = buy_data[2]
-    buy_time_stamp = dateutil.parser.parse(buy_time_stamp_str)
+    buy_time_stamp = parse_gainz_datetime(buy_time_stamp_str)
     buy_quantity = buy_data[3]
     link_quantity = buy_data[5]
 
@@ -252,7 +251,7 @@ def linkable_data():
     row_data = request.json['row_data']
     symbol = row_data[1]
     time_stamp_str = row_data[2]
-    time_stamp = dateutil.parser.parse(time_stamp_str)
+    time_stamp = parse_gainz_datetime(time_stamp_str)
     quantity = row_data[3]
     usd_spot = row_data[5]
 
@@ -820,7 +819,7 @@ def link_batch():
     # Get Sell Object 
     symbol = sell_data[1]
     time_stamp_str = sell_data[2]
-    time_stamp = dateutil.parser.parse(time_stamp_str)
+    time_stamp = parse_gainz_datetime(time_stamp_str)
     quantity = sell_data[3]
 
 
@@ -845,7 +844,7 @@ def link_batch():
         # Get Buy Object
         symbol = row_data[1]
         time_stamp_str = row_data[2]
-        time_stamp = dateutil.parser.parse(time_stamp_str)
+        time_stamp = parse_gainz_datetime(time_stamp_str)
         buy_quantity = row_data[3]
         link_quantity = row_data[5]
 
@@ -881,12 +880,12 @@ def delete_link_from_linked():
         
         # print(v)
 
-        sell_time_stamp =  dateutil.parser.parse(request.json['sell_time_stamp'])
+        sell_time_stamp = parse_gainz_datetime(request.json['sell_time_stamp'])
         
         symbol = request.json['symbol'] # incorportate in matched link!
 
 
-        buy_time_stamp = dateutil.parser.parse(v[0])
+        buy_time_stamp = parse_gainz_datetime(v[0])
         link_quantity = v[5]
 
         # print(link_quantity)
@@ -930,8 +929,8 @@ def delete_link():
         
         # print(v)
         symbol = v[0]
-        buy_time_stamp = dateutil.parser.parse(v[1])
-        sell_time_stamp = dateutil.parser.parse(v[2])
+        buy_time_stamp = parse_gainz_datetime(v[1])
+        sell_time_stamp = parse_gainz_datetime(v[2])
         link_quantity = v[5]
 
         # print(link_quantity)

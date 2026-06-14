@@ -3,22 +3,13 @@
 import csv
 import logging
 import pandas as pd
-import dateutil
 import os
 import re
 from openpyxl import load_workbook
-from dateutil import parser
-from dateutil.tz import gettz
+from date_parsing import parse_gainz_datetime
 from transaction import Buy, Sell, Send, Receive
 
 parsers_logger = logging.getLogger('parsers')
-
-# Define timezone mappings for dateutil.parser
-tzinfos = {
-    'PDT': -7 * 3600,  # Pacific Daylight Time
-    'PST': -8 * 3600,  # Pacific Standard Time
-    # Add other timezones as needed
-}
 
 COLUMN_ALIASES = {
     'date': [
@@ -784,7 +775,7 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
 
         # Detect the CSV format
         csv_format = detect_csv_format(file_path, header_row=header_row)
-        print(f"Detected CSV format: {csv_format}")
+        parsers_logger.info("Detected CSV format: %s", csv_format)
 
         # Read the CSV file
         header_row = int(header_row or 1)
@@ -842,7 +833,7 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
                     continue
 
                 quantity = parse_quantity_value(row['Asset Amount'])
-                time_stamp = parser.parse(row['Date'], tzinfos=tzinfos)
+                time_stamp = parse_gainz_datetime(row['Date'])
                 usd_spot = parse_money_value(row['Asset Price'])
 
                 # Ensure trans_type is a string before calling lower()

@@ -14,8 +14,7 @@ from conversion import Conversion
 
 from wtforms.fields import DateTimeLocalField
 from utils import *
-
-import dateutil.parser
+from date_parsing import parse_gainz_datetime
 
 
 class ManualTransaction(FlaskForm):
@@ -170,7 +169,7 @@ def delete_transactions():
     row_data = request.json['row_data']
     symbol = row_data[1]
     time_stamp_str = row_data[2]
-    time_stamp = dateutil.parser.parse(time_stamp_str)
+    time_stamp = parse_gainz_datetime(time_stamp_str)
     quantity = row_data[3]
     usd_spot = row_data[5]
 
@@ -201,7 +200,7 @@ def buy_convert():
     row_data = request.json['row_data']
     symbol = row_data[1]
     time_stamp_str = row_data[2]
-    time_stamp = dateutil.parser.parse(time_stamp_str)
+    time_stamp = parse_gainz_datetime(time_stamp_str)
     quantity = row_data[3]
     usd_spot = row_data[5]
 
@@ -250,7 +249,7 @@ def receive_convert():
         # Get selected Trans Object
         symbol = row_data[1]
         time_stamp_str = row_data[2]
-        time_stamp = dateutil.parser.parse(time_stamp_str)
+        time_stamp = parse_gainz_datetime(time_stamp_str)
         quantity = row_data[3]
         usd_spot = row_data[5]
 
@@ -293,7 +292,7 @@ def send_convert():
     row_data = request.json['row_data']
     symbol = row_data[1]
     time_stamp_str = row_data[2]
-    time_stamp = dateutil.parser.parse(time_stamp_str)
+    time_stamp = parse_gainz_datetime(time_stamp_str)
     quantity = row_data[3]
     usd_spot = row_data[5]
 

@@ -16,8 +16,6 @@ from conversion import Conversion
 from wtforms.fields import DateTimeLocalField
 from utils import *
 
-import dateutil.parser
-
 
 def _holdings_stats_rows(stats_table_data):
     return [

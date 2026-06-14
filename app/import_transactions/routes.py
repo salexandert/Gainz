@@ -14,13 +14,13 @@ from conversion import Conversion
 from wtforms.fields import DateTimeLocalField
 from utils import *
 
-import dateutil.parser
 import os
 from collections import Counter
 from datetime import datetime
 
 from flask import Blueprint, request
 from transactions import Transactions
+from date_parsing import parse_gainz_datetime
 from app.services.import_service import ImportService
 from app.services.import_warning_service import (
     clear_import_warnings_for_source,
@@ -84,7 +84,7 @@ def _manual_transaction_from_values(row, row_number=None):
         raise ValueError(f"{prefix}complete {', '.join(missing)}.")
 
     try:
-        parsed_timestamp = dateutil.parser.parse(timestamp)
+        parsed_timestamp = parse_gainz_datetime(timestamp)
     except (TypeError, ValueError):
         raise ValueError(f"{prefix}enter a valid timestamp.")
 

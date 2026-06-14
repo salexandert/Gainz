@@ -1200,7 +1200,7 @@ class Transactions:
         Returns:
             list: List of failures where sells couldn't be fully linked.
         """
-        from dateutil import parser
+        from date_parsing import parse_gainz_datetime
 
         buys = {}
         sells = {}
@@ -1229,16 +1229,15 @@ class Transactions:
         # Filter by date range if provided
         if date_range is not None:
             try:
-                tzinfos = {"EST": -5 * 3600, "EDT": -4 * 3600}
-                start_date = parser.parse(date_range['start_date'], tzinfos=tzinfos)
-                end_date = parser.parse(date_range['end_date'], tzinfos=tzinfos)
+                start_date = parse_gainz_datetime(date_range['start_date'])
+                end_date = parse_gainz_datetime(date_range['end_date'])
 
                 # Filter Transactions to date range
                 for key in sells.keys():
                     filtered_transactions = []
                     for trans in sells[key]:
                         if isinstance(trans.time_stamp, str):
-                            trans_time_stamp = parser.parse(trans.time_stamp, tzinfos=tzinfos)
+                            trans_time_stamp = parse_gainz_datetime(trans.time_stamp)
                         else:
                             trans_time_stamp = trans.time_stamp
 
