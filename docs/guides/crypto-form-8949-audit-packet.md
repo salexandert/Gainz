@@ -19,6 +19,7 @@ A Gainz audit packet can include:
 - Form 8949 totals CSV and JSON.
 - Tax filing review CSV and JSON.
 - Tax evidence inventory CSV and JSON.
+- Suggested filed totals CSV and JSON.
 - Holdings reconciliation CSV.
 - Current holdings lots CSV.
 - Import warnings CSV with review decisions.
@@ -41,6 +42,7 @@ Before generating a packet, check:
 - Import warnings have been reviewed.
 - Possible overlapping source files have been reviewed.
 - Tax evidence inventory says whether filed returns, crypto totals evidence, payment evidence, estimates, and zero/not-applicable confirmations are present by year.
+- Suggested filed totals have been confirmed, edited, or marked as needs research.
 - Declared holdings are entered for relevant assets.
 - Holdings items marked Needs Review are resolved or documented.
 - Missing basis items marked Needs user research are understood as draft-only blockers.

@@ -83,13 +83,91 @@
 </div>
 {% endif %}
 
+{% if saved_suggestion %}
+<div class="row">
+  <div class="col-md-12">
+    <div class="alert alert-success" role="alert">
+      Suggested filed totals review saved.
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Confirm Suggested Filed Totals</h5>
+        <p class="text-muted">
+          Gainz can scan local CSV, XLSX, and readable PDF evidence for possible filed totals. These are suggestions only. Confirm, edit, or mark a year as needs research before using the comparison.
+        </p>
+        <div class="table-responsive">
+          <table class="table table-striped table-bordered" style="width:100%">
+            <thead>
+              <tr>
+                <th>Year</th>
+                <th>Source</th>
+                <th>Confidence</th>
+                <th>Reported Proceeds</th>
+                <th>Reported Cost Basis</th>
+                <th>Reported Gain/Loss</th>
+                <th>Tax Paid</th>
+                <th>Review Note</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for candidate in suggested_totals %}
+              {% set suggested_form_id = "suggested-total-" ~ loop.index %}
+              <tr>
+                <td>
+                  {{ candidate.year or "Unassigned" }}
+                  <input form="{{ suggested_form_id }}" type="hidden" name="year" value="{{ candidate.year }}">
+                  <input form="{{ suggested_form_id }}" type="hidden" name="source_reference" value="{{ candidate.source_path or candidate.source_label }}">
+                  <input form="{{ suggested_form_id }}" type="hidden" name="source_note" value="{{ candidate.notes }}">
+                  <input form="{{ suggested_form_id }}" type="hidden" name="filing_status" value="Filed">
+                </td>
+                <td>
+                  <strong>{{ candidate.source_label }}</strong><br>
+                  <span class="text-muted">{{ candidate.evidence_type_label }}</span>
+                </td>
+                <td><span class="gainz-status-badge {{ candidate.confidence_class }}">{{ candidate.confidence }}</span></td>
+                <td><input form="{{ suggested_form_id }}" name="reported_proceeds" type="number" step="0.01" class="form-control" value="{{ candidate.reported_proceeds if candidate.reported_proceeds is not none else '' }}"></td>
+                <td><input form="{{ suggested_form_id }}" name="reported_cost_basis" type="number" step="0.01" class="form-control" value="{{ candidate.reported_cost_basis if candidate.reported_cost_basis is not none else '' }}"></td>
+                <td><input form="{{ suggested_form_id }}" name="reported_gain_loss" type="number" step="0.01" class="form-control" value="{{ candidate.reported_gain_loss if candidate.reported_gain_loss is not none else '' }}"></td>
+                <td><input form="{{ suggested_form_id }}" name="tax_paid" type="number" step="0.01" class="form-control" value="{{ candidate.tax_paid if candidate.tax_paid is not none else '' }}"></td>
+                <td>
+                  <input form="{{ suggested_form_id }}" name="notes" type="text" class="form-control" placeholder="Optional review note">
+                  <small class="text-muted">{{ candidate.notes }}</small>
+                </td>
+                <td>
+                  <form id="{{ suggested_form_id }}" method="POST" action="{{ url_for('tax_filing_review_blueprint.confirm_suggested_filed_totals') }}"></form>
+                  <button form="{{ suggested_form_id }}" type="submit" class="btn btn-sm btn-success btn-block">Confirm / Edit</button>
+                  <button form="{{ suggested_form_id }}" type="submit" class="btn btn-sm btn-warning btn-block" formaction="{{ url_for('tax_filing_review_blueprint.mark_suggested_filed_totals_needs_research') }}" formnovalidate>Needs Research</button>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="9" class="text-muted">
+                  No suggested totals found yet. Add or scan tax evidence files, then review any suggestions here.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="row">
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
         <h5 class="card-title">Tax Evidence Inventory</h5>
         <p class="text-muted">
-          Add filed returns, Form 8949, Schedule D, payment receipts, crypto workbooks, broker forms, transaction CSVs, estimates, or zero/not-applicable confirmations. Gainz classifies filenames and notes, but does not read or interpret tax PDFs.
+          Add filed returns, Form 8949, Schedule D, payment receipts, crypto workbooks, broker forms, transaction CSVs, estimates, or zero/not-applicable confirmations. Gainz classifies evidence first, then surfaces reviewable suggested totals when it can read clear source values.
         </p>
 
         <div class="row">

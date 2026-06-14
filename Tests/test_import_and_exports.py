@@ -873,6 +873,68 @@ class ImportAndExportTests(unittest.TestCase):
                 db.session.remove()
                 db.engine.dispose()
 
+    def test_tax_filing_review_confirms_suggested_totals_or_marks_research(self):
+        transactions = empty_transactions()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            evidence_path = Path(temp_dir) / "2024_crypto_tax_workbook.csv"
+            evidence_path.write_text(
+                "Year,Reported Proceeds,Reported Cost Basis,Reported Gain Loss,Tax Paid\n"
+                "2024,300,100,200,25\n",
+                encoding="utf-8",
+            )
+            transactions.set_tax_evidence_record(
+                year=2024,
+                evidence_type="crypto_workbook",
+                evidence_label=evidence_path.name,
+                evidence_path=str(evidence_path),
+            )
+
+            class RouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(RouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                confirm_response = client.post(
+                    "/tax_filing_review/suggested_totals/confirm",
+                    data={
+                        "year": "2024",
+                        "reported_proceeds": "300",
+                        "reported_cost_basis": "100",
+                        "reported_gain_loss": "200",
+                        "tax_paid": "25",
+                        "source_reference": evidence_path.name,
+                        "notes": "Reviewed source row.",
+                    },
+                )
+                research_response = client.post(
+                    "/tax_filing_review/suggested_totals/research",
+                    data={
+                        "year": "2023",
+                        "source_reference": "2023 filed return PDF",
+                        "notes": "Needs source review.",
+                    },
+                )
+
+            self.assertEqual(302, confirm_response.status_code)
+            self.assertEqual(302, research_response.status_code)
+            confirmed = transactions.get_tax_year_record(2024)
+            self.assertEqual(300.0, confirmed["reported_proceeds"])
+            self.assertEqual(25.0, confirmed["tax_paid"])
+            self.assertIn("Confirmed from Gainz", confirmed["notes"])
+            needs_research = transactions.get_tax_year_record(2023)
+            self.assertEqual("Needs research", needs_research["filing_status"])
+            self.assertEqual("Needs source review.", needs_research["notes"])
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
     def test_export_routes_use_requested_output_folder(self):
         transactions = empty_transactions()
         buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "demo")
@@ -964,6 +1026,18 @@ class ImportAndExportTests(unittest.TestCase):
         )
 
         with tempfile.TemporaryDirectory() as temp_dir:
+            tax_evidence_path = Path(temp_dir) / "2024_crypto_tax_workbook.csv"
+            tax_evidence_path.write_text(
+                "Year,Reported Proceeds,Reported Cost Basis,Reported Gain Loss,Tax Paid\n"
+                "2024,300,100,200,25\n",
+                encoding="utf-8",
+            )
+            transactions.set_tax_evidence_record(
+                year=2024,
+                evidence_type="crypto_workbook",
+                evidence_label=tax_evidence_path.name,
+                evidence_path=str(tax_evidence_path),
+            )
             packet_root = Path(temp_dir) / "packets"
             export_root = Path(temp_dir) / "exports"
             packet_path = Path(AuditPacketService(packet_root, export_root).create_packet(transactions))
@@ -979,7 +1053,9 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertTrue((packet_path / "01_reports" / "tax_filing_alignment.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "tax_evidence_inventory.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "tax_evidence_items.csv").exists())
+            self.assertTrue((packet_path / "01_reports" / "suggested_filed_totals.csv").exists())
             self.assertTrue((packet_path / "03_manifests" / "tax_evidence_inventory.json").exists())
+            self.assertTrue((packet_path / "03_manifests" / "suggested_filed_totals.json").exists())
             self.assertEqual(1, len(list((packet_path / "01_reports").glob("*.xlsx"))))
             self.assertEqual(1, len(list((packet_path / "02_source_files").glob("*.csv"))))
 
@@ -1004,11 +1080,18 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual("Aligned", tax_alignment_rows[0]["status"])
             self.assertEqual("25.00", tax_alignment_rows[0]["tax_paid"])
 
+            with open(packet_path / "01_reports" / "suggested_filed_totals.csv", newline="", encoding="utf-8") as file:
+                suggested_rows = list(csv.DictReader(file))
+            self.assertEqual("2024", suggested_rows[0]["year"])
+            self.assertEqual("High", suggested_rows[0]["confidence"])
+            self.assertEqual("200.00", suggested_rows[0]["reported_gain_loss"])
+
             summary = json.loads((packet_path / "03_manifests" / "audit_packet_summary.json").read_text(encoding="utf-8"))
             self.assertEqual(200, summary["form_8949_totals"]["total"]["gain_loss"])
             self.assertEqual(1, summary["import_warning_count"])
             self.assertEqual("Aligned", summary["tax_filing_alignment"]["overall_status"])
             self.assertIn("tax_evidence_inventory", summary)
+            self.assertEqual(1, len(summary["suggested_filed_totals"]))
 
 
 if __name__ == "__main__":

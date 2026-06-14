@@ -13,6 +13,7 @@ from app.services.tax_evidence_service import (
     get_tax_evidence_inventory_summary,
     tax_evidence_type_label,
 )
+from app.services.tax_total_extraction_service import get_suggested_filed_totals
 from utils import (
     FORM_8949_COLUMNS,
     format_quantity,
@@ -97,6 +98,7 @@ class AuditPacketService:
         self._write_tax_reports(packet_dir, transactions)
         self._write_tax_filing_alignment(packet_dir, transactions)
         self._write_tax_evidence_inventory(packet_dir, transactions)
+        self._write_suggested_filed_totals(packet_dir, transactions)
         self._write_holdings_reports(packet_dir, transactions)
         self._write_import_warnings(packet_dir, transactions)
         self._write_source_overlap_review(packet_dir, transactions)
@@ -349,6 +351,42 @@ class AuditPacketService:
             encoding="utf-8",
         )
 
+    def _write_suggested_filed_totals(self, packet_dir, transactions):
+        suggested_totals = get_suggested_filed_totals(transactions)
+        fieldnames = [
+            "year",
+            "source_label",
+            "evidence_type",
+            "confidence",
+            "reported_proceeds",
+            "reported_cost_basis",
+            "reported_gain_loss",
+            "tax_paid",
+            "matched_fields",
+            "notes",
+        ]
+        with open(packet_dir / "01_reports" / "suggested_filed_totals.csv", "w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in suggested_totals:
+                writer.writerow({
+                    "year": row.get("year") or "",
+                    "source_label": row.get("source_label", ""),
+                    "evidence_type": row.get("evidence_type_label", ""),
+                    "confidence": row.get("confidence", ""),
+                    "reported_proceeds": self._format_optional_money(row.get("reported_proceeds")),
+                    "reported_cost_basis": self._format_optional_money(row.get("reported_cost_basis")),
+                    "reported_gain_loss": self._format_optional_money(row.get("reported_gain_loss")),
+                    "tax_paid": self._format_optional_money(row.get("tax_paid")),
+                    "matched_fields": ", ".join(row.get("matched_fields", [])),
+                    "notes": row.get("notes", ""),
+                })
+
+        (packet_dir / "03_manifests" / "suggested_filed_totals.json").write_text(
+            json.dumps(suggested_totals, indent=2),
+            encoding="utf-8",
+        )
+
     def _write_form_8949_detail(self, path, rows):
         fieldnames = FORM_8949_COLUMNS + ["link_id", "buy_uid", "sell_uid"]
         with open(path, "w", newline="", encoding="utf-8") as file:
@@ -533,6 +571,7 @@ class AuditPacketService:
             "form_8949_totals": form_8949_totals,
             "tax_filing_alignment": get_tax_filing_alignment_summary(transactions),
             "tax_evidence_inventory": get_tax_evidence_inventory_summary(transactions),
+            "suggested_filed_totals": get_suggested_filed_totals(transactions),
             "holdings_reconciliation_rows": len(get_multi_asset_holdings_reconciliation_table_data(transactions)),
             "import_warning_count": len(getattr(transactions, "import_warnings", []) or []),
             "unresolved_import_warning_count": readiness["metrics"]["unresolved_import_warnings"],

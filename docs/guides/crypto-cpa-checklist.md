@@ -19,6 +19,7 @@ This checklist is for organizing crypto records before a tax professional review
   <li>A current holdings snapshot for each asset, including exchange balances and self-custody wallets.</li>
   <li>The Gainz audit packet generated from the reviewed save.</li>
   <li>Form 8949-style detail and totals from Gainz, separated by short-term and long-term rows.</li>
+  <li>Filed-total review notes showing which suggested values were confirmed, edited, or left as needs research.</li>
   <li>Holdings reconciliation showing declared holdings, calculated holdings, differences, and review status.</li>
   <li>Import warnings, skipped rows, unlinked sales, and any notes explaining unresolved items.</li>
   <li>Basis-method notes and any manual reclassification notes.</li>
@@ -39,6 +40,7 @@ This checklist is for organizing crypto records before a tax professional review
 - [Check stats and warnings]({{ '/user-walkthrough/#3-check-stats-and-warnings' | relative_url }}) in **Stats & Charts**.
 - [Declare current holdings]({{ '/user-walkthrough/#5-declare-current-holdings' | relative_url }}) in **Holdings & Accounting**.
 - [Review audit packet status]({{ '/user-walkthrough/#7-review-audit-packet-status' | relative_url }}) in **Export**.
+- [Confirm suggested filed totals]({{ '/user-walkthrough/#7-review-audit-packet-status' | relative_url }}) in **Tax Filing Review**.
 
 ## Related Guides
 

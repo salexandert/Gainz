@@ -13,6 +13,7 @@ from app.services.tax_evidence_service import (
     infer_tax_evidence_year,
     tax_evidence_type_label,
 )
+from app.services.tax_total_extraction_service import get_suggested_filed_totals
 
 from . import blueprint
 
@@ -76,21 +77,40 @@ def _add_tax_evidence_record(transactions, year, reference, evidence_type, notes
     )
 
 
+def _money_from_form_or_existing(form_name, record_field, existing_record):
+    raw_value = request.form.get(form_name)
+    if raw_value in (None, "") and existing_record:
+        return existing_record.get(record_field)
+
+    return parse_float_value(raw_value)
+
+
+def _existing_text_or_form(form_name, record_field, existing_record):
+    raw_value = request.form.get(form_name)
+    if raw_value in (None, "") and existing_record:
+        return existing_record.get(record_field, "")
+
+    return raw_value or ""
+
+
 @blueprint.route('/', methods=['GET'])
 @login_required
 def index():
     transactions = current_app.config['transactions']
     alignment = get_tax_filing_alignment_summary(transactions)
     evidence_inventory = get_tax_evidence_inventory_summary(transactions, alignment)
+    suggested_totals = get_suggested_filed_totals(transactions)
 
     return render_template(
         'tax_filing_review.html',
         alignment=alignment,
         evidence_inventory=evidence_inventory,
+        suggested_totals=suggested_totals,
         evidence_type_choices=TAX_EVIDENCE_TYPE_CHOICES,
         available_years=_available_years(alignment),
         saved_year=request.args.get("saved_year"),
         saved_evidence=request.args.get("saved_evidence"),
+        saved_suggestion=request.args.get("saved_suggestion"),
     )
 
 
@@ -113,6 +133,64 @@ def save_tax_year_record():
     transactions.save(description=f"Recorded filed tax totals for {year}")
 
     return redirect(url_for('tax_filing_review_blueprint.index', saved_year=year))
+
+
+@blueprint.route('/suggested_totals/confirm', methods=['POST'])
+@login_required
+def confirm_suggested_filed_totals():
+    transactions = current_app.config['transactions']
+    year = int(request.form.get("year"))
+    existing_record = transactions.get_tax_year_record(year)
+    source_reference = request.form.get("source_reference") or ""
+    source_note = request.form.get("source_note") or ""
+    user_note = request.form.get("notes") or ""
+    notes = "; ".join(
+        note
+        for note in (
+            "Confirmed from Gainz suggested filed totals review.",
+            source_note,
+            user_note,
+        )
+        if note
+    )
+
+    transactions.set_tax_year_record(
+        year=year,
+        reported_proceeds=_money_from_form_or_existing("reported_proceeds", "reported_proceeds", existing_record),
+        reported_cost_basis=_money_from_form_or_existing("reported_cost_basis", "reported_cost_basis", existing_record),
+        reported_gain_loss=_money_from_form_or_existing("reported_gain_loss", "reported_gain_loss", existing_record),
+        tax_paid=_money_from_form_or_existing("tax_paid", "tax_paid", existing_record),
+        filing_status=request.form.get("filing_status") or _existing_text_or_form("filing_status", "filing_status", existing_record) or "Filed",
+        evidence_reference=source_reference or _existing_text_or_form("evidence_reference", "evidence_reference", existing_record),
+        notes=notes,
+    )
+    transactions.save(description=f"Confirmed suggested filed totals for {year}")
+
+    return redirect(url_for('tax_filing_review_blueprint.index', saved_year=year, saved_suggestion=1))
+
+
+@blueprint.route('/suggested_totals/research', methods=['POST'])
+@login_required
+def mark_suggested_filed_totals_needs_research():
+    transactions = current_app.config['transactions']
+    year = int(request.form.get("year"))
+    existing_record = transactions.get_tax_year_record(year)
+    source_reference = request.form.get("source_reference") or _existing_text_or_form("evidence_reference", "evidence_reference", existing_record)
+    user_note = request.form.get("notes") or "Review source evidence before recording filed totals."
+
+    transactions.set_tax_year_record(
+        year=year,
+        reported_proceeds=existing_record.get("reported_proceeds") if existing_record else None,
+        reported_cost_basis=existing_record.get("reported_cost_basis") if existing_record else None,
+        reported_gain_loss=existing_record.get("reported_gain_loss") if existing_record else None,
+        tax_paid=existing_record.get("tax_paid") if existing_record else None,
+        filing_status="Needs research",
+        evidence_reference=source_reference,
+        notes=user_note,
+    )
+    transactions.save(description=f"Marked filed totals for {year} as needs research")
+
+    return redirect(url_for('tax_filing_review_blueprint.index', saved_year=year, saved_suggestion=1))
 
 
 @blueprint.route('/evidence', methods=['POST'])

@@ -158,6 +158,8 @@ Open **Tax Filing Review** before generating the packet.
 
 Use **Tax Evidence Inventory** to scan a local tax evidence folder or add one item at a time. Gainz classifies filenames and notes as filed returns, Form 8949, Schedule D, payment receipts, crypto workbooks, broker forms, transaction CSVs, estimates, or zero/not-applicable confirmations. The inventory separates calculated totals from filed totals, payment evidence, and user notes.
 
+Review **Confirm Suggested Filed Totals**. When Gainz can read clear values from local CSV, XLSX, or readable PDF evidence, it shows possible filed proceeds, cost basis, gain/loss, and tax-paid values with a confidence label and source file. Confirm, edit, or mark the year as needs research. Suggested totals are not treated as recorded filed totals until you save a review decision.
+
 Review **What Gainz Found / What Gainz Needs**. Each year should say whether the evidence is ready or whether the missing item is specific, such as filed totals, filed return evidence, payment evidence, crypto totals evidence, estimate-only evidence, or a zero/not-applicable confirmation.
 
 Open **Export**.
@@ -195,6 +197,7 @@ The audit packet includes:
 - Form 8949 totals CSV and JSON.
 - Tax filing review CSV and JSON.
 - Tax evidence inventory CSV and JSON.
+- Suggested filed totals CSV and JSON.
 - Holdings reconciliation CSV.
 - Current holdings lots CSV.
 - Import warnings CSV with review decisions.

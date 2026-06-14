@@ -12,6 +12,7 @@ from app.services.tax_evidence_service import (
     classify_tax_evidence,
     get_tax_evidence_inventory_summary,
 )
+from app.services.tax_total_extraction_service import get_suggested_filed_totals
 from app.stats.routes import _auto_fix_safe_issues
 from openpyxl import Workbook
 from transaction import Buy, Receive, Sell, Send
@@ -404,6 +405,51 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual(3, inventory["metrics"]["years_needing_review"])
         needs_by_year = {row["year"]: row["what_gainz_needs"] for row in inventory["rows"]}
         self.assertIn("2022: upload/record the filed return PDF", needs_by_year[2022])
+
+    def test_suggested_filed_totals_extracts_reviewable_values_from_csv(self):
+        transactions = empty_transactions()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            evidence_path = Path(temp_dir) / "2024_crypto_tax_workbook.csv"
+            evidence_path.write_text(
+                "Year,Reported Proceeds,Reported Cost Basis,Reported Gain Loss,Tax Paid\n"
+                "2024,300.00,100.00,200.00,25.00\n",
+                encoding="utf-8",
+            )
+            transactions.set_tax_evidence_record(
+                year=2024,
+                evidence_type="crypto_workbook",
+                evidence_label=evidence_path.name,
+                evidence_path=str(evidence_path),
+            )
+
+            suggestions = get_suggested_filed_totals(transactions)
+
+        self.assertEqual(1, len(suggestions))
+        suggestion = suggestions[0]
+        self.assertEqual(2024, suggestion["year"])
+        self.assertEqual(300.0, suggestion["reported_proceeds"])
+        self.assertEqual(100.0, suggestion["reported_cost_basis"])
+        self.assertEqual(200.0, suggestion["reported_gain_loss"])
+        self.assertEqual(25.0, suggestion["tax_paid"])
+        self.assertEqual("High", suggestion["confidence"])
+
+    def test_partial_tax_year_research_record_stays_needs_research(self):
+        transactions = empty_transactions()
+        buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange")
+        sell = Sell("BTC", 1, datetime.datetime(2024, 6, 1), 300, "exchange")
+        sell.link_transaction(buy, 1)
+        transactions.transactions = [buy, sell]
+        transactions.set_tax_year_record(
+            2024,
+            filing_status="Needs research",
+            evidence_reference="2024 return PDF",
+            notes="Review source evidence before recording filed totals.",
+        )
+
+        alignment = get_tax_filing_alignment_summary(transactions)
+
+        self.assertEqual("Needs research", alignment["rows"][0]["status"])
+        self.assertIn("enter filed proceeds", alignment["rows"][0]["next_action"])
 
     def test_tax_year_records_round_trip_through_save_file(self):
         original_basedir = transactions_module.basedir

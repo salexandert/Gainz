@@ -287,12 +287,36 @@ def _money_difference(calculated, reported):
     return round(float(calculated) - float(reported), 2)
 
 
+def _record_has_reported_totals(record):
+    return bool(
+        record
+        and record.get("reported_proceeds") is not None
+        and record.get("reported_cost_basis") is not None
+        and record.get("reported_gain_loss") is not None
+    )
+
+
 def _tax_alignment_status(record, differences, sell_counts, tolerance):
     if record is None:
         return {
             "status": "Needs filed totals",
             "status_class": "status-needs-declared-holdings",
             "next_action": "Enter the totals reported for this year and record the payment reference or filing note.",
+        }
+
+    if not _record_has_reported_totals(record):
+        filing_status = str(record.get("filing_status") or "").lower()
+        if "research" in filing_status:
+            return {
+                "status": "Needs research",
+                "status_class": "status-needs-review",
+                "next_action": "Review the evidence note for this year, then enter filed proceeds, cost basis, and gain/loss when confirmed.",
+            }
+
+        return {
+            "status": "Needs filed totals",
+            "status_class": "status-needs-declared-holdings",
+            "next_action": "Enter filed proceeds, cost basis, and gain/loss from the official filing or mark the year as needs research.",
         }
 
     if sell_counts["unlinked_sell_count"] > 0:
@@ -868,6 +892,7 @@ def get_audit_readiness_summary(transactions):
             "Form 8949 totals CSV and JSON",
             "Tax filing review CSV and JSON",
             "Tax evidence inventory CSV and JSON",
+            "Suggested filed totals CSV and JSON",
             "Holdings reconciliation CSV",
             "Current holdings lots CSV",
             "Import warnings CSV with review decisions",
