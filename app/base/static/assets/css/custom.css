@@ -276,6 +276,15 @@
     padding: 16px;
 }
 
+.holdings-resolution-panel .alert {
+    margin: 12px 0;
+}
+
+.holdings-resolution-panel .btn,
+#zero_holdings_button {
+    margin: 2px 4px 2px 0;
+}
+
 .holdings-difference-panel {
     background: #fff;
     border: 1px solid rgba(0, 0, 0, 0.08);

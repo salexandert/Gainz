@@ -507,6 +507,7 @@ $(document).ready(function() {
     var holdingsDifferenceYearlyTable = null;
     var holdingsDifferenceTransactionsTable = null;
     var holdingsClassificationReviewTable = null;
+    var holdingsCurrentBreakdown = null;
 
     function holdingsParseQuantity(value) {
         if (value === undefined || value === null || value === 'N/A') {
@@ -587,6 +588,20 @@ $(document).ready(function() {
         return table.row({selected:true}).data();
     }
 
+    function holdingsSelectAsset(asset) {
+        var selectedRow = null;
+        table.rows().deselect();
+        table.rows(function(index, rowData) {
+            if (rowData && rowData[0] == asset) {
+                selectedRow = rowData;
+                return true;
+            }
+            return false;
+        }).select();
+
+        return selectedRow;
+    }
+
     function holdingsScrollTo(selector) {
         var target = $(selector);
         if (target.length == 0) {
@@ -598,12 +613,41 @@ $(document).ready(function() {
         }, 250);
     }
 
+    function holdingsHideSendDisposalRecommendation() {
+        $('#holdings_send_disposal_recommendation').hide();
+        $('#holdings_send_disposal_text').text('');
+    }
+
+    function holdingsRenderSendDisposalRecommendation(summary) {
+        var asset = summary.asset || (holdingsSelectedAssetRow() || [])[0] || '';
+        var recommendedQuantity = holdingsParseQuantity(summary.recommended_disposal_quantity);
+        var sendQuantity = holdingsParseQuantity(summary.send_quantity);
+        var difference = holdingsParseQuantity(summary.difference);
+
+        if (!summary.has_send_disposal_recommendation || !recommendedQuantity || recommendedQuantity <= 0) {
+            holdingsHideSendDisposalRecommendation();
+            return;
+        }
+
+        $('#convert_quantity').val(holdingsFormatQuantity(recommendedQuantity));
+        $('#holdings_send_disposal_text').text(
+            'Gainz found a ' + holdingsFormatQuantity(difference) + ' ' + asset +
+            ' review difference and ' + holdingsFormatQuantity(sendQuantity) +
+            ' ' + asset + ' of imported sends. If source records show ' +
+            holdingsFormatQuantity(recommendedQuantity) +
+            ' left your ownership or was sent elsewhere and traded/sold, classify that documented quantity as disposals and run FIFO. Owner transfers should remain transfers.'
+        );
+        $('#holdings_send_disposal_recommendation').show();
+    }
+
     function holdingsClearDifferenceBreakdown() {
+        holdingsCurrentBreakdown = null;
         $('#holdings_difference_breakdown').hide();
         $('#holdings_difference_formula').text('Select an asset to see how the difference was calculated.');
         $('#holdings_difference_declared_formula, #holdings_difference_transfer_formula, #holdings_difference_interpretation').text('');
         $('#holdings_difference_transaction_count').text('0 transactions');
         $('#holdings_breakdown_buys, #holdings_breakdown_sells, #holdings_breakdown_sends, #holdings_breakdown_receives, #holdings_breakdown_imported_net').text('--');
+        holdingsHideSendDisposalRecommendation();
 
         if (holdingsClassificationReviewTable) {
             holdingsClassificationReviewTable.clear().draw();
@@ -619,11 +663,13 @@ $(document).ready(function() {
     }
 
     function holdingsShowDifferenceLoading(rowData) {
+        holdingsCurrentBreakdown = null;
         $('#holdings_difference_breakdown').show();
         $('#holdings_difference_formula').text('Loading ' + rowData[0] + ' timeline...');
         $('#holdings_difference_declared_formula, #holdings_difference_transfer_formula, #holdings_difference_interpretation').text('');
         $('#holdings_difference_transaction_count').text('Loading');
         $('#holdings_breakdown_buys, #holdings_breakdown_sells, #holdings_breakdown_sends, #holdings_breakdown_receives, #holdings_breakdown_imported_net').text('--');
+        holdingsHideSendDisposalRecommendation();
 
         if (holdingsClassificationReviewTable) {
             holdingsClassificationReviewTable.clear().draw();
@@ -639,6 +685,7 @@ $(document).ready(function() {
     }
 
     function holdingsRenderDifferenceBreakdown(data) {
+        holdingsCurrentBreakdown = data || null;
         var summary = data && data.summary ? data.summary : {};
         var transactionCount = summary.transaction_count || 0;
 
@@ -656,6 +703,7 @@ $(document).ready(function() {
             .removeClass('status-matched status-verified status-needs-declared-holdings status-mismatch status-needs-review status-unlinked-sales')
             .addClass(holdingsStatusClass(summary.status))
             .text(transactionCount + ' transaction' + (transactionCount == 1 ? '' : 's'));
+        holdingsRenderSendDisposalRecommendation(summary);
 
         if (holdingsClassificationReviewTable) {
             holdingsClassificationReviewTable.clear();
@@ -817,6 +865,7 @@ $(document).ready(function() {
             $('#holdings_expected_from_activity, #holdings_declared_current, #holdings_difference, #holdings_unlinked_sales').text('--');
             $('#holdings_next_action').text('Pick an asset to see the next action.');
             $('#holdings_quantity').attr('placeholder', 'Select an asset first').val('');
+            $('#convert_quantity').attr('placeholder', 'Quantity to resolve').val('');
             holdingsSetBadge('Needs asset');
             holdingsClearDifferenceBreakdown();
             return;
@@ -834,12 +883,14 @@ $(document).ready(function() {
         $('#holdings_expected_from_activity').text(holdingsFormatQuantity(expectedHoldings));
         $('#holdings_unlinked_sales').text(holdingsFormatQuantity(soldUnlinked));
         $('#holdings_quantity').attr('placeholder', 'Current holding for ' + asset);
-        $('#convert_text').text('Use these tools only when supported by source records. If you know the missing transaction, adding the actual transaction is preferable to automatic classification. Self-transfers should stay as transfers.');
+        $('#convert_quantity').attr('placeholder', 'Quantity to classify for ' + asset);
+        $('#convert_text').text('Use these tools only when supported by source records. If you know the missing transaction, adding the actual transaction is preferable to automatic classification. Owner transfers should stay as transfers.');
 
         if (holdings === null) {
             $('#holdings_declared_current').text('--');
             $('#holdings_difference').text('--');
             $('#holdings_quantity').val('');
+            $('#convert_quantity').val('');
             $('#holdings_next_action').text('Enter the amount of ' + asset + ' you want Gainz to use for reconciliation. Keep source records for the amount entered.');
             holdingsSetBadge('Needs declared holdings');
             return;
@@ -858,10 +909,12 @@ $(document).ready(function() {
             holdingsSetBadge('Unlinked sales');
         } else if (difference > 0) {
             $('#holdings_next_action').text('The calculated net from imported buys and sells is higher than declared ' + asset + '. Review source records for missing disposals, transfers, losses, or other activity before using generated reports.');
-            $('#convert_text').text('Gainz can record documented taxable disposals or mark possible losses for review. Use this only with source records; self-transfers should stay as transfers.');
+            $('#convert_quantity').val(holdingsFormatQuantity(difference));
+            $('#convert_text').text('If source records show selected sends left your ownership or were sent elsewhere and traded/sold, classify only the documented quantity as disposals. Owner transfers should stay as transfers.');
             holdingsSetBadge('Needs Review');
         } else {
             $('#holdings_next_action').text('Declared holdings are higher than imported buys and sells currently explain. Review missing acquisitions, income, gifts, transfers, or other records that may need basis support.');
+            $('#convert_quantity').val('');
             holdingsSetBadge('Needs Review');
         }
     }
@@ -1091,7 +1144,11 @@ $(document).ready(function() {
                 holdingsLoadDifferenceBreakdown(updatedRow || rowData);
                 holdingsLoadPrecheck(updatedRow || rowData);
                 $('#holdings_quantity').focus().select();
-                $('#holdings_save_message').text(data['message'] || 'Declared holdings saved.').show();
+                $('#holdings_save_message')
+                    .removeClass('alert-warning')
+                    .addClass('alert-success')
+                    .text(data['message'] || 'Declared holdings saved.')
+                    .show();
             },
             error: function () {
                 alert("Declared holdings could not be saved. Please try again.");
@@ -1100,6 +1157,22 @@ $(document).ready(function() {
                 saveButton.prop('disabled', false).text('Save Declared Holdings');
             },
         });
+    });
+
+    $("#zero_holdings_button").click(function(){
+        var rowData = holdingsSelectedAssetRow();
+
+        if (!rowData) {
+            alert("Select an asset first.");
+            return;
+        }
+
+        if (!window.confirm('Save declared holdings of 0 for ' + rowData[0] + '? Use this only when your records show you currently hold none of this asset.')) {
+            return;
+        }
+
+        $('#holdings_quantity').val('0');
+        $('#submit_holdings_button').trigger('click');
     });
 
     $("#holdings_run_fifo_button").click(function(){
@@ -1142,21 +1215,79 @@ $(document).ready(function() {
         });
     });
 
-    $("#sends_to_sells_button").click(function(){
+    function holdingsClassifyDocumentedSends() {
+        var rowData = holdingsSelectedAssetRow();
+        var quantity = $('#convert_quantity').val();
+        var asset = rowData ? rowData[0] : null;
+
+        if (!rowData) {
+            alert("Select an asset first.");
+            return;
+        }
+
+        if (!quantity || (holdingsParseQuantity(quantity) || 0) <= 0) {
+            alert("Enter the documented send quantity to classify.");
+            return;
+        }
+
+        if (!window.confirm('Classify ' + quantity + ' ' + asset + ' of documented sends as disposals and run FIFO Auto Link? Owner transfers should remain transfers.')) {
+            return;
+        }
+
+        $('#sends_to_sells_button, #classify_sends_fifo_button').prop('disabled', true).text('Classifying...');
+        $('#holdings_save_message').hide().text('');
+
         $.ajax({
             type: "POST",
             url: "/holdings_accounting/sends_to_sells",
             data: JSON.stringify({
-                'quantity': $('#convert_quantity').val(),
-                'asset': $('#eh_stats_datatable').DataTable().row( {selected:true} ).data()
+                'quantity': quantity,
+                'asset': rowData,
+                'auto_link': true
               }),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
-                alert(data)
-                location.reload()
+                holdingsRowsSet(data['stats_table_rows']);
+                holdingsSetSummary(data['holdings_summary']);
+
+                var updatedRow = holdingsSelectAsset(asset);
+                holdingsRenderSelection(updatedRow || rowData);
+                holdingsRenderDifferenceBreakdown(data['difference_breakdown']);
+                holdingsLoadPrecheck(updatedRow || rowData);
+
+                var message = data['message'] || 'Documented sends classified for review.';
+                if (data['auto_link_failures'] && data['auto_link_failures'].length > 0) {
+                    message += ' Remaining basis review: ' + data['auto_link_failures'].map(function(failure) {
+                        return failure.asset + ' ' + failure.unlinked_quantity + ' unlinked';
+                    }).join('; ') + '.';
+                    $('#holdings_save_message')
+                        .removeClass('alert-success')
+                        .addClass('alert-warning');
+                } else {
+                    $('#holdings_save_message')
+                        .removeClass('alert-warning')
+                        .addClass('alert-success');
+                }
+                $('#holdings_save_message').text(message).show();
+                holdingsScrollTo('#holdings_save_message');
+            },
+            error: function (xhr) {
+                var message = 'Documented sends could not be classified. Review the selected asset and quantity, then try again.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    message = xhr.responseJSON.message;
+                }
+                alert(message);
+            },
+            complete: function () {
+                $('#sends_to_sells_button').prop('disabled', false).text('Classify Documented Sends as Disposals');
+                $('#classify_sends_fifo_button').prop('disabled', false).text('Classify Documented Sends And Run FIFO');
             },
         });
+    }
+
+    $("#sends_to_sells_button, #classify_sends_fifo_button").click(function(){
+        holdingsClassifyDocumentedSends();
     });
 
     $("#receives_to_buys_button").click(function(){
@@ -2083,6 +2214,35 @@ $(document).ready(function() {
         },
     });
 
+    function exportOutputPayload() {
+        return {
+            'output_dir': $('#export_output_dir').val()
+        };
+    }
+
+    function exportResponsePath(data) {
+        if (typeof data == 'string') {
+            return data;
+        }
+
+        return data && data.path ? data.path : '';
+    }
+
+    function exportReadyForOutput() {
+        var isReady = String($('#draft_export_ack_panel').data('ready')) == '1';
+        if (isReady || $('#draft_export_ack').is(':checked')) {
+            return true;
+        }
+
+        $('#export_button_text').text('Check the draft-output acknowledgement before generating files with unresolved review items.');
+        return false;
+    }
+
+    $('#use_detected_tax_folder_button').click(function() {
+        $('#export_output_dir').val($(this).data('folder'));
+        $('#export_button_text').text('Output folder set to detected tax folder.');
+    });
+
     // $('#exportpage_stats_datatable tbody').on( 'click', 'tr', function () {
     //     console.log( table.row( this ).data() );
     //     $.ajax({
@@ -2107,39 +2267,55 @@ $(document).ready(function() {
 
 
     $("#export_button").click(function(){
+        if (!exportReadyForOutput()) {
+            return;
+        }
+
         $('#export_button_text').text('Creating Excel export...');
         $.ajax({
             type: "POST",
             url: "/export/save",
-            data: JSON.stringify({
-                'data': $('#exportpage_stats_datatable').DataTable().row( {selected:true} ).data(),
-              }),
+            data: JSON.stringify(exportOutputPayload()),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
-                $('#export_button_text').text("Export saved to " + data);
-                alert("Saving Export as " + data)
+                var outputPath = exportResponsePath(data);
+                $('#export_button_text').text("Export saved to " + outputPath);
+                alert("Export saved to " + outputPath)
             },
             error: function (xhr) {
-                $('#export_button_text').text("Export failed. Check the app log for details.");
+                var message = "Export failed. Check the output folder and app log, then try again.";
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    message = xhr.responseJSON.message;
+                }
+                $('#export_button_text').text(message);
             },
         });
     });
 
     $("#audit_packet_button").click(function(){
+        if (!exportReadyForOutput()) {
+            return;
+        }
+
         $('#export_button_text').text('Generating audit packet...');
         $.ajax({
             type: "POST",
             url: "/export/audit_packet",
-            data: JSON.stringify({}),
+            data: JSON.stringify(exportOutputPayload()),
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
-                $('#export_button_text').text("Audit packet saved to " + data);
-                alert("Audit packet saved to " + data)
+                var outputPath = exportResponsePath(data);
+                $('#export_button_text').text("Audit packet saved to " + outputPath);
+                alert("Audit packet saved to " + outputPath)
             },
             error: function (xhr) {
-                $('#export_button_text').text("Audit packet failed. Check the readiness blockers and app log, then try again.");
+                var message = "Audit packet failed. Check the readiness blockers, output folder, and app log, then try again.";
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    message = xhr.responseJSON.message;
+                }
+                $('#export_button_text').text(message);
             },
         });
     });

@@ -44,6 +44,47 @@ def _holdings_summary(transactions):
     }
 
 
+def _request_asset(payload):
+    asset_data = payload.get("asset")
+    if isinstance(asset_data, list) and asset_data:
+        return str(asset_data[0]).upper()
+
+    if isinstance(asset_data, str):
+        return asset_data.upper()
+
+    return ""
+
+
+def _auto_link_failures_for_json(failures):
+    rows = []
+    for failure in failures or []:
+        timestamp = failure.get("timestamp")
+        if hasattr(timestamp, "strftime"):
+            timestamp = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+
+        rows.append({
+            "asset": failure.get("asset", ""),
+            "unlinked_quantity": format_quantity(failure.get("unlinkable", 0)),
+            "sell_quantity": format_quantity(failure.get("quantity", 0)),
+            "timestamp": str(timestamp or ""),
+            "method": failure.get("algo", ""),
+        })
+
+    return rows
+
+
+def _holdings_update_payload(transactions, asset, message, links_created=0, failures=None):
+    stats_table_data = get_stats_table_data(transactions)
+    return {
+        "message": message,
+        "links_created": links_created,
+        "auto_link_failures": _auto_link_failures_for_json(failures),
+        "stats_table_rows": _holdings_stats_rows(stats_table_data),
+        "holdings_summary": _holdings_summary(transactions),
+        "difference_breakdown": get_holdings_difference_breakdown(transactions, asset),
+    }
+
+
 @blueprint.route('/', methods=['POST', 'GET'])
 @login_required
 def holdings_accounting():
@@ -163,13 +204,47 @@ def difference_breakdown():
 def sends_to_sells():
 
     transactions = current_app.config['transactions']
-    asset = request.json['asset'][0]
-    amount_to_convert = float(request.json['quantity'])
+    payload = request.get_json(silent=True) or {}
+    asset = _request_asset(payload)
 
+    try:
+        amount_to_convert = float(payload.get('quantity') or 0)
+    except (TypeError, ValueError):
+        amount_to_convert = 0
+
+    if not asset:
+        return jsonify({"message": "Select an asset before classifying documented sends."}), 400
+
+    if amount_to_convert <= 0:
+        return jsonify({"message": "Enter a quantity greater than 0 before classifying documented sends."}), 400
+
+    links_before = len(transactions.links)
     result_str = transactions.convert_sends_to_sells(asset=asset, amount_to_convert=amount_to_convert)
-    transactions.save(description="Recorded documented sends as taxable disposals")
+    failures = []
 
-    return jsonify(result_str)
+    if payload.get("auto_link", True):
+        failures = transactions.auto_link(asset=asset, algo="fifo")
+
+    links_created = max(len(transactions.links) - links_before, 0)
+    transactions.save(description="Recorded documented sends as taxable disposals and ran FIFO")
+
+    if links_created:
+        result_str = f"{result_str} FIFO linked {links_created} basis lot(s)."
+
+    if failures:
+        result_str = (
+            f"{result_str} {len(failures)} sale record(s) still need basis review."
+        )
+
+    return jsonify(
+        _holdings_update_payload(
+            transactions,
+            asset,
+            result_str,
+            links_created=links_created,
+            failures=failures,
+        )
+    )
 
 
 

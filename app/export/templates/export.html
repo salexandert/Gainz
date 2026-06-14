@@ -116,6 +116,60 @@
 </div>
 <!-- /Audit Readiness -->
 
+<!-- Output Location -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <h4 class="card-title">Output Location</h4>
+        <p class="card-category">Choose where Gainz writes the Excel workbook or audit packet on this computer.</p>
+
+        <div class="form-group">
+          <label for="export_output_dir">Folder</label>
+          <input
+            id="export_output_dir"
+            type="text"
+            class="form-control"
+            value="{{ detected_tax_folder or audit_packet_folder }}"
+            aria-describedby="export_output_help"
+          >
+          <small id="export_output_help" class="form-text text-muted">
+            Default workbook folder: {{ export_folder }}. Default audit packet folder: {{ audit_packet_folder }}.
+          </small>
+        </div>
+
+        {% if detected_tax_folder %}
+        <button
+          type="button"
+          id="use_detected_tax_folder_button"
+          class="btn btn-sm btn-outline-primary"
+          data-folder="{{ detected_tax_folder }}"
+        >
+          Use Detected Tax Folder
+        </button>
+        {% endif %}
+
+        {% if not audit_readiness.is_ready %}
+        <div id="draft_export_ack_panel" class="alert alert-warning mt-3" role="alert" data-ready="0">
+          <div class="form-check">
+            <label class="form-check-label">
+              <input id="draft_export_ack" class="form-check-input" type="checkbox">
+              Generate draft output with unresolved review items included.
+            </label>
+          </div>
+          <p class="mb-0">
+            Draft output is useful for review, but should not be treated as filing-ready until blockers and warnings are resolved or documented.
+          </p>
+        </div>
+        {% else %}
+        <div id="draft_export_ack_panel" data-ready="1" style="display: none;"></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Output Location -->
+
 
 <!-- All Asset Stats Table -->
 <div class="row">

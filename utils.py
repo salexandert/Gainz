@@ -1285,10 +1285,16 @@ def get_holdings_reconciliation(transactions, asset):
             next_action = "No quantity difference was detected from imported buys and sells. Review source records, lots, and basis links before using generated reports."
         elif difference > 0:
             status = "Needs Review"
-            next_action = (
-                "Review whether the difference is explained by missing disposals, transfers, losses, or other records. "
-                "Reclassify activity only when supported by documentation."
-            )
+            if totals["send"] > 0:
+                next_action = (
+                    f"Review imported sends. If source records show up to {format_quantity(min(difference, totals['send']))} {asset} "
+                    "left your ownership, classify those documented sends as disposals; owner transfers should remain transfers."
+                )
+            else:
+                next_action = (
+                    "Review whether the difference is explained by missing disposals, transfers, losses, or other records. "
+                    "Reclassify activity only when supported by documentation."
+                )
         else:
             status = "Needs Review"
             next_action = (
@@ -1489,6 +1495,16 @@ def _holdings_reconciliation_interpretation(reconciliation):
         return "This asset is verified against imported buys and sells. Review lots, links, and source records before export."
 
     if difference > 0:
+        if reconciliation["send_quantity"] > 0:
+            recommended_quantity = min(difference, reconciliation["send_quantity"])
+            return (
+                f"The calculated net from imported buys and sells is higher than declared holdings by "
+                f"{format_quantity(difference)} {asset}. Imported sends total "
+                f"{format_quantity(reconciliation['send_quantity'])} {asset}. If source records show "
+                f"{format_quantity(recommended_quantity)} {asset} of those sends left your ownership or were sent elsewhere "
+                "and traded, classify only the documented quantity as disposals. Owner transfers should remain transfers."
+            )
+
         return (
             "The calculated net from imported buys and sells is higher than declared holdings. Review sends, "
             "missing disposals, losses, transfers, or other records before using generated reports."
@@ -1597,6 +1613,18 @@ def get_holdings_difference_breakdown(transactions, asset):
             f"{format_quantity(reconciliation['difference'])} {asset} review difference vs declared holdings."
         )
 
+    recommended_disposal_quantity = None
+    if (
+        declared_holdings is not None
+        and reconciliation["difference"] is not None
+        and reconciliation["difference"] > 0.00000001
+        and reconciliation["send_quantity"] > 0.00000001
+    ):
+        recommended_disposal_quantity = min(
+            reconciliation["difference"],
+            reconciliation["send_quantity"],
+        )
+
     return {
         "summary": {
             "asset": asset,
@@ -1616,6 +1644,12 @@ def get_holdings_difference_breakdown(transactions, asset):
                 if reconciliation["difference"] is not None
                 else "N/A"
             ),
+            "recommended_disposal_quantity": (
+                format_quantity(recommended_disposal_quantity)
+                if recommended_disposal_quantity is not None
+                else "N/A"
+            ),
+            "has_send_disposal_recommendation": recommended_disposal_quantity is not None,
             "status": reconciliation["status"],
             "transaction_count": len(asset_transactions),
             "expected_formula": expected_formula,

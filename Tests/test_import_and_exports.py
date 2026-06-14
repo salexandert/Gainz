@@ -11,6 +11,7 @@ from dateutil.parser import UnknownTimezoneWarning
 from openpyxl import load_workbook
 
 from app import create_app
+from app.extensions import db
 from app.import_transactions import routes as import_routes
 from app.import_transactions.routes import (
     _manual_batch_rows,
@@ -22,7 +23,7 @@ from app.import_transactions.routes import (
 from app.services.audit_packet_service import AuditPacketService
 from app.services.import_service import ImportService
 from app.services.import_warning_service import import_warning_review_rows
-from transaction import Buy, Sell
+from transaction import Buy, Sell, Send
 from transactions import Transactions
 from utils import (
     get_form_8949_report_rows,
@@ -705,6 +706,100 @@ class ImportAndExportTests(unittest.TestCase):
 
             self.assertIsNone(sheet["B2"].value.tzinfo)
             self.assertIsNone(sheet["C2"].value.tzinfo)
+
+    def test_holdings_classifies_documented_sends_and_runs_fifo(self):
+        transactions = empty_transactions()
+        buy = Buy("BTC", 2, datetime.datetime(2024, 1, 1), 100, "demo")
+        send = Send("BTC", 1, datetime.datetime(2024, 6, 1), 200, "wallet")
+        transactions.transactions = [buy, send]
+        transactions.set_holdings("BTC", 1)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class RouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(RouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/holdings_accounting/sends_to_sells",
+                    json={
+                        "asset": ["BTC"],
+                        "quantity": "1",
+                        "auto_link": True,
+                    },
+                )
+
+            self.assertEqual(200, response.status_code)
+            payload = response.get_json()
+            sells = [trans for trans in transactions if trans.trans_type == "sell"]
+            sends = [trans for trans in transactions if trans.trans_type == "send"]
+
+            self.assertIn("taxable disposal", payload["message"])
+            self.assertEqual(1, payload["links_created"])
+            self.assertEqual([], payload["auto_link_failures"])
+            self.assertEqual(1, len(sells))
+            self.assertEqual(0, len(sends))
+            self.assertEqual(1, len(sells[0].links))
+            self.assertEqual("0", payload["difference_breakdown"]["summary"]["difference"])
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_export_routes_use_requested_output_folder(self):
+        transactions = empty_transactions()
+        buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "demo")
+        sell = Sell("BTC", 1, datetime.datetime(2024, 6, 1), 300, "demo")
+        sell.link_transaction(buy, 1)
+        transactions.transactions = [buy, sell]
+        transactions.set_holdings("BTC", 0)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "tax-review-output"
+
+            class ExportRouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+                EXPORT_FOLDER = str(Path(temp_dir) / "default-exports")
+                AUDIT_PACKET_FOLDER = str(Path(temp_dir) / "default-packets")
+
+            app = create_app(ExportRouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                export_response = client.post(
+                    "/export/save",
+                    json={"output_dir": str(output_dir)},
+                )
+                packet_response = client.post(
+                    "/export/audit_packet",
+                    json={"output_dir": str(output_dir)},
+                )
+
+            export_payload = export_response.get_json()
+            packet_payload = packet_response.get_json()
+
+            self.assertEqual(200, export_response.status_code)
+            self.assertEqual(200, packet_response.status_code)
+            self.assertEqual(output_dir.resolve(), Path(export_payload["output_dir"]))
+            self.assertEqual(output_dir.resolve(), Path(packet_payload["output_dir"]))
+            self.assertEqual(output_dir.resolve(), Path(export_payload["path"]).parent)
+            self.assertEqual(output_dir.resolve(), Path(packet_payload["path"]).parent)
+            self.assertTrue(Path(export_payload["path"]).exists())
+            self.assertTrue((Path(packet_payload["path"]) / "03_manifests" / "audit_packet_summary.json").exists())
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
 
     def test_form_8949_rows_are_built_from_links_with_prorated_fees(self):
         transactions = empty_transactions()
