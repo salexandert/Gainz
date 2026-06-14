@@ -33,26 +33,21 @@
         </div>
         {% endif %}
         <div class="gainz-home-flow">
-          <a href="{{ url_for('import_transactions_blueprint.import_wizard') }}" class="gainz-home-flow-step">
-            <span>1</span>
-            <strong>Import</strong>
-            <p>Load exchange CSVs or demo data.</p>
+          {% for step in home_progress.steps %}
+          <a
+            href="{{ step.url }}"
+            class="gainz-home-flow-step is-{{ step.state }}"
+            {% if step.state in ['current', 'review', 'ready'] %}aria-current="step"{% endif %}
+          >
+            <span class="gainz-home-flow-number">{{ step.number }}</span>
+            <div class="gainz-home-flow-heading">
+              <strong>{{ step.title }}</strong>
+              <small>{{ step.status }}</small>
+            </div>
+            <p>{{ step.description }}</p>
+            <div class="gainz-home-flow-detail">{{ step.detail }}</div>
           </a>
-          <a href="{{ url_for('holdings_accounting_blueprint.holdings_accounting') }}" class="gainz-home-flow-step">
-            <span>2</span>
-            <strong>Declare Holdings</strong>
-            <p>Enter what you actually hold today.</p>
-          </a>
-          <a href="{{ url_for('stats_blueprint.index') }}" class="gainz-home-flow-step">
-            <span>3</span>
-            <strong>Reconcile</strong>
-            <p>Review missing activity before using reports.</p>
-          </a>
-          <a href="{{ url_for('export_blueprint.index') }}" class="gainz-home-flow-step">
-            <span>4</span>
-            <strong>Review & Export</strong>
-            <p>Check Stats, Model Sell, and audit packet outputs.</p>
-          </a>
+          {% endfor %}
         </div>
         {% if support_url %}
         <div class="gainz-support-panel">

@@ -528,17 +528,49 @@
 .gainz-home-flow-step {
     background: #fff;
     border: 1px solid rgba(0, 0, 0, 0.08);
+    border-left: 5px solid #d8d5cf;
     border-radius: 8px;
     color: inherit;
     display: block;
+    min-height: 156px;
     padding: 14px;
     text-decoration: none;
     transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
+.gainz-home-flow-step.is-current {
+    background: #eefbfc;
+    border-color: rgba(81, 203, 206, 0.55);
+    border-left-color: #51cbce;
+}
+
+.gainz-home-flow-step.is-complete {
+    background: #eefaf4;
+    border-color: rgba(65, 171, 122, 0.45);
+    border-left-color: #41ab7a;
+}
+
+.gainz-home-flow-step.is-review {
+    background: #fff7e4;
+    border-color: rgba(245, 166, 35, 0.48);
+    border-left-color: #f5a623;
+}
+
+.gainz-home-flow-step.is-ready {
+    background: #ecfbf8;
+    border-color: rgba(42, 187, 155, 0.5);
+    border-left-color: #2abb9b;
+}
+
+.gainz-home-flow-step.is-waiting {
+    background: #fbfbfa;
+    color: #5f6870;
+}
+
 .gainz-home-flow-step:hover,
 .gainz-home-flow-step:focus {
     border-color: #51cbce;
+    border-left-color: #51cbce;
     box-shadow: 0 6px 18px rgba(81, 203, 206, 0.18);
     color: inherit;
     outline: none;
@@ -546,7 +578,7 @@
     transform: translateY(-1px);
 }
 
-.gainz-home-flow span {
+.gainz-home-flow-number {
     align-items: center;
     background: #51cbce;
     border-radius: 999px;
@@ -560,15 +592,57 @@
     width: 28px;
 }
 
+.gainz-home-flow-step.is-complete .gainz-home-flow-number {
+    background: #41ab7a;
+}
+
+.gainz-home-flow-step.is-review .gainz-home-flow-number {
+    background: #f5a623;
+}
+
+.gainz-home-flow-step.is-waiting .gainz-home-flow-number {
+    background: #b8b3aa;
+}
+
+.gainz-home-flow-step.is-ready .gainz-home-flow-number {
+    background: #2abb9b;
+}
+
+.gainz-home-flow-heading {
+    align-items: flex-start;
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+}
+
 .gainz-home-flow strong {
     display: block;
     font-weight: 700;
     margin-bottom: 4px;
 }
 
+.gainz-home-flow-heading small {
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.72);
+    color: #252422;
+    flex: 0 0 auto;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+    padding: 5px 8px;
+    text-transform: uppercase;
+}
+
 .gainz-home-flow p {
     color: #4f5962;
     margin-bottom: 0;
+}
+
+.gainz-home-flow-detail {
+    color: #4f5962;
+    font-size: 13px;
+    line-height: 1.35;
+    margin-top: 12px;
 }
 
 .gainz-support-panel {
