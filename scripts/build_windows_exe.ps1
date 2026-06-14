@@ -10,6 +10,11 @@ $packageName = "Gainz-Windows-v$version"
 $packageDir = Join-Path $distDir $packageName
 $versionedZip = Join-Path $distDir "$packageName.zip"
 $latestZip = Join-Path $distDir "Gainz-Windows.zip"
+$iconPath = Join-Path $repoRoot "gainz_logo.ico"
+
+if (-not (Test-Path -LiteralPath $iconPath)) {
+    throw "Missing Gainz icon asset: $iconPath"
+}
 
 & $python -m PyInstaller `
     --noconfirm `
@@ -17,8 +22,11 @@ $latestZip = Join-Path $distDir "Gainz-Windows.zip"
     --onefile `
     --windowed `
     --name Gainz `
+    --icon $iconPath `
     --add-data "VERSION;." `
     --add-data "app_version.py;." `
+    --add-data "gainz_logo.ico;." `
+    --add-data "gainz_logo.png;." `
     --add-data "app;app" `
     --add-data "Templates;Templates" `
     --add-data "Tax Forms;Tax Forms" `

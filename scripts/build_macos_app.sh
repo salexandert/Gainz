@@ -19,6 +19,8 @@ latest_zip="$dist_dir/Gainz-macOS.zip"
   --name Gainz \
   --add-data "VERSION:." \
   --add-data "app_version.py:." \
+  --add-data "gainz_logo.ico:." \
+  --add-data "gainz_logo.png:." \
   --add-data "app:app" \
   --add-data "Templates:Templates" \
   --add-data "Tax Forms:Tax Forms" \

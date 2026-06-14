@@ -10,6 +10,8 @@ from app.base.models import User
 from app.extensions import db
 from configs.config import config_dict
 from launcher import credentials_file_path, find_available_port, health_url, server_url
+from launcher import GAINZ_ICON_FILE, GAINZ_PNG_ICON_FILE
+from launcher import launcher_icon_path, launcher_png_icon_path
 from password_reset import DOCUMENTED_RESET_PHRASE, reset_admin_password
 from port_guard import require_port_available
 from single_instance import SingleInstanceLock
@@ -72,6 +74,25 @@ class LauncherStartupTests(unittest.TestCase):
             expected_path = Path(temp_dir) / "instance" / "first_run_credentials.txt"
 
             self.assertEqual(str(expected_path), credentials_file_path(temp_dir))
+
+    def test_launcher_icon_assets_are_available(self):
+        ico_path = Path(launcher_icon_path())
+        png_path = Path(launcher_png_icon_path())
+
+        self.assertEqual(GAINZ_ICON_FILE, ico_path.name)
+        self.assertEqual(GAINZ_PNG_ICON_FILE, png_path.name)
+        self.assertTrue(ico_path.is_file())
+        self.assertTrue(png_path.is_file())
+
+    def test_release_build_scripts_bundle_gainz_icons(self):
+        windows_script = Path("scripts/build_windows_exe.ps1").read_text(encoding="utf-8")
+        macos_script = Path("scripts/build_macos_app.sh").read_text(encoding="utf-8")
+
+        self.assertIn("--icon $iconPath", windows_script)
+        self.assertIn('--add-data "gainz_logo.ico;."', windows_script)
+        self.assertIn('--add-data "gainz_logo.png;."', windows_script)
+        self.assertIn('--add-data "gainz_logo.ico:."', macos_script)
+        self.assertIn('--add-data "gainz_logo.png:."', macos_script)
 
     def test_single_instance_lock_blocks_competing_gainz_process(self):
         with tempfile.TemporaryDirectory() as temp_dir:

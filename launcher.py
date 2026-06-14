@@ -18,6 +18,9 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 5000
 DEFAULT_SUPPORT_URL = "https://cash.app/$SAl3xander"
 STARTUP_CHECK_INTERVAL_MS = 500
+GAINZ_ICON_FILE = "gainz_logo.ico"
+GAINZ_PNG_ICON_FILE = "gainz_logo.png"
+WINDOWS_APP_USER_MODEL_ID = "Gainz.LocalFirstCryptoAccounting"
 
 
 def app_base_dir():
@@ -27,13 +30,67 @@ def app_base_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
 
+def resource_path(relative_path):
+    bundle_dir = getattr(sys, "_MEIPASS", None)
+    if bundle_dir:
+        return os.path.join(bundle_dir, relative_path)
+
+    return os.path.join(app_base_dir(), relative_path)
+
+
+def launcher_icon_path():
+    icon_path = resource_path(GAINZ_ICON_FILE)
+    return icon_path if os.path.exists(icon_path) else None
+
+
+def launcher_png_icon_path():
+    icon_path = resource_path(GAINZ_PNG_ICON_FILE)
+    return icon_path if os.path.exists(icon_path) else None
+
+
+def configure_windows_app_identity():
+    if os.name != "nt":
+        return
+
+    try:
+        import ctypes
+
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            WINDOWS_APP_USER_MODEL_ID
+        )
+    except Exception:
+        return
+
+
+def apply_window_icon(window):
+    applied = False
+    icon_path = launcher_icon_path()
+    if icon_path:
+        try:
+            window.iconbitmap(icon_path)
+            applied = True
+        except (OSError, tk.TclError):
+            pass
+
+    png_icon_path = launcher_png_icon_path()
+    if png_icon_path:
+        try:
+            icon_image = tk.PhotoImage(file=png_icon_path)
+            window.iconphoto(True, icon_image)
+            window._gainz_icon_image = icon_image
+            applied = True
+        except (OSError, tk.TclError):
+            pass
+
+    return applied
+
+
 def find_available_port(preferred_port=DEFAULT_PORT):
     configured_port = os.environ.get("GAINZ_PORT")
     port = int(configured_port) if configured_port else preferred_port
 
     require_port_available(DEFAULT_HOST, port)
     return port
-
 
 
 def server_url(port):
@@ -90,6 +147,7 @@ class GainzLauncher(tk.Tk):
     def __init__(self, instance_lock, port=None):
         super().__init__()
         self.instance_lock = instance_lock
+        apply_window_icon(self)
         self.title(f"{APP_NAME} {APP_VERSION}")
         self.geometry("560x350")
         self.resizable(False, False)
@@ -257,12 +315,14 @@ class GainzLauncher(tk.Tk):
 
 def main():
     os.chdir(app_base_dir())
+    configure_windows_app_identity()
     instance_lock = SingleInstanceLock(app_base_dir())
     if not instance_lock.acquire():
         info = wait_for_lock_info(instance_lock)
         port = int(info.get("port") or DEFAULT_PORT)
         url = info.get("url") or server_url(port)
         root = tk.Tk()
+        apply_window_icon(root)
         root.withdraw()
 
         if wait_for_server(health_url(port), timeout=5):
@@ -285,6 +345,7 @@ def main():
     except RuntimeError as exc:
         instance_lock.release()
         root = tk.Tk()
+        apply_window_icon(root)
         root.withdraw()
         messagebox.showerror(APP_NAME, str(exc))
         root.destroy()
