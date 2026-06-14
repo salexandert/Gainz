@@ -48,6 +48,8 @@ File names help Gainz detect the parser. Use names that include terms such as `c
 
 Gainz also recognizes common column-name variations. For example, headers like `Transaction Date`, `Activity Type`, `Crypto Quantity`, `Token Symbol`, `Spot Price USD`, and `Transaction Value` can be mapped into the import fields even when an exchange changes its export wording. If the columns are too unusual, Gainz will ask for the header row and let you choose the Date/time, Transaction type, Asset symbol, Asset quantity, and USD price/value columns.
 
+If Gainz shows import warnings, review them before relying on generated reports. The warning table shows the source file, row number, date, type, asset, quantity, issue, likely category, and review decision. For each warning, choose whether it is a true zero-value transfer, needs a manual USD value, should be ignored for now, or needs a note. Unresolved warnings stay visible in Export and the audit packet.
+
 If a CSV is missing known buys or sells, use **Add Manual Transactions** on the same page. Enter as many rows as needed, leave unused rows blank, and submit the batch. Gainz saves the batch as one revision with source `Gainz App Manual Add`.
 
 ![Gainz manual transaction batch entry table]({{ '/assets/screenshots/gainz-manual-batch-entry.png' | relative_url }})
@@ -117,6 +119,8 @@ Gainz compares:
 
 If the status is `Needs Review`, review missing buys, missing disposals, sends, receives, gifts, income, losses, or conversions.
 
+If your records show one primary asset and every other tracked asset is currently zero, use **Bulk Current Holdings**. Enter the primary asset and amount, then let Gainz set all other tracked assets to zero in one revision. Review the confirmation before continuing.
+
 Use **Transfer Classification Review** for the selected asset. It shows send and receive rows as questions to answer:
 
 - Did this send go to another wallet or exchange you own, or did it leave your ownership?
@@ -125,6 +129,8 @@ Use **Transfer Classification Review** for the selected asset. It shows send and
 - What source record supports the classification?
 
 Keep owner transfers as transfers. Record a documented disposal or basis-supported acquisition only when source records support it.
+
+If a sale still needs earlier basis and you do not have the source records yet, choose **Leave Missing Basis As Needs Research** and add a note. Gainz will keep exports draft/not filing-ready while showing that the missing basis is a known research item rather than an unexplained silent gap.
 
 ![Gainz Holdings and Accounting walkthrough]({{ '/assets/screenshots/gainz-holdings-accounting.png' | relative_url }})
 {: .screenshot-frame }
@@ -150,15 +156,17 @@ Open **Export**.
 
 The **Audit Packet Review Status** panel summarizes whether the packet is ready for review:
 
+- Reconciliation checklist.
 - Form 8949 row count.
 - Form 8949 gain/loss total.
 - Unlinked sales count.
 - Holdings gaps.
 - Holdings review items.
-- Import warnings.
+- Import warnings and review decisions.
+- Missing acquisition basis before sales.
 - Review guidance.
 
-If the status is `Not ready`, review the listed blockers before using the packet.
+If the status is `Not ready`, review the listed blockers before using the packet. Gainz should tell you whether the blockers are missing basis before sales, current-holdings gaps, unreviewed import warnings, missing filed totals, or draft-only research items.
 
 ![Gainz Export audit readiness panel]({{ '/assets/screenshots/gainz-export-audit-readiness.png' | relative_url }})
 {: .screenshot-frame }
@@ -177,7 +185,8 @@ The audit packet includes:
 - Form 8949 totals CSV and JSON.
 - Holdings reconciliation CSV.
 - Current holdings lots CSV.
-- Import warnings CSV.
+- Import warnings CSV with review decisions.
+- Missing basis review CSV.
 - Source files copied into the packet when they are still available on disk.
 - Evidence manifest.
 - Packet inventory.

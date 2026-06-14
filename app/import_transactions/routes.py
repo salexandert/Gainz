@@ -25,6 +25,7 @@ from app.services.import_service import ImportService
 from app.services.import_warning_service import (
     clear_import_warnings_for_source,
     import_warning_review_rows,
+    unresolved_import_warning_rows,
 )
 
 import_transactions_bp = Blueprint('import_transactions', __name__)
@@ -205,6 +206,7 @@ def _data_source_summary(transactions):
         })
 
     import_warnings = getattr(transactions, "import_warnings", []) or []
+    warning_rows = import_warning_review_rows(import_warnings, transactions=transactions)
 
     return {
         "transaction_count": len(getattr(transactions, "transactions", [])),
@@ -219,7 +221,8 @@ def _data_source_summary(transactions):
             "receive": type_counter.get("receive", 0),
         },
         "import_warnings": import_warnings,
-        "import_warning_rows": import_warning_review_rows(import_warnings),
+        "import_warning_rows": warning_rows,
+        "unresolved_import_warning_count": len(unresolved_import_warning_rows(transactions)),
     }
 
 
@@ -504,6 +507,32 @@ def remove_source():
         "save_path": save_path,
         "save_summary": _current_save_summary(transactions, refresh=True),
         "data_summary": _data_source_summary(transactions),
+    })
+
+
+@blueprint.route('/import_warning_review', methods=['POST'])
+@login_required
+def import_warning_review():
+    data = request.get_json(silent=True) or {}
+    warning = str(data.get("warning") or "")
+    decision = str(data.get("decision") or "")
+    note = str(data.get("note") or "")
+
+    if not warning:
+        return jsonify({"error": "Choose an import warning to review."}), 400
+
+    transactions = current_app.config['transactions']
+    if warning not in (getattr(transactions, "import_warnings", []) or []):
+        return jsonify({"error": "That warning is not part of the current save."}), 404
+
+    transactions.set_import_warning_review(warning, decision=decision, note=note)
+    save_path = transactions.save(description="Reviewed import warning")
+
+    return jsonify({
+        "message": "Import warning review decision saved.",
+        "save_path": save_path,
+        "data_summary": _data_source_summary(transactions),
+        "save_summary": _current_save_summary(transactions, refresh=True),
     })
 
 

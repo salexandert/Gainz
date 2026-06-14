@@ -22,6 +22,18 @@ TAX_YEAR_RECORD_COLUMNS = [
     "notes",
     "updated_at",
 ]
+IMPORT_WARNING_REVIEW_COLUMNS = [
+    "warning",
+    "decision",
+    "note",
+    "updated_at",
+]
+BASIS_REVIEW_NOTE_COLUMNS = [
+    "asset",
+    "status",
+    "note",
+    "updated_at",
+]
 
 
 def _optional_cell(row, column):
@@ -82,6 +94,8 @@ class Transactions:
         self.conversions = []
         self.asset_objects = []
         self.import_warnings = []
+        self.import_warning_reviews = []
+        self.basis_review_notes = []
         self.tax_year_records = []
 
         if view is not None:
@@ -219,6 +233,8 @@ class Transactions:
         else:
             self.import_warnings = []
 
+        self.import_warning_reviews = self._load_import_warning_reviews(workbook)
+        self.basis_review_notes = self._load_basis_review_notes(workbook)
         self.tax_year_records = self._load_tax_year_records(workbook)
 
         # Read Previously saved data into pandas df - Transactions
@@ -424,6 +440,48 @@ class Transactions:
         print(f"Finished recreating links: {links_created_count} created, {links_skipped_count} skipped/errors.") # Add summary logging
         return list(transactions)
 
+    def _load_records_sheet(self, workbook, sheet_name, columns):
+        if sheet_name not in workbook.sheetnames:
+            return []
+
+        sheet = workbook[sheet_name]
+        headers = [
+            str(cell.value).strip()
+            for cell in sheet[1]
+            if cell.value is not None
+        ]
+        records = []
+
+        for values in sheet.iter_rows(min_row=2, values_only=True):
+            row = dict(zip(headers, values))
+            if not any(row.get(column) not in (None, "") for column in columns):
+                continue
+
+            records.append({
+                column: _string_or_empty(row.get(column))
+                for column in columns
+            })
+
+        return records
+
+    def _load_import_warning_reviews(self, workbook):
+        return self._load_records_sheet(
+            workbook,
+            "Import Warning Reviews",
+            IMPORT_WARNING_REVIEW_COLUMNS,
+        )
+
+    def _load_basis_review_notes(self, workbook):
+        records = self._load_records_sheet(
+            workbook,
+            "Basis Review Notes",
+            BASIS_REVIEW_NOTE_COLUMNS,
+        )
+        for record in records:
+            record["asset"] = str(record.get("asset", "")).upper()
+
+        return records
+
     def _load_tax_year_records(self, workbook):
         if 'Tax Year Records' not in workbook.sheetnames:
             return []
@@ -461,6 +519,59 @@ class Transactions:
 
         records.sort(key=lambda record: record["year"], reverse=True)
         return records
+
+    def get_import_warning_review(self, warning):
+        warning = str(warning or "")
+        for record in getattr(self, "import_warning_reviews", []) or []:
+            if str(record.get("warning", "")) == warning:
+                return record
+
+        return None
+
+    def set_import_warning_review(self, warning, decision="", note=""):
+        warning = str(warning or "")
+        record = {
+            "warning": warning,
+            "decision": str(decision or "").strip(),
+            "note": str(note or "").strip(),
+            "updated_at": strftime("%Y-%m-%d %H:%M:%S"),
+        }
+
+        records = [
+            existing
+            for existing in getattr(self, "import_warning_reviews", []) or []
+            if str(existing.get("warning", "")) != warning
+        ]
+        records.append(record)
+        self.import_warning_reviews = records
+        return record
+
+    def get_basis_review_note(self, asset):
+        asset = str(asset or "").upper()
+        for record in getattr(self, "basis_review_notes", []) or []:
+            if str(record.get("asset", "")).upper() == asset:
+                return record
+
+        return None
+
+    def set_basis_review_note(self, asset, status="needs_research", note=""):
+        asset = str(asset or "").upper()
+        record = {
+            "asset": asset,
+            "status": str(status or "needs_research").strip(),
+            "note": str(note or "").strip(),
+            "updated_at": strftime("%Y-%m-%d %H:%M:%S"),
+        }
+
+        records = [
+            existing
+            for existing in getattr(self, "basis_review_notes", []) or []
+            if str(existing.get("asset", "")).upper() != asset
+        ]
+        records.append(record)
+        records.sort(key=lambda item: item["asset"])
+        self.basis_review_notes = records
+        return record
 
     def get_tax_year_record(self, year):
         year = int(year)
@@ -525,6 +636,14 @@ class Transactions:
         trans_df = pd.DataFrame([vars(s) for s in self.transactions])
         conversion_df = pd.DataFrame([vars(s) for s in self.conversions])
         asset_df = pd.DataFrame([vars(s) for s in self.asset_objects])
+        import_warning_reviews_df = pd.DataFrame(
+            getattr(self, "import_warning_reviews", []),
+            columns=IMPORT_WARNING_REVIEW_COLUMNS,
+        )
+        basis_review_notes_df = pd.DataFrame(
+            getattr(self, "basis_review_notes", []),
+            columns=BASIS_REVIEW_NOTE_COLUMNS,
+        )
         tax_year_records_df = pd.DataFrame(
             getattr(self, "tax_year_records", []),
             columns=TAX_YEAR_RECORD_COLUMNS,
@@ -551,6 +670,8 @@ class Transactions:
             asset_df.to_excel(writer, sheet_name="Assets")
 
             links_df.to_excel(writer, sheet_name="Links")
+            import_warning_reviews_df.to_excel(writer, sheet_name="Import Warning Reviews", index=False)
+            basis_review_notes_df.to_excel(writer, sheet_name="Basis Review Notes", index=False)
             tax_year_records_df.to_excel(writer, sheet_name="Tax Year Records", index=False)
 
         # Open file to add description and update revision number

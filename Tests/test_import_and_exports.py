@@ -26,6 +26,7 @@ from app.services.import_warning_service import import_warning_review_rows
 from transaction import Buy, Sell, Send
 from transactions import Transactions
 from utils import (
+    get_audit_readiness_summary,
     get_form_8949_report_rows,
     get_form_8949_table_data,
     get_form_8949_totals,
@@ -42,6 +43,8 @@ def empty_transactions():
     transactions.conversions = []
     transactions.asset_objects = []
     transactions.import_warnings = []
+    transactions.import_warning_reviews = []
+    transactions.basis_review_notes = []
     transactions.tax_year_records = []
     transactions.view = ""
     transactions.transactions = []
@@ -746,6 +749,90 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual(0, len(sends))
             self.assertEqual(1, len(sells[0].links))
             self.assertEqual("0", payload["difference_breakdown"]["summary"]["difference"])
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_bulk_holdings_sets_primary_asset_and_zeroes_others(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "demo"),
+            Buy("ETH", 2, datetime.datetime(2024, 1, 2), 50, "demo"),
+            Buy("BCH", 3, datetime.datetime(2024, 1, 3), 25, "demo"),
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class RouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(RouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/holdings_accounting/bulk_holdings",
+                    json={
+                        "primary_asset": "BTC",
+                        "primary_quantity": "0.12345678",
+                    },
+                )
+
+            self.assertEqual(200, response.status_code)
+            payload = response.get_json()
+            self.assertEqual("0.12345678", payload["primary_quantity"])
+            self.assertEqual(0.12345678, transactions.get_holdings("BTC"))
+            self.assertEqual(0, transactions.get_holdings("ETH"))
+            self.assertEqual(0, transactions.get_holdings("BCH"))
+            self.assertEqual(["BCH", "ETH"], payload["zeroed_assets"])
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_leave_basis_unresolved_keeps_export_not_ready_with_research_status(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Sell("LTC", 1, datetime.datetime(2019, 1, 7), 40, "exchange"),
+        ]
+        transactions.set_holdings("LTC", 0)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class RouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(RouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/holdings_accounting/leave_basis_unresolved",
+                    json={
+                        "asset": ["LTC"],
+                        "note": "User will investigate source records later.",
+                    },
+                )
+
+            self.assertEqual(200, response.status_code)
+            payload = response.get_json()
+            self.assertIn("needs user research", payload["message"])
+            self.assertEqual(
+                "User will investigate source records later.",
+                transactions.get_basis_review_note("LTC")["note"],
+            )
+
+            readiness = get_audit_readiness_summary(transactions)
+            self.assertFalse(readiness["is_ready"])
+            self.assertEqual("Needs user research", readiness["missing_records"]["basis"][0]["status"])
+            self.assertIn("Missing basis left as needs user research", readiness["blockers"][0])
 
             with app.app_context():
                 db.drop_all()

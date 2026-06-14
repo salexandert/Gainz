@@ -19,7 +19,8 @@ A Gainz audit packet can include:
 - Form 8949 totals CSV and JSON.
 - Holdings reconciliation CSV.
 - Current holdings lots CSV.
-- Import warnings CSV.
+- Import warnings CSV with review decisions.
+- Missing basis review CSV.
 - Source file manifest.
 - SHA-256 hashes.
 - Methodology memo.
@@ -36,6 +37,8 @@ Before generating a packet, check:
 - Import warnings have been reviewed.
 - Declared holdings are entered for relevant assets.
 - Holdings items marked Needs Review are resolved or documented.
+- Missing basis items marked Needs user research are understood as draft-only blockers.
+- Filed totals and payment records have been entered where you want prior-year alignment.
 - Source files are preserved when possible.
 
 ## Who This Helps

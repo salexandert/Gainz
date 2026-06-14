@@ -32,6 +32,8 @@ def empty_transactions():
     transactions.conversions = []
     transactions.asset_objects = []
     transactions.import_warnings = []
+    transactions.import_warning_reviews = []
+    transactions.basis_review_notes = []
     transactions.tax_year_records = []
     transactions.view = ""
     transactions.transactions = []
@@ -378,6 +380,45 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual(50.0, record["tax_paid"])
         self.assertEqual("2024 return", record["evidence_reference"])
 
+    def test_review_decisions_round_trip_through_save_file(self):
+        original_basedir = transactions_module.basedir
+        warning = "Imported row 10 from exchange.csv with $0 USD spot price."
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            (temp_path / "saves").mkdir()
+            transactions = empty_transactions()
+            transactions.save = Transactions.save.__get__(transactions, Transactions)
+            transactions.transactions = [
+                Sell("LTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange.csv")
+            ]
+            transactions.import_warnings = [warning]
+            transactions.set_import_warning_review(
+                warning,
+                decision="needs_manual_usd_value",
+                note="Find source USD value later.",
+            )
+            transactions.set_basis_review_note(
+                "LTC",
+                status="needs_research",
+                note="User will investigate source records later.",
+            )
+
+            try:
+                transactions_module.basedir = str(temp_path)
+                save_path = transactions.save(description="Review record test")
+                loaded = Transactions(save_path)
+            finally:
+                transactions_module.basedir = original_basedir
+
+        self.assertEqual(
+            "needs_manual_usd_value",
+            loaded.get_import_warning_review(warning)["decision"],
+        )
+        self.assertEqual(
+            "User will investigate source records later.",
+            loaded.get_basis_review_note("LTC")["note"],
+        )
+
     def test_audit_readiness_flags_missing_links_and_holdings(self):
         transactions = empty_transactions()
         transactions.transactions = [
@@ -392,15 +433,25 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual(1, readiness["metrics"]["assets_with_unlinked_sales"])
         self.assertEqual(1, readiness["metrics"]["assets_needing_holdings"])
         self.assertEqual(0, readiness["metrics"]["form_8949_rows"])
-        self.assertTrue(any("Review or create basis links" in blocker for blocker in readiness["blockers"]))
+        self.assertTrue(any("Missing acquisition basis" in blocker for blocker in readiness["blockers"]))
+        self.assertEqual(1, readiness["metrics"]["missing_basis_rows"])
+        self.assertIn("BTC sale on 2024-02-01", readiness["missing_records"]["basis"][0]["message"])
 
-    def test_audit_readiness_is_ready_when_links_and_holdings_match(self):
+    def test_audit_readiness_is_ready_when_links_holdings_and_filed_totals_match(self):
         transactions = empty_transactions()
         buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange")
         sell = Sell("BTC", 0.25, datetime.datetime(2024, 6, 1), 300, "exchange")
         sell.link_transaction(buy, 0.25)
         transactions.transactions = [buy, sell]
         transactions.set_holdings("BTC", 0.75)
+        transactions.set_tax_year_record(
+            2024,
+            reported_proceeds=75,
+            reported_cost_basis=25,
+            reported_gain_loss=50,
+            tax_paid=5,
+            evidence_reference="2024 filed return",
+        )
 
         readiness = get_audit_readiness_summary(transactions)
 

@@ -28,6 +28,18 @@ FORM_8949_COLUMNS = [
 ]
 
 
+def _import_warning_review_rows(warnings, transactions=None):
+    from app.services.import_warning_service import import_warning_review_rows
+
+    return import_warning_review_rows(warnings, transactions=transactions)
+
+
+def _unresolved_import_warning_rows(transactions):
+    from app.services.import_warning_service import unresolved_import_warning_rows
+
+    return unresolved_import_warning_rows(transactions)
+
+
 def format_quantity(quantity, decimals=8):
     """Format crypto quantities without exposing floating-point noise."""
     if isinstance(quantity, str):
@@ -504,6 +516,153 @@ def _stats_row_has_unlinked_sales(row):
     )
 
 
+def _basis_review_note(transactions, asset):
+    if hasattr(transactions, "get_basis_review_note"):
+        return transactions.get_basis_review_note(asset)
+
+    return None
+
+
+def _basis_review_needs_research(transactions, asset):
+    note = _basis_review_note(transactions, asset)
+    return bool(note and note.get("status") == "needs_research")
+
+
+def _basis_review_note_text(transactions, asset):
+    note = _basis_review_note(transactions, asset)
+    return (note or {}).get("note", "")
+
+
+def get_missing_basis_review_rows(transactions):
+    rows = []
+
+    for transaction in sorted(
+        getattr(transactions, "transactions", []) or [],
+        key=lambda item: (
+            comparable_datetime(getattr(item, "time_stamp", "")),
+            getattr(item, "symbol", ""),
+        ),
+    ):
+        if getattr(transaction, "trans_type", "") != "sell":
+            continue
+
+        unlinked_quantity = getattr(transaction, "unlinked_quantity", 0)
+        if unlinked_quantity <= 0.000000009:
+            continue
+
+        asset = transaction.symbol
+        needs_research = _basis_review_needs_research(transactions, asset)
+        note_text = _basis_review_note_text(transactions, asset)
+        rows.append({
+            "asset": asset,
+            "date": _format_report_datetime(transaction.time_stamp),
+            "quantity": format_quantity(transaction.quantity),
+            "unlinked_quantity": format_quantity(unlinked_quantity),
+            "source": os.path.basename(str(getattr(transaction, "source", "") or "")) or "Unknown source",
+            "status": "Needs user research" if needs_research else "Missing acquisition basis",
+            "note": note_text,
+            "message": (
+                f"{asset} sale on {_format_report_datetime(transaction.time_stamp)} needs "
+                f"{format_quantity(unlinked_quantity)} {asset} of earlier acquisition basis before generated reports are filing-ready."
+            ),
+        })
+
+    return rows
+
+
+def _missing_current_holdings_records(holdings_rows):
+    return [
+        {
+            "asset": row[0],
+            "message": f"Current holdings are not entered for {row[0]}.",
+        }
+        for row in holdings_rows
+        if row[6] == "Needs declared holdings"
+    ]
+
+
+def _missing_holdings_explanation_records(holdings_rows):
+    records = []
+    for row in holdings_rows:
+        if row[6] != "Needs Review":
+            continue
+
+        records.append({
+            "asset": row[0],
+            "message": (
+                f"Declared {row[0]} is {row[1]}, but imported buy/sell net is {row[2]}. "
+                "Gainz needs transfers, disposals, losses, or missing source files to explain the difference."
+            ),
+        })
+
+    return records
+
+
+def _missing_filed_total_records(tax_alignment):
+    return [
+        {
+            "year": row["year"],
+            "status": row["status"],
+            "message": (
+                f"Filed totals not recorded for {row['year']}. If you have Crypto Taxes Paid.csv, "
+                "record those totals in Tax Filing Review instead of importing it as transaction activity."
+                if row["status"] == "Needs filed totals"
+                else row["next_action"]
+            ),
+        }
+        for row in tax_alignment["rows"]
+        if row["status"] != "Aligned"
+    ]
+
+
+def _reconciliation_checklist(
+    transactions,
+    holdings_rows,
+    missing_basis_rows,
+    unresolved_warning_rows,
+    tax_alignment,
+    draft_acknowledged=False,
+):
+    current_holdings_entered = not any(row[6] == "Needs declared holdings" for row in holdings_rows)
+    fifo_run = len(missing_basis_rows) == 0
+    import_warnings_reviewed = len(unresolved_warning_rows) == 0
+    missing_basis_reviewed = len(missing_basis_rows) == 0
+    filed_totals_entered = tax_alignment["metrics"]["years_needing_review"] == 0
+
+    return [
+        {
+            "label": "Current holdings entered",
+            "complete": current_holdings_entered,
+            "detail": "All assets have declared current holdings." if current_holdings_entered else "Enter holdings for every asset, or use the bulk holdings step.",
+        },
+        {
+            "label": "FIFO run",
+            "complete": fifo_run,
+            "detail": "No unlinked sales remain." if fifo_run else "Run FIFO or leave specific missing basis as needs user research.",
+        },
+        {
+            "label": "Import warnings reviewed",
+            "complete": import_warnings_reviewed,
+            "detail": "All import warnings have reviewed decisions." if import_warnings_reviewed else "Review each warning and choose a decision.",
+        },
+        {
+            "label": "Missing basis reviewed",
+            "complete": missing_basis_reviewed,
+            "detail": "No missing acquisition basis remains." if missing_basis_reviewed else "Some sales still need earlier acquisition basis or user research.",
+        },
+        {
+            "label": "Filed totals entered",
+            "complete": filed_totals_entered,
+            "detail": "Filed totals align with generated reports." if filed_totals_entered else "Record filed proceeds, basis, gain/loss, and tax paid in Tax Filing Review.",
+        },
+        {
+            "label": "Draft export acknowledged",
+            "complete": bool(draft_acknowledged),
+            "detail": "Draft output may be generated for review." if draft_acknowledged else "Required only when unresolved review items remain.",
+        },
+    ]
+
+
 def get_audit_readiness_summary(transactions):
     if len(getattr(transactions, "transactions", [])) == 0:
         stats_rows = []
@@ -513,6 +672,10 @@ def get_audit_readiness_summary(transactions):
     holdings_rows = get_multi_asset_holdings_reconciliation_table_data(transactions)
     form_8949_totals = get_form_8949_totals(transactions)
     import_warnings = getattr(transactions, "import_warnings", []) or []
+    warning_rows = _import_warning_review_rows(import_warnings, transactions=transactions)
+    unresolved_warning_rows = _unresolved_import_warning_rows(transactions)
+    missing_basis_rows = get_missing_basis_review_rows(transactions)
+    tax_alignment = get_tax_filing_alignment_summary(transactions)
 
     assets_with_unlinked_sales = [
         row["symbol"]
@@ -529,15 +692,30 @@ def get_audit_readiness_summary(transactions):
         for row in holdings_rows
         if row[6] == "Needs Review"
     ]
+    basis_assets_needing_research = sorted({
+        row["asset"]
+        for row in missing_basis_rows
+        if row["status"] == "Needs user research"
+    })
+    basis_assets_missing = sorted({
+        row["asset"]
+        for row in missing_basis_rows
+        if row["status"] != "Needs user research"
+    })
     blockers = []
     warnings = []
 
     if len(getattr(transactions, "transactions", [])) == 0:
         blockers.append("Import transactions before generating an audit packet.")
 
-    if assets_with_unlinked_sales:
+    if basis_assets_missing:
         blockers.append(
-            "Review or create basis links for: " + ", ".join(assets_with_unlinked_sales)
+            "Missing acquisition basis before sales for: " + ", ".join(basis_assets_missing)
+        )
+
+    if basis_assets_needing_research:
+        blockers.append(
+            "Missing basis left as needs user research for: " + ", ".join(basis_assets_needing_research)
         )
 
     if assets_needing_holdings:
@@ -550,21 +728,31 @@ def get_audit_readiness_summary(transactions):
             "Review holdings discrepancies for: " + ", ".join(assets_with_mismatches)
         )
 
-    if import_warnings:
+    if unresolved_warning_rows:
         warnings.append(
-            f"Review {len(import_warnings)} import warning"
-            f"{'s' if len(import_warnings) != 1 else ''}."
+            f"Choose review decisions for {len(unresolved_warning_rows)} import warning"
+            f"{'s' if len(unresolved_warning_rows) != 1 else ''}."
         )
 
     if form_8949_totals["total"]["rows"] == 0 and any(row.get("num_sells", 0) > 0 for row in stats_rows):
         blockers.append("Sells exist, but no linked Form 8949-style rows can be generated yet.")
+
+    filed_total_records = _missing_filed_total_records(tax_alignment)
+    if filed_total_records:
+        blockers.append(
+            "Record filed totals or payment evidence for: "
+            + ", ".join(str(row["year"]) for row in filed_total_records)
+        )
 
     is_ready = len(blockers) == 0 and len(warnings) == 0
 
     if blockers:
         status = "Not ready"
         status_class = "status-needs-review"
-        next_action = blockers[0]
+        next_action = (
+            "You are missing basis before these sales, current holdings for these assets, "
+            "and review decisions for these import warnings."
+        )
     elif warnings:
         status = "Review warnings"
         status_class = "status-unlinked-sales"
@@ -582,6 +770,21 @@ def get_audit_readiness_summary(transactions):
         "blockers": blockers,
         "warnings": warnings,
         "import_warnings": import_warnings,
+        "import_warning_rows": warning_rows,
+        "unresolved_import_warning_rows": unresolved_warning_rows,
+        "missing_records": {
+            "basis": missing_basis_rows,
+            "current_holdings": _missing_current_holdings_records(holdings_rows),
+            "holdings_explanations": _missing_holdings_explanation_records(holdings_rows),
+            "filed_totals": filed_total_records,
+        },
+        "checklist": _reconciliation_checklist(
+            transactions,
+            holdings_rows,
+            missing_basis_rows,
+            unresolved_warning_rows,
+            tax_alignment,
+        ),
         "metrics": {
             "transactions": len(getattr(transactions, "transactions", [])),
             "assets": len(getattr(transactions, "assets", set())),
@@ -590,6 +793,8 @@ def get_audit_readiness_summary(transactions):
             "assets_with_mismatches": len(assets_with_mismatches),
             "assets_with_unlinked_sales": len(assets_with_unlinked_sales),
             "import_warnings": len(import_warnings),
+            "unresolved_import_warnings": len(unresolved_warning_rows),
+            "missing_basis_rows": len(missing_basis_rows),
             "form_8949_rows": form_8949_totals["total"]["rows"],
             "form_8949_proceeds": currency(form_8949_totals["total"]["proceeds"]),
             "form_8949_cost_basis": currency(form_8949_totals["total"]["cost_basis"]),
@@ -603,7 +808,8 @@ def get_audit_readiness_summary(transactions):
             "Tax filing review CSV and JSON",
             "Holdings reconciliation CSV",
             "Current holdings lots CSV",
-            "Import warnings CSV",
+            "Import warnings CSV with review decisions",
+            "Missing basis review CSV",
             "Copied source files when still available on disk",
             "Evidence manifest, packet inventory, and SHA-256 hashes",
             "Methodology memo",
@@ -1651,6 +1857,8 @@ def get_holdings_difference_breakdown(transactions, asset):
             ),
             "has_send_disposal_recommendation": recommended_disposal_quantity is not None,
             "status": reconciliation["status"],
+            "basis_review_status": (_basis_review_note(transactions, asset) or {}).get("status", ""),
+            "basis_review_note": (_basis_review_note(transactions, asset) or {}).get("note", ""),
             "transaction_count": len(asset_transactions),
             "expected_formula": expected_formula,
             "difference_formula": difference_formula,

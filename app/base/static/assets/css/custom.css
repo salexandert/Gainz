@@ -79,6 +79,37 @@
     margin: -4px 15px 16px;
 }
 
+.audit-checklist-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    margin: 12px 0 18px;
+}
+
+.audit-checklist-item {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.audit-checklist-item strong {
+    display: block;
+    margin-top: 8px;
+}
+
+.audit-checklist-item p {
+    color: #4f5962;
+    margin: 6px 0 0;
+}
+
+.audit-checklist-complete {
+    background: rgba(45, 206, 137, 0.05);
+}
+
+.audit-checklist-open {
+    background: rgba(245, 54, 92, 0.05);
+}
+
 .model-summary-band {
     display: grid;
     gap: 12px;
@@ -158,6 +189,11 @@
 .status-unlinked-sales {
     background: rgba(255, 193, 7, 0.18);
     color: #8a6300 !important;
+}
+
+.status-needs-user-research {
+    background: rgba(108, 117, 125, 0.16);
+    color: #495057 !important;
 }
 
 #statspage_all_holdings_reconciliation_datatable tbody tr {

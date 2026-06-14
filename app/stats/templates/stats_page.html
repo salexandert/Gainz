@@ -112,8 +112,15 @@
         <tr>
           <th>Source</th>
           <th>Row</th>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Asset</th>
+          <th>Quantity</th>
           <th>Issue</th>
+          <th>Likely category</th>
           <th>Status</th>
+          <th>Decision</th>
+          <th>Notes</th>
           <th>Suggested next action</th>
         </tr>
       </thead>
@@ -122,8 +129,19 @@
         <tr>
           <td>{{ warning.source }}</td>
           <td>{{ warning.row }}</td>
+          <td>{{ warning.row_date }}</td>
+          <td>{{ warning.row_type }}</td>
+          <td>{{ warning.asset }}</td>
+          <td>{{ warning.quantity }}</td>
           <td>{{ warning.issue }}</td>
-          <td><span class="gainz-status-badge status-needs-review">{{ warning.status }}</span></td>
+          <td>{{ warning.likely_category }}</td>
+          <td>
+            <span class="gainz-status-badge {% if warning.is_resolved %}status-verified{% else %}status-needs-review{% endif %}">
+              {{ warning.review_status }}
+            </span>
+          </td>
+          <td>{{ warning.decision_label }}{% if warning.review_note %}: {{ warning.review_note }}{% endif %}</td>
+          <td>{{ warning.notes }}</td>
           <td class="import-warning-action">{{ warning.next_action }}</td>
         </tr>
         {% endfor %}

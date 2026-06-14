@@ -123,6 +123,7 @@ function gainzNormalizeImportWarningRows(warnings, warningRows) {
 function gainzRenderImportWarningTable(tableSelector, rows) {
     var table = $(tableSelector);
     var tbody = table.find("tbody");
+    var reviewUrl = table.data("review-url");
 
     if (table.length === 0 || tbody.length === 0) {
         return;
@@ -134,12 +135,49 @@ function gainzRenderImportWarningTable(tableSelector, rows) {
         var tableRow = $("<tr></tr>");
         tableRow.append($("<td></td>").text(row.source || "Current import"));
         tableRow.append($("<td></td>").text(row.row || "N/A"));
+        tableRow.append($("<td></td>").text(row.row_date || ""));
+        tableRow.append($("<td></td>").text(row.row_type || ""));
+        tableRow.append($("<td></td>").text(row.asset || ""));
+        tableRow.append($("<td></td>").text(row.quantity || ""));
         tableRow.append($("<td></td>").text(row.issue || row.raw || "Review import row"));
+        tableRow.append($("<td></td>").text(row.likely_category || ""));
 
-        var badge = $('<span class="gainz-status-badge status-needs-review"></span>')
-            .text(row.status || "Needs review");
+        var reviewStatus = row.review_status || row.status || "Needs review";
+        var badgeClass = row.is_resolved ? "status-verified" : "status-needs-review";
+        var badge = $('<span class="gainz-status-badge"></span>')
+            .addClass(badgeClass)
+            .text(reviewStatus);
         tableRow.append($("<td></td>").append(badge));
-        tableRow.append($('<td class="import-warning-action"></td>').text(row.next_action || row.raw || "Review this source row."));
+
+        var decisionText = row.decision_label || "Not reviewed";
+        if (row.review_note) {
+            decisionText += ": " + row.review_note;
+        }
+        tableRow.append($("<td></td>").text(decisionText));
+        tableRow.append($("<td></td>").text(row.notes || ""));
+
+        var actionCell = $('<td class="import-warning-action"></td>');
+        actionCell.append($("<p></p>").text(row.next_action || row.raw || "Review this source row."));
+
+        if (reviewUrl) {
+            var noteInput = $('<input type="text" class="form-control form-control-sm import-warning-note-input" placeholder="Add note">')
+                .val(row.review_note || "");
+            actionCell.append(noteInput);
+            [
+                ["true_zero_value_transfer", "True zero-value transfer"],
+                ["needs_manual_usd_value", "Needs manual USD value"],
+                ["ignore_for_now", "Ignore for now"],
+                ["note", "Add note"]
+            ].forEach(function(action) {
+                var button = $('<button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button"></button>')
+                    .text(action[1])
+                    .data("decision", action[0])
+                    .data("warning", row.raw || "");
+                actionCell.append(button);
+            });
+        }
+
+        tableRow.append(actionCell);
         tbody.append(tableRow);
     });
 }
@@ -159,6 +197,62 @@ function gainzSetImportWarningWorkflow(panelSelector, tableSelector, warnings, w
         panel.hide();
     }
 }
+
+$(document).on("click", ".import-warning-decision-button", function() {
+    var button = $(this);
+    var table = button.closest("table");
+    var reviewUrl = table.data("review-url");
+    var note = button.closest("td").find(".import-warning-note-input").val() || "";
+
+    if (!reviewUrl) {
+        return;
+    }
+
+    button.prop("disabled", true).text("Saving...");
+    $.ajax({
+        type: "POST",
+        url: reviewUrl,
+        data: JSON.stringify({
+            warning: button.data("warning"),
+            decision: button.data("decision"),
+            note: note
+        }),
+        dataType: "json",
+        contentType: "application/json",
+        success: function(data) {
+            if (data.data_summary) {
+                gainzSetImportWarningWorkflow(
+                    "#import_warning_workflow",
+                    "#import_warning_workflow_table",
+                    data.data_summary.import_warnings || [],
+                    data.data_summary.import_warning_rows || []
+                );
+                $("#import_upload_result")
+                    .removeClass("alert-info alert-danger")
+                    .addClass("alert-warning")
+                    .text(data.message || "Import warning review decision saved.")
+                    .show();
+            }
+        },
+        error: function(xhr) {
+            var message = "Review decision could not be saved.";
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                message = xhr.responseJSON.error;
+            }
+            alert(message);
+        },
+        complete: function() {
+            button.prop("disabled", false).text(
+                {
+                    true_zero_value_transfer: "True zero-value transfer",
+                    needs_manual_usd_value: "Needs manual USD value",
+                    ignore_for_now: "Ignore for now",
+                    note: "Add note"
+                }[button.data("decision")] || "Save"
+            );
+        }
+    });
+});
 
 function gainzParseDisplayNumber(value) {
     return Number(String(value).replace(/[$,]/g, '').trim());
@@ -534,7 +628,7 @@ $(document).ready(function() {
         var badge = $('#holdings_status_badge');
         var className = holdingsStatusClass(status);
         badge
-            .removeClass('status-matched status-verified status-needs-declared-holdings status-mismatch status-needs-review status-unlinked-sales')
+            .removeClass('status-matched status-verified status-needs-declared-holdings status-mismatch status-needs-review status-unlinked-sales status-needs-user-research')
             .addClass(className)
             .text(status);
     }
@@ -700,10 +794,19 @@ $(document).ready(function() {
         $('#holdings_breakdown_receives').text(summary.receive_quantity || '--');
         $('#holdings_breakdown_imported_net').text(summary.imported_net || '--');
         $('#holdings_difference_transaction_count')
-            .removeClass('status-matched status-verified status-needs-declared-holdings status-mismatch status-needs-review status-unlinked-sales')
+            .removeClass('status-matched status-verified status-needs-declared-holdings status-mismatch status-needs-review status-unlinked-sales status-needs-user-research')
             .addClass(holdingsStatusClass(summary.status))
             .text(transactionCount + ' transaction' + (transactionCount == 1 ? '' : 's'));
         holdingsRenderSendDisposalRecommendation(summary);
+
+        if (summary.basis_review_status == 'needs_research') {
+            $('#basis_review_note').val(summary.basis_review_note || '');
+            $('#holdings_save_message')
+                .removeClass('alert-success')
+                .addClass('alert-warning')
+                .text('Missing basis for ' + summary.asset + ' is marked as needs user research. Exports remain draft/not filing-ready until resolved.')
+                .show();
+        }
 
         if (holdingsClassificationReviewTable) {
             holdingsClassificationReviewTable.clear();
@@ -749,7 +852,7 @@ $(document).ready(function() {
 
     function holdingsSetReadinessBadge(status) {
         $('#holdings_readiness_badge')
-            .removeClass('status-matched status-verified status-needs-declared-holdings status-mismatch status-needs-review status-unlinked-sales')
+            .removeClass('status-matched status-verified status-needs-declared-holdings status-mismatch status-needs-review status-unlinked-sales status-needs-user-research')
             .addClass(holdingsStatusClass(status))
             .text(status);
     }
@@ -766,6 +869,7 @@ $(document).ready(function() {
         if (!rowData) {
             $('#holdings_readiness_asset, #holdings_readiness_holdings, #holdings_readiness_unlinked, #holdings_readiness_difference').text('--');
             $('#holdings_run_fifo_button').prop('disabled', true).text('Run FIFO Auto Link for Selected Asset');
+            $('#holdings_leave_basis_unresolved_button').prop('disabled', true);
             holdingsSetReadinessBadge('Select asset');
             holdingsSetReadinessMessage('Select an asset to see the next review step.', 'info');
             return;
@@ -785,6 +889,7 @@ $(document).ready(function() {
         $('#holdings_readiness_unlinked').text(holdingsFormatQuantity(soldUnlinked));
         $('#holdings_readiness_difference').text(difference === null ? '--' : holdingsFormatQuantity(difference));
         $('#holdings_run_fifo_button').prop('disabled', soldUnlinked <= tolerance).text('Run FIFO Auto Link for Selected Asset');
+        $('#holdings_leave_basis_unresolved_button').prop('disabled', soldUnlinked <= tolerance);
 
         if (declaredHoldings === null) {
             holdingsSetReadinessBadge('Needs declared holdings');
@@ -1069,6 +1174,71 @@ $(document).ready(function() {
 
     holdingsApplySummaryFilter('all', { skipScroll: true });
 
+    function holdingsRefreshBulkButtonText() {
+        var asset = String($('#bulk_primary_asset').val() || 'BTC').trim().toUpperCase() || 'BTC';
+        $('#bulk_primary_asset').val(asset);
+        $('#bulk_set_non_primary_zero_button').text('Set All Non-' + asset + ' Assets To 0');
+    }
+
+    $('#bulk_primary_asset').on('input blur', holdingsRefreshBulkButtonText);
+    holdingsRefreshBulkButtonText();
+
+    $('#bulk_set_non_primary_zero_button').click(function() {
+        var button = $(this);
+        var primaryAsset = String($('#bulk_primary_asset').val() || 'BTC').trim().toUpperCase() || 'BTC';
+        var primaryQuantity = $('#bulk_primary_quantity').val();
+
+        if (!primaryQuantity && primaryQuantity !== '0') {
+            alert('Enter the current holdings quantity for ' + primaryAsset + '.');
+            return;
+        }
+
+        if (!window.confirm('Save current holdings as ' + primaryAsset + ' ' + primaryQuantity + ' and set every other tracked asset to 0?')) {
+            return;
+        }
+
+        button.prop('disabled', true).text('Saving...');
+        $('#bulk_holdings_message').hide().text('');
+
+        $.ajax({
+            type: "POST",
+            url: "/holdings_accounting/bulk_holdings",
+            data: JSON.stringify({
+                'primary_asset': primaryAsset,
+                'primary_quantity': primaryQuantity
+            }),
+            dataType: "json",
+            contentType: 'application/json',
+            success: function(data) {
+                holdingsRowsSet(data['stats_table_rows']);
+                holdingsSetSummary(data['holdings_summary']);
+                var updatedRow = holdingsSelectAsset(primaryAsset);
+                holdingsLoadRow(updatedRow);
+                $('#bulk_holdings_message')
+                    .removeClass('alert-warning')
+                    .addClass('alert-success')
+                    .text(data['message'] + ' Confirmation: ' + primaryAsset + ' ' + data['primary_quantity'] + ', all others 0.')
+                    .show();
+                holdingsScrollTo('#bulk_holdings_message');
+            },
+            error: function(xhr) {
+                var message = 'Bulk holdings could not be saved.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    message = xhr.responseJSON.message;
+                }
+                $('#bulk_holdings_message')
+                    .removeClass('alert-success')
+                    .addClass('alert-warning')
+                    .text(message)
+                    .show();
+            },
+            complete: function() {
+                holdingsRefreshBulkButtonText();
+                button.prop('disabled', false);
+            },
+        });
+    });
+
     $("#auto_action_button").click(function(){
 
         var table_data = $('#auto_actions_datatable').DataTable().rows( {selected:true} ).data()
@@ -1213,6 +1383,63 @@ $(document).ready(function() {
                 button.prop('disabled', false).text('Run FIFO Auto Link for Selected Asset');
             },
         });
+    });
+
+    function holdingsLeaveBasisUnresolved() {
+        var rowData = holdingsSelectedAssetRow();
+        var asset = rowData ? rowData[0] : null;
+        var note = $('#basis_review_note').val();
+
+        if (!rowData) {
+            alert('Select an asset first.');
+            return;
+        }
+
+        if (!window.confirm('Leave missing basis for ' + asset + ' unresolved as needs user research? Generated exports will remain draft/not filing-ready.')) {
+            return;
+        }
+
+        $('#leave_basis_unresolved_button, #holdings_leave_basis_unresolved_button').prop('disabled', true).text('Saving...');
+        $.ajax({
+            type: "POST",
+            url: "/holdings_accounting/leave_basis_unresolved",
+            data: JSON.stringify({
+                'asset': rowData,
+                'note': note
+            }),
+            dataType: "json",
+            contentType: 'application/json',
+            success: function(data) {
+                holdingsRowsSet(data['stats_table_rows']);
+                holdingsSetSummary(data['holdings_summary']);
+                var updatedRow = holdingsSelectAsset(asset);
+                holdingsRenderSelection(updatedRow || rowData);
+                holdingsRenderDifferenceBreakdown(data['difference_breakdown']);
+                holdingsLoadPrecheck(updatedRow || rowData);
+                $('#holdings_save_message')
+                    .removeClass('alert-success')
+                    .addClass('alert-warning')
+                    .text(data['message'] || (asset + ' left unresolved as needs user research.'))
+                    .show();
+                holdingsScrollTo('#holdings_save_message');
+            },
+            error: function(xhr) {
+                var message = 'Basis review status could not be saved.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    message = xhr.responseJSON.message;
+                }
+                alert(message);
+            },
+            complete: function() {
+                $('#leave_basis_unresolved_button').prop('disabled', false).text('Leave Unresolved / Needs Research');
+                $('#holdings_leave_basis_unresolved_button').text('Leave Missing Basis As Needs Research');
+                holdingsRenderReadiness();
+            },
+        });
+    }
+
+    $('#leave_basis_unresolved_button, #holdings_leave_basis_unresolved_button').click(function() {
+        holdingsLeaveBasisUnresolved();
     });
 
     function holdingsClassifyDocumentedSends() {

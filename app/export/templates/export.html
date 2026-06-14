@@ -80,6 +80,21 @@
           <strong>Review guidance:</strong> {{ audit_readiness.next_action }}
         </div>
 
+        <div class="audit-packet-list">
+          <h6>Reconciliation checklist</h6>
+          <div class="audit-checklist-grid">
+            {% for item in audit_readiness.checklist %}
+            <div class="audit-checklist-item {% if item.complete %}audit-checklist-complete{% else %}audit-checklist-open{% endif %}">
+              <span class="gainz-status-badge {% if item.complete %}status-verified{% else %}status-needs-review{% endif %}">
+                {% if item.complete %}Done{% else %}Open{% endif %}
+              </span>
+              <strong>{{ item.label }}</strong>
+              <p>{{ item.detail }}</p>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
         {% if audit_readiness.blockers %}
         <div class="alert alert-warning" role="alert">
           <strong>Review before using this packet:</strong>
@@ -99,6 +114,112 @@
             <li>{{ warning }}</li>
             {% endfor %}
           </ul>
+        </div>
+        {% endif %}
+
+        {% if audit_readiness.missing_records.basis %}
+        <div class="audit-packet-list">
+          <h6>Missing acquisition basis before sales</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-striped">
+              <thead>
+                <tr>
+                  <th>Asset</th>
+                  <th>Sale date</th>
+                  <th>Unlinked quantity</th>
+                  <th>Source</th>
+                  <th>Status</th>
+                  <th>Message</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in audit_readiness.missing_records.basis %}
+                <tr>
+                  <td>{{ row.asset }}</td>
+                  <td>{{ row.date }}</td>
+                  <td>{{ row.unlinked_quantity }}</td>
+                  <td>{{ row.source }}</td>
+                  <td>
+                    <span class="gainz-status-badge {% if row.status == 'Needs user research' %}status-needs-user-research{% else %}status-needs-review{% endif %}">
+                      {{ row.status }}
+                    </span>
+                  </td>
+                  <td>{{ row.message }}</td>
+                  <td>{{ row.note }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if audit_readiness.missing_records.current_holdings or audit_readiness.missing_records.holdings_explanations %}
+        <div class="audit-packet-list">
+          <h6>Current holdings explanations</h6>
+          <ul>
+            {% for row in audit_readiness.missing_records.current_holdings %}
+            <li>{{ row.message }}</li>
+            {% endfor %}
+            {% for row in audit_readiness.missing_records.holdings_explanations %}
+            <li>{{ row.message }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        {% if audit_readiness.unresolved_import_warning_rows %}
+        <div class="audit-packet-list">
+          <h6>Unresolved import-warning decisions</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-striped import-warning-table">
+              <thead>
+                <tr>
+                  <th>Source</th>
+                  <th>Row</th>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Asset</th>
+                  <th>Quantity</th>
+                  <th>Issue</th>
+                  <th>Likely category</th>
+                  <th>Status</th>
+                  <th>Decision</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for warning in audit_readiness.unresolved_import_warning_rows %}
+                <tr>
+                  <td>{{ warning.source }}</td>
+                  <td>{{ warning.row }}</td>
+                  <td>{{ warning.row_date }}</td>
+                  <td>{{ warning.row_type }}</td>
+                  <td>{{ warning.asset }}</td>
+                  <td>{{ warning.quantity }}</td>
+                  <td>{{ warning.issue }}</td>
+                  <td>{{ warning.likely_category }}</td>
+                  <td><span class="gainz-status-badge status-needs-review">{{ warning.review_status }}</span></td>
+                  <td>{{ warning.decision_label }}</td>
+                  <td>{{ warning.review_note }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if audit_readiness.missing_records.filed_totals %}
+        <div class="audit-packet-list">
+          <h6>Filed totals and payment records</h6>
+          <ul>
+            {% for row in audit_readiness.missing_records.filed_totals %}
+            <li>{{ row.message }}</li>
+            {% endfor %}
+          </ul>
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('tax_filing_review_blueprint.index') }}">Open Tax Filing Review</a>
         </div>
         {% endif %}
 

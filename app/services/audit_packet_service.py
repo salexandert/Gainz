@@ -11,9 +11,11 @@ from app.services.import_warning_service import import_warning_review_rows
 from utils import (
     FORM_8949_COLUMNS,
     format_quantity,
+    get_audit_readiness_summary,
     get_current_holdings_lots,
     get_form_8949_report_rows,
     get_form_8949_totals,
+    get_missing_basis_review_rows,
     get_multi_asset_holdings_reconciliation_table_data,
     get_tax_filing_alignment_summary,
 )
@@ -304,18 +306,47 @@ class AuditPacketService:
         with open(packet_dir / "01_reports" / "import_warnings.csv", "w", newline="", encoding="utf-8") as file:
             writer = csv.DictWriter(
                 file,
-                fieldnames=["source", "row", "issue", "status", "next_action", "warning"],
+                fieldnames=[
+                    "source",
+                    "row",
+                    "date",
+                    "type",
+                    "asset",
+                    "quantity",
+                    "issue",
+                    "likely_category",
+                    "status",
+                    "decision",
+                    "note",
+                    "next_action",
+                    "warning",
+                ],
             )
             writer.writeheader()
-            for row in import_warning_review_rows(warnings):
+            for row in import_warning_review_rows(warnings, transactions=transactions):
                 writer.writerow({
                     "source": row["source"],
                     "row": row["row"],
+                    "date": row["row_date"],
+                    "type": row["row_type"],
+                    "asset": row["asset"],
+                    "quantity": row["quantity"],
                     "issue": row["issue"],
-                    "status": row["status"],
+                    "likely_category": row["likely_category"],
+                    "status": row["review_status"],
+                    "decision": row["decision_label"],
+                    "note": row["review_note"],
                     "next_action": row["next_action"],
                     "warning": row["raw"],
                 })
+
+        with open(packet_dir / "01_reports" / "missing_basis_review.csv", "w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(
+                file,
+                fieldnames=["asset", "date", "quantity", "unlinked_quantity", "source", "status", "message", "note"],
+            )
+            writer.writeheader()
+            writer.writerows(get_missing_basis_review_rows(transactions))
 
     def _write_inventory(self, packet_dir):
         rows = []
@@ -342,6 +373,7 @@ class AuditPacketService:
         copied_sources = len([row for row in manifest_rows if row["status"] == "COPIED"])
         missing_sources = len([row for row in manifest_rows if row["status"] == "MISSING"])
         form_8949_totals = get_form_8949_totals(transactions)
+        readiness = get_audit_readiness_summary(transactions)
         summary = {
             "created_at": datetime.now().isoformat(timespec="seconds"),
             "packet_path": str(packet_dir),
@@ -352,6 +384,9 @@ class AuditPacketService:
             "tax_filing_alignment": get_tax_filing_alignment_summary(transactions),
             "holdings_reconciliation_rows": len(get_multi_asset_holdings_reconciliation_table_data(transactions)),
             "import_warning_count": len(getattr(transactions, "import_warnings", []) or []),
+            "unresolved_import_warning_count": readiness["metrics"]["unresolved_import_warnings"],
+            "missing_basis_rows": readiness["missing_records"]["basis"],
+            "reconciliation_checklist": readiness["checklist"],
         }
         (packet_dir / "03_manifests" / "audit_packet_summary.json").write_text(
             json.dumps(summary, indent=2),

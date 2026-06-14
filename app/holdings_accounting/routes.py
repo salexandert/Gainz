@@ -44,6 +44,16 @@ def _holdings_summary(transactions):
     }
 
 
+def _all_crypto_assets(transactions):
+    assets = set(getattr(transactions, "assets", set()) or set())
+    assets.update(
+        asset.symbol
+        for asset in getattr(transactions, "asset_objects", []) or []
+        if getattr(asset, "symbol", None)
+    )
+    return sorted(asset for asset in assets if asset not in FIAT_ASSET_SYMBOLS)
+
+
 def _request_asset(payload):
     asset_data = payload.get("asset")
     if isinstance(asset_data, list) and asset_data:
@@ -82,6 +92,21 @@ def _holdings_update_payload(transactions, asset, message, links_created=0, fail
         "stats_table_rows": _holdings_stats_rows(stats_table_data),
         "holdings_summary": _holdings_summary(transactions),
         "difference_breakdown": get_holdings_difference_breakdown(transactions, asset),
+    }
+
+
+def _holdings_bulk_payload(transactions, primary_asset, primary_quantity, zeroed_assets):
+    stats_table_data = get_stats_table_data(transactions)
+    return {
+        "message": (
+            f"Saved current holdings: {primary_asset} {format_quantity(primary_quantity)}, "
+            f"all other tracked assets 0."
+        ),
+        "primary_asset": primary_asset,
+        "primary_quantity": format_quantity(primary_quantity),
+        "zeroed_assets": zeroed_assets,
+        "stats_table_rows": _holdings_stats_rows(stats_table_data),
+        "holdings_summary": _holdings_summary(transactions),
     }
 
 
@@ -187,6 +212,46 @@ def holdings_info():
     })
 
 
+@blueprint.route('/bulk_holdings', methods=['POST'])
+@login_required
+def bulk_holdings():
+    payload = request.get_json(silent=True) or {}
+    primary_asset = str(payload.get("primary_asset") or "BTC").strip().upper()
+
+    try:
+        primary_quantity = float(payload.get("primary_quantity") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"message": "Enter a valid current holdings quantity."}), 400
+
+    if primary_quantity < 0:
+        return jsonify({"message": "Current holdings cannot be negative."}), 400
+
+    transactions = current_app.config['transactions']
+    assets = _all_crypto_assets(transactions)
+    if primary_asset not in assets:
+        assets.append(primary_asset)
+        assets.sort()
+
+    zeroed_assets = []
+    for asset in assets:
+        if asset == primary_asset:
+            continue
+        transactions.set_holdings(asset, 0)
+        zeroed_assets.append(asset)
+
+    transactions.set_holdings(primary_asset, primary_quantity)
+    transactions.save(description=f"Bulk holdings update: {primary_asset} plus zero balances")
+
+    return jsonify(
+        _holdings_bulk_payload(
+            transactions,
+            primary_asset,
+            primary_quantity,
+            zeroed_assets,
+        )
+    )
+
+
 @blueprint.route('/difference_breakdown', methods=['POST'])
 @login_required
 def difference_breakdown():
@@ -243,6 +308,31 @@ def sends_to_sells():
             result_str,
             links_created=links_created,
             failures=failures,
+        )
+    )
+
+
+@blueprint.route('/leave_basis_unresolved', methods=['POST'])
+@login_required
+def leave_basis_unresolved():
+    transactions = current_app.config['transactions']
+    payload = request.get_json(silent=True) or {}
+    asset = _request_asset(payload)
+    note = str(payload.get("note") or "").strip()
+    if not note:
+        note = "User will investigate source records later."
+
+    if not asset:
+        return jsonify({"message": "Select an asset before marking basis review status."}), 400
+
+    transactions.set_basis_review_note(asset, status="needs_research", note=note)
+    transactions.save(description=f"Marked {asset} basis review as needs research")
+
+    return jsonify(
+        _holdings_update_payload(
+            transactions,
+            asset,
+            f"{asset} basis review left unresolved as needs user research.",
         )
     )
 

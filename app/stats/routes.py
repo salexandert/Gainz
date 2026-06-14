@@ -8,7 +8,7 @@ from utils import *
 from wtforms import SubmitField
 from time import strftime
 from app.services.auto_link_service import AutoLinkService
-from app.services.import_warning_service import import_warning_review_rows
+from app.services.import_warning_service import import_warning_review_rows, unresolved_import_warning_rows
 
 
 def _stats_table_rows(stats_table_data):
@@ -72,7 +72,7 @@ def _has_unlinked_sales(stats_row):
     )
 
 
-def _holdings_reconciliation_rows(raw_holdings_rows, stats_table_data):
+def _holdings_reconciliation_rows(raw_holdings_rows, stats_table_data, transactions=None):
     stats_by_asset = {row['symbol']: row for row in stats_table_data}
     table_rows = []
 
@@ -81,19 +81,37 @@ def _holdings_reconciliation_rows(raw_holdings_rows, stats_table_data):
         asset = row[0]
 
         if _has_unlinked_sales(stats_by_asset.get(asset)):
-            row[6] = "Unlinked sales"
-            row[7] = "Run FIFO Auto Link or review basis links before using this asset in generated reports."
+            basis_note = (
+                transactions.get_basis_review_note(asset)
+                if transactions and hasattr(transactions, "get_basis_review_note")
+                else None
+            )
+            if basis_note and basis_note.get("status") == "needs_research":
+                row[6] = "Needs user research"
+                row[7] = (
+                    "Missing acquisition basis is intentionally left unresolved for user research. "
+                    "Generated exports remain draft/not filing-ready until this is resolved."
+                )
+                if basis_note.get("note"):
+                    row[7] += " Note: " + basis_note["note"]
+            else:
+                row[6] = "Unlinked sales"
+                row[7] = "Run FIFO Auto Link or review basis links before using this asset in generated reports."
 
         table_rows.append(row)
 
     return table_rows
 
 
-def _stats_summary(stats_table_data, raw_holdings_rows, import_warnings):
+def _stats_summary(stats_table_data, raw_holdings_rows, import_warnings, unresolved_warning_count=None):
     assets_needing_holdings = sum(1 for row in raw_holdings_rows if row[1] == "N/A")
     assets_with_mismatches = sum(1 for row in raw_holdings_rows if row[6] == "Needs Review")
     unlinked_sales = sum(1 for row in stats_table_data if _has_unlinked_sales(row))
-    import_warning_count = len(import_warnings or [])
+    import_warning_count = (
+        unresolved_warning_count
+        if unresolved_warning_count is not None
+        else len(import_warnings or [])
+    )
     is_ready = (
         assets_needing_holdings == 0
         and assets_with_mismatches == 0
@@ -125,17 +143,24 @@ def _stats_response_payload(transactions, year_value='All Time'):
     stats_table_data = get_stats_table_data_range(transactions, date_range)
     raw_holdings_reconciliation = get_multi_asset_holdings_reconciliation_table_data(transactions)
     import_warnings = _stats_import_warnings(transactions)
-    import_warning_rows = import_warning_review_rows(import_warnings)
+    import_warning_rows = import_warning_review_rows(import_warnings, transactions=transactions)
+    unresolved_warning_count = len(unresolved_import_warning_rows(transactions))
 
     return {
         'stats_table_rows': _stats_table_rows(stats_table_data),
         'reconciliation_status': _stats_reconciliation_status(stats_table_data),
         'import_warnings': import_warnings,
         'import_warning_rows': import_warning_rows,
-        'stats_summary': _stats_summary(stats_table_data, raw_holdings_reconciliation, import_warnings),
+        'stats_summary': _stats_summary(
+            stats_table_data,
+            raw_holdings_reconciliation,
+            import_warnings,
+            unresolved_warning_count=unresolved_warning_count,
+        ),
         'holdings_reconciliation_table_data': _holdings_reconciliation_rows(
             raw_holdings_reconciliation,
             stats_table_data,
+            transactions=transactions,
         ),
     }
 
@@ -199,7 +224,8 @@ def index():
     ranged_stats_table_data = get_stats_table_data_range(transactions, all_time_range)
     raw_holdings_reconciliation = get_multi_asset_holdings_reconciliation_table_data(transactions)
     import_warnings = _stats_import_warnings(transactions)
-    import_warning_rows = import_warning_review_rows(import_warnings)
+    import_warning_rows = import_warning_review_rows(import_warnings, transactions=transactions)
+    unresolved_warning_count = len(unresolved_import_warning_rows(transactions))
 
     return render_template(
         'stats_page.html',
@@ -209,10 +235,16 @@ def index():
         reconciliation_status=_stats_reconciliation_status(ranged_stats_table_data),
         import_warnings=import_warnings,
         import_warning_rows=import_warning_rows,
-        stats_summary=_stats_summary(ranged_stats_table_data, raw_holdings_reconciliation, import_warnings),
+        stats_summary=_stats_summary(
+            ranged_stats_table_data,
+            raw_holdings_reconciliation,
+            import_warnings,
+            unresolved_warning_count=unresolved_warning_count,
+        ),
         holdings_reconciliation_table_data=_holdings_reconciliation_rows(
             raw_holdings_reconciliation,
             ranged_stats_table_data,
+            transactions=transactions,
         ),
     )
 
@@ -330,10 +362,12 @@ def selected_asset():
     data_dict['holdings_reconciliation_data'] = holdings_reconciliation_data
     raw_holdings_reconciliation = get_multi_asset_holdings_reconciliation_table_data(transactions)
     import_warnings = _stats_import_warnings(transactions)
-    import_warning_rows = import_warning_review_rows(import_warnings)
+    import_warning_rows = import_warning_review_rows(import_warnings, transactions=transactions)
+    unresolved_warning_count = len(unresolved_import_warning_rows(transactions))
     data_dict['holdings_reconciliation_table_data'] = _holdings_reconciliation_rows(
         raw_holdings_reconciliation,
         stats_table_data,
+        transactions=transactions,
     )
     data_dict['unrealized_chart_data'] = chart_data["points"]
     data_dict['chart_current_usd_spot'] = chart_data["current_usd_spot"]
@@ -349,7 +383,12 @@ def selected_asset():
     }
     data_dict['import_warnings'] = import_warnings
     data_dict['import_warning_rows'] = import_warning_rows
-    data_dict['stats_summary'] = _stats_summary(stats_table_data, raw_holdings_reconciliation, import_warnings)
+    data_dict['stats_summary'] = _stats_summary(
+        stats_table_data,
+        raw_holdings_reconciliation,
+        import_warnings,
+        unresolved_warning_count=unresolved_warning_count,
+    )
 
     return jsonify(data_dict)
 
@@ -378,17 +417,24 @@ def date_range():
     stats_table_data = get_stats_table_data_range(transactions, date_range)
     raw_holdings_reconciliation = get_multi_asset_holdings_reconciliation_table_data(transactions)
     import_warnings = _stats_import_warnings(transactions)
-    import_warning_rows = import_warning_review_rows(import_warnings)
+    import_warning_rows = import_warning_review_rows(import_warnings, transactions=transactions)
+    unresolved_warning_count = len(unresolved_import_warning_rows(transactions))
 
     data = {}
     data['stats_table_rows'] = _stats_table_rows(stats_table_data)
     data['reconciliation_status'] = _stats_reconciliation_status(stats_table_data)
     data['import_warnings'] = import_warnings
     data['import_warning_rows'] = import_warning_rows
-    data['stats_summary'] = _stats_summary(stats_table_data, raw_holdings_reconciliation, import_warnings)
+    data['stats_summary'] = _stats_summary(
+        stats_table_data,
+        raw_holdings_reconciliation,
+        import_warnings,
+        unresolved_warning_count=unresolved_warning_count,
+    )
     data['holdings_reconciliation_table_data'] = _holdings_reconciliation_rows(
         raw_holdings_reconciliation,
         stats_table_data,
+        transactions=transactions,
     )
 
     # convert dates back to string format

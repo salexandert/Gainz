@@ -86,6 +86,34 @@
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
+        <h4 class="card-title">Bulk Current Holdings</h4>
+        <p class="card-category">Use this when your current records show one primary holding and every other tracked asset is zero.</p>
+        <div id="bulk_holdings_message" class="alert alert-info" role="status" style="display: none;"></div>
+        <div class="form-group row align-items-end">
+          <div class="col-md-3 col-sm-4">
+            <label for="bulk_primary_asset">Primary asset</label>
+            <input id="bulk_primary_asset" class="form-control text-uppercase" value="BTC">
+          </div>
+          <div class="col-md-4 col-sm-5">
+            <label for="bulk_primary_quantity">Current holdings</label>
+            <input id="bulk_primary_quantity" type="number" step="any" min="0" class="form-control" placeholder="0.00000000">
+          </div>
+          <div class="col-md-5 col-sm-12">
+            <button type="button" id="bulk_set_non_primary_zero_button" class="btn btn-primary">
+              Set All Non-BTC Assets To 0
+            </button>
+          </div>
+        </div>
+        <p class="text-muted mb-0">Gainz will save one revision showing the primary asset amount and zero declared holdings for every other imported asset.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
         <h4 class="card-title">Step 2: Select an Asset</h4>
         <p class="card-category">Choose an asset, then use the workbench below to declare holdings and interpret the difference.</p>
         <table id="eh_stats_datatable" class="table table-striped table-bordered" style="width:100%">
@@ -287,6 +315,17 @@
               <button type="button" id="buys_to_lost_button" class="btn btn-warning">Mark Loss for Review</button>
             </div>
           </div>
+          <div class="form-group row">
+            <label class="control-label col-md-2 col-sm-3" for="basis_review_note">Research note</label>
+            <div class="col-md-6 col-sm-6">
+              <input type="text" id="basis_review_note" class="form-control" placeholder="User will investigate source records later.">
+            </div>
+            <div class="col-md-4 col-sm-12">
+              <button type="button" id="leave_basis_unresolved_button" class="btn btn-outline-warning">
+                Leave Unresolved / Needs Research
+              </button>
+            </div>
+          </div>
         </div>
 
         <div id="eh_options" class="holdings-hidden-legacy">Select a row from Stats Table to Populate</div>
@@ -332,6 +371,7 @@
 
         <div class="holdings-readiness-actions">
           <button type="button" id="holdings_run_fifo_button" class="btn btn-primary" disabled>Run FIFO Auto Link for Selected Asset</button>
+          <button type="button" id="holdings_leave_basis_unresolved_button" class="btn btn-outline-warning" disabled>Leave Missing Basis As Needs Research</button>
           <a class="btn btn-outline-primary" href="/stats">Open Stats & Charts</a>
           <a class="btn btn-outline-secondary" href="/export">Open Export</a>
         </div>
