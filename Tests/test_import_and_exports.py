@@ -795,6 +795,39 @@ class ImportAndExportTests(unittest.TestCase):
                 db.session.remove()
                 db.engine.dispose()
 
+    def test_data_source_summary_flags_likely_full_history_overlap(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Buy("BCH", 1, datetime.datetime(2024, 1, 1), 100, "exchange_all_activity.csv"),
+            Sell("BCH", 0.5, datetime.datetime(2024, 2, 1), 200, "exchange_all_activity.csv"),
+            Buy("BCH", 1, datetime.datetime(2024, 1, 1), 100, "exchange_all_activity_2025.csv"),
+            Sell("BCH", 0.5, datetime.datetime(2024, 2, 1), 200, "exchange_all_activity_2025.csv"),
+        ]
+
+        summary = import_routes._data_source_summary(transactions)
+
+        self.assertEqual(1, summary["source_overlap_count"])
+        self.assertEqual("Likely full-history overlap", summary["source_overlaps"][0]["status"])
+        self.assertEqual(
+            {"Potential overlap"},
+            {source["status"] for source in summary["sources"]},
+        )
+
+    def test_audit_readiness_surfaces_source_overlap_review(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange_all_activity.csv"),
+            Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange_all_activity_2025.csv"),
+        ]
+        transactions.set_holdings("BTC", 2)
+
+        readiness = get_audit_readiness_summary(transactions)
+
+        self.assertFalse(readiness["is_ready"])
+        self.assertEqual(1, readiness["metrics"]["source_overlaps"])
+        self.assertTrue(any("overlapping source file" in warning for warning in readiness["warnings"]))
+        self.assertEqual(1, len(readiness["missing_records"]["source_overlaps"]))
+
     def test_leave_basis_unresolved_keeps_export_not_ready_with_research_status(self):
         transactions = empty_transactions()
         transactions.transactions = [
@@ -941,6 +974,7 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertTrue((packet_path / "01_reports" / "holdings_reconciliation.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "current_holdings_lots.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "import_warnings.csv").exists())
+            self.assertTrue((packet_path / "01_reports" / "source_overlap_review.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "tax_filing_alignment.csv").exists())
             self.assertEqual(1, len(list((packet_path / "01_reports").glob("*.xlsx"))))
             self.assertEqual(1, len(list((packet_path / "02_source_files").glob("*.csv"))))

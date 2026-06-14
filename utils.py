@@ -40,6 +40,12 @@ def _unresolved_import_warning_rows(transactions):
     return unresolved_import_warning_rows(transactions)
 
 
+def _source_overlap_rows(transactions):
+    from app.services.source_overlap_service import detect_source_overlaps
+
+    return detect_source_overlaps(transactions)
+
+
 def format_quantity(quantity, decimals=8):
     """Format crypto quantities without exposing floating-point noise."""
     if isinstance(quantity, str):
@@ -620,12 +626,14 @@ def _reconciliation_checklist(
     holdings_rows,
     missing_basis_rows,
     unresolved_warning_rows,
+    source_overlap_rows,
     tax_alignment,
     draft_acknowledged=False,
 ):
     current_holdings_entered = not any(row[6] == "Needs declared holdings" for row in holdings_rows)
     fifo_run = len(missing_basis_rows) == 0
     import_warnings_reviewed = len(unresolved_warning_rows) == 0
+    source_overlaps_reviewed = len(source_overlap_rows) == 0
     missing_basis_reviewed = len(missing_basis_rows) == 0
     filed_totals_entered = tax_alignment["metrics"]["years_needing_review"] == 0
 
@@ -644,6 +652,11 @@ def _reconciliation_checklist(
             "label": "Import warnings reviewed",
             "complete": import_warnings_reviewed,
             "detail": "All import warnings have reviewed decisions." if import_warnings_reviewed else "Review each warning and choose a decision.",
+        },
+        {
+            "label": "Source overlap reviewed",
+            "complete": source_overlaps_reviewed,
+            "detail": "No overlapping source files detected." if source_overlaps_reviewed else "Review possible full-history/year-specific duplicate exports.",
         },
         {
             "label": "Missing basis reviewed",
@@ -675,6 +688,7 @@ def get_audit_readiness_summary(transactions):
     warning_rows = _import_warning_review_rows(import_warnings, transactions=transactions)
     unresolved_warning_rows = _unresolved_import_warning_rows(transactions)
     missing_basis_rows = get_missing_basis_review_rows(transactions)
+    source_overlap_rows = _source_overlap_rows(transactions)
     tax_alignment = get_tax_filing_alignment_summary(transactions)
 
     assets_with_unlinked_sales = [
@@ -734,6 +748,12 @@ def get_audit_readiness_summary(transactions):
             f"{'s' if len(unresolved_warning_rows) != 1 else ''}."
         )
 
+    if source_overlap_rows:
+        warnings.append(
+            f"Review {len(source_overlap_rows)} possible overlapping source file pair"
+            f"{'s' if len(source_overlap_rows) != 1 else ''}."
+        )
+
     if form_8949_totals["total"]["rows"] == 0 and any(row.get("num_sells", 0) > 0 for row in stats_rows):
         blockers.append("Sells exist, but no linked Form 8949-style rows can be generated yet.")
 
@@ -749,9 +769,22 @@ def get_audit_readiness_summary(transactions):
     if blockers:
         status = "Not ready"
         status_class = "status-needs-review"
+        missing_parts = []
+        if missing_basis_rows:
+            missing_parts.append("basis before these sales")
+        if assets_needing_holdings or assets_with_mismatches:
+            missing_parts.append("current holdings explanations for these assets")
+        if unresolved_warning_rows:
+            missing_parts.append("review decisions for these import warnings")
+        if source_overlap_rows:
+            missing_parts.append("review of possible overlapping source files")
+        if filed_total_records:
+            missing_parts.append("filed totals/payment evidence")
+
         next_action = (
-            "You are missing basis before these sales, current holdings for these assets, "
-            "and review decisions for these import warnings."
+            "You are missing " + ", ".join(missing_parts) + "."
+            if missing_parts
+            else blockers[0]
         )
     elif warnings:
         status = "Review warnings"
@@ -777,12 +810,14 @@ def get_audit_readiness_summary(transactions):
             "current_holdings": _missing_current_holdings_records(holdings_rows),
             "holdings_explanations": _missing_holdings_explanation_records(holdings_rows),
             "filed_totals": filed_total_records,
+            "source_overlaps": source_overlap_rows,
         },
         "checklist": _reconciliation_checklist(
             transactions,
             holdings_rows,
             missing_basis_rows,
             unresolved_warning_rows,
+            source_overlap_rows,
             tax_alignment,
         ),
         "metrics": {
@@ -795,6 +830,7 @@ def get_audit_readiness_summary(transactions):
             "import_warnings": len(import_warnings),
             "unresolved_import_warnings": len(unresolved_warning_rows),
             "missing_basis_rows": len(missing_basis_rows),
+            "source_overlaps": len(source_overlap_rows),
             "form_8949_rows": form_8949_totals["total"]["rows"],
             "form_8949_proceeds": currency(form_8949_totals["total"]["proceeds"]),
             "form_8949_cost_basis": currency(form_8949_totals["total"]["cost_basis"]),
@@ -810,6 +846,7 @@ def get_audit_readiness_summary(transactions):
             "Current holdings lots CSV",
             "Import warnings CSV with review decisions",
             "Missing basis review CSV",
+            "Source overlap review CSV",
             "Copied source files when still available on disk",
             "Evidence manifest, packet inventory, and SHA-256 hashes",
             "Methodology memo",

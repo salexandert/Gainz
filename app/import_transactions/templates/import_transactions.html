@@ -66,7 +66,10 @@
       <div class="card-body">
         <p class="card-category">Data Sources</p>
         <h4 class="card-title">{{ data_summary.source_count }}</h4>
-        <p class="text-muted mb-0">{{ data_summary.link_count }} basis link{% if data_summary.link_count != 1 %}s{% endif %}</p>
+        <p class="text-muted mb-0">
+          {{ data_summary.link_count }} basis link{% if data_summary.link_count != 1 %}s{% endif %}
+          {% if data_summary.source_overlap_count %} · {{ data_summary.source_overlap_count }} overlap review{% if data_summary.source_overlap_count != 1 %}s{% endif %}{% endif %}
+        </p>
       </div>
     </div>
   </div>
@@ -333,6 +336,43 @@
       <div class="card-body">
         <h5 class="card-title">Current Data Sources</h5>
         <div id="data_source_action_result" class="alert alert-info" role="alert" style="display: none;"></div>
+        <div
+          id="source_overlap_workflow"
+          class="alert alert-warning"
+          role="alert"
+          {% if not data_summary.source_overlaps %}style="display: none;"{% endif %}
+        >
+          <strong>Possible overlapping source files need review.</strong>
+          <p class="mb-2">
+            Gainz found source files that look like they may cover the same activity. This often happens when a full-history export and a year-specific export are both imported.
+          </p>
+          <div class="table-responsive">
+            <table id="source_overlap_table" class="table table-sm table-striped">
+              <thead>
+                <tr>
+                  <th>Source A</th>
+                  <th>Source B</th>
+                  <th>Matching rows</th>
+                  <th>Status</th>
+                  <th>Why it matters</th>
+                  <th>Next action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for overlap in data_summary.source_overlaps %}
+                <tr>
+                  <td title="{{ overlap.source_a }}">{{ overlap.name_a }}<br><small>{{ overlap.date_range_a }}</small></td>
+                  <td title="{{ overlap.source_b }}">{{ overlap.name_b }}<br><small>{{ overlap.date_range_b }}</small></td>
+                  <td>{{ overlap.matching_rows }} ({{ overlap.overlap_percent }})</td>
+                  <td><span class="gainz-status-badge status-needs-review">{{ overlap.status }}</span></td>
+                  <td>{{ overlap.message }}</td>
+                  <td>{{ overlap.next_action }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
         <p class="text-muted">
           Remove a source only removes its transactions from the current data set and saves a new revision.
           Previous revisions remain available in History, and source CSV files are not deleted from disk.
@@ -343,6 +383,7 @@
               <tr>
                 <th>Source</th>
                 <th>Rows</th>
+                <th>Date Range</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
@@ -352,8 +393,11 @@
               <tr>
                 <td title="{{ source.source }}">{{ source.name }}</td>
                 <td>{{ source.count }}</td>
+                <td>{{ source.date_range }}</td>
                 <td>
-                  {% if source.is_file %}
+                  {% if source.has_overlap %}
+                    <span class="badge badge-warning">{{ source.status }}</span>
+                  {% elif source.is_file %}
                     <span class="badge badge-success">{{ source.status }}</span>
                   {% elif source.is_gainz_source %}
                     <span class="badge badge-info">{{ source.status }}</span>
@@ -375,7 +419,7 @@
               </tr>
               {% else %}
               <tr>
-                <td colspan="4" class="text-muted">No imported data yet.</td>
+                <td colspan="5" class="text-muted">No imported data yet.</td>
               </tr>
               {% endfor %}
             </tbody>

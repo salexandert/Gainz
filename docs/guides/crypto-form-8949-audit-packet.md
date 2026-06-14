@@ -21,6 +21,7 @@ A Gainz audit packet can include:
 - Current holdings lots CSV.
 - Import warnings CSV with review decisions.
 - Missing basis review CSV.
+- Source overlap review CSV.
 - Source file manifest.
 - SHA-256 hashes.
 - Methodology memo.
@@ -35,6 +36,7 @@ Before generating a packet, check:
 
 - Unlinked sales are zero or intentionally explained.
 - Import warnings have been reviewed.
+- Possible overlapping source files have been reviewed.
 - Declared holdings are entered for relevant assets.
 - Holdings items marked Needs Review are resolved or documented.
 - Missing basis items marked Needs user research are understood as draft-only blockers.

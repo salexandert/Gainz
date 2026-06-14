@@ -26,6 +26,8 @@ Current holdings reconciliation answers a plain question: does the activity you 
 
 A difference can point to missing buys, missing sells, transfers between wallets, receives, sends, conversions, rewards, losses, unsupported CSV rows, or records from another platform. The number is not automatically wrong and it is not automatically taxable. It is a signal that the record set needs review.
 
+Another cause is overlapping source files. For example, a full-history exchange export and a year-specific export may both include the same older activity. Gainz flags likely overlaps on Import & Manage Data and carries them into Export so you can remove duplicate/overlapping sources from the current data set after confirming the source files.
+
 Sends are not automatically sales. A send to another account you own or control should remain a transfer. A send supported by records showing a sale, exchange, payment, fee, gift, or other transfer of ownership may need to be recorded as a taxable disposal. A possible lost, stolen, abandoned, or worthless lot should be marked for review and discussed with a qualified tax professional before relying on generated reports.
 
 Receives are not automatically buys. A receive can be the other side of an owner transfer, a buy from another exchange, income, rewards, a gift, a transfer from a wallet that was not imported yet, or another acquisition that needs basis support.

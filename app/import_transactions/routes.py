@@ -16,7 +16,7 @@ from utils import *
 
 import os
 from collections import Counter
-from datetime import datetime
+from datetime import date, datetime, time
 
 from flask import Blueprint, request
 from transactions import Transactions
@@ -27,6 +27,7 @@ from app.services.import_warning_service import (
     import_warning_review_rows,
     unresolved_import_warning_rows,
 )
+from app.services.source_overlap_service import detect_source_overlaps, sources_with_overlaps
 
 import_transactions_bp = Blueprint('import_transactions', __name__)
 
@@ -182,12 +183,27 @@ def _current_save_summary(transactions, refresh=False):
 def _data_source_summary(transactions):
     source_counter = Counter()
     type_counter = Counter()
+    source_ranges = {}
 
     for transaction in getattr(transactions, "transactions", []):
         source = getattr(transaction, "source", "") or "Manual / Unknown"
         source_counter[source] += 1
         type_counter[getattr(transaction, "trans_type", "unknown")] += 1
+        timestamp = getattr(transaction, "time_stamp", None)
+        if timestamp is not None:
+            if hasattr(timestamp, "to_pydatetime"):
+                timestamp = timestamp.to_pydatetime()
+            if isinstance(timestamp, date) and not isinstance(timestamp, datetime):
+                timestamp = datetime.combine(timestamp, time.min)
+            if hasattr(timestamp, "replace"):
+                try:
+                    timestamp = timestamp.replace(tzinfo=None)
+                except TypeError:
+                    pass
+            source_ranges.setdefault(source, []).append(timestamp)
 
+    source_overlaps = detect_source_overlaps(transactions)
+    overlapped_sources = sources_with_overlaps(source_overlaps)
     sources = []
     for source, count in source_counter.most_common():
         exists = os.path.exists(str(source))
@@ -196,13 +212,28 @@ def _data_source_summary(transactions):
             or "Converted in Gainz App" in str(source)
             or "Reclassified in Gainz App" in str(source)
         )
+        timestamps = source_ranges.get(source, [])
+        date_range = "N/A"
+        if timestamps:
+            first = min(timestamps)
+            last = max(timestamps)
+            if hasattr(first, "strftime") and hasattr(last, "strftime"):
+                date_range = f"{first.strftime('%Y-%m-%d')} to {last.strftime('%Y-%m-%d')}"
+            else:
+                date_range = f"{first} to {last}"
         sources.append({
             "source": source,
             "name": os.path.basename(str(source)) if source != "Manual / Unknown" else source,
             "count": count,
-            "status": "Available" if exists else "Generated in Gainz" if is_gainz_source else "Not found",
+            "status": (
+                "Potential overlap"
+                if source in overlapped_sources
+                else "Available" if exists else "Generated in Gainz" if is_gainz_source else "Not found"
+            ),
             "is_file": exists,
             "is_gainz_source": is_gainz_source,
+            "has_overlap": source in overlapped_sources,
+            "date_range": date_range,
         })
 
     import_warnings = getattr(transactions, "import_warnings", []) or []
@@ -213,6 +244,8 @@ def _data_source_summary(transactions):
         "asset_count": len(getattr(transactions, "assets", set())),
         "link_count": len(getattr(transactions, "links", set())),
         "source_count": len(sources),
+        "source_overlaps": source_overlaps,
+        "source_overlap_count": len(source_overlaps),
         "sources": sources,
         "type_counts": {
             "buy": type_counter.get("buy", 0),
@@ -247,6 +280,12 @@ def _public_import_result(result):
     else:
         public_result["warning_rows"] = import_warning_review_rows(public_result.get("warnings", []))
 
+    return public_result
+
+
+def _public_import_response(transactions, result):
+    public_result = _public_import_result(result)
+    public_result["data_summary"] = _data_source_summary(transactions)
     return public_result
 
 
@@ -341,7 +380,7 @@ def import_wizard():
                     return _import_error_response("uploaded CSV")
                 if result.get("mapping_required"):
                     session["pending_import_file_path"] = result["file_path"]
-                return jsonify(_public_import_result(result))
+                return jsonify(_public_import_response(transactions, result))
 
         # Current holdings
         if current_holdings.validate_on_submit():
@@ -459,7 +498,7 @@ def mapped_import():
     if not result.get("mapping_required"):
         session.pop("pending_import_file_path", None)
 
-    return jsonify(_public_import_result(result))
+    return jsonify(_public_import_response(transactions, result))
 
 
 @blueprint.route('/demo', methods=['POST'])
@@ -473,7 +512,7 @@ def import_demo_data():
         )
     except Exception:
         return _import_error_response("demo data")
-    return jsonify(_public_import_result(result))
+    return jsonify(_public_import_response(transactions, result))
 
 
 @blueprint.route('/remove_source', methods=['POST'])

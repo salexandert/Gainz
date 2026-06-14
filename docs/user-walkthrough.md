@@ -50,6 +50,8 @@ Gainz also recognizes common column-name variations. For example, headers like `
 
 If Gainz shows import warnings, review them before relying on generated reports. The warning table shows the source file, row number, date, type, asset, quantity, issue, likely category, and review decision. For each warning, choose whether it is a true zero-value transfer, needs a manual USD value, should be ignored for now, or needs a note. Unresolved warnings stay visible in Export and the audit packet.
 
+Also review **Possible overlapping source files** on Import & Manage Data. Gainz flags pairs that look like a full-history export plus a year-specific export, or files with overlapping transaction signatures. If one source duplicates another, remove only the duplicate/overlapping source from current data and keep the original CSV for evidence.
+
 If a CSV is missing known buys or sells, use **Add Manual Transactions** on the same page. Enter as many rows as needed, leave unused rows blank, and submit the batch. Gainz saves the batch as one revision with source `Gainz App Manual Add`.
 
 ![Gainz manual transaction batch entry table]({{ '/assets/screenshots/gainz-manual-batch-entry.png' | relative_url }})
@@ -163,6 +165,7 @@ The **Audit Packet Review Status** panel summarizes whether the packet is ready 
 - Holdings gaps.
 - Holdings review items.
 - Import warnings and review decisions.
+- Possible overlapping source files.
 - Missing acquisition basis before sales.
 - Review guidance.
 
@@ -187,6 +190,7 @@ The audit packet includes:
 - Current holdings lots CSV.
 - Import warnings CSV with review decisions.
 - Missing basis review CSV.
+- Source overlap review CSV.
 - Source files copied into the packet when they are still available on disk.
 - Evidence manifest.
 - Packet inventory.

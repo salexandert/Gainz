@@ -44,6 +44,122 @@ function gainzShowImportResult(result, fileName, alertClass) {
     } else {
         $("#import_warning_workflow").hide();
     }
+
+    if (result.data_summary) {
+        gainzSetSourceOverlapWorkflow(result.data_summary.source_overlaps || []);
+        gainzRenderDataSources(result.data_summary);
+    }
+}
+
+function gainzRenderSourceOverlapTable(rows) {
+    var table = $("#source_overlap_table");
+    var tbody = table.find("tbody");
+
+    if (table.length === 0 || tbody.length === 0) {
+        return;
+    }
+
+    tbody.empty();
+    (rows || []).forEach(function(row) {
+        var tableRow = $("<tr></tr>");
+        tableRow.append(
+            $("<td></td>")
+                .attr("title", row.source_a || "")
+                .append($("<span></span>").text(row.name_a || "Source A"))
+                .append("<br>")
+                .append($("<small></small>").text(row.date_range_a || ""))
+        );
+        tableRow.append(
+            $("<td></td>")
+                .attr("title", row.source_b || "")
+                .append($("<span></span>").text(row.name_b || "Source B"))
+                .append("<br>")
+                .append($("<small></small>").text(row.date_range_b || ""))
+        );
+        tableRow.append($("<td></td>").text((row.matching_rows || 0) + " (" + (row.overlap_percent || "0%") + ")"));
+        tableRow.append(
+            $("<td></td>").append(
+                $('<span class="gainz-status-badge status-needs-review"></span>').text(row.status || "Needs review")
+            )
+        );
+        tableRow.append($("<td></td>").text(row.message || "Review these source files for overlap."));
+        tableRow.append($("<td></td>").text(row.next_action || "Review sources and remove the duplicate only after confirming the overlap."));
+        tbody.append(tableRow);
+    });
+}
+
+function gainzSetSourceOverlapWorkflow(rows) {
+    var panel = $("#source_overlap_workflow");
+    if (panel.length === 0) {
+        return;
+    }
+
+    if (rows && rows.length > 0) {
+        gainzRenderSourceOverlapTable(rows);
+        panel.show();
+    } else {
+        panel.hide();
+    }
+}
+
+function gainzRenderDataSources(summary) {
+    var table = $("#import_data_sources_table");
+    var tbody = table.find("tbody");
+
+    if (!summary || table.length === 0 || tbody.length === 0) {
+        return;
+    }
+
+    tbody.empty();
+
+    if (!summary.sources || summary.sources.length === 0) {
+        tbody.append(
+            $("<tr></tr>").append(
+                $("<td></td>")
+                    .attr("colspan", 5)
+                    .addClass("text-muted")
+                    .text("No imported data yet.")
+            )
+        );
+        return;
+    }
+
+    summary.sources.forEach(function(source) {
+        var row = $("<tr></tr>");
+        var statusClass = "badge-secondary";
+
+        if (source.has_overlap) {
+            statusClass = "badge-warning";
+        } else if (source.is_file) {
+            statusClass = "badge-success";
+        } else if (source.is_gainz_source) {
+            statusClass = "badge-info";
+        }
+
+        row.append($("<td></td>").attr("title", source.source || "").text(source.name || "Unknown source"));
+        row.append($("<td></td>").text(source.count || 0));
+        row.append($("<td></td>").text(source.date_range || "N/A"));
+        row.append(
+            $("<td></td>").append(
+                $("<span></span>").addClass("badge").addClass(statusClass).text(source.status || "Not found")
+            )
+        );
+
+        if (!source.is_gainz_source && source.source !== "Manual / Unknown") {
+            row.append(
+                $("<td></td>").append(
+                    $('<button type="button" class="btn btn-sm btn-outline-danger remove-data-source-button">Remove from Current Data</button>')
+                        .data("source", source.source)
+                        .data("source-name", source.name || "this source")
+                        .data("source-count", source.count || 0)
+                )
+            );
+        } else {
+            row.append($("<td></td>").addClass("text-muted").text("Managed by Gainz"));
+        }
+
+        tbody.append(row);
+    });
 }
 
 function gainzShowColumnReviewResult(result) {
@@ -409,6 +525,11 @@ if (window.Dropzone) {
             this.on("sending", function (file, xhr, formData) {
                 var reviewColumns = $("#import_review_columns_before_import").is(":checked") ? "1" : "0";
                 formData.append("review_columns", reviewColumns);
+                $("#import_upload_result")
+                    .removeClass("alert-danger alert-warning")
+                    .addClass("alert-info")
+                    .text("Uploading and importing " + (file.name || "CSV") + ". Large files may take 10-30 seconds while Gainz parses rows, checks duplicates, and saves a revision.")
+                    .show();
             });
 
             this.on("success", function (file, response) {
@@ -452,6 +573,11 @@ $(document).ready(function () {
         var demoUrl = button.data("demo-url");
 
         button.prop("disabled", true).text("Loading Demo Data...");
+        $("#import_upload_result")
+            .removeClass("alert-danger alert-warning")
+            .addClass("alert-info")
+            .text("Loading demo data, checking for duplicate rows, and saving a revision...")
+            .show();
 
         $.post(demoUrl)
             .done(function (result) {
@@ -507,6 +633,14 @@ $(document).ready(function () {
     $("#import_submit_mapping_button").on("click", function () {
         var mapper = $("#import_column_mapper");
         var importUrl = mapper.data("import-url");
+        var button = $(this);
+
+        button.prop("disabled", true).text("Importing...");
+        $("#import_upload_result")
+            .removeClass("alert-danger alert-warning")
+            .addClass("alert-info")
+            .text("Importing with your mapped columns. Large files may take 10-30 seconds while Gainz parses rows, checks duplicates, and saves a revision.")
+            .show();
 
         $.ajax({
             url: importUrl,
@@ -535,10 +669,12 @@ $(document).ready(function () {
                 .addClass("alert-danger")
                 .text(message)
                 .show();
+        }).always(function () {
+            button.prop("disabled", false).text("Import With These Columns");
         });
     });
 
-    $(".remove-data-source-button").on("click", function () {
+    $(document).on("click", ".remove-data-source-button", function () {
         var button = $(this);
         var table = $("#import_data_sources_table");
         var removeUrl = table.data("remove-url");
@@ -561,7 +697,7 @@ $(document).ready(function () {
         resultBox
             .removeClass("alert-danger alert-info alert-success")
             .addClass("alert-info")
-            .text("Removing data source and saving a new revision...")
+            .text("Removing data source, recalculating links and summaries, and saving a new revision. This can take a few seconds on large data sets...")
             .show();
 
         $.ajax({
@@ -1197,8 +1333,13 @@ $(document).ready(function() {
             return;
         }
 
-        button.prop('disabled', true).text('Saving...');
-        $('#bulk_holdings_message').hide().text('');
+        var startedAt = Date.now();
+        button.prop('disabled', true).text('Saving revision...');
+        $('#bulk_holdings_message')
+            .removeClass('alert-success alert-warning')
+            .addClass('alert-info')
+            .text('Saving current holdings, recalculating reconciliation, and writing a new revision. Large data sets may take 10-30 seconds; keep this tab open.')
+            .show();
 
         $.ajax({
             type: "POST",
@@ -1215,9 +1356,9 @@ $(document).ready(function() {
                 var updatedRow = holdingsSelectAsset(primaryAsset);
                 holdingsLoadRow(updatedRow);
                 $('#bulk_holdings_message')
-                    .removeClass('alert-warning')
+                    .removeClass('alert-info alert-warning')
                     .addClass('alert-success')
-                    .text(data['message'] + ' Confirmation: ' + primaryAsset + ' ' + data['primary_quantity'] + ', all others 0.')
+                    .text(data['message'] + ' Confirmation: ' + primaryAsset + ' ' + data['primary_quantity'] + ', all others 0. Completed in ' + Math.max(1, Math.round((Date.now() - startedAt) / 1000)) + ' second(s).')
                     .show();
                 holdingsScrollTo('#bulk_holdings_message');
             },
@@ -1227,7 +1368,7 @@ $(document).ready(function() {
                     message = xhr.responseJSON.message;
                 }
                 $('#bulk_holdings_message')
-                    .removeClass('alert-success')
+                    .removeClass('alert-info alert-success')
                     .addClass('alert-warning')
                     .text(message)
                     .show();
@@ -1359,8 +1500,9 @@ $(document).ready(function() {
             return;
         }
 
-        button.prop('disabled', true).text('Linking...');
-        holdingsSetReadinessMessage('Running FIFO Auto Link for ' + asset + '...', 'info');
+        var startedAt = Date.now();
+        button.prop('disabled', true).text('Linking and saving...');
+        holdingsSetReadinessMessage('Running FIFO Auto Link for ' + asset + ', recalculating basis links, and saving a revision. This can take 10-30 seconds on large data sets; keep this tab open.', 'info');
 
         $.ajax({
             type: "POST",
@@ -1373,7 +1515,7 @@ $(document).ready(function() {
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
-                holdingsSetReadinessMessage(data || 'FIFO Auto Link complete. Refreshing review data...', 'success');
+                holdingsSetReadinessMessage((data || 'FIFO Auto Link complete.') + ' Completed in ' + Math.max(1, Math.round((Date.now() - startedAt) / 1000)) + ' second(s). Refreshing review data...', 'success');
                 window.setTimeout(function () {
                     location.reload();
                 }, 900);
@@ -1585,6 +1727,8 @@ $(document).ready(function() {
             return;
         }
 
+        autoLinkShowResult('Running ' + algo.replace(/_/g, ' ').toUpperCase() + ' Auto Link for ' + selectedAsset[0] + ', recalculating basis links, and saving a revision. Keep this tab open.', false);
+
         $.ajax({
             type: "POST",
             url: "/auto_link/auto_link_asset",
@@ -1611,9 +1755,10 @@ $(document).ready(function() {
         var button = $(this);
         var originalText = button.text();
         var endpoint = button.data('url') || "/auto_link/auto_link_all_fifo";
+        var startedAt = Date.now();
 
-        autoLinkShowResult('Running FIFO Auto Link across assets with unlinked sales...', false);
-        button.prop('disabled', true).text('Linking...');
+        autoLinkShowResult('Running FIFO Auto Link across assets with unlinked sales, recalculating basis links, and saving a revision. Large data sets may take 10-30 seconds; keep this tab open.', false);
+        button.prop('disabled', true).text('Linking and saving...');
 
         $.ajax({
             type: "POST",
@@ -1625,6 +1770,7 @@ $(document).ready(function() {
             contentType: 'application/json',
             success: function (data) {
                 var message = data && data.message ? data.message : 'FIFO Auto Link complete. Review generated links before using reports.';
+                message += ' Completed in ' + Math.max(1, Math.round((Date.now() - startedAt) / 1000)) + ' second(s).';
                 autoLinkShowResult(message, false);
                 window.setTimeout(function () {
                     location.reload();

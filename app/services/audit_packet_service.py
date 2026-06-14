@@ -8,6 +8,7 @@ from pathlib import Path
 
 from app.services.export_service import ExportService
 from app.services.import_warning_service import import_warning_review_rows
+from app.services.source_overlap_service import detect_source_overlaps
 from utils import (
     FORM_8949_COLUMNS,
     format_quantity,
@@ -91,6 +92,7 @@ class AuditPacketService:
         self._write_tax_filing_alignment(packet_dir, transactions)
         self._write_holdings_reports(packet_dir, transactions)
         self._write_import_warnings(packet_dir, transactions)
+        self._write_source_overlap_review(packet_dir, transactions)
         self._write_manifest(packet_dir, manifest_rows)
         self._write_inventory(packet_dir)
         self._write_summary(packet_dir, manifest_rows, transactions)
@@ -348,6 +350,40 @@ class AuditPacketService:
             writer.writeheader()
             writer.writerows(get_missing_basis_review_rows(transactions))
 
+    def _write_source_overlap_review(self, packet_dir, transactions):
+        with open(packet_dir / "01_reports" / "source_overlap_review.csv", "w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(
+                file,
+                fieldnames=[
+                    "source_a",
+                    "source_b",
+                    "count_a",
+                    "count_b",
+                    "date_range_a",
+                    "date_range_b",
+                    "matching_rows",
+                    "overlap_percent",
+                    "status",
+                    "message",
+                    "next_action",
+                ],
+            )
+            writer.writeheader()
+            for row in detect_source_overlaps(transactions):
+                writer.writerow({
+                    "source_a": row["source_a"],
+                    "source_b": row["source_b"],
+                    "count_a": row["count_a"],
+                    "count_b": row["count_b"],
+                    "date_range_a": row["date_range_a"],
+                    "date_range_b": row["date_range_b"],
+                    "matching_rows": row["matching_rows"],
+                    "overlap_percent": row["overlap_percent"],
+                    "status": row["status"],
+                    "message": row["message"],
+                    "next_action": row["next_action"],
+                })
+
     def _write_inventory(self, packet_dir):
         rows = []
         for path in sorted(packet_dir.rglob("*")):
@@ -386,6 +422,7 @@ class AuditPacketService:
             "import_warning_count": len(getattr(transactions, "import_warnings", []) or []),
             "unresolved_import_warning_count": readiness["metrics"]["unresolved_import_warnings"],
             "missing_basis_rows": readiness["missing_records"]["basis"],
+            "source_overlap_rows": readiness["missing_records"]["source_overlaps"],
             "reconciliation_checklist": readiness["checklist"],
         }
         (packet_dir / "03_manifests" / "audit_packet_summary.json").write_text(

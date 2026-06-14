@@ -100,7 +100,7 @@ Windows may show a Microsoft Defender SmartScreen warning while Gainz is young a
 1. Learn the cost-basis question and collect source files.
 2. Import transaction CSVs in **Import & Manage Data**.
 3. Add source-backed manual rows in the batch table when a CSV is missing known buys or sells.
-4. Review imported buys, sells, sends, receives, warnings, and data sources.
+4. Review imported buys, sells, sends, receives, warnings, data sources, and possible overlapping exports.
 5. Link sells to earlier buys, usually starting with FIFO for a first review pass.
 6. Declare current holdings and resolve review items.
 7. Export the Excel report and audit packet from the Export page.
@@ -126,7 +126,7 @@ A good demo run is:
 7. Open **Export** and review the **Audit Packet Review Status** checklist.
 8. Click **Generate Audit Packet**.
 
-The audit packet includes the Excel workbook, Form 8949 detail CSVs, Form 8949 totals, holdings reconciliation, current holdings lots, import warnings with review decisions, missing-basis review, copied source files when available, hashes, and a methodology memo.
+The audit packet includes the Excel workbook, Form 8949 detail CSVs, Form 8949 totals, holdings reconciliation, current holdings lots, import warnings with review decisions, missing-basis review, source-overlap review, copied source files when available, hashes, and a methodology memo.
 
 ## Documentation
 

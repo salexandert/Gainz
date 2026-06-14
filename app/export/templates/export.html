@@ -74,6 +74,10 @@
             <span>Warnings</span>
             <strong>{{ audit_readiness.metrics.import_warnings }}</strong>
           </div>
+          <div class="audit-readiness-item">
+            <span>Source Overlaps</span>
+            <strong>{{ audit_readiness.metrics.source_overlaps }}</strong>
+          </div>
         </div>
 
         <div class="audit-next-action">
@@ -203,6 +207,38 @@
                   <td><span class="gainz-status-badge status-needs-review">{{ warning.review_status }}</span></td>
                   <td>{{ warning.decision_label }}</td>
                   <td>{{ warning.review_note }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if audit_readiness.missing_records.source_overlaps %}
+        <div class="audit-packet-list">
+          <h6>Possible overlapping source files</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-striped">
+              <thead>
+                <tr>
+                  <th>Source A</th>
+                  <th>Source B</th>
+                  <th>Matching rows</th>
+                  <th>Status</th>
+                  <th>Why it matters</th>
+                  <th>Next action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for overlap in audit_readiness.missing_records.source_overlaps %}
+                <tr>
+                  <td title="{{ overlap.source_a }}">{{ overlap.name_a }}<br><small>{{ overlap.date_range_a }}</small></td>
+                  <td title="{{ overlap.source_b }}">{{ overlap.name_b }}<br><small>{{ overlap.date_range_b }}</small></td>
+                  <td>{{ overlap.matching_rows }} ({{ overlap.overlap_percent }})</td>
+                  <td><span class="gainz-status-badge status-needs-review">{{ overlap.status }}</span></td>
+                  <td>{{ overlap.message }}</td>
+                  <td>{{ overlap.next_action }}</td>
                 </tr>
                 {% endfor %}
               </tbody>
