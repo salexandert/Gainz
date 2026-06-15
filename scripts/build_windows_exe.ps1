@@ -28,6 +28,7 @@ if (-not (Test-Path -LiteralPath $iconPath)) {
     --add-data "gainz_logo.ico;." `
     --add-data "gainz_logo.png;." `
     --add-data "app;app" `
+    --add-data "demo_data;demo_data" `
     --add-data "Templates;Templates" `
     --add-data "Tax Forms;Tax Forms" `
     --add-data "certifi;certifi" `

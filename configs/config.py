@@ -1,12 +1,21 @@
 import os
 import secrets
+from pathlib import Path
+
+from runtime_paths import data_path
 
 
 def _local_instance_path():
-    return os.environ.get(
+    instance_path = os.environ.get(
         'GAINZ_INSTANCE_PATH',
-        os.path.join(os.getcwd(), 'instance')
+        str(data_path('instance'))
     )
+    os.makedirs(instance_path, exist_ok=True)
+    return instance_path
+
+
+def _sqlite_uri(path):
+    return "sqlite:///" + Path(path).as_posix()
 
 
 def _read_secret_key():
@@ -26,7 +35,10 @@ def _admin_config():
 
 class Config(object):
     SECRET_KEY = _read_secret_key()
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///database.db'
+    SQLALCHEMY_DATABASE_URI = os.environ.get(
+        'GAINZ_DATABASE_URI',
+        _sqlite_uri(Path(_local_instance_path()) / 'database.db')
+    )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     STORE_URL = os.environ.get('GAINZ_STORE_URL', 'https://cryptogainz.store')
     SUPPORT_URL = os.environ.get(
@@ -40,15 +52,15 @@ class Config(object):
     INSTANCE_PATH = _local_instance_path()
     UPLOAD_FOLDER = os.environ.get(
         'GAINZ_UPLOAD_FOLDER',
-        os.path.join(os.getcwd(), 'uploads')
+        str(data_path('uploads'))
     )
     EXPORT_FOLDER = os.environ.get(
         'GAINZ_EXPORT_FOLDER',
-        os.path.join(os.getcwd(), 'exports')
+        str(data_path('exports'))
     )
     AUDIT_PACKET_FOLDER = os.environ.get(
         'GAINZ_AUDIT_PACKET_FOLDER',
-        os.path.join(os.getcwd(), 'audit_packets')
+        str(data_path('audit_packets'))
     )
     ADMIN = _admin_config()
 

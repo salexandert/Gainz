@@ -7,6 +7,7 @@ import os
 import webbrowser
 
 from port_guard import require_port_available
+from runtime_paths import ensure_data_dir
 from single_instance import SingleInstanceLock
 
 
@@ -59,12 +60,10 @@ import logging
 from datetime import datetime
 
 # Create logs directory if it doesn't exist
-log_dir = 'logs'
-if not os.path.exists(log_dir):
-    os.makedirs(log_dir)
+log_dir = str(ensure_data_dir('logs'))
 
 # Set up logging with timestamp in filename
-log_filename = f'logs/gainz_{datetime.now().strftime("%Y-%m-%d")}.log'
+log_filename = os.path.join(log_dir, f"gainz_{datetime.now().strftime('%Y-%m-%d')}.log")
 logging.basicConfig(
     filename=log_filename,
     level=logging.INFO,

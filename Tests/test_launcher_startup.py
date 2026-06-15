@@ -1,6 +1,8 @@
 import unittest
 import tempfile
 import socket
+import os
+import sys
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from unittest.mock import patch
@@ -14,6 +16,7 @@ from launcher import GAINZ_ICON_FILE, GAINZ_PNG_ICON_FILE
 from launcher import launcher_icon_path, launcher_png_icon_path
 from password_reset import DOCUMENTED_RESET_PHRASE, reset_admin_password
 from port_guard import require_port_available
+from runtime_paths import data_dir, resource_dir
 from single_instance import SingleInstanceLock
 
 
@@ -91,8 +94,25 @@ class LauncherStartupTests(unittest.TestCase):
         self.assertIn("--icon $iconPath", windows_script)
         self.assertIn('--add-data "gainz_logo.ico;."', windows_script)
         self.assertIn('--add-data "gainz_logo.png;."', windows_script)
+        self.assertIn('--add-data "demo_data;demo_data"', windows_script)
         self.assertIn('--add-data "gainz_logo.ico:."', macos_script)
         self.assertIn('--add-data "gainz_logo.png:."', macos_script)
+        self.assertIn('--add-data "demo_data:demo_data"', macos_script)
+
+    def test_frozen_runtime_separates_data_dir_from_resource_dir(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            exe_path = Path(temp_dir) / "extracted" / "Gainz.exe"
+            mei_path = Path(temp_dir) / "_MEI12345"
+            exe_path.parent.mkdir()
+            mei_path.mkdir()
+            exe_path.write_text("", encoding="utf-8")
+
+            with patch.dict(os.environ, {}, clear=True):
+                with patch.object(sys, "frozen", True, create=True):
+                    with patch.object(sys, "executable", str(exe_path)):
+                        with patch.object(sys, "_MEIPASS", str(mei_path), create=True):
+                            self.assertEqual(exe_path.parent.resolve(), data_dir())
+                            self.assertEqual(mei_path.resolve(), resource_dir())
 
     def test_single_instance_lock_blocks_competing_gainz_process(self):
         with tempfile.TemporaryDirectory() as temp_dir:

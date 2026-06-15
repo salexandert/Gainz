@@ -6,10 +6,13 @@ import pandas as pd
 from conversion import Conversion
 from transaction import Buy, Sell, Send, Receive
 from assets import Asset
+from runtime_paths import data_dir, resource_dir
 from time import strftime
 
-# Define the base directory for the project
-basedir = os.path.dirname(__file__)
+# Runtime data lives beside Gainz.exe in packaged builds, not in PyInstaller's
+# temporary _MEI resource extraction directory.
+basedir = str(data_dir())
+resource_basedir = str(resource_dir())
 FIAT_ASSET_SYMBOLS = {"USD"}
 LEGACY_ASSET_HOLDINGS_COLUMN = "ho" + "dl"
 TAX_YEAR_RECORD_COLUMNS = [
@@ -89,6 +92,16 @@ def _string_or_empty(value):
 
     return str(value)
 
+
+def _save_dir():
+    save_dir = os.path.join(basedir, "saves")
+    os.makedirs(save_dir, exist_ok=True)
+    return save_dir
+
+
+def _resource_file(filename):
+    return os.path.join(resource_basedir, filename)
+
 # Updated imports to reflect the new modular structure
 from parsers import *
 from filters import *
@@ -156,9 +169,10 @@ class Transactions:
         match_object = "saved_"
 
         view_num = 1
-        for root, dirs, files in os.walk(os.path.join(basedir, 'saves')):
+        saves_dir = _save_dir()
+        for root, dirs, files in os.walk(saves_dir):
             for f in files:  # Corrected the incomplete for loop
-                save_as_filename = os.path.join(basedir, 'saves', f)
+                save_as_filename = os.path.join(saves_dir, f)
                 if match_object in f and f.endswith('xlsx'):
                     description = ""
                     revision_num = None
@@ -727,7 +741,7 @@ class Transactions:
         return record
 
     def save(self, description=None):
-        save_as_filename = os.path.join(basedir, "saves", f"saved_{strftime('Y%Y-M%m-D%d_H%H-M%M-S%S')}.xlsx")
+        save_as_filename = os.path.join(_save_dir(), f"saved_{strftime('Y%Y-M%m-D%d_H%H-M%M-S%S')}.xlsx")
 
         # Make sure all transactions are properly updated before saving
         for trans in self.transactions:
@@ -832,7 +846,7 @@ class Transactions:
         save_as_filename = os.path.join(export_dir, f"Export_{strftime('Y%Y-M%m-D%d_H%H-M%M')}.xlsx")
 
         # Template to use
-        workbook = load_workbook(filename= os.path.join(basedir, 'Gainz_Export_Template-DO_NOT_MODIFY.xlsx'))
+        workbook = load_workbook(filename=_resource_file('Gainz_Export_Template-DO_NOT_MODIFY.xlsx'))
         c_sheet = workbook['Conversions']
         l_sheet = workbook['Gains']
         a_sheet = workbook['All Transactions']

@@ -28,6 +28,7 @@ from app.services.import_warning_service import (
     unresolved_import_warning_rows,
 )
 from app.services.source_overlap_service import detect_source_overlaps, sources_with_overlaps
+from runtime_paths import resource_dir
 
 import_transactions_bp = Blueprint('import_transactions', __name__)
 
@@ -512,7 +513,7 @@ def import_demo_data():
     try:
         result = ImportService(current_app.config['UPLOAD_FOLDER']).import_demo_data(
             transactions,
-            repo_root=current_app.root_path + "/..",
+            repo_root=resource_dir(),
         )
     except Exception:
         return _import_error_response("demo data")

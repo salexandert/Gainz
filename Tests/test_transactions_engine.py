@@ -96,6 +96,35 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual("saved_newer_low_revision.xlsx", Path(transactions.view).name)
         self.assertEqual(["saved_newer_low_revision.xlsx"], loaded_paths)
 
+    def test_save_creates_persistent_saves_directory(self):
+        original_basedir = transactions_module.basedir
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "Gainz-Windows"
+            transactions = Transactions.__new__(Transactions)
+            transactions.revision_num = 0
+            transactions.saves = []
+            transactions.index = 0
+            transactions.conversions = []
+            transactions.asset_objects = []
+            transactions.import_warnings = []
+            transactions.import_warning_reviews = []
+            transactions.basis_review_notes = []
+            transactions.tax_year_records = []
+            transactions.tax_evidence_records = []
+            transactions.view = ""
+            transactions.transactions = []
+
+            try:
+                transactions_module.basedir = str(data_dir)
+                save_path = Transactions.save(transactions, "Packaged save path smoke test")
+            finally:
+                transactions_module.basedir = original_basedir
+
+            save_path = Path(save_path)
+            self.assertEqual(data_dir / "saves", save_path.parent)
+            self.assertTrue(save_path.is_file())
+
     def test_assets_excludes_fiat_symbols_but_keeps_transactions(self):
         transactions = empty_transactions()
         transactions.transactions = [

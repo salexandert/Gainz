@@ -155,6 +155,7 @@ class GainzLauncher(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self.close_app)
 
         os.chdir(app_base_dir())
+        os.environ.setdefault("GAINZ_DATA_DIR", app_base_dir())
         self.port = port if port is not None else find_available_port()
         self.url = server_url(self.port)
         self.health_url = health_url(self.port)
@@ -315,6 +316,7 @@ class GainzLauncher(tk.Tk):
 
 def main():
     os.chdir(app_base_dir())
+    os.environ.setdefault("GAINZ_DATA_DIR", app_base_dir())
     configure_windows_app_identity()
     instance_lock = SingleInstanceLock(app_base_dir())
     if not instance_lock.acquire():

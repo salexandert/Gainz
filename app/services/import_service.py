@@ -5,6 +5,7 @@ from werkzeug.utils import secure_filename
 
 from app.services.import_warning_service import clear_import_warnings_for_source
 from parsers import analyze_csv_import, import_transactions
+from runtime_paths import resource_dir
 
 
 class ImportService:
@@ -133,7 +134,7 @@ class ImportService:
         )
 
     def import_demo_data(self, transactions, repo_root=None):
-        repo_root = Path(repo_root or Path(__file__).resolve().parents[2])
+        repo_root = Path(repo_root) if repo_root else resource_dir()
         demo_root = repo_root / "demo_data"
         results = []
         total_imported = 0
