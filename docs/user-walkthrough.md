@@ -160,6 +160,8 @@ Use **Tax Evidence Inventory** to scan a local tax evidence folder or add one it
 
 Review **Confirm Suggested Filed Totals**. When Gainz can read clear values from local CSV, XLSX, or readable PDF evidence, it shows possible filed proceeds, cost basis, gain/loss, and tax-paid values with a confidence label and source file. Confirm, edit, or mark the year as needs research. Suggested totals are not treated as recorded filed totals until you save a review decision.
 
+Use **Import Filed Totals from CSV** when you already have a year-by-year filed-total CSV. Gainz reports the actual number of rows imported and skipped. If a CSV only contains three years, Gainz imports three years and leaves the other evidence years visible for review.
+
 Review **What Gainz Found / What Gainz Needs**. Each year should say whether the evidence is ready or whether the missing item is specific, such as filed totals, filed return evidence, payment evidence, crypto totals evidence, estimate-only evidence, or a zero/not-applicable confirmation.
 
 Open **Export**.
@@ -200,7 +202,7 @@ The audit packet includes:
 - Suggested filed totals CSV and JSON.
 - Holdings reconciliation CSV.
 - Current holdings lots CSV.
-- Import warnings CSV with review decisions.
+- Import warnings CSV with active warnings and preserved review decisions for warnings that were later cleared by source updates.
 - Missing basis review CSV.
 - Source overlap review CSV.
 - Source files copied into the packet when they are still available on disk.

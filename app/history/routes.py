@@ -60,6 +60,27 @@ def index():
         restored=request.args.get("restored"),
     )
 
+@blueprint.route('/bulk_classify', methods=['POST'])
+@login_required
+def bulk_classify():
+    transactions = _current_transactions()
+    asset = str(request.form.get("asset") or "").upper()
+    from_type = request.form.get("from_type")
+    to_type = request.form.get("to_type")
+
+    count = 0
+    if asset and from_type and to_type:
+        for trans in transactions:
+            if trans.symbol == asset and trans.trans_type.lower() == from_type.lower():
+                trans.trans_type = to_type
+                count += 1
+
+        if count > 0:
+            transactions.save(description=f"Bulk classified {count} {asset} {from_type}s to {to_type}")
+
+    return redirect(url_for('history_blueprint.index'))
+
+
 @blueprint.route('/compare_selected',  methods=['POST'])
 @login_required
 def compare_selected():

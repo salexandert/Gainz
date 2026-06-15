@@ -653,7 +653,7 @@ def _missing_filed_total_records(tax_alignment, tax_evidence_inventory=None):
             "year": row["year"],
             "status": row["status"],
             "message": (
-                f"Filed totals not recorded for {row['year']}. If you have Crypto Taxes Paid.csv, "
+                f"Filed totals not recorded for {row['year']}. If you have a filed totals CSV, "
                 "record those totals in Tax Filing Review instead of importing it as transaction activity."
                 if row["status"] == "Needs filed totals"
                 else row["next_action"]
@@ -677,9 +677,19 @@ def _reconciliation_checklist(
     current_holdings_entered = not any(row[6] == "Needs declared holdings" for row in holdings_rows)
     fifo_run = len(missing_basis_rows) == 0
     import_warnings_reviewed = len(unresolved_warning_rows) == 0
+    import_warning_count = len(getattr(transactions, "import_warnings", []) or [])
+    import_warning_review_count = len(getattr(transactions, "import_warning_reviews", []) or [])
     source_overlaps_reviewed = len(source_overlap_rows) == 0
     missing_basis_reviewed = len(missing_basis_rows) == 0
     tax_evidence_reviewed = tax_evidence_inventory["metrics"]["years_needing_review"] == 0
+    if not import_warnings_reviewed:
+        import_warning_detail = "Review each active warning and choose a decision."
+    elif import_warning_count == 0 and import_warning_review_count > 0:
+        import_warning_detail = "No active import warnings; prior review decisions are preserved for the audit trail."
+    elif import_warning_count == 0:
+        import_warning_detail = "No active import warnings in this save."
+    else:
+        import_warning_detail = "All active import warnings have reviewed decisions."
 
     return [
         {
@@ -695,7 +705,7 @@ def _reconciliation_checklist(
         {
             "label": "Import warnings reviewed",
             "complete": import_warnings_reviewed,
-            "detail": "All import warnings have reviewed decisions." if import_warnings_reviewed else "Review each warning and choose a decision.",
+            "detail": import_warning_detail,
         },
         {
             "label": "Source overlap reviewed",

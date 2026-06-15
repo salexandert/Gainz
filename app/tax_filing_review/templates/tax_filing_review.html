@@ -93,6 +93,27 @@
 </div>
 {% endif %}
 
+{% if imported_tax_rows is defined and imported_tax_rows is not none %}
+<div class="row">
+  <div class="col-md-12">
+    <div class="alert alert-success" role="alert">
+      Imported {{ imported_tax_rows }} filed total record{% if imported_tax_rows != "1" %}s{% endif %} from CSV.
+      {% if skipped_tax_rows and skipped_tax_rows != "0" %}Skipped {{ skipped_tax_rows }} row{% if skipped_tax_rows != "1" %}s{% endif %} without a year or recognizable totals.{% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if tax_import_error is defined and tax_import_error %}
+<div class="row">
+  <div class="col-md-12">
+    <div class="alert alert-warning" role="alert">
+      Gainz could not import that filed totals CSV. Check that it has a year column and proceeds, cost basis, and gain/loss columns.
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="row">
   <div class="col-md-12">
     <div class="card">
@@ -156,6 +177,18 @@
             </tbody>
           </table>
         </div>
+
+        <div class="mt-4">
+          <h6>Import Filed Totals from CSV</h6>
+          <p class="text-muted small">Upload a CSV file with historical tax filing totals to populate Tax Filing Review records.</p>
+          <form method="POST" action="{{ url_for('tax_filing_review_blueprint.import_filed_totals_csv') }}" enctype="multipart/form-data" class="form-inline">
+            <div class="form-group mb-2 mr-2">
+              <input id="csv_file" name="csv_file" type="file" class="form-control-file" accept=".csv" required>
+            </div>
+            <button type="submit" class="btn btn-info mb-2">Import CSV</button>
+          </form>
+        </div>
+
       </div>
     </div>
   </div>

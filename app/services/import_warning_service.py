@@ -29,6 +29,11 @@ IMPORT_WARNING_DECISIONS = {
         "status": "Needs review",
         "resolved": False,
     },
+    "cleared_by_source_update": {
+        "label": "Cleared by source update",
+        "status": "Cleared",
+        "resolved": True,
+    },
 }
 
 
@@ -253,6 +258,30 @@ def import_warning_review_rows(warnings, transactions=None):
     return [classify_import_warning(warning, transactions=transactions) for warning in warnings or []]
 
 
+def import_warning_audit_rows(transactions):
+    active_warnings = list(getattr(transactions, "import_warnings", []) or [])
+    active_set = set(active_warnings)
+    rows = []
+    for row in import_warning_review_rows(active_warnings, transactions=transactions):
+        row["active_status"] = "Active"
+        rows.append(row)
+
+    for review in getattr(transactions, "import_warning_reviews", []) or []:
+        warning = review.get("warning")
+        if not warning or warning in active_set:
+            continue
+
+        row = classify_import_warning(warning, transactions=transactions)
+        row["active_status"] = "Cleared from active warnings"
+        row["next_action"] = (
+            "This warning is no longer active in the current save. The historical review "
+            "decision is preserved for the audit trail."
+        )
+        rows.append(row)
+
+    return rows
+
+
 def unresolved_import_warning_rows(transactions):
     return [
         row
@@ -283,8 +312,14 @@ def clear_import_warnings_for_source(transactions, source):
         if not warning_matches_source(warning, source)
     ]
     if removed_warnings:
-        transactions.import_warning_reviews = [
-            review
-            for review in getattr(transactions, "import_warning_reviews", []) or []
-            if review.get("warning") not in removed_warnings
-        ]
+        for warning in removed_warnings:
+            if transactions.get_import_warning_review(warning):
+                continue
+            transactions.set_import_warning_review(
+                warning,
+                decision="cleared_by_source_update",
+                note=(
+                    "Warning removed from the active list when its source was re-imported "
+                    "or removed. Review the current source records before relying on reports."
+                ),
+            )

@@ -40,6 +40,38 @@
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
+        <h5 class="card-title">Bulk Classify Transactions</h5>
+        <p class="text-muted">
+          Use this tool to quickly bulk classify high-volume sends or receives into Owner Transfers.
+        </p>
+        <form class="form-inline" method="post" action="{{ url_for('history_blueprint.bulk_classify') }}">
+          <div class="form-group mb-2 mr-sm-2">
+            <label for="asset" class="sr-only">Asset</label>
+            <input type="text" class="form-control" id="asset" name="asset" placeholder="e.g. BTC" required>
+          </div>
+          <div class="form-group mb-2 mr-sm-2">
+            <label for="from_type" class="sr-only">From Type</label>
+            <select class="form-control" id="from_type" name="from_type" required>
+              <option value="" disabled selected>Change from...</option>
+              <option value="Send">Send</option>
+              <option value="Receive">Receive</option>
+            </select>
+          </div>
+          <div class="form-group mb-2 mr-sm-2">
+            <label for="to_type" class="sr-only">To Type</label>
+            <input type="text" class="form-control" id="to_type" name="to_type" value="Owner Transfer" required>
+          </div>
+          <button type="submit" class="btn btn-warning mb-2">Bulk Classify</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
         <h5 class="card-title">Saved Revisions</h5>
         <p class="text-muted">
           Restoring does not delete newer saves. Gainz loads the selected save and immediately writes a new latest revision so the audit trail remains visible.

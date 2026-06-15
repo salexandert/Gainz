@@ -13,6 +13,7 @@ from app.services.tax_evidence_service import (
     infer_tax_evidence_year,
     tax_evidence_type_label,
 )
+from app.services.tax_filing_import_service import import_tax_total_records
 from app.services.tax_total_extraction_service import get_suggested_filed_totals
 
 from . import blueprint
@@ -111,6 +112,9 @@ def index():
         saved_year=request.args.get("saved_year"),
         saved_evidence=request.args.get("saved_evidence"),
         saved_suggestion=request.args.get("saved_suggestion"),
+        imported_tax_rows=request.args.get("imported_tax_rows"),
+        skipped_tax_rows=request.args.get("skipped_tax_rows"),
+        tax_import_error=request.args.get("tax_import_error"),
     )
 
 
@@ -252,3 +256,26 @@ def scan_tax_evidence_folder():
         transactions.save(description=f"Scanned {added} tax evidence item(s)")
 
     return redirect(url_for('tax_filing_review_blueprint.index', saved_evidence=added))
+
+
+@blueprint.route('/import_csv', methods=['POST'])
+@login_required
+def import_filed_totals_csv():
+    transactions = current_app.config['transactions']
+    file_storage = request.files.get("csv_file")
+    if not file_storage or not file_storage.filename:
+        return redirect(url_for('tax_filing_review_blueprint.index'))
+
+    try:
+        summary = import_tax_total_records(file_storage, transactions, file_storage.filename)
+        if summary["imported_count"]:
+            transactions.save(description=f"Imported {summary['imported_count']} filed tax total record(s) from CSV")
+
+        return redirect(url_for(
+            'tax_filing_review_blueprint.index',
+            imported_tax_rows=summary["imported_count"],
+            skipped_tax_rows=summary["skipped_count"],
+        ))
+    except Exception:
+        current_app.logger.exception("Error importing filed totals CSV")
+        return redirect(url_for('tax_filing_review_blueprint.index', tax_import_error=1))

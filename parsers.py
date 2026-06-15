@@ -445,10 +445,19 @@ def analyze_csv_import(file_path, header_row=None, column_mapping=None, data_sta
     data_start_row = int(data_start_row or (int(header_row or 1) + 1))
     columns = read_csv_columns(file_path, header_row=header_row)
     status = get_import_column_status(columns, column_mapping=column_mapping)
+    detected_format = detect_csv_format(file_path, header_row=header_row)
+    if detected_format == 'gdax':
+        status = {
+            **status,
+            'can_import': True,
+            'has_pricing': True,
+            'missing_required': [],
+        }
 
     return {
         'can_import': status['can_import'],
         'has_pricing': status['has_pricing'],
+        'detected_format': detected_format,
         'header_row': int(header_row or 1),
         'data_start_row': data_start_row,
         'columns': columns,
@@ -600,15 +609,23 @@ def detect_csv_format(file_path, header_row=1):
         coinbase_match = sum(1 for field in common_fields if field in column_lookup)
         coinbase_match += sum(1 for marker in coinbase_markers if marker in normalized_headers)
 
+        gdax_markers = {'trade id', 'size unit', 'price fee total unit', 'product'}
+        gdax_match = sum(1 for field in common_fields if field in column_lookup)
+        gdax_match += sum(1 for marker in gdax_markers if marker in normalized_headers)
+
         if 'cash app' in filename_hint or 'cashapp' in filename_hint:
             cash_app_match += 2
         if 'coinbase' in filename_hint:
             coinbase_match += 2
+        if 'gdax' in filename_hint:
+            gdax_match += 2
 
-        if cash_app_match >= 6 and cash_app_match >= coinbase_match:
+        if cash_app_match >= 6 and cash_app_match >= coinbase_match and cash_app_match >= gdax_match:
             return 'cashapp'
-        elif coinbase_match >= 6:
+        elif coinbase_match >= 6 and coinbase_match >= gdax_match:
             return 'coinbase'
+        elif gdax_match >= 5:
+            return 'gdax'
         else:
             return 'unknown'
     except Exception:
@@ -706,6 +723,42 @@ def transform_coinbase_to_standard(df):
 
     return pd.DataFrame(rows)
 
+
+def transform_gdax_to_standard(df):
+    """
+    Transforms GDAX CSV format to the standard format expected by import_transactions.
+    """
+    rows = []
+
+    for _, row in df.iterrows():
+        product = str(row.get('product', '')).upper()
+        if not product or '-' not in product:
+            continue
+
+        asset = product.split('-')[0]
+
+        side = str(row.get('side', '')).upper()
+        if side == 'BUY':
+            trans_type = 'Buy'
+        elif side == 'SELL':
+            trans_type = 'Sell'
+        else:
+            trans_type = standardize_transaction_type(side)
+
+        timestamp = row.get('created at')
+        quantity = parse_quantity_value(row.get('size'))
+        asset_price = parse_money_value(row.get('price'))
+
+        rows.append({
+            'Asset Type': asset,
+            'Transaction Type': trans_type,
+            'Asset Amount': abs(quantity),
+            'Date': timestamp,
+            'Asset Price': asset_price,
+        })
+
+    return pd.DataFrame(rows)
+
 def import_transactions(file_path, transactions, header_row=1, column_mapping=None, data_start_row=None):
     """
     Imports transactions from a given file path and adds them to the Transactions object.
@@ -792,6 +845,8 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
             trans_df = transform_cashapp_to_standard(raw_df)
         elif csv_format == 'coinbase':
             trans_df = transform_coinbase_to_standard(raw_df)
+        elif csv_format == 'gdax':
+            trans_df = transform_gdax_to_standard(raw_df)
         else:
             trans_df = transform_generic_to_standard(raw_df)
             if trans_df is raw_df:

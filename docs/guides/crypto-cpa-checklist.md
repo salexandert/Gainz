@@ -21,7 +21,7 @@ This checklist is for organizing crypto records before a tax professional review
   <li>Form 8949-style detail and totals from Gainz, separated by short-term and long-term rows.</li>
   <li>Filed-total review notes showing which suggested values were confirmed, edited, or left as needs research.</li>
   <li>Holdings reconciliation showing declared holdings, calculated holdings, differences, and review status.</li>
-  <li>Import warnings, skipped rows, unlinked sales, and any notes explaining unresolved items.</li>
+  <li>Import warnings, skipped rows, preserved cleared-warning decisions, unlinked sales, and any notes explaining unresolved items.</li>
   <li>Basis-method notes and any manual reclassification notes.</li>
   <li>Prior-year filing records and taxes-paid evidence when they are relevant to the review.</li>
 </ul>

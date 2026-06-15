@@ -184,3 +184,4 @@ audit_packet_*/
 audit_packets/
 *.sqlite
 scripts/release_version.env
+scripts/automate_*.py

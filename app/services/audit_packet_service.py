@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from app.services.export_service import ExportService
-from app.services.import_warning_service import import_warning_review_rows
+from app.services.import_warning_service import import_warning_audit_rows
 from app.services.source_overlap_service import detect_source_overlaps
 from app.services.tax_evidence_service import (
     get_tax_evidence_inventory_summary,
@@ -456,13 +456,13 @@ class AuditPacketService:
                     })
 
     def _write_import_warnings(self, packet_dir, transactions):
-        warnings = getattr(transactions, "import_warnings", []) or []
         with open(packet_dir / "01_reports" / "import_warnings.csv", "w", newline="", encoding="utf-8") as file:
             writer = csv.DictWriter(
                 file,
                 fieldnames=[
                     "source",
                     "row",
+                    "active_status",
                     "date",
                     "type",
                     "asset",
@@ -472,15 +472,17 @@ class AuditPacketService:
                     "status",
                     "decision",
                     "note",
+                    "review_updated_at",
                     "next_action",
                     "warning",
                 ],
             )
             writer.writeheader()
-            for row in import_warning_review_rows(warnings, transactions=transactions):
+            for row in import_warning_audit_rows(transactions):
                 writer.writerow({
                     "source": row["source"],
                     "row": row["row"],
+                    "active_status": row["active_status"],
                     "date": row["row_date"],
                     "type": row["row_type"],
                     "asset": row["asset"],
@@ -490,6 +492,7 @@ class AuditPacketService:
                     "status": row["review_status"],
                     "decision": row["decision_label"],
                     "note": row["review_note"],
+                    "review_updated_at": row["review_updated_at"],
                     "next_action": row["next_action"],
                     "warning": row["raw"],
                 })
@@ -574,6 +577,7 @@ class AuditPacketService:
             "suggested_filed_totals": get_suggested_filed_totals(transactions),
             "holdings_reconciliation_rows": len(get_multi_asset_holdings_reconciliation_table_data(transactions)),
             "import_warning_count": len(getattr(transactions, "import_warnings", []) or []),
+            "import_warning_review_count": len(getattr(transactions, "import_warning_reviews", []) or []),
             "unresolved_import_warning_count": readiness["metrics"]["unresolved_import_warnings"],
             "missing_basis_rows": readiness["missing_records"]["basis"],
             "source_overlap_rows": readiness["missing_records"]["source_overlaps"],

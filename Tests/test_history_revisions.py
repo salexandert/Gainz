@@ -1,9 +1,11 @@
+import datetime
 import tempfile
 import unittest
 from pathlib import Path
 
 from app import create_app
 from configs.config import config_dict
+from transaction import Send
 
 
 class FakeTransactions:
@@ -23,6 +25,25 @@ class FakeTransactions:
     def save(self, description=None):
         self.saved_description = description
         return str(Path(self.view).with_name("saved_restored.xlsx"))
+
+
+class BulkClassifyTransactions(FakeTransactions):
+    def __init__(self):
+        super().__init__([
+            {
+                "value": "current.xlsx",
+                "description": "Current",
+                "revision_num": 1,
+                "modified_time": 1710000000,
+            }
+        ])
+        self.transactions = [
+            Send("BTC", 1, datetime.datetime(2024, 1, 1), 100, "wallet"),
+            Send("ETH", 1, datetime.datetime(2024, 1, 1), 100, "wallet"),
+        ]
+
+    def __iter__(self):
+        return iter(self.transactions)
 
 
 class HistoryRevisionTests(unittest.TestCase):
@@ -86,6 +107,25 @@ class HistoryRevisionTests(unittest.TestCase):
 
         self.assertEqual(400, response.status_code)
         self.assertIsNone(transactions.loaded)
+
+    def test_bulk_classify_updates_matching_asset_only(self):
+        transactions = BulkClassifyTransactions()
+        app = create_app(config_dict["Debug"], selenium=True)
+        app.config["transactions"] = transactions
+
+        response = app.test_client().post(
+            "/history/bulk_classify",
+            data={
+                "asset": "btc",
+                "from_type": "Send",
+                "to_type": "Owner Transfer",
+            },
+        )
+
+        self.assertEqual(302, response.status_code)
+        self.assertEqual("Owner Transfer", transactions.transactions[0].trans_type)
+        self.assertEqual("send", transactions.transactions[1].trans_type)
+        self.assertIn("Bulk classified 1 BTC", transactions.saved_description)
 
 
 if __name__ == "__main__":

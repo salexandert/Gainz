@@ -1,5 +1,6 @@
 import datetime
 import csv
+import io
 import json
 import tempfile
 import unittest
@@ -352,8 +353,14 @@ class ImportAndExportTests(unittest.TestCase):
         transactions.transactions = [removed_buy, remaining_buy, remaining_sell]
         transactions.import_warnings = [
             "Skipped row 4 from remove.csv: unrecognized transaction type 'Mystery'",
+            "Skipped row 6 from remove.csv: unrecognized transaction type 'Other'",
             "Skipped row 5 from keep.csv: unrecognized transaction type 'Mystery'",
         ]
+        transactions.set_import_warning_review(
+            "Skipped row 4 from remove.csv: unrecognized transaction type 'Mystery'",
+            decision="note",
+            note="Reviewed before source cleanup.",
+        )
 
         result = _remove_data_source(transactions, "remove.csv")
 
@@ -364,6 +371,18 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual([
             "Skipped row 5 from keep.csv: unrecognized transaction type 'Mystery'"
         ], transactions.import_warnings)
+        self.assertEqual(
+            "Reviewed before source cleanup.",
+            transactions.get_import_warning_review(
+                "Skipped row 4 from remove.csv: unrecognized transaction type 'Mystery'"
+            )["note"],
+        )
+        self.assertEqual(
+            "cleared_by_source_update",
+            transactions.get_import_warning_review(
+                "Skipped row 6 from remove.csv: unrecognized transaction type 'Other'"
+            )["decision"],
+        )
 
     def test_import_service_imports_coinbase_sample(self):
         transactions = empty_transactions()
@@ -392,6 +411,26 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual([0.5, 0.02], [t.quantity for t in transactions.transactions])
         self.assertEqual(4000, transactions.transactions[0].usd_spot)
         self.assertEqual(100000, transactions.transactions[1].usd_spot)
+
+    def test_import_service_imports_gdax_fills(self):
+        transactions = empty_transactions()
+        csv_text = "\n".join([
+            "trade id,product,side,created at,size,size unit,price,fee,total,price/fee/total unit",
+            "1,BTC-USD,BUY,2024-01-05T10:15:00Z,0.1,BTC,40000,1,4000,USD",
+            "2,BTC-USD,SELL,2024-02-05T10:15:00Z,0.05,BTC,50000,1,2500,USD",
+        ])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "gdax_fills.csv"
+            upload_dir = Path(temp_dir) / "uploads"
+            source.write_text(csv_text, encoding="utf-8")
+            result = ImportService(upload_dir).import_upload(FileUpload(source), transactions)
+
+        self.assertEqual(2, result["imported_count"])
+        self.assertEqual(0, result["skipped_count"])
+        self.assertEqual(["buy", "sell"], [t.trans_type for t in transactions.transactions])
+        self.assertEqual({"BTC"}, transactions.assets)
+        self.assertEqual([0.1, 0.05], sorted([t.quantity for t in transactions.transactions], reverse=True))
 
     def test_import_service_imports_cash_app_with_updated_headers(self):
         transactions = empty_transactions()
@@ -935,6 +974,58 @@ class ImportAndExportTests(unittest.TestCase):
                 db.session.remove()
                 db.engine.dispose()
 
+    def test_tax_filing_review_imports_filed_totals_csv_with_unicode_hyphen_headers(self):
+        transactions = empty_transactions()
+        csv_text = (
+            "Tax Year,Short\u2011term Proceeds,Short\u2011term Cost Basis,Short\u2011term Gain,"
+            "Long\u2011term Proceeds,Long\u2011term Cost Basis,Long\u2011term Gain\n"
+            "2021,$0.00,$0.00,$0.00,$0.00,$0.00,$0.00\n"
+            "2022,\"$18,338.19\",\"$18,453.11\",($114.93),\"$112,689.71\",\"$51,005.76\",\"$61,683.96\"\n"
+            "missing,,,,,,\n"
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class RouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(RouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/tax_filing_review/import_csv",
+                    data={
+                        "csv_file": (
+                            io.BytesIO(csv_text.encode("utf-8")),
+                            "filed_totals.csv",
+                        ),
+                    },
+                    content_type="multipart/form-data",
+                )
+
+            self.assertEqual(302, response.status_code)
+            self.assertIn("imported_tax_rows=2", response.location)
+            self.assertIn("skipped_tax_rows=1", response.location)
+            zero_record = transactions.get_tax_year_record(2021)
+            self.assertEqual(0.0, zero_record["reported_gain_loss"])
+            record = transactions.get_tax_year_record(2022)
+            self.assertEqual(131027.90, round(record["reported_proceeds"], 2))
+            self.assertEqual(69458.87, round(record["reported_cost_basis"], 2))
+            self.assertEqual(61569.03, round(record["reported_gain_loss"], 2))
+            self.assertIsNone(record["tax_paid"])
+            self.assertEqual(
+                {2021, 2022},
+                {record["year"] for record in transactions.tax_evidence_records},
+            )
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
     def test_export_routes_use_requested_output_folder(self):
         transactions = empty_transactions()
         buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "demo")
@@ -1062,6 +1153,7 @@ class ImportAndExportTests(unittest.TestCase):
             with open(packet_path / "01_reports" / "import_warnings.csv", newline="", encoding="utf-8") as file:
                 warning_rows = list(csv.DictReader(file))
             self.assertEqual("Example warning", warning_rows[0]["warning"])
+            self.assertEqual("Active", warning_rows[0]["active_status"])
             self.assertEqual("Needs review", warning_rows[0]["status"])
 
             with open(packet_path / "01_reports" / "form_8949_totals.csv", newline="", encoding="utf-8") as file:
@@ -1092,6 +1184,35 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual("Aligned", summary["tax_filing_alignment"]["overall_status"])
             self.assertIn("tax_evidence_inventory", summary)
             self.assertEqual(1, len(summary["suggested_filed_totals"]))
+
+    def test_audit_packet_preserves_cleared_import_warning_review_records(self):
+        transactions = empty_transactions()
+        buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "demo_data/cash_app_sample.csv")
+        transactions.transactions = [buy]
+        transactions.set_holdings("BTC", 1)
+        warning = "Imported row 10 from sample.csv with $0 USD spot price."
+        transactions.set_import_warning_review(
+            warning,
+            decision="true_zero_value_transfer",
+            note="Reviewed before warning was cleared.",
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            packet_root = Path(temp_dir) / "packets"
+            export_root = Path(temp_dir) / "exports"
+            packet_path = Path(AuditPacketService(packet_root, export_root).create_packet(transactions))
+
+            with open(packet_path / "01_reports" / "import_warnings.csv", newline="", encoding="utf-8") as file:
+                warning_rows = list(csv.DictReader(file))
+
+            self.assertEqual(1, len(warning_rows))
+            self.assertEqual("Cleared from active warnings", warning_rows[0]["active_status"])
+            self.assertEqual("True zero-value transfer", warning_rows[0]["decision"])
+            self.assertEqual("Reviewed before warning was cleared.", warning_rows[0]["note"])
+
+            summary = json.loads((packet_path / "03_manifests" / "audit_packet_summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(0, summary["import_warning_count"])
+            self.assertEqual(1, summary["import_warning_review_count"])
 
 
 if __name__ == "__main__":
