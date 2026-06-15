@@ -54,6 +54,10 @@ class CurrentHoldings(FlaskForm):
 MANUAL_TRANSACTION_SOURCE = "Gainz App Manual Add"
 
 
+def _safe_filename(value):
+    return os.path.basename(str(value or "").replace("\\", "/"))
+
+
 def _manual_row_is_blank(row):
     return not any(
         str(row.get(field, "") or "").strip()
@@ -263,7 +267,7 @@ def _public_import_result(result):
     public_result = dict(result or {})
     file_path = public_result.pop("file_path", None)
     if file_path and "filename" not in public_result:
-        public_result["filename"] = os.path.basename(file_path)
+        public_result["filename"] = _safe_filename(file_path)
 
     if "files" in public_result:
         public_files = []
@@ -271,7 +275,7 @@ def _public_import_result(result):
             public_item = dict(item)
             item_path = public_item.pop("file_path", None)
             if item_path and "filename" not in public_item:
-                public_item["filename"] = os.path.basename(item_path)
+                public_item["filename"] = _safe_filename(item_path)
             public_files.append(public_item)
         public_result["files"] = public_files
 
