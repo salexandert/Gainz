@@ -867,6 +867,9 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual(1, readiness["metrics"]["source_overlaps"])
         self.assertTrue(any("overlapping source file" in warning for warning in readiness["warnings"]))
         self.assertEqual(1, len(readiness["missing_records"]["source_overlaps"]))
+        self.assertTrue(any(group["key"] == "source_overlaps" for group in readiness["blocker_groups"]))
+        source_group = next(group for group in readiness["blocker_groups"] if group["key"] == "source_overlaps")
+        self.assertEqual("Review sources", source_group["action_label"])
 
     def test_leave_basis_unresolved_keeps_export_not_ready_with_research_status(self):
         transactions = empty_transactions()
@@ -906,6 +909,9 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertFalse(readiness["is_ready"])
             self.assertEqual("Needs user research", readiness["missing_records"]["basis"][0]["status"])
             self.assertIn("Missing basis left as needs user research", readiness["blockers"][0])
+            basis_group = next(group for group in readiness["blocker_groups"] if group["key"] == "missing_basis")
+            self.assertEqual("Needs research", basis_group["status"])
+            self.assertEqual("/holdings_accounting/", basis_group["action_url"])
 
             with app.app_context():
                 db.drop_all()

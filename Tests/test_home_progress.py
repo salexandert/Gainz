@@ -6,6 +6,7 @@ from app.home.routes import _home_progress
 from configs.config import config_dict
 from transaction import Buy, Sell
 from transactions import Transactions
+from utils import get_audit_readiness_summary
 
 
 def empty_transactions():
@@ -13,6 +14,12 @@ def empty_transactions():
     transactions.transactions = []
     transactions.asset_objects = []
     transactions.import_warnings = []
+    transactions.import_warning_reviews = []
+    transactions.basis_review_notes = []
+    transactions.tax_year_records = []
+    transactions.tax_evidence_records = []
+    transactions.saves = []
+    transactions.conversions = []
     return transactions
 
 
@@ -27,6 +34,7 @@ def render_home_page(transactions):
     with app.test_request_context("/home/"):
         return app.jinja_env.get_template("home.html").render(
             home_progress=_home_progress(transactions),
+            audit_readiness=get_audit_readiness_summary(transactions),
             store_url=None,
             support_url=None,
             btc_receive_address=None,
@@ -127,6 +135,8 @@ class HomeProgressTests(unittest.TestCase):
 
         self.assertIn("Load exchange CSVs or demo data.", rendered)
         self.assertIn("Review missing activity before using reports.", rendered)
+        self.assertIn("Reconciliation Dashboard", rendered)
+        self.assertIn("Open Review Groups", rendered)
         self.assertNotIn("gainz-home-flow-heading", rendered)
         self.assertNotIn("gainz-home-flow-detail", rendered)
         self.assertNotIn("Start by importing source files.", rendered)

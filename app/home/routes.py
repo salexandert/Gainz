@@ -1,7 +1,10 @@
 from . import blueprint
 from flask import current_app, render_template, url_for
 from flask_login import login_required
-from utils import get_multi_asset_holdings_reconciliation_table_data
+from utils import (
+    get_audit_readiness_summary,
+    get_multi_asset_holdings_reconciliation_table_data,
+)
 
 
 def _plural(count, singular, plural=None):
@@ -156,4 +159,8 @@ def _home_progress(transactions):
 def index():
     transactions = current_app.config['transactions']
 
-    return render_template('home.html', home_progress=_home_progress(transactions))
+    return render_template(
+        'home.html',
+        home_progress=_home_progress(transactions),
+        audit_readiness=get_audit_readiness_summary(transactions),
+    )

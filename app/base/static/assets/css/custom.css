@@ -563,6 +563,44 @@
     margin: 18px 0;
 }
 
+.gainz-page-hero,
+.gainz-dashboard-hero {
+    align-items: flex-start;
+    display: flex;
+    gap: 18px;
+    justify-content: space-between;
+}
+
+.gainz-page-hero p,
+.gainz-dashboard-hero p {
+    color: #4f5962;
+}
+
+.gainz-dashboard-actions {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.gainz-dashboard-metrics {
+    margin-top: 22px;
+}
+
+.gainz-home-review-queue {
+    background: #f8f9fa;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    margin: 18px 0;
+    padding: 16px;
+}
+
+.gainz-home-advice-note {
+    color: #4f5962;
+    margin: 14px 0 0;
+}
+
 .gainz-home-flow {
     display: grid;
     gap: 12px;
@@ -672,6 +710,15 @@
 }
 
 @media (max-width: 768px) {
+    .gainz-page-hero,
+    .gainz-dashboard-hero {
+        flex-direction: column;
+    }
+
+    .gainz-dashboard-actions {
+        justify-content: flex-start;
+    }
+
     .gainz-support-panel {
         align-items: flex-start;
         flex-direction: column;
@@ -711,6 +758,7 @@
     background: #f8f9fa;
     border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 8px;
+    color: #252422;
     margin-bottom: 16px;
     padding: 12px 14px;
 }
@@ -733,4 +781,60 @@
     .audit-packet-list ul {
         columns: 1;
     }
+}
+
+.audit-blocker-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.audit-blocker-card {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-left: 4px solid #fbc658;
+    border-radius: 8px;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    min-height: 168px;
+    padding: 14px;
+    text-decoration: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.audit-blocker-card:hover,
+.audit-blocker-card:focus {
+    border-color: #51cbce;
+    box-shadow: 0 6px 18px rgba(81, 203, 206, 0.18);
+    color: inherit;
+    outline: none;
+    text-decoration: none;
+    transform: translateY(-1px);
+}
+
+.audit-blocker-card strong {
+    display: block;
+    font-weight: 700;
+    margin: 12px 0 6px;
+}
+
+.audit-blocker-card p {
+    color: #4f5962;
+    flex: 1 1 auto;
+    margin-bottom: 10px;
+}
+
+.audit-blocker-card small {
+    color: #5d6770;
+    font-weight: 600;
+}
+
+.sidebar .sidebar-wrapper .nav .sidebar-nav-label {
+    color: #9a9a9a;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0;
+    margin: 16px 20px 6px;
+    text-transform: uppercase;
 }

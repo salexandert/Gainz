@@ -16,34 +16,99 @@
         <p class="card-category">Offline crypto accounting and cost-basis reconciliation</p>
       </div>
       <div class="card-body">
-        <p>
-          Gainz helps you import exchange CSVs, link sale records to earlier buys, review unresolved transfers,
-          and export documentation for review with a qualified tax professional.
-        </p>
-        <p>
-          The clearest path is to import what you know, declare what you currently hold, reconcile the difference,
-          then review generated reports and export. Gainz runs locally so your transaction history stays on this machine.
-        </p>
-        <p>
-          Gainz does not provide legal, financial, or tax advice. Validate reports and source records before filing.
-        </p>
-        {% if store_url %}
-        <div class="gainz-home-actions">
-          <a class="btn btn-outline-primary btn-round" href="{{ store_url }}" target="_blank" rel="noopener noreferrer">Visit Gainz Website</a>
+        <div class="gainz-dashboard-hero">
+          <div>
+            <div class="d-flex flex-wrap align-items-center mb-2">
+              <h4 class="mb-0 mr-2">Reconciliation Dashboard</h4>
+              <span class="gainz-status-badge {{ audit_readiness.status_class }}">{{ audit_readiness.status }}</span>
+            </div>
+            <p class="mb-2">
+              Gainz helps you import exchange CSVs, link sale records to earlier buys, review unresolved transfers,
+              and export documentation for review with a qualified tax professional.
+            </p>
+            <p class="mb-0">
+              <strong>Next action:</strong> {{ audit_readiness.next_action }}
+            </p>
+          </div>
+          <div class="gainz-dashboard-actions">
+            <a class="btn btn-primary btn-round" href="{{ audit_readiness.primary_action.url }}">
+              {{ audit_readiness.primary_action.label }}
+            </a>
+            {% if store_url %}
+            <a class="btn btn-outline-primary btn-round" href="{{ store_url }}" target="_blank" rel="noopener noreferrer">Visit Gainz Website</a>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="audit-readiness-grid gainz-dashboard-metrics" aria-label="Current reconciliation summary">
+          <div class="audit-readiness-item">
+            <span>Transactions</span>
+            <strong>{{ audit_readiness.metrics.transactions }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Assets</span>
+            <strong>{{ audit_readiness.metrics.assets }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Basis Links</span>
+            <strong>{{ audit_readiness.metrics.links }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Open Review Groups</span>
+            <strong>{{ audit_readiness.blocker_groups|length }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Import Warnings</span>
+            <strong>{{ audit_readiness.metrics.unresolved_import_warnings }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Tax Evidence Years</span>
+            <strong>{{ audit_readiness.metrics.tax_evidence_years_needing_review }}</strong>
+          </div>
+        </div>
+
+        {% if audit_readiness.blocker_groups %}
+        <div class="gainz-home-review-queue">
+          <div class="d-flex flex-wrap justify-content-between align-items-end">
+            <div>
+              <h5 class="mb-1">Review Queue</h5>
+              <p class="text-muted mb-2">Work these items from top to bottom to move toward export readiness.</p>
+            </div>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('export_blueprint.index') }}">Open Reports & Export</a>
+          </div>
+          <div class="audit-blocker-grid">
+            {% for group in audit_readiness.blocker_groups[:4] %}
+            <a class="audit-blocker-card" href="{{ group.action_url }}">
+              <span class="gainz-status-badge {{ group.status_class }}">{{ group.status }}</span>
+              <strong>{{ group.title }}</strong>
+              <p>{{ group.detail }}</p>
+              <small>
+                {% if group.count > 0 %}{{ group.count }} item{% if group.count != 1 %}s{% endif %} · {% endif %}{{ group.action_label }}
+              </small>
+            </a>
+            {% endfor %}
+          </div>
         </div>
         {% endif %}
+
         <div class="gainz-home-flow">
           {% for step in home_progress.steps %}
           <a
             href="{{ step.url }}"
             class="gainz-home-flow-step{% if step.state == 'complete' %} is-complete{% endif %}"
+            aria-label="Step {{ step.number }}: {{ step.title }}. {{ step.status }}."
           >
-            <span>{{ step.number }}</span>
+            <span aria-hidden="true">{{ step.number }}</span>
             <strong>{{ step.title }}</strong>
             <p>{{ step.description }}</p>
           </a>
           {% endfor %}
         </div>
+
+        <p class="gainz-home-advice-note">
+          Gainz does not provide legal, financial, or tax advice. Validate reports and source records before filing.
+        </p>
+
         {% if support_url %}
         <div class="gainz-support-panel">
           <div>

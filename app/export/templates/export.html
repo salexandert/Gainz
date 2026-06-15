@@ -8,33 +8,25 @@
 
 {% block content %}
 
-<!-- Page Description and Instructions -->
 <div class="row">
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
-        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
-          <h4 class="card-title">Step 6: Export to Excel</h4>
-          <div class="card card-plain">
-            <div class="card-header" role="tab" id="headingOne">
-              <a data-toggle="collapse" data-parent="#accordion" href="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
-                How to use this page
-                <i class="nc-icon nc-minimal-down"></i>
-              </a>
-            </div>
-            <div id="collapseOne" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
-              <div class="card-body">
-                Use this page to export a human-readable workbook and audit packet for review. Form 8949-style Short/Long sheets by year are included when basis links exist.
-
-              </div>
-            </div>
+        <div class="gainz-page-hero">
+          <div>
+            <h4 class="card-title">Reports & Export</h4>
+            <p class="card-category">Generate a workbook or audit packet after reviewing open reconciliation items.</p>
+            <p class="mb-0">
+              Form 8949-style short-term and long-term sheets by year are included when basis links exist.
+              Draft output preserves unresolved review items for discussion and documentation.
+            </p>
           </div>
+          <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index') }}">Back to Dashboard</a>
         </div>
       </div>
     </div>
   </div>
 </div>
-<!-- /Page Description and Instructions -->
 
 <!-- Audit Readiness -->
 <div class="row">
@@ -43,8 +35,8 @@
       <div class="card-body">
         <div class="d-flex flex-wrap justify-content-between align-items-start">
           <div>
-            <h4 class="card-title">Audit Packet Review Status</h4>
-            <p class="card-category">Items to review before export</p>
+            <h4 class="card-title">Readiness Review</h4>
+            <p class="card-category">What Gainz found, what still needs review, and where to go next.</p>
           </div>
           <span class="gainz-status-badge {{ audit_readiness.status_class }}">{{ audit_readiness.status }}</span>
         </div>
@@ -86,7 +78,28 @@
 
         <div class="audit-next-action">
           <strong>Review guidance:</strong> {{ audit_readiness.next_action }}
+          <a class="btn btn-sm btn-primary btn-round ml-2" href="{{ audit_readiness.primary_action.url }}">
+            {{ audit_readiness.primary_action.label }}
+          </a>
         </div>
+
+        {% if audit_readiness.blocker_groups %}
+        <div class="audit-packet-list">
+          <h6>Review queue</h6>
+          <div class="audit-blocker-grid">
+            {% for group in audit_readiness.blocker_groups %}
+            <a class="audit-blocker-card" href="{{ group.action_url }}">
+              <span class="gainz-status-badge {{ group.status_class }}">{{ group.status }}</span>
+              <strong>{{ group.title }}</strong>
+              <p>{{ group.detail }}</p>
+              <small>
+                {% if group.count > 0 %}{{ group.count }} item{% if group.count != 1 %}s{% endif %} · {% endif %}{{ group.action_label }}
+              </small>
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
 
         <div class="audit-packet-list">
           <h6>Reconciliation checklist</h6>
@@ -359,15 +372,16 @@
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
-        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
-          <h4 class="card-title">All Asset Stats</h4>
+        <div id="assetStatsAccordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Advanced Asset Stats</h4>
           <div class="card card-plain">
-            <div class="card-header" role="tab" id="headingOne">
-              <a data-toggle="collapse" data-parent="#accordion" href="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+            <div class="card-header" role="tab" id="assetStatsHeading">
+              <a data-toggle="collapse" data-parent="#assetStatsAccordion" href="#assetStatsCollapse" aria-expanded="false" aria-controls="assetStatsCollapse">
+                Show asset totals used by this export
                 <i class="nc-icon nc-minimal-down"></i>
               </a>
             </div>
-            <div id="collapseOne" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+            <div id="assetStatsCollapse" class="collapse" role="tabpanel" aria-labelledby="assetStatsHeading">
 
               <!-- Card Body -->
               <div class="card-body ">
@@ -421,25 +435,27 @@
 
 
 <!-- Export Button  -->
-<div class="row">
+<div class="row" id="export_actions">
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
-        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
-          <h4 class="card-title">Export</h4>
+        <div id="exportActionsAccordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h4 class="card-title">Generate Files</h4>
           <div class="card card-plain">
-            <div class="card-header" role="tab" id="headingOne">
-              <a data-toggle="collapse" data-parent="#accordion" href="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+            <div class="card-header" role="tab" id="exportActionsHeading">
+              <a data-toggle="collapse" data-parent="#exportActionsAccordion" href="#exportActionsCollapse" aria-expanded="true" aria-controls="exportActionsCollapse">
                 <i class="nc-icon nc-minimal-down"></i>
               </a>
             </div>
-            <div id="collapseOne" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
+            <div id="exportActionsCollapse" class="collapse show" role="tabpanel" aria-labelledby="exportActionsHeading">
 
               <!-- Card Body -->
               <div class="card-body ">
                 <p id="export_button_text"></p>
-                <button type="button" id="export_button" class="btn btn-success">Export</button>
-                <button type="button" id="audit_packet_button" class="btn btn-info">Generate Audit Packet</button>
+                <button type="button" id="export_button" class="btn btn-success">Generate Workbook</button>
+                <button type="button" id="audit_packet_button" class="btn btn-info">
+                  {% if audit_readiness.is_ready %}Generate Audit Packet{% else %}Generate Draft Audit Packet{% endif %}
+                </button>
               </div>
               <!-- /Card Body -->
 

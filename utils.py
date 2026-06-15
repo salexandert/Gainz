@@ -674,13 +674,15 @@ def _reconciliation_checklist(
     tax_evidence_inventory,
     draft_acknowledged=False,
 ):
-    current_holdings_entered = not any(row[6] == "Needs declared holdings" for row in holdings_rows)
-    fifo_run = len(missing_basis_rows) == 0
+    transaction_count = len(getattr(transactions, "transactions", []) or [])
+    has_transactions = transaction_count > 0
+    current_holdings_entered = has_transactions and not any(row[6] == "Needs declared holdings" for row in holdings_rows)
+    fifo_run = has_transactions and len(missing_basis_rows) == 0
     import_warnings_reviewed = len(unresolved_warning_rows) == 0
     import_warning_count = len(getattr(transactions, "import_warnings", []) or [])
     import_warning_review_count = len(getattr(transactions, "import_warning_reviews", []) or [])
-    source_overlaps_reviewed = len(source_overlap_rows) == 0
-    missing_basis_reviewed = len(missing_basis_rows) == 0
+    source_overlaps_reviewed = has_transactions and len(source_overlap_rows) == 0
+    missing_basis_reviewed = has_transactions and len(missing_basis_rows) == 0
     tax_evidence_reviewed = tax_evidence_inventory["metrics"]["years_needing_review"] == 0
     if not import_warnings_reviewed:
         import_warning_detail = "Review each active warning and choose a decision."
@@ -690,17 +692,63 @@ def _reconciliation_checklist(
         import_warning_detail = "No active import warnings in this save."
     else:
         import_warning_detail = "All active import warnings have reviewed decisions."
+    transaction_detail = (
+        f"{_count_label(transaction_count, 'source transaction')} loaded."
+        if has_transactions
+        else "Import exchange CSVs, try demo data, or add known manual rows."
+    )
+    holdings_detail = (
+        "All assets have declared current holdings."
+        if current_holdings_entered
+        else (
+            "Import transactions first, then enter holdings for every asset or use the bulk holdings step."
+            if not has_transactions
+            else "Enter holdings for every asset, or use the bulk holdings step."
+        )
+    )
+    fifo_detail = (
+        "No unlinked sales remain."
+        if fifo_run
+        else (
+            "Import transactions first, then run FIFO."
+            if not has_transactions
+            else "Run FIFO or leave specific missing basis as needs user research."
+        )
+    )
+    source_overlap_detail = (
+        "No overlapping source files detected."
+        if source_overlaps_reviewed
+        else (
+            "Import transactions first, then review possible full-history/year-specific duplicate exports."
+            if not has_transactions
+            else "Review possible full-history/year-specific duplicate exports."
+        )
+    )
+    missing_basis_detail = (
+        "No missing acquisition basis remains."
+        if missing_basis_reviewed
+        else (
+            "Import transactions first, then review sales that need earlier acquisition basis or user research."
+            if not has_transactions
+            else "Some sales still need earlier acquisition basis or user research."
+        )
+    )
 
     return [
         {
+            "label": "Transactions imported",
+            "complete": has_transactions,
+            "detail": transaction_detail,
+        },
+        {
             "label": "Current holdings entered",
             "complete": current_holdings_entered,
-            "detail": "All assets have declared current holdings." if current_holdings_entered else "Enter holdings for every asset, or use the bulk holdings step.",
+            "detail": holdings_detail,
         },
         {
             "label": "FIFO run",
             "complete": fifo_run,
-            "detail": "No unlinked sales remain." if fifo_run else "Run FIFO or leave specific missing basis as needs user research.",
+            "detail": fifo_detail,
         },
         {
             "label": "Import warnings reviewed",
@@ -710,12 +758,12 @@ def _reconciliation_checklist(
         {
             "label": "Source overlap reviewed",
             "complete": source_overlaps_reviewed,
-            "detail": "No overlapping source files detected." if source_overlaps_reviewed else "Review possible full-history/year-specific duplicate exports.",
+            "detail": source_overlap_detail,
         },
         {
             "label": "Missing basis reviewed",
             "complete": missing_basis_reviewed,
-            "detail": "No missing acquisition basis remains." if missing_basis_reviewed else "Some sales still need earlier acquisition basis or user research.",
+            "detail": missing_basis_detail,
         },
         {
             "label": "Tax evidence inventory reviewed",
@@ -728,6 +776,219 @@ def _reconciliation_checklist(
             "detail": "Draft output may be generated for review." if draft_acknowledged else "Required only when unresolved review items remain.",
         },
     ]
+
+
+def _compact_names(names, max_items=5):
+    unique_names = sorted({str(name) for name in names if str(name).strip()})
+    if len(unique_names) <= max_items:
+        return ", ".join(unique_names)
+
+    visible = ", ".join(unique_names[:max_items])
+    return f"{visible}, and {len(unique_names) - max_items} more"
+
+
+def _count_label(count, singular, plural=None):
+    label = singular if count == 1 else (plural or f"{singular}s")
+    return f"{count} {label}"
+
+
+def _readiness_group(
+    key,
+    title,
+    count,
+    status,
+    status_class,
+    detail,
+    action_label,
+    action_url,
+    severity="blocker",
+):
+    return {
+        "key": key,
+        "title": title,
+        "count": count,
+        "status": status,
+        "status_class": status_class,
+        "detail": detail,
+        "action_label": action_label,
+        "action_url": action_url,
+        "severity": severity,
+    }
+
+
+def _audit_readiness_groups(
+    transactions,
+    missing_basis_rows,
+    assets_needing_holdings,
+    assets_with_mismatches,
+    unresolved_warning_rows,
+    source_overlap_rows,
+    filed_total_records,
+    form_8949_totals,
+    stats_rows,
+):
+    groups = []
+    transaction_count = len(getattr(transactions, "transactions", []) or [])
+    assets_with_unlinked_sales = [
+        row["symbol"]
+        for row in stats_rows
+        if _stats_row_has_unlinked_sales(row)
+    ]
+
+    if transaction_count == 0:
+        groups.append(_readiness_group(
+            "import",
+            "Import data",
+            0,
+            "Start here",
+            "status-needs-declared-holdings",
+            "No source transactions are loaded yet. Import exchange CSVs, try demo data, or add known manual rows.",
+            "Open import",
+            "/import_transactions/",
+        ))
+
+    if missing_basis_rows:
+        research_count = sum(1 for row in missing_basis_rows if row["status"] == "Needs user research")
+        missing_count = len(missing_basis_rows) - research_count
+        if missing_count and research_count:
+            detail = (
+                f"{_count_label(missing_count, 'sale row')} still "
+                f"{'needs' if missing_count == 1 else 'need'} earlier acquisition basis, and "
+                f"{_count_label(research_count, 'row')} "
+                f"{'is' if research_count == 1 else 'are'} parked as needs user research."
+            )
+            status = "Needs action"
+            status_class = "status-needs-review"
+        elif research_count:
+            detail = (
+                f"{_count_label(research_count, 'sale row')} "
+                f"{'is' if research_count == 1 else 'are'} documented as needs user research. "
+                "Draft exports can include the notes, but this is not filing-ready."
+            )
+            status = "Needs research"
+            status_class = "status-needs-user-research"
+        else:
+            detail = (
+                f"{_count_label(missing_count, 'sale row')} "
+                f"{'needs' if missing_count == 1 else 'need'} earlier acquisition basis before Form 8949-style totals are reliable."
+            )
+            status = "Needs basis"
+            status_class = "status-needs-review"
+
+        groups.append(_readiness_group(
+            "missing_basis",
+            "Missing acquisition basis",
+            len(missing_basis_rows),
+            status,
+            status_class,
+            detail,
+            "Review basis",
+            "/holdings_accounting/",
+        ))
+
+    holdings_assets = sorted(set(assets_needing_holdings + assets_with_mismatches))
+    if holdings_assets:
+        if assets_needing_holdings and assets_with_mismatches:
+            detail = (
+                f"Enter declared holdings for {_compact_names(assets_needing_holdings)} and review "
+                f"accounting differences for {_compact_names(assets_with_mismatches)}."
+            )
+            status = "Needs review"
+        elif assets_needing_holdings:
+            detail = f"Declare current holdings for {_compact_names(assets_needing_holdings)}."
+            status = "Needs holdings"
+        else:
+            detail = f"Review accounting differences for {_compact_names(assets_with_mismatches)}."
+            status = "Needs review"
+
+        groups.append(_readiness_group(
+            "holdings",
+            "Holdings reconciliation",
+            len(holdings_assets),
+            status,
+            "status-needs-review",
+            detail,
+            "Open reconcile",
+            "/holdings_accounting/",
+        ))
+
+    if unresolved_warning_rows:
+        groups.append(_readiness_group(
+            "import_warnings",
+            "Import warning decisions",
+            len(unresolved_warning_rows),
+            "Needs decisions",
+            "status-unlinked-sales",
+            "Review each skipped or assumption-based import row, then choose a decision or add a note.",
+            "Review warnings",
+            "/import_transactions/#import_warning_workflow",
+            severity="warning",
+        ))
+
+    if source_overlap_rows:
+        groups.append(_readiness_group(
+            "source_overlaps",
+            "Possible duplicate source files",
+            len(source_overlap_rows),
+            "Needs review",
+            "status-unlinked-sales",
+            "Some source files look like they may cover the same activity. Review before relying on totals.",
+            "Review sources",
+            "/import_transactions/#source_overlap_workflow",
+            severity="warning",
+        ))
+
+    if (
+        form_8949_totals["total"]["rows"] == 0
+        and any(row.get("num_sells", 0) > 0 for row in stats_rows)
+    ):
+        groups.append(_readiness_group(
+            "form_8949",
+            "Form 8949 rows",
+            len(assets_with_unlinked_sales),
+            "Blocked",
+            "status-needs-review",
+            "Sells exist, but linked Form 8949-style rows cannot be generated yet. Run FIFO or review missing basis.",
+            "Run FIFO",
+            "/auto_link/",
+        ))
+
+    if filed_total_records:
+        groups.append(_readiness_group(
+            "tax_evidence",
+            "Tax evidence inventory",
+            len(filed_total_records),
+            "Needs evidence",
+            "status-needs-review",
+            "Review filed returns, crypto totals, payment evidence, and zero/not-applicable confirmations by year.",
+            "Open tax evidence",
+            "/tax_filing_review/",
+        ))
+
+    return groups
+
+
+def _primary_readiness_action(blocker_groups, is_ready):
+    if blocker_groups:
+        first_group = blocker_groups[0]
+        return {
+            "label": first_group["action_label"],
+            "url": first_group["action_url"],
+            "detail": first_group["detail"],
+        }
+
+    if is_ready:
+        return {
+            "label": "Prepare export",
+            "url": "/export/#export_actions",
+            "detail": "Generate the workbook or audit packet, then review the exported files against source records.",
+        }
+
+    return {
+        "label": "Review export",
+        "url": "/export/",
+        "detail": "Review the checklist and warnings before generating files.",
+    }
 
 
 def get_audit_readiness_summary(transactions):
@@ -850,11 +1111,26 @@ def get_audit_readiness_summary(transactions):
         status_class = "status-verified"
         next_action = "Generate the audit packet, then review exported files against source records."
 
+    blocker_groups = _audit_readiness_groups(
+        transactions,
+        missing_basis_rows,
+        assets_needing_holdings,
+        assets_with_mismatches,
+        unresolved_warning_rows,
+        source_overlap_rows,
+        filed_total_records,
+        form_8949_totals,
+        stats_rows,
+    )
+    primary_action = _primary_readiness_action(blocker_groups, is_ready)
+
     return {
         "status": status,
         "status_class": status_class,
         "is_ready": is_ready,
         "next_action": next_action,
+        "primary_action": primary_action,
+        "blocker_groups": blocker_groups,
         "blockers": blockers,
         "warnings": warnings,
         "import_warnings": import_warnings,

@@ -1,98 +1,78 @@
-
-
 <!-- sidebar menu -->
+{% set current_path = request.path %}
 <div class="logo">
-  <a href="/home" class="simple-text logo-mini">
+  <a href="{{ url_for('home_blueprint.index') }}" class="simple-text logo-mini" aria-label="Gainz dashboard">
     <div class="logo-image-small">
-      <img src="{{ url_for('static', filename='/assets/img/gainz_logo.jpg') }}">
+      <img src="{{ url_for('static', filename='/assets/img/gainz_logo.jpg') }}" alt="Gainz logo">
     </div>
-    <!-- <p>CT</p> -->
   </a>
-  <a href="/home" class="simple-text logo-normal">
+  <a href="{{ url_for('home_blueprint.index') }}" class="simple-text logo-normal">
     Gainz!
-    <!-- <div class="logo-image-big">
-      <img src="../assets/img/logo-big.png">
-    </div> -->
   </a>
 </div>
 <div class="sidebar-wrapper">
   <ul class="nav">
-    <li>
-      <a href="/home">
-        <i class="nc-icon nc-bank"></i>
-        <p>Home</p>
+    <li class="{% if current_path.startswith('/home') %}active{% endif %}">
+      <a href="{{ url_for('home_blueprint.index') }}" {% if current_path.startswith('/home') %}aria-current="page"{% endif %}>
+        <i class="nc-icon nc-bank" aria-hidden="true"></i>
+        <p>Dashboard</p>
       </a>
     </li>
-    <li>
-      <a href="/import_transactions/">
-        <i class="nc-icon nc-cloud-upload-94"></i>
-        <p>Import & Manage Data</p>
+    <li class="{% if current_path.startswith('/import_transactions') %}active{% endif %}">
+      <a href="{{ url_for('import_transactions_blueprint.import_wizard') }}" {% if current_path.startswith('/import_transactions') %}aria-current="page"{% endif %}>
+        <i class="nc-icon nc-cloud-upload-94" aria-hidden="true"></i>
+        <p>Import</p>
       </a>
     </li>
-    <li>
-      <a href="/holdings_accounting">
-        <i class="nc-icon nc-ruler-pencil"></i>
-        <p>Holdings & Accounting</p>
+    <li class="{% if current_path.startswith('/holdings_accounting') %}active{% endif %}">
+      <a href="{{ url_for('holdings_accounting_blueprint.holdings_accounting') }}" {% if current_path.startswith('/holdings_accounting') %}aria-current="page"{% endif %}>
+        <i class="nc-icon nc-ruler-pencil" aria-hidden="true"></i>
+        <p>Reconcile</p>
       </a>
     </li>
-    <li>
-      <a href="/auto_link">
-        <i class="nc-icon nc-planet"></i>
+    <li class="{% if current_path.startswith('/tax_filing_review') %}active{% endif %}">
+      <a href="{{ url_for('tax_filing_review_blueprint.index') }}" {% if current_path.startswith('/tax_filing_review') %}aria-current="page"{% endif %}>
+        <i class="nc-icon nc-paper" aria-hidden="true"></i>
+        <p>Tax Evidence</p>
+      </a>
+    </li>
+    <li class="{% if current_path.startswith('/export') %}active{% endif %}">
+      <a href="{{ url_for('export_blueprint.index') }}" {% if current_path.startswith('/export') %}aria-current="page"{% endif %}>
+        <i class="nc-icon nc-share-66" aria-hidden="true"></i>
+        <p>Reports & Export</p>
+      </a>
+    </li>
+
+    <li class="sidebar-nav-label" aria-hidden="true">Advanced tools</li>
+    <li class="{% if current_path.startswith('/auto_link') %}active{% endif %}">
+      <a href="{{ url_for('auto_link_blueprint.auto_link') }}" {% if current_path.startswith('/auto_link') %}aria-current="page"{% endif %}>
+        <i class="nc-icon nc-planet" aria-hidden="true"></i>
         <p>Auto Link</p>
       </a>
     </li>
-    <li>
-      <a href="/stats">
-        <i class="nc-icon nc-chart-bar-32"></i>
+    <li class="{% if current_path.startswith('/stats') %}active{% endif %}">
+      <a href="{{ url_for('stats_blueprint.index') }}" {% if current_path.startswith('/stats') %}aria-current="page"{% endif %}>
+        <i class="nc-icon nc-chart-bar-32" aria-hidden="true"></i>
         <p>Stats & Charts</p>
       </a>
     </li>
-    <li>
-      <a href="/tax_filing_review/">
-        <i class="nc-icon nc-paper"></i>
-        <p>Tax Filing Review</p>
-      </a>
-    </li>
-    <li>
-      <a href="/model">
-        <i class="nc-icon nc-credit-card"></i>
+    <li class="{% if current_path.startswith('/model') %}active{% endif %}">
+      <a href="{{ url_for('model_blueprint.index') }}" {% if current_path.startswith('/model') %}aria-current="page"{% endif %}>
+        <i class="nc-icon nc-credit-card" aria-hidden="true"></i>
         <p>Model Sell</p>
       </a>
     </li>
-    <li>
-      <a href="/export">
-        <i class="nc-icon nc-share-66"></i>
-        <p>Export</p>
+    <li class="{% if current_path.startswith('/history') %}active{% endif %}">
+      <a href="{{ url_for('history_blueprint.index') }}" {% if current_path.startswith('/history') %}aria-current="page"{% endif %}>
+        <i class="nc-icon nc-hat-3" aria-hidden="true"></i>
+        <p>History</p>
       </a>
     </li>
-    <li>
-      <a href="/history/">
-        <i class="nc-icon nc-hat-3"></i>
-        <p>Revision History</p>
+    <li class="{% if current_path.startswith('/add_links') %}active{% endif %}">
+      <a href="{{ url_for('add_links_blueprint.add_links') }}" {% if current_path.startswith('/add_links') %}aria-current="page"{% endif %}>
+        <i class="nc-icon nc-vector" aria-hidden="true"></i>
+        <p>Manage Links</p>
       </a>
     </li>
-    <li>
-      <a href="/add_links">
-        <i class="nc-icon nc-vector"></i>
-        <p>Add & Manage Links</p>
-      </a>
-    </li>
-    {% if support_url %}
-    <li>
-      <a href="{{ support_url }}" target="_blank" rel="noopener noreferrer">
-        <i class="nc-icon nc-favourite-28"></i>
-        <p>Support Gainz</p>
-      </a>
-    </li>
-    {% endif %}
-    {% if store_url %}
-    <li>
-      <a href="{{ store_url }}" target="_blank" rel="noopener noreferrer">
-        <i class="nc-icon nc-world-2"></i>
-        <p>Gainz Website</p>
-      </a>
-    </li>
-    {% endif %}
-
   </ul>
 </div>
