@@ -17,24 +17,29 @@ File names should include `coinbase`, `coinbase_pro`, or `gdax` when appropriate
 
 ## After Import
 
-Open **Stats & Charts** and check:
+Return to **Dashboard** and follow **Continue reconciliation**. The dashboard shows the next review group instead of making you guess which page to open.
+
+Use **Import** and **Reconcile** to check:
 
 - Import warnings.
-- Unlinked sales.
 - Assets needing declared holdings.
 - Assets marked Needs Review in holdings reconciliation.
+- Transfer questions, source overlaps, and source files that may be incomplete.
+- Unlinked sales that still need basis.
 
 An imported table is not automatically review-ready. Generated reports require basis links for sells and review of transfer gaps.
 
 ## Linking Coinbase Sells
 
-Use **Auto Link** to connect Coinbase sells to earlier buy lots. FIFO is a common first review pass because it is easy to inspect, but Gainz also supports FILO and higher-basis comparison methods for review.
+Use **Auto Link** when Dashboard or Reports & Export says Coinbase sells need basis links. FIFO is a common first review pass because it is easy to inspect, but Gainz also supports FILO and higher-basis comparison methods for review.
 
 After linking, the Form 8949-style rows and audit packet totals are generated from those links.
 
 ## Current Holdings Reconciliation
 
 Coinbase data may not include every wallet movement or external acquisition. Gainz compares declared holdings against imported buys, sells, sends, and receives so you can spot missing data before using the packet.
+
+Use **Stats & Charts** as an advanced inspection page for current-lot estimates, sales rows, Form 8949-style rows, and charts after Dashboard identifies what needs deeper review.
 
 Gainz is not tax, legal, or financial advice. Use it to prepare documentation for review.
 

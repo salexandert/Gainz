@@ -1,6 +1,6 @@
 {% extends "base_site.html" %}
 
-{% block title %} Holdings & Accounting {% endblock title %}
+{% block title %} Reconcile {% endblock title %}
 
 {% block stylesheets %}
   {{ super() }}
@@ -71,9 +71,9 @@
           <div class="holdings-step">
             <div class="holdings-step-number">5</div>
             <div>
-              <h5>Verify on Stats</h5>
-              <p>Once assets are declared and review items are handled, review Current Holdings Reconciliation, current lots, unlinked sales, and audit packet readiness.</p>
-              <a class="btn btn-sm btn-outline-primary" href="/stats">Open Stats & Charts</a>
+              <h5>Review readiness</h5>
+              <p>Once assets are declared and review items are handled, review readiness, output location, and draft packet status.</p>
+              <a class="btn btn-sm btn-outline-primary" href="/export">Open Reports & Export</a>
             </div>
           </div>
         </div>
@@ -341,7 +341,7 @@
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start">
           <div>
             <h4 class="card-title">Step 4: Review Readiness</h4>
-            <p class="card-category">Use the selected asset status to decide whether to add holdings, create basis links, review source records, or move to Stats and Export.</p>
+            <p class="card-category">Use the selected asset status to decide whether to add holdings, create basis links, review source records, or move to Reports & Export.</p>
           </div>
           <span id="holdings_readiness_badge" class="gainz-status-badge status-needs-declared-holdings">Select asset</span>
         </div>
@@ -372,8 +372,8 @@
         <div class="holdings-readiness-actions">
           <button type="button" id="holdings_run_fifo_button" class="btn btn-primary" disabled>Run FIFO Auto Link for Selected Asset</button>
           <button type="button" id="holdings_leave_basis_unresolved_button" class="btn btn-outline-warning" disabled>Leave Missing Basis As Needs Research</button>
-          <a class="btn btn-outline-primary" href="/stats">Open Stats & Charts</a>
-          <a class="btn btn-outline-secondary" href="/export">Open Export</a>
+          <a class="btn btn-outline-primary" href="/export">Open Reports & Export</a>
+          <a class="btn btn-outline-secondary" href="/stats">Open Stats & Charts</a>
         </div>
 
         <div class="holdings-readiness-details">

@@ -9,7 +9,7 @@ This sample packet uses synthetic demo data only. It is meant to show the shape 
 
 <p><a class="button" href="{{ '/assets/downloads/gainz-synthetic-audit-packet-sample.zip' | relative_url }}">Download the synthetic sample packet</a></p>
 
-![Gainz Export audit readiness panel]({{ '/assets/screenshots/gainz-export-audit-readiness.png' | relative_url }})
+![Gainz Reports and Export readiness panel]({{ '/assets/screenshots/gainz-export-audit-readiness.png' | relative_url }})
 {: .screenshot-frame }
 
 ## What Is Inside

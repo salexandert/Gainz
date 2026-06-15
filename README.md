@@ -98,13 +98,15 @@ Windows may show a Microsoft Defender SmartScreen warning while Gainz is young a
 ## Common Workflow
 
 1. Learn the cost-basis question and collect source files.
-2. Import transaction CSVs in **Import & Manage Data**.
-3. Add source-backed manual rows in the batch table when a CSV is missing known buys or sells.
-4. Review imported buys, sells, sends, receives, warnings, data sources, and possible overlapping exports.
-5. Link sells to earlier buys, usually starting with FIFO for a first review pass.
-6. Declare current holdings and resolve review items.
-7. Open **Tax Filing Review**, build the year-by-year tax evidence inventory, and confirm or mark suggested filed totals for research.
-8. Export the Excel report and audit packet from the Export page.
+2. Start on **Dashboard** and use it as the control center.
+3. Import transaction CSVs in **Import**.
+4. Add source-backed manual rows in the batch table when a CSV is missing known buys or sells.
+5. Return to **Dashboard** and follow **Continue reconciliation**.
+6. Declare current holdings in **Reconcile** before deeper basis work unless Dashboard points somewhere else.
+7. Review import warnings, source overlaps, and transfer questions that affect the reconciliation.
+8. Run FIFO or another basis-linking review in **Auto Link** when Dashboard or Reports & Export says sales still need basis.
+9. Open **Tax Evidence**, build the year-by-year tax evidence inventory, and confirm or mark suggested filed totals for research.
+10. Open **Reports & Export**, review readiness, expand **Review Details** only when needed, and generate the workbook or audit packet.
 
 For a complete click-by-click guide, see [Using Gainz from import to audit packet](docs/user-walkthrough.md).
 
@@ -119,13 +121,15 @@ The `demo_data/` folder contains synthetic CSVs that are safe to use for testing
 A good demo run is:
 
 1. Start Gainz with `python launcher.py`.
-2. Open **Import & Manage Data**.
+2. Open **Import**.
 3. Click **Try Demo Data**, or upload each demo CSV one file at a time.
-4. Open **Auto Link**, select each asset, and run **FIFO**.
-5. Open **Holdings & Accounting** and declare current holdings for each demo asset.
-6. Open **Stats & Charts** to review reconciliation and current lots.
-7. Open **Export** and review the **Audit Packet Review Status** checklist.
-8. Click **Generate Audit Packet**.
+4. Return to **Dashboard** and follow **Continue reconciliation**.
+5. Enter current holdings in **Reconcile**.
+6. Review warnings or tax evidence if Dashboard shows them.
+7. Run **FIFO** in **Auto Link** only when Dashboard or Reports & Export says basis links are blocking readiness.
+8. Open **Reports & Export** and review the **Readiness Review** checklist.
+9. Expand **Review Details** only when you need row-level evidence.
+10. Generate the workbook or draft audit packet.
 
 The audit packet includes the Excel workbook, Form 8949 detail CSVs, Form 8949 totals, tax filing review, tax evidence inventory, suggested filed totals, holdings reconciliation, current holdings lots, active and preserved import-warning decisions, missing-basis review, source-overlap review, copied source files when available, hashes, and a methodology memo.
 
@@ -151,7 +155,7 @@ The GitHub wiki is generated from `docs/` and includes an inline screenshot walk
 
 Public screenshots are captured from synthetic demo data so they can show the first-run workflow without exposing private transaction history.
 
-Current public screenshots live under `docs/assets/screenshots/`, including the blank batch manual entry table used on the website and walkthrough.
+Current public screenshots live under `docs/assets/screenshots/`, including Dashboard, Import, Reconcile, Reports & Export, advanced Stats & Charts, Model Sell, and blank batch manual entry screens captured from synthetic demo data.
 
 When a product change affects public documentation, update `docs/` first. Netlify builds the website from those files, and the wiki sync workflow regenerates the GitHub Wiki from the same source.
 

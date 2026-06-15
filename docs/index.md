@@ -32,7 +32,7 @@ schema_type: SoftwareApplication
   <ol class="process-list">
     <li><strong>Learn cost basis.</strong> Understand proceeds, basis, gains, missing basis, and why crypto records often split across platforms.</li>
     <li><strong>Collect source files.</strong> Export exchange CSVs, wallet records, current holdings, and prior-year evidence before trusting totals.</li>
-    <li><strong>Use Gainz locally.</strong> Import files, review warnings, link sells to buys, and reconcile current holdings.</li>
+    <li><strong>Use Gainz locally.</strong> Import files, follow the Dashboard next action, reconcile current holdings, review warnings, and link sells to buys when needed.</li>
     <li><strong>Package for review.</strong> Generate an audit packet with Form 8949-style rows, totals, source manifests, and reconciliation status.</li>
   </ol>
   <p><a class="button-secondary" href="{{ '/guides/crypto-cost-basis-learning/' | relative_url }}">Open the cost basis learning path</a></p>
@@ -60,7 +60,7 @@ schema_type: SoftwareApplication
   <h2>Fill Gaps With Source-Backed Manual Entries</h2>
   <p>When a CSV misses a known buy or sell, Gainz now supports batch manual entry. Add several supported records at once, leave unused rows blank, and save the batch as one revision for review.</p>
   <img class="screenshot-frame" src="{{ '/assets/screenshots/gainz-manual-batch-entry.png' | relative_url }}" alt="Gainz manual transaction batch entry table">
-  <p><a class="button-secondary" href="{{ '/user-walkthrough/#2-import-transaction-files' | relative_url }}">See where this fits in the walkthrough</a></p>
+  <p><a class="button-secondary" href="{{ '/user-walkthrough/#4-add-source-backed-manual-rows-when-needed' | relative_url }}">See where this fits in the walkthrough</a></p>
 </section>
 
 ## Guides For Real Search Problems

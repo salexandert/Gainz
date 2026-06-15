@@ -77,7 +77,7 @@ def _home_progress(transactions):
         {
             "number": 4,
             "title": "Review & Export",
-            "description": "Check Stats, Model Sell, and audit packet outputs.",
+            "description": "Review readiness, model sales, and generate outputs.",
             "url": url_for("export_blueprint.index"),
             "state": "waiting",
             "status": "Waiting",

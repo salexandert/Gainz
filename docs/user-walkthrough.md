@@ -24,14 +24,27 @@ On first run, Gainz asks you to create a local admin account in the browser. The
 
 If you forget the local password, use **Reset Password** in the launcher. The local password gates the browser UI; it does not encrypt imported CSVs, XLSX saves, exports, or audit packets. See [Reset Your Local Gainz Password]({{ '/guides/local-password-reset/' | relative_url }}).
 
-![Gainz home page after opening the local app]({{ '/assets/screenshots/gainz-home.png' | relative_url }})
+## 2. Use The Reconciliation Dashboard
+
+After sign-in, start on **Dashboard**. This is the control center for the workflow.
+
+The dashboard shows:
+
+- **Summary**: the open review groups Gainz found.
+- **Next action**: the most useful next step.
+- **Continue reconciliation**: a button that takes you to the right page for that step.
+- **Review Queue**: grouped blockers such as holdings, import warnings, missing basis, source overlaps, and tax evidence.
+
+If you are not sure what to do next, return to Dashboard and follow **Continue reconciliation**.
+
+![Gainz Reconciliation Dashboard]({{ '/assets/screenshots/gainz-home.png' | relative_url }})
 {: .screenshot-frame }
 
-## 2. Import Transaction Files
+## 3. Import Transaction Files
 
-Open **Import & Manage Data**.
+Open **Import**.
 
-If you are learning Gainz, click **Try Demo Data**. This loads the bundled synthetic Cash App, Coinbase, and Coinbase Convert files so you can reach Stats, Auto Link, and Export quickly.
+If you are learning Gainz, click **Try Demo Data**. This loads the bundled synthetic Cash App, Coinbase, and Coinbase Convert files so you can reach Dashboard, Reconcile, and Reports & Export without using private records.
 
 Upload one file at a time. Gainz shows how many rows were imported, skipped, or warned after each upload.
 
@@ -46,13 +59,18 @@ Supported workflows currently include:
 
 File names help Gainz detect the parser. Use names that include terms such as `cash_app`, `coinbase`, `coinbase_pro`, `gdax`, or `kraken`.
 
-Gainz also recognizes common column-name variations. For example, headers like `Transaction Date`, `Activity Type`, `Crypto Quantity`, `Token Symbol`, `Spot Price USD`, and `Transaction Value` can be mapped into the import fields even when an exchange changes its export wording. If the columns are too unusual, Gainz will ask for the header row and let you choose the Date/time, Transaction type, Asset symbol, Asset quantity, and USD price/value columns.
+Gainz also recognizes common column-name variations. For example, headers like `Transaction Date`, `Activity Type`, `Crypto Quantity`, `Token Symbol`, `Spot Price USD`, and `Transaction Value` can be mapped into the import fields even when an exchange changes its export wording. If the columns are too unusual, Gainz asks for the header row and lets you choose the Date/time, Transaction type, Asset symbol, Asset quantity, and USD price/value columns.
 
-If Gainz shows import warnings, review them before relying on generated reports. The warning table shows the source file, row number, date, type, asset, quantity, issue, likely category, and review decision. For each warning, choose whether it is a true zero-value transfer, needs a manual USD value, should be ignored for now, or needs a note. Unresolved warnings stay visible in Export and the audit packet.
+Also review **Possible overlapping source files** on Import. Gainz flags pairs that look like a full-history export plus a year-specific export, or files with overlapping transaction signatures. If one source duplicates another, remove only the duplicate or overlapping source from current data and keep the original CSV for evidence.
 
-Also review **Possible overlapping source files** on Import & Manage Data. Gainz flags pairs that look like a full-history export plus a year-specific export, or files with overlapping transaction signatures. If one source duplicates another, remove only the duplicate/overlapping source from current data and keep the original CSV for evidence.
+![Gainz Import page]({{ '/assets/screenshots/gainz-import-manage-data.png' | relative_url }})
+{: .screenshot-frame }
 
-If a CSV is missing known buys or sells, use **Add Manual Transactions** on the same page. Enter as many rows as needed, leave unused rows blank, and submit the batch. Gainz saves the batch as one revision with source `Gainz App Manual Add`.
+## 4. Add Source-Backed Manual Rows When Needed
+
+If a CSV is missing known buys or sells, use **Add Manual Transactions** on the Import page.
+
+Enter as many rows as needed, leave unused rows blank, and submit the batch. Gainz saves the batch as one revision with source `Gainz App Manual Add`.
 
 ![Gainz manual transaction batch entry table]({{ '/assets/screenshots/gainz-manual-batch-entry.png' | relative_url }})
 {: .screenshot-frame }
@@ -65,50 +83,15 @@ demo_data/coinbase_sample.csv
 demo_data/coinbase_convert_sample.csv
 ```
 
-![Gainz Import and Manage Data page]({{ '/assets/screenshots/gainz-import-manage-data.png' | relative_url }})
-{: .screenshot-frame }
+## 5. Follow Next Action And Declare Holdings
 
-## 3. Check Stats And Warnings
+Return to **Dashboard** after importing and follow **Continue reconciliation**.
 
-Open **Stats & Charts** after importing.
+For most new imports, Gainz sends you to **Reconcile** first because current holdings tell Gainz whether imported buys and sells explain what you actually still hold.
 
-The top summary band answers the first important question: is the file set ready enough to trust?
+On **Reconcile**:
 
-Watch these values:
-
-- `Reconciliation`: overall readiness.
-- `Assets needing holdings`: assets where you have not entered current holdings.
-- `Needs review`: declared holdings do not reconcile with imported buys/sells.
-- `Import warnings`: rows Gainz could not fully interpret.
-- `Unlinked sales`: sells that do not yet have basis links.
-
-If sells exist and links are missing, Gainz will show `Not ready`. That is expected before auto-linking.
-
-![Gainz Stats and Charts review page]({{ '/assets/screenshots/gainz-stats-charts.png' | relative_url }})
-{: .screenshot-frame }
-
-## 4. Link Sells To Earlier Buys
-
-Open **Auto Link**.
-
-Select an asset row, choose a year or `All Time`, then choose a linking method:
-
-- `FIFO`: oldest available buys first.
-- `FILO`: newest available buys first.
-- `Min Gain`: higher-basis lots first for comparison under your selected method.
-- `Min Gain Long`: long-term lots first for comparison under your selected method.
-
-For a simple first review pass, use `FIFO`.
-
-Repeat for every asset with unlinked sales. Then return to **Stats & Charts** and confirm `Unlinked sales` has dropped.
-
-## 5. Declare Current Holdings
-
-Open **Holdings & Accounting**.
-
-This page is the guided current-holdings walkthrough. For each asset:
-
-1. Select the asset row.
+1. Select an asset row.
 2. Enter the amount you currently hold across wallets and exchanges.
 3. Save declared holdings.
 4. Review the status and guidance.
@@ -119,54 +102,56 @@ Gainz compares:
 - `Imported Net Including Transfers`: buys plus receives minus sells minus sends.
 - `Declared Holdings`: what you say you actually hold today.
 
-If the status is `Needs Review`, review missing buys, missing disposals, sends, receives, gifts, income, losses, or conversions.
+If the status is `Needs Review`, look for missing buys, missing disposals, sends, receives, gifts, income, losses, conversions, or overlapping source files.
 
 If your records show one primary asset and every other tracked asset is currently zero, use **Bulk Current Holdings**. Enter the primary asset and amount, then let Gainz set all other tracked assets to zero in one revision. Review the confirmation before continuing.
 
-Use **Transfer Classification Review** for the selected asset. It shows send and receive rows as questions to answer:
-
-- Did this send go to another wallet or exchange you own, or did it leave your ownership?
-- Did this receive come from another account you own, or was it a buy, income, reward, gift, or other acquisition?
-- Is there a nearby same-quantity send/receive pair that may be an owner transfer?
-- What source record supports the classification?
-
-Keep owner transfers as transfers. Record a documented disposal or basis-supported acquisition only when source records support it.
-
-If a sale still needs earlier basis and you do not have the source records yet, choose **Leave Missing Basis As Needs Research** and add a note. Gainz will keep exports draft/not filing-ready while showing that the missing basis is a known research item rather than an unexplained silent gap.
-
-![Gainz Holdings and Accounting walkthrough]({{ '/assets/screenshots/gainz-holdings-accounting.png' | relative_url }})
+![Gainz Reconcile holdings walkthrough]({{ '/assets/screenshots/gainz-holdings-accounting.png' | relative_url }})
 {: .screenshot-frame }
 
-## 6. Review Current Lots
+## 6. Review Import Warnings And Source Issues
 
-Open **Stats & Charts** and select an asset.
+Use **Import** for source warnings and source-management decisions.
 
-Review:
+If Gainz shows import warnings, review them before relying on generated reports. The warning table shows source file, row number, date, type, asset, quantity, issue, likely category, and review decision.
 
-- Current holdings reconciliation.
-- Current holdings lots.
-- Sales rows.
-- Form 8949 short-term rows.
-- Form 8949 long-term rows.
-- Unrealized current-lot chart.
+For each warning, choose whether it is:
 
-The current-lot estimate explains which remaining acquisition lots support current holdings. This is especially useful when you need to explain how today's balance relates to past buys and sells.
+- A true zero-value transfer.
+- A row that needs a manual USD value.
+- Something to ignore for now.
+- Something that needs a note.
 
-## 7. Review Audit Packet Status
+Unresolved warnings stay visible in Reports & Export and the audit packet.
 
-Open **Tax Filing Review** before generating the packet.
+## 7. Review Tax Evidence
 
-Use **Tax Evidence Inventory** to scan a local tax evidence folder or add one item at a time. Gainz classifies filenames and notes as filed returns, Form 8949, Schedule D, payment receipts, crypto workbooks, broker forms, transaction CSVs, estimates, or zero/not-applicable confirmations. The inventory separates calculated totals from filed totals, payment evidence, and user notes.
+Open **Tax Evidence** before generating a packet for a real filing review.
+
+Use **Tax Evidence Inventory** to scan a local tax evidence folder or add one item at a time. Gainz classifies filenames and notes as filed returns, Form 8949, Schedule D, payment receipts, crypto workbooks, broker forms, transaction CSVs, estimates, or zero/not-applicable confirmations.
 
 Review **Confirm Suggested Filed Totals**. When Gainz can read clear values from local CSV, XLSX, or readable PDF evidence, it shows possible filed proceeds, cost basis, gain/loss, and tax-paid values with a confidence label and source file. Confirm, edit, or mark the year as needs research. Suggested totals are not treated as recorded filed totals until you save a review decision.
 
 Use **Import Filed Totals from CSV** when you already have a year-by-year filed-total CSV. Gainz reports the actual number of rows imported and skipped. If a CSV only contains three years, Gainz imports three years and leaves the other evidence years visible for review.
 
-Review **What Gainz Found / What Gainz Needs**. Each year should say whether the evidence is ready or whether the missing item is specific, such as filed totals, filed return evidence, payment evidence, crypto totals evidence, estimate-only evidence, or a zero/not-applicable confirmation.
+## 8. Run FIFO And Basis Review When Dashboard Asks
 
-Open **Export**.
+Use **Auto Link** when Dashboard or Reports & Export says sales need basis links.
 
-The **Audit Packet Review Status** panel summarizes whether the packet is ready for review:
+For a simple first review pass, use **FIFO**. FIFO links sales to the oldest available acquisition lots first, then creates Form 8949-style rows from those links.
+
+Repeat for assets with unlinked sales. If a sale still needs earlier basis and you do not have the source records yet, return to **Reconcile**, choose **Leave Missing Basis As Needs Research**, and add a note. Gainz keeps exports draft/not filing-ready while showing that the missing basis is a known research item.
+
+Use **Stats & Charts** as an advanced inspection page when you need deeper asset-level details, current-lot estimates, sales rows, Form 8949 rows, or charts. It is useful for analysis, but Dashboard and Reports & Export are the main workflow guides.
+
+![Gainz Stats and Charts advanced review page]({{ '/assets/screenshots/gainz-stats-charts.png' | relative_url }})
+{: .screenshot-frame }
+
+## 9. Open Reports And Export
+
+Open **Reports & Export** when Dashboard says you are ready to review output, or when you want to see exactly what is blocking readiness.
+
+The **Readiness Review** panel shows:
 
 - Reconciliation checklist.
 - Form 8949 row count.
@@ -178,19 +163,36 @@ The **Audit Packet Review Status** panel summarizes whether the packet is ready 
 - Possible overlapping source files.
 - Tax evidence inventory items.
 - Missing acquisition basis before sales.
-- Review guidance.
+- Next action.
 
-If the status is `Not ready`, review the listed blockers before using the packet. Gainz should tell you whether the blockers are missing basis before sales, current-holdings gaps, unreviewed import warnings, overlapping source files, missing tax evidence, or draft-only research items.
+If the status is `Not ready`, review the listed blockers before using the packet. Gainz should tell you whether the blockers are current-holdings gaps, unreviewed import warnings, missing basis before sales, overlapping source files, missing tax evidence, or draft-only research items.
 
-![Gainz Export audit readiness panel]({{ '/assets/screenshots/gainz-export-audit-readiness.png' | relative_url }})
+![Gainz Reports and Export readiness panel]({{ '/assets/screenshots/gainz-export-audit-readiness.png' | relative_url }})
 {: .screenshot-frame }
 
-## 8. Generate Outputs
+## 10. Expand Review Details Only When Needed
 
-On **Export**, you can create:
+Reports & Export keeps raw evidence tables collapsed under **Review Details** so the page starts with the decision-making workflow.
+
+Expand **Review Details** when you need row-level evidence for:
+
+- Missing acquisition basis.
+- Import warning decisions.
+- Holdings explanations.
+- Source overlaps.
+- Tax evidence inventory.
+- Form 8949 totals.
+
+Use those tables for review and documentation, not as the first place to decide what to do next.
+
+## 11. Generate Outputs
+
+On **Reports & Export**, choose an output folder and create:
 
 - Excel workbook export.
 - Audit packet.
+
+If blockers remain, Gainz can generate draft output only after you acknowledge that unresolved review items remain.
 
 The audit packet includes:
 
@@ -212,8 +214,8 @@ The audit packet includes:
 - SHA-256 hashes.
 - Methodology memo.
 
-## 9. Review Before Filing
+## 12. Review Before Filing
 
-Gainz is documentation support. It is not tax, legal, or financial advice.
+Gainz is documentation support. It is not tax, legal, accounting, filing, or financial advice.
 
 Before filing, review outputs yourself and with a qualified tax professional. Pay special attention to import warnings, unlinked sales, holdings review items, manually reclassified transactions, and any asset whose source history is incomplete.

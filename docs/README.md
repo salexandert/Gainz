@@ -22,6 +22,6 @@ Focused guides:
 - [What to give your CPA](guides/crypto-cpa-checklist.md)
 - [Synthetic sample audit packet](guides/sample-crypto-audit-packet.md)
 
-Tax Filing Review now includes a **Confirm Suggested Filed Totals** flow. Gainz can scan local CSV, XLSX, and readable PDF evidence for possible filed totals, then asks the user to confirm, edit, or mark the year as needs research before those numbers become recorded filed totals.
+Tax Evidence now includes a **Confirm Suggested Filed Totals** flow. Gainz can scan local CSV, XLSX, and readable PDF evidence for possible filed totals, then asks the user to confirm, edit, or mark the year as needs research before those numbers become recorded filed totals.
 
 For the visual screenshot walkthrough, start with [Using Gainz from import to audit packet](user-walkthrough.md). The [GitHub Wiki](https://github.com/salexandert/Gainz/wiki) is regenerated from these docs so the wiki, website, and repository stay aligned.

@@ -18,12 +18,12 @@ ROOT_DOCS = [
 
 SCREENSHOTS = [
     (
-        "Open Gainz",
+        "Reconciliation Dashboard",
         "gainz-home.png",
-        "The home page points users into the import, holdings, reconciliation, and export flow.",
+        "Dashboard shows the readiness summary, next action, and review queue.",
     ),
     (
-        "Import and manage data",
+        "Import",
         "gainz-import-manage-data.png",
         "Import source CSVs, try demo data, add manual batches, review data sources, and inspect revisions.",
     ),
@@ -33,14 +33,14 @@ SCREENSHOTS = [
         "Manual rows let users enter known buys or sells that were not present in imported CSV files.",
     ),
     (
-        "Stats and charts",
-        "gainz-stats-charts.png",
-        "The summary band surfaces reconciliation status, import warnings, and unlinked sales.",
-    ),
-    (
-        "Holdings and accounting",
+        "Reconcile holdings",
         "gainz-holdings-accounting.png",
         "Current holdings reconciliation helps users compare declared holdings against imported activity.",
+    ),
+    (
+        "Advanced stats and charts",
+        "gainz-stats-charts.png",
+        "Stats and Charts remains available for deeper asset-level inspection after Dashboard identifies what to review.",
     ),
     (
         "Model a sale",
@@ -48,9 +48,9 @@ SCREENSHOTS = [
         "Model Sell estimates proceeds, basis, and gain or loss for a hypothetical sale.",
     ),
     (
-        "Audit packet readiness",
+        "Reports and Export readiness",
         "gainz-export-audit-readiness.png",
-        "The export page summarizes packet readiness before generating review files.",
+        "Reports and Export summarizes readiness, output location, file generation, and collapsed review details.",
     ),
 ]
 

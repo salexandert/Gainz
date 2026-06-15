@@ -35,8 +35,9 @@ Good external learning resources help users understand why Gainz asks for comple
 <ol class="process-list">
   <li><strong>Collect every source file.</strong> Export CSVs from each exchange, app, wallet tool, and prior platform that touched the assets being reviewed.</li>
   <li><strong>Import and inspect warnings.</strong> Load files in Gainz and resolve skipped rows, unsupported conversions, or changed column names before relying on reports.</li>
-  <li><strong>Link sells to earlier acquisitions.</strong> Use FIFO auto-link or a reviewed method to connect each sell quantity to a supported buy quantity.</li>
+  <li><strong>Follow the Dashboard next action.</strong> Gainz surfaces the highest-priority review group instead of making you guess which page to open.</li>
   <li><strong>Reconcile current holdings.</strong> Declare what is actually held today and compare it to what imported buys and sells imply should remain.</li>
+  <li><strong>Link sells to earlier acquisitions when needed.</strong> Use FIFO auto-link or a reviewed method after Gainz says sales still need basis support.</li>
   <li><strong>Explain the gaps.</strong> For differences, look for missing sales, sends, losses, transfers, gifts, income, rewards, or manually documented transactions.</li>
   <li><strong>Package evidence for review.</strong> Export the audit packet with source files, Form 8949-style rows, totals, import warnings, holdings reconciliation, and methodology notes.</li>
 </ol>
@@ -60,7 +61,7 @@ Gainz is built for the middle of the workflow: turning raw transaction files int
   </div>
 </div>
 
-If a known source record is missing from a CSV, use **Import & Manage Data** to add supported manual transactions in a batch. Blank rows are ignored, and the batch is saved as one revision so the change can be reviewed later.
+If a known source record is missing from a CSV, use **Import** to add supported manual transactions in a batch. Blank rows are ignored, and the batch is saved as one revision so the change can be reviewed later.
 
 ![Gainz manual transaction batch entry table]({{ '/assets/screenshots/gainz-manual-batch-entry.png' | relative_url }})
 {: .screenshot-frame }

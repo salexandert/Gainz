@@ -7,7 +7,7 @@ description: A practical checklist of crypto CSVs, holdings records, Form 8949-s
 
 This checklist is for organizing crypto records before a tax professional reviews them. It is not tax, legal, or financial advice. Your CPA or other qualified tax professional decides how the records should be used for filing.
 
-![Gainz Export audit readiness panel]({{ '/assets/screenshots/gainz-export-audit-readiness.png' | relative_url }})
+![Gainz Reports and Export readiness panel]({{ '/assets/screenshots/gainz-export-audit-readiness.png' | relative_url }})
 {: .screenshot-frame }
 
 ## Handoff Checklist
@@ -36,11 +36,12 @@ This checklist is for organizing crypto records before a tax professional review
 
 ## Where This Happens In Gainz
 
-- [Import transaction files]({{ '/user-walkthrough/#2-import-transaction-files' | relative_url }}) in **Import & Manage Data**.
-- [Check stats and warnings]({{ '/user-walkthrough/#3-check-stats-and-warnings' | relative_url }}) in **Stats & Charts**.
-- [Declare current holdings]({{ '/user-walkthrough/#5-declare-current-holdings' | relative_url }}) in **Holdings & Accounting**.
-- [Review audit packet status]({{ '/user-walkthrough/#7-review-audit-packet-status' | relative_url }}) in **Export**.
-- [Confirm suggested filed totals]({{ '/user-walkthrough/#7-review-audit-packet-status' | relative_url }}) in **Tax Filing Review**.
+- [Use the Reconciliation Dashboard]({{ '/user-walkthrough/#2-use-the-reconciliation-dashboard' | relative_url }}) to follow the current next action.
+- [Import transaction files]({{ '/user-walkthrough/#3-import-transaction-files' | relative_url }}) in **Import**.
+- [Declare current holdings]({{ '/user-walkthrough/#5-follow-next-action-and-declare-holdings' | relative_url }}) in **Reconcile**.
+- [Review import warnings and source issues]({{ '/user-walkthrough/#6-review-import-warnings-and-source-issues' | relative_url }}) in **Import** and **Reconcile**.
+- [Review tax evidence]({{ '/user-walkthrough/#7-review-tax-evidence' | relative_url }}) in **Tax Evidence**.
+- [Review readiness and generate outputs]({{ '/user-walkthrough/#9-open-reports-and-export' | relative_url }}) in **Reports & Export**.
 
 ## Related Guides
 

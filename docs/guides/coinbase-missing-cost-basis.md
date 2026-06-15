@@ -23,12 +23,14 @@ Missing Coinbase basis usually means the sale exists, but the earlier acquisitio
 ## How To Troubleshoot In Gainz
 
 1. Import all available Coinbase, Coinbase Pro, GDAX, and related exchange files.
-2. Review **Import & Manage Data** for warnings, skipped rows, and data sources.
+2. Review **Import** for warnings, skipped rows, data sources, and possible overlapping source files.
 3. If automatic detection cannot find the needed fields, use the column mapper to select the header row and map date, type, asset, quantity, and USD value columns.
 4. Confirm Coinbase Convert rows appear as both the disposed asset and the acquired asset.
-5. Run FIFO auto-link for the affected asset, then check **Stats & Charts** for remaining unlinked sales.
-6. Declare current holdings in **Holdings & Accounting** and review whether the calculated balance matches what you actually hold.
-7. Add manual transactions only when you have source records that support the entry.
+5. Return to **Dashboard** and follow **Continue reconciliation**.
+6. Declare current holdings in **Reconcile** and review whether the calculated balance matches what you actually hold.
+7. Run FIFO auto-link for the affected asset when Dashboard or Reports & Export says sales still need basis links.
+8. Use **Stats & Charts** only for deeper asset-level inspection after the dashboard points to a specific issue.
+9. Add manual transactions only when you have source records that support the entry.
 
 ![Gainz Holdings and Accounting needs-review view]({{ '/assets/screenshots/gainz-holdings-accounting.png' | relative_url }})
 {: .screenshot-frame }

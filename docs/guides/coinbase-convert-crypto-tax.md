@@ -27,11 +27,12 @@ Coinbase export formats can change. If Gainz cannot confidently interpret a conv
 ## Review Checklist
 
 1. Import the Coinbase file.
-2. Check import warnings on **Stats & Charts**.
-3. Confirm both sides of expected converts appear in the ledger.
-4. Run auto-linking for assets with sells.
-5. Reconcile current holdings across all converted assets.
-6. Include import warnings and holdings reconciliation in the audit packet.
+2. Check import warnings on **Import**.
+3. Return to **Dashboard** and follow **Continue reconciliation**.
+4. Reconcile current holdings across all converted assets.
+5. Confirm both sides of expected converts appear in the ledger.
+6. Run auto-linking for assets with sells when Dashboard or Reports & Export says basis links are blocking readiness.
+7. Include import warnings and holdings reconciliation in the audit packet.
 
 Gainz helps organize the evidence. It does not decide your tax treatment for you.
 
