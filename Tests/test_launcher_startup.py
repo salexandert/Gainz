@@ -8,7 +8,7 @@ from urllib.parse import parse_qs, urlparse
 from unittest.mock import patch
 
 from app import create_app
-from app.base.models import User
+from app.base.models import User, is_local_admin
 from app.extensions import db
 from configs.config import config_dict
 from launcher import credentials_file_path, find_available_port, health_url, server_url
@@ -170,12 +170,12 @@ class LauncherStartupTests(unittest.TestCase):
                 response = client.get("/login")
                 self.assertEqual(200, response.status_code)
                 self.assertIn(b"Create Local Admin", response.data)
+                self.assertNotIn(b"Email", response.data)
 
                 response = client.post(
                     "/login",
                     data={
                         "username": "admin",
-                        "email": "admin@local.gainz",
                         "password": "local-password",
                         "create_account": "1",
                     },
@@ -186,6 +186,84 @@ class LauncherStartupTests(unittest.TestCase):
 
             with app.app_context():
                 self.assertEqual(1, User.query.count())
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_first_run_setup_allows_custom_local_admin_username(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class FirstRunCustomUsernameConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+                ADMIN = {
+                    "username": "admin",
+                    "email": "admin@local.gainz",
+                    "password": "",
+                }
+
+            app = create_app(FirstRunCustomUsernameConfig, selenium=True)
+
+            with app.test_client() as client:
+                response = client.get("/login")
+                self.assertEqual(200, response.status_code)
+                self.assertIn(b'value="admin"', response.data)
+
+                response = client.post(
+                    "/login",
+                    data={
+                        "username": "local-owner",
+                        "password": "local-password",
+                        "create_account": "1",
+                    },
+                )
+                self.assertEqual(302, response.status_code)
+
+            with app.app_context():
+                user = User.query.filter_by(username="local-owner").first()
+                self.assertIsNotNone(user)
+                self.assertTrue(is_local_admin(user, "admin"))
+                self.assertTrue(user.checkpw("local-password"))
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_password_reset_updates_custom_first_local_admin(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class PasswordResetCustomAdminConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+                ADMIN = {
+                    "username": "admin",
+                    "email": "admin@local.gainz",
+                    "password": "",
+                }
+
+            app = create_app(PasswordResetCustomAdminConfig, selenium=True)
+
+            with app.app_context():
+                db.create_all()
+                User(username="local-owner", email="admin@local.gainz", password="old-password").add_to_db()
+                db.session.remove()
+                db.engine.dispose()
+
+            result = reset_admin_password(
+                password=DOCUMENTED_RESET_PHRASE,
+                config_class=PasswordResetCustomAdminConfig,
+            )
+
+            self.assertFalse(result.created)
+            self.assertEqual("local-owner", result.username)
+
+            verify_app = create_app(PasswordResetCustomAdminConfig, selenium=True)
+            with verify_app.app_context():
+                user = User.query.filter_by(username="local-owner").first()
+                self.assertIsNotNone(user)
+                self.assertTrue(user.checkpw(DOCUMENTED_RESET_PHRASE))
+                self.assertFalse(user.checkpw("old-password"))
                 db.drop_all()
                 db.session.remove()
                 db.engine.dispose()

@@ -28,7 +28,7 @@ def reset_admin_password(password=DOCUMENTED_RESET_PHRASE, config_class: Type = 
         raise ValueError("The reset password must be at least 8 characters.")
 
     from app import create_app, db
-    from app.base.models import User
+    from app.base.models import User, local_admin_user
 
     app = create_app(config_class or get_config_class())
 
@@ -39,7 +39,7 @@ def reset_admin_password(password=DOCUMENTED_RESET_PHRASE, config_class: Type = 
         username = admin_config.get("username") or "admin"
         email = admin_config.get("email") or "admin@local.gainz"
 
-        user = User.query.filter_by(username=username).first()
+        user = local_admin_user(username)
         created = user is None
 
         if created:

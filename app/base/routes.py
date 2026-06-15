@@ -13,6 +13,8 @@ from . import blueprint
 from .forms import LoginForm, CreateAccountForm
 from .models import User
 
+LOCAL_ADMIN_EMAIL = "admin@local.gainz"
+
 
 @blueprint.route('/')
 def route_default():
@@ -78,17 +80,14 @@ def login():
         status = ''
         if 'create_account' in request.form:
             username = (request.form.get('username') or '').strip()
-            email = (request.form.get('email') or '').strip() or 'admin@local.gainz'
             password = request.form.get('password') or ''
 
             if not username:
                 status = 'Choose a username.'
-            elif username != admin_username:
-                status = f'Use {admin_username} as the local admin username.'
             elif len(password) < 8:
                 status = 'Use a password with at least 8 characters.'
             else:
-                user = User(username=username, email=email, password=password)
+                user = User(username=username, email=LOCAL_ADMIN_EMAIL, password=password)
                 user.add_to_db()
                 login_user(user)
                 return redirect(_safe_login_redirect())

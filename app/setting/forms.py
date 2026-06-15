@@ -6,7 +6,6 @@ from wtforms import StringField, PasswordField
 
 class add_user_Form(FlaskForm):
     username = StringField('Username', id='username_create')
-    email = StringField('Email')
     password = PasswordField('Password', id='pwd_create')
 
 class delete_user_Form(FlaskForm):

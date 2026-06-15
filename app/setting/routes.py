@@ -2,23 +2,29 @@ from . import blueprint
 from flask import render_template, current_app, request, redirect
 from flask_login import login_required, current_user
 from .forms import add_user_Form, delete_user_Form, change_password_Form, setting_password_Form
-from ..base.models import User
+from ..base.models import User, is_local_admin
+
+
+def _local_email_for_username(username):
+    return f"{username}@local.gainz"
 
 @blueprint.route('/add_user', methods=['GET', 'POST'])
 @login_required
 def add_User():
     admin_user = current_app.config['ADMIN']['username']
-    if current_user.username == admin_user: 
+    if is_local_admin(current_user, admin_user):
         form = add_user_Form(request.form)
         if 'Add' in request.form:
-            user = User.query.filter_by(username=request.form['username']).first()
-            email = User.query.filter_by(email=request.form['email']).first()
+            username = (request.form.get('username') or '').strip()
+            user = User.query.filter_by(username=username).first()
             if user :
                 status = 'Username is existing'
-            elif email:
-                status = 'Email is existing'
             else:
-                User(**request.form).add_to_db()
+                User(
+                    username=username,
+                    email=_local_email_for_username(username),
+                    password=request.form['password'],
+                ).add_to_db()
                 status = 'Add user success !'
             return render_template('add_user.html', form = form, status = status)
         return render_template('add_user.html', form = form, status = '')
@@ -28,7 +34,7 @@ def add_User():
 @login_required
 def delete_user():    
     admin_user = current_app.config['ADMIN']['username']
-    if current_user.username == admin_user:  
+    if is_local_admin(current_user, admin_user):
         form = delete_user_Form(request.form)
         if 'Delete' in request.form:
             username = request.form['username']
@@ -49,7 +55,7 @@ def delete_user():
 @login_required
 def setting_password():
     admin_user = current_app.config['ADMIN']['username']
-    if current_user.username == admin_user:  
+    if is_local_admin(current_user, admin_user):
         form = setting_password_Form(request.form)
         if 'Setting' in request.form:
             username = request.form['username']

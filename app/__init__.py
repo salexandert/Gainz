@@ -2,7 +2,7 @@ from flask import Flask, redirect, request, url_for
 from flask_login import current_user
 from .extensions import db, login_manager
 from importlib import import_module
-from .base.models import User
+from .base.models import User, is_local_admin
 from os import path
 import logging
 from transactions import Transactions
@@ -86,7 +86,7 @@ def apply_themes(app):
     """
     @app.context_processor
     def override_url_for():
-        Is_admin = current_user.is_authenticated and current_user.username == app.config['ADMIN']['username']
+        Is_admin = is_local_admin(current_user, app.config['ADMIN']['username'])
         return dict(url_for = _generate_url_for_theme,
                     Is_admin = Is_admin,
                     store_url = app.config.get('STORE_URL'),

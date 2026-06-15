@@ -57,3 +57,19 @@ def request_loader(request):
     username = request.form.get('username')
     user = User.query.filter_by(username=username).first()
     return user if user else None
+
+
+def local_admin_user(configured_username="admin"):
+    configured_user = User.query.filter_by(username=configured_username).first()
+    if configured_user:
+        return configured_user
+
+    return User.query.order_by(User.id.asc()).first()
+
+
+def is_local_admin(user, configured_username="admin"):
+    if not getattr(user, "is_authenticated", False):
+        return False
+
+    admin_user = local_admin_user(configured_username)
+    return bool(admin_user and admin_user.id == user.id)
