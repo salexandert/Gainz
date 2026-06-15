@@ -15,7 +15,7 @@
     <div class="card">
       <div class="card-body">
         <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
-          <h4 class="card-title">Import & Manage Data</h4>
+          <h1 class="gainz-page-title">Import Data</h1>
           <div class="card card-plain">
             <div class="card-header" role="tab" id="headingOne">
               <a data-toggle="collapse" data-parent="#accordion" href="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
@@ -68,7 +68,7 @@
         <h4 class="card-title">{{ data_summary.source_count }}</h4>
         <p class="text-muted mb-0">
           {{ data_summary.link_count }} basis link{% if data_summary.link_count != 1 %}s{% endif %}
-          {% if data_summary.source_overlap_count %} · {{ data_summary.source_overlap_count }} overlap review{% if data_summary.source_overlap_count != 1 %}s{% endif %}{% endif %}
+          {% if data_summary.source_overlap_count %} &middot; {{ data_summary.source_overlap_count }} overlap review{% if data_summary.source_overlap_count != 1 %}s{% endif %}{% endif %}
         </p>
       </div>
     </div>

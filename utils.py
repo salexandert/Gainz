@@ -816,6 +816,44 @@ def _readiness_group(
     }
 
 
+def _missing_basis_summary_rows(missing_basis_rows):
+    summaries = {}
+
+    for row in missing_basis_rows:
+        date_text = str(row.get("date", "") or "")
+        year = date_text[:4] if len(date_text) >= 4 else "Unknown"
+        key = (
+            row.get("asset") or "Unknown",
+            year,
+            row.get("source") or "Unknown",
+            row.get("status") or "Needs Review",
+        )
+        summary = summaries.setdefault(key, {
+            "asset": key[0],
+            "year": key[1],
+            "source": key[2],
+            "status": key[3],
+            "rows": 0,
+            "unlinked_quantity": 0.0,
+        })
+        summary["rows"] += 1
+        try:
+            summary["unlinked_quantity"] += float(row.get("unlinked_quantity") or 0)
+        except (TypeError, ValueError):
+            pass
+
+    return [
+        {
+            **summary,
+            "unlinked_quantity": format_quantity(summary["unlinked_quantity"]),
+        }
+        for summary in sorted(
+            summaries.values(),
+            key=lambda item: (item["asset"], item["year"], item["source"], item["status"]),
+        )
+    ]
+
+
 def _audit_readiness_groups(
     transactions,
     missing_basis_rows,
@@ -845,6 +883,45 @@ def _audit_readiness_groups(
             "No source transactions are loaded yet. Import exchange CSVs, try demo data, or add known manual rows.",
             "Open import",
             "/import_transactions/",
+        ))
+
+    holdings_assets = sorted(set(assets_needing_holdings + assets_with_mismatches))
+    if holdings_assets:
+        if assets_needing_holdings and assets_with_mismatches:
+            detail = (
+                f"Enter declared holdings for {_compact_names(assets_needing_holdings)} and review "
+                f"accounting differences for {_compact_names(assets_with_mismatches)}."
+            )
+            status = "Needs review"
+        elif assets_needing_holdings:
+            detail = f"Declare current holdings for {_compact_names(assets_needing_holdings)}."
+            status = "Needs holdings"
+        else:
+            detail = f"Review accounting differences for {_compact_names(assets_with_mismatches)}."
+            status = "Needs review"
+
+        groups.append(_readiness_group(
+            "holdings",
+            "Holdings reconciliation",
+            len(holdings_assets),
+            status,
+            "status-needs-review",
+            detail,
+            "Enter holdings" if assets_needing_holdings else "Open reconcile",
+            "/holdings_accounting/",
+        ))
+
+    if unresolved_warning_rows:
+        groups.append(_readiness_group(
+            "import_warnings",
+            "Import warning decisions",
+            len(unresolved_warning_rows),
+            "Needs decisions",
+            "status-unlinked-sales",
+            "Review each skipped or assumption-based import row, then choose a decision or add a note.",
+            "Review warnings",
+            "/import_transactions/#import_warning_workflow",
+            severity="warning",
         ))
 
     if missing_basis_rows:
@@ -884,45 +961,6 @@ def _audit_readiness_groups(
             detail,
             "Review basis",
             "/holdings_accounting/",
-        ))
-
-    holdings_assets = sorted(set(assets_needing_holdings + assets_with_mismatches))
-    if holdings_assets:
-        if assets_needing_holdings and assets_with_mismatches:
-            detail = (
-                f"Enter declared holdings for {_compact_names(assets_needing_holdings)} and review "
-                f"accounting differences for {_compact_names(assets_with_mismatches)}."
-            )
-            status = "Needs review"
-        elif assets_needing_holdings:
-            detail = f"Declare current holdings for {_compact_names(assets_needing_holdings)}."
-            status = "Needs holdings"
-        else:
-            detail = f"Review accounting differences for {_compact_names(assets_with_mismatches)}."
-            status = "Needs review"
-
-        groups.append(_readiness_group(
-            "holdings",
-            "Holdings reconciliation",
-            len(holdings_assets),
-            status,
-            "status-needs-review",
-            detail,
-            "Open reconcile",
-            "/holdings_accounting/",
-        ))
-
-    if unresolved_warning_rows:
-        groups.append(_readiness_group(
-            "import_warnings",
-            "Import warning decisions",
-            len(unresolved_warning_rows),
-            "Needs decisions",
-            "status-unlinked-sales",
-            "Review each skipped or assumption-based import row, then choose a decision or add a note.",
-            "Review warnings",
-            "/import_transactions/#import_warning_workflow",
-            severity="warning",
         ))
 
     if source_overlap_rows:
@@ -991,6 +1029,24 @@ def _primary_readiness_action(blocker_groups, is_ready):
     }
 
 
+def _readiness_summary_text(blocker_groups, blockers, warnings, is_ready):
+    if is_ready:
+        return "No unresolved blocker groups are open."
+
+    if blocker_groups:
+        return "Open review groups: " + ", ".join(
+            f"{group['count']} {group['title'].lower()}"
+            if group["count"] > 0
+            else group["title"].lower()
+            for group in blocker_groups
+        ) + "."
+
+    if warnings:
+        return "Open warnings: " + "; ".join(warnings)
+
+    return blockers[0] if blockers else "Review the checklist before generating files."
+
+
 def get_audit_readiness_summary(transactions):
     if len(getattr(transactions, "transactions", [])) == 0:
         stats_rows = []
@@ -1038,16 +1094,6 @@ def get_audit_readiness_summary(transactions):
     if len(getattr(transactions, "transactions", [])) == 0:
         blockers.append("Import transactions before generating an audit packet.")
 
-    if basis_assets_missing:
-        blockers.append(
-            "Missing acquisition basis before sales for: " + ", ".join(basis_assets_missing)
-        )
-
-    if basis_assets_needing_research:
-        blockers.append(
-            "Missing basis left as needs user research for: " + ", ".join(basis_assets_needing_research)
-        )
-
     if assets_needing_holdings:
         blockers.append(
             "Record current holdings for: " + ", ".join(assets_needing_holdings)
@@ -1056,6 +1102,16 @@ def get_audit_readiness_summary(transactions):
     if assets_with_mismatches:
         blockers.append(
             "Review holdings discrepancies for: " + ", ".join(assets_with_mismatches)
+        )
+
+    if basis_assets_missing:
+        blockers.append(
+            "Missing acquisition basis before sales for: " + ", ".join(basis_assets_missing)
+        )
+
+    if basis_assets_needing_research:
+        blockers.append(
+            "Missing basis left as needs user research for: " + ", ".join(basis_assets_needing_research)
         )
 
     if unresolved_warning_rows:
@@ -1082,35 +1138,6 @@ def get_audit_readiness_summary(transactions):
 
     is_ready = len(blockers) == 0 and len(warnings) == 0
 
-    if blockers:
-        status = "Not ready"
-        status_class = "status-needs-review"
-        missing_parts = []
-        if missing_basis_rows:
-            missing_parts.append("basis before these sales")
-        if assets_needing_holdings or assets_with_mismatches:
-            missing_parts.append("current holdings explanations for these assets")
-        if unresolved_warning_rows:
-            missing_parts.append("review decisions for these import warnings")
-        if source_overlap_rows:
-            missing_parts.append("review of possible overlapping source files")
-        if filed_total_records:
-            missing_parts.append("year-level tax evidence inventory")
-
-        next_action = (
-            "You are missing " + ", ".join(missing_parts) + "."
-            if missing_parts
-            else blockers[0]
-        )
-    elif warnings:
-        status = "Review warnings"
-        status_class = "status-unlinked-sales"
-        next_action = warnings[0]
-    else:
-        status = "Ready for review"
-        status_class = "status-verified"
-        next_action = "Generate the audit packet, then review exported files against source records."
-
     blocker_groups = _audit_readiness_groups(
         transactions,
         missing_basis_rows,
@@ -1123,11 +1150,26 @@ def get_audit_readiness_summary(transactions):
         stats_rows,
     )
     primary_action = _primary_readiness_action(blocker_groups, is_ready)
+    summary_text = _readiness_summary_text(blocker_groups, blockers, warnings, is_ready)
+
+    if blockers:
+        status = "Not ready"
+        status_class = "status-needs-review"
+        next_action = primary_action["detail"]
+    elif warnings:
+        status = "Review warnings"
+        status_class = "status-unlinked-sales"
+        next_action = primary_action["detail"]
+    else:
+        status = "Ready for review"
+        status_class = "status-verified"
+        next_action = "Generate the audit packet, then review exported files against source records."
 
     return {
         "status": status,
         "status_class": status_class,
         "is_ready": is_ready,
+        "summary": summary_text,
         "next_action": next_action,
         "primary_action": primary_action,
         "blocker_groups": blocker_groups,
@@ -1138,6 +1180,7 @@ def get_audit_readiness_summary(transactions):
         "unresolved_import_warning_rows": unresolved_warning_rows,
         "missing_records": {
             "basis": missing_basis_rows,
+            "basis_summary": _missing_basis_summary_rows(missing_basis_rows),
             "current_holdings": _missing_current_holdings_records(holdings_rows),
             "holdings_explanations": _missing_holdings_explanation_records(holdings_rows),
             "filed_totals": filed_total_records,

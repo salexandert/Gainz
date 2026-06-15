@@ -23,6 +23,98 @@
     text-align: center;
 }
 
+.login-field-label {
+    color: #3f4a54;
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0 0 6px;
+    text-align: left;
+}
+
+.gainz-page-title {
+    color: #252422;
+    font-size: 30px;
+    font-weight: 500;
+    line-height: 1.2;
+    margin-bottom: 8px;
+}
+
+.gainz-section-title {
+    color: #252422;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.25;
+    margin-bottom: 8px;
+}
+
+.btn,
+.sidebar .nav p,
+.navbar .navbar-nav .nav-link p,
+.dropdown-menu .dropdown-item,
+.card-category,
+.table thead th {
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+}
+
+.btn-primary,
+.btn-primary:focus {
+    background-color: #2364aa !important;
+    border-color: #2364aa !important;
+    color: #fff !important;
+}
+
+.btn-primary:hover {
+    background-color: #1a4f86 !important;
+    border-color: #1a4f86 !important;
+    color: #fff !important;
+}
+
+.btn-info,
+.btn-info:focus {
+    background-color: #0f766e !important;
+    border-color: #0f766e !important;
+    color: #fff !important;
+}
+
+.btn-info:hover {
+    background-color: #0b5f59 !important;
+    border-color: #0b5f59 !important;
+    color: #fff !important;
+}
+
+.btn-success,
+.btn-success:focus {
+    background-color: #1f7a4d !important;
+    border-color: #1f7a4d !important;
+    color: #fff !important;
+}
+
+.btn-success:hover {
+    background-color: #17613d !important;
+    border-color: #17613d !important;
+    color: #fff !important;
+}
+
+.alert-warning {
+    background-color: #fff3cd !important;
+    border-color: #d39e00 !important;
+    color: #3d2e00 !important;
+}
+
+.alert-info {
+    background-color: #e6f7f8 !important;
+    border-color: #218a96 !important;
+    color: #153f46 !important;
+}
+
+.alert-success {
+    background-color: #e6f4ea !important;
+    border-color: #1f7a4d !important;
+    color: #174b32 !important;
+}
+
 .stats-chart-card .card-title {
     margin-bottom: 2px;
 }
@@ -836,5 +928,5 @@
     font-weight: 700;
     letter-spacing: 0;
     margin: 16px 20px 6px;
-    text-transform: uppercase;
+    text-transform: none;
 }

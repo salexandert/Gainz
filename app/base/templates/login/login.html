@@ -23,6 +23,7 @@
           <p class="text-muted">First run only. This account is stored locally on this computer.</p>
           {% for field in create_form if field.widget.input_type != 'hidden'  %}
             <div>
+              {{ field.label(class="login-field-label") }}
               {{ field(class="form-control required", placeholder=field.label.text) }}
             </div>
           {% endfor %}
@@ -36,6 +37,7 @@
           <h1>Login</h1>
           {% for field in login_form if field.widget.input_type != 'hidden'  %}
             <div>
+              {{ field.label(class="login-field-label") }}
               {{ field(class="form-control required", placeholder=field.label.text) }}
             </div>
           {% endfor %}

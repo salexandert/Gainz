@@ -871,6 +871,21 @@ class ImportAndExportTests(unittest.TestCase):
         source_group = next(group for group in readiness["blocker_groups"] if group["key"] == "source_overlaps")
         self.assertEqual("Review sources", source_group["action_label"])
 
+    def test_audit_readiness_prioritizes_holdings_before_basis_review(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange"),
+            Sell("BTC", 0.5, datetime.datetime(2024, 2, 1), 150, "exchange"),
+        ]
+
+        readiness = get_audit_readiness_summary(transactions)
+
+        self.assertFalse(readiness["is_ready"])
+        self.assertEqual("holdings", readiness["blocker_groups"][0]["key"])
+        self.assertEqual("Enter holdings", readiness["primary_action"]["label"])
+        self.assertIn("Declare current holdings", readiness["next_action"])
+        self.assertTrue(readiness["missing_records"]["basis_summary"])
+
     def test_leave_basis_unresolved_keeps_export_not_ready_with_research_status(self):
         transactions = empty_transactions()
         transactions.transactions = [
@@ -908,7 +923,9 @@ class ImportAndExportTests(unittest.TestCase):
             readiness = get_audit_readiness_summary(transactions)
             self.assertFalse(readiness["is_ready"])
             self.assertEqual("Needs user research", readiness["missing_records"]["basis"][0]["status"])
-            self.assertIn("Missing basis left as needs user research", readiness["blockers"][0])
+            self.assertTrue(
+                any("Missing basis left as needs user research" in blocker for blocker in readiness["blockers"])
+            )
             basis_group = next(group for group in readiness["blocker_groups"] if group["key"] == "missing_basis")
             self.assertEqual("Needs research", basis_group["status"])
             self.assertEqual("/holdings_accounting/", basis_group["action_url"])

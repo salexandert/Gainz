@@ -19,12 +19,15 @@
         <div class="gainz-dashboard-hero">
           <div>
             <div class="d-flex flex-wrap align-items-center mb-2">
-              <h4 class="mb-0 mr-2">Reconciliation Dashboard</h4>
+              <h1 class="gainz-page-title mb-0 mr-2">Reconciliation Dashboard</h1>
               <span class="gainz-status-badge {{ audit_readiness.status_class }}">{{ audit_readiness.status }}</span>
             </div>
             <p class="mb-2">
               Gainz helps you import exchange CSVs, link sale records to earlier buys, review unresolved transfers,
               and export documentation for review with a qualified tax professional.
+            </p>
+            <p class="mb-2">
+              <strong>Summary:</strong> {{ audit_readiness.summary }}
             </p>
             <p class="mb-0">
               <strong>Next action:</strong> {{ audit_readiness.next_action }}
@@ -32,11 +35,8 @@
           </div>
           <div class="gainz-dashboard-actions">
             <a class="btn btn-primary btn-round" href="{{ audit_readiness.primary_action.url }}">
-              {{ audit_readiness.primary_action.label }}
+              Continue reconciliation
             </a>
-            {% if store_url %}
-            <a class="btn btn-outline-primary btn-round" href="{{ store_url }}" target="_blank" rel="noopener noreferrer">Visit Gainz Website</a>
-            {% endif %}
           </div>
         </div>
 
@@ -71,7 +71,7 @@
         <div class="gainz-home-review-queue">
           <div class="d-flex flex-wrap justify-content-between align-items-end">
             <div>
-              <h5 class="mb-1">Review Queue</h5>
+              <h2 class="gainz-section-title mb-1">Review Queue</h2>
               <p class="text-muted mb-2">Work these items from top to bottom to move toward export readiness.</p>
             </div>
             <a class="btn btn-sm btn-outline-primary" href="{{ url_for('export_blueprint.index') }}">Open Reports & Export</a>
@@ -83,7 +83,7 @@
               <strong>{{ group.title }}</strong>
               <p>{{ group.detail }}</p>
               <small>
-                {% if group.count > 0 %}{{ group.count }} item{% if group.count != 1 %}s{% endif %} · {% endif %}{{ group.action_label }}
+                {% if group.count > 0 %}{{ group.count }} item{% if group.count != 1 %}s{% endif %} &middot; {% endif %}{{ group.action_label }}
               </small>
             </a>
             {% endfor %}
@@ -108,27 +108,6 @@
         <p class="gainz-home-advice-note">
           Gainz does not provide legal, financial, or tax advice. Validate reports and source records before filing.
         </p>
-
-        {% if support_url %}
-        <div class="gainz-support-panel">
-          <div>
-            <h6>Keep Gainz local-first</h6>
-            <p>
-              Gainz is free to run locally. Donations help fund parser fixes, audit-packet polish,
-              and packaging work without turning your tax history into hosted data.
-            </p>
-          </div>
-          <a class="btn btn-primary btn-round" href="{{ support_url }}" target="_blank" rel="noopener noreferrer">
-            Support Gainz
-          </a>
-          {% if btc_receive_address %}
-          <div class="gainz-btc-support">
-            <span>BTC donations</span>
-            <code>{{ btc_receive_address }}</code>
-          </div>
-          {% endif %}
-        </div>
-        {% endif %}
       </div>
     </div>
   </div>

@@ -170,6 +170,8 @@ class LauncherStartupTests(unittest.TestCase):
                 response = client.get("/login")
                 self.assertEqual(200, response.status_code)
                 self.assertIn(b"Create Local Admin", response.data)
+                self.assertIn(b'<label class="login-field-label" for="username_create">Username</label>', response.data)
+                self.assertIn(b'<label class="login-field-label" for="pwd_create">Password</label>', response.data)
                 self.assertNotIn(b"Email", response.data)
 
                 response = client.post(

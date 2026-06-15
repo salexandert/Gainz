@@ -14,7 +14,7 @@
       <div class="card-body">
         <div class="gainz-page-hero">
           <div>
-            <h4 class="card-title">Reports & Export</h4>
+            <h1 class="gainz-page-title">Reports & Export</h1>
             <p class="card-category">Generate a workbook or audit packet after reviewing open reconciliation items.</p>
             <p class="mb-0">
               Form 8949-style short-term and long-term sheets by year are included when basis links exist.
@@ -35,7 +35,7 @@
       <div class="card-body">
         <div class="d-flex flex-wrap justify-content-between align-items-start">
           <div>
-            <h4 class="card-title">Readiness Review</h4>
+            <h2 class="gainz-section-title">Readiness Review</h2>
             <p class="card-category">What Gainz found, what still needs review, and where to go next.</p>
           </div>
           <span class="gainz-status-badge {{ audit_readiness.status_class }}">{{ audit_readiness.status }}</span>
@@ -77,15 +77,18 @@
         </div>
 
         <div class="audit-next-action">
-          <strong>Review guidance:</strong> {{ audit_readiness.next_action }}
-          <a class="btn btn-sm btn-primary btn-round ml-2" href="{{ audit_readiness.primary_action.url }}">
-            {{ audit_readiness.primary_action.label }}
-          </a>
+          <p class="mb-2"><strong>Summary:</strong> {{ audit_readiness.summary }}</p>
+          <p class="mb-0">
+            <strong>Next action:</strong> {{ audit_readiness.next_action }}
+            <a class="btn btn-sm btn-primary btn-round ml-2" href="{{ audit_readiness.primary_action.url }}">
+              Continue reconciliation
+            </a>
+          </p>
         </div>
 
         {% if audit_readiness.blocker_groups %}
         <div class="audit-packet-list">
-          <h6>Review queue</h6>
+          <h3 class="gainz-section-title">Review queue</h3>
           <div class="audit-blocker-grid">
             {% for group in audit_readiness.blocker_groups %}
             <a class="audit-blocker-card" href="{{ group.action_url }}">
@@ -93,7 +96,7 @@
               <strong>{{ group.title }}</strong>
               <p>{{ group.detail }}</p>
               <small>
-                {% if group.count > 0 %}{{ group.count }} item{% if group.count != 1 %}s{% endif %} · {% endif %}{{ group.action_label }}
+                {% if group.count > 0 %}{{ group.count }} item{% if group.count != 1 %}s{% endif %} &middot; {% endif %}{{ group.action_label }}
               </small>
             </a>
             {% endfor %}
@@ -102,7 +105,7 @@
         {% endif %}
 
         <div class="audit-packet-list">
-          <h6>Reconciliation checklist</h6>
+          <h3 class="gainz-section-title">Reconciliation checklist</h3>
           <div class="audit-checklist-grid">
             {% for item in audit_readiness.checklist %}
             <div class="audit-checklist-item {% if item.complete %}audit-checklist-complete{% else %}audit-checklist-open{% endif %}">
@@ -137,170 +140,6 @@
           </ul>
         </div>
         {% endif %}
-
-        {% if audit_readiness.missing_records.basis %}
-        <div class="audit-packet-list">
-          <h6>Missing acquisition basis before sales</h6>
-          <div class="table-responsive">
-            <table class="table table-sm table-striped">
-              <thead>
-                <tr>
-                  <th>Asset</th>
-                  <th>Sale date</th>
-                  <th>Unlinked quantity</th>
-                  <th>Source</th>
-                  <th>Status</th>
-                  <th>Message</th>
-                  <th>Note</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for row in audit_readiness.missing_records.basis %}
-                <tr>
-                  <td>{{ row.asset }}</td>
-                  <td>{{ row.date }}</td>
-                  <td>{{ row.unlinked_quantity }}</td>
-                  <td>{{ row.source }}</td>
-                  <td>
-                    <span class="gainz-status-badge {% if row.status == 'Needs user research' %}status-needs-user-research{% else %}status-needs-review{% endif %}">
-                      {{ row.status }}
-                    </span>
-                  </td>
-                  <td>{{ row.message }}</td>
-                  <td>{{ row.note }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        {% endif %}
-
-        {% if audit_readiness.missing_records.current_holdings or audit_readiness.missing_records.holdings_explanations %}
-        <div class="audit-packet-list">
-          <h6>Current holdings explanations</h6>
-          <ul>
-            {% for row in audit_readiness.missing_records.current_holdings %}
-            <li>{{ row.message }}</li>
-            {% endfor %}
-            {% for row in audit_readiness.missing_records.holdings_explanations %}
-            <li>{{ row.message }}</li>
-            {% endfor %}
-          </ul>
-        </div>
-        {% endif %}
-
-        {% if audit_readiness.unresolved_import_warning_rows %}
-        <div class="audit-packet-list">
-          <h6>Unresolved import-warning decisions</h6>
-          <div class="table-responsive">
-            <table class="table table-sm table-striped import-warning-table">
-              <thead>
-                <tr>
-                  <th>Source</th>
-                  <th>Row</th>
-                  <th>Date</th>
-                  <th>Type</th>
-                  <th>Asset</th>
-                  <th>Quantity</th>
-                  <th>Issue</th>
-                  <th>Likely category</th>
-                  <th>Status</th>
-                  <th>Decision</th>
-                  <th>Note</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for warning in audit_readiness.unresolved_import_warning_rows %}
-                <tr>
-                  <td>{{ warning.source }}</td>
-                  <td>{{ warning.row }}</td>
-                  <td>{{ warning.row_date }}</td>
-                  <td>{{ warning.row_type }}</td>
-                  <td>{{ warning.asset }}</td>
-                  <td>{{ warning.quantity }}</td>
-                  <td>{{ warning.issue }}</td>
-                  <td>{{ warning.likely_category }}</td>
-                  <td><span class="gainz-status-badge status-needs-review">{{ warning.review_status }}</span></td>
-                  <td>{{ warning.decision_label }}</td>
-                  <td>{{ warning.review_note }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        {% endif %}
-
-        {% if audit_readiness.missing_records.source_overlaps %}
-        <div class="audit-packet-list">
-          <h6>Possible overlapping source files</h6>
-          <div class="table-responsive">
-            <table class="table table-sm table-striped">
-              <thead>
-                <tr>
-                  <th>Source A</th>
-                  <th>Source B</th>
-                  <th>Matching rows</th>
-                  <th>Status</th>
-                  <th>Why it matters</th>
-                  <th>Next action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for overlap in audit_readiness.missing_records.source_overlaps %}
-                <tr>
-                  <td title="{{ overlap.source_a }}">{{ overlap.name_a }}<br><small>{{ overlap.date_range_a }}</small></td>
-                  <td title="{{ overlap.source_b }}">{{ overlap.name_b }}<br><small>{{ overlap.date_range_b }}</small></td>
-                  <td>{{ overlap.matching_rows }} ({{ overlap.overlap_percent }})</td>
-                  <td><span class="gainz-status-badge status-needs-review">{{ overlap.status }}</span></td>
-                  <td>{{ overlap.message }}</td>
-                  <td>{{ overlap.next_action }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        {% endif %}
-
-        {% if audit_readiness.missing_records.filed_totals %}
-        <div class="audit-packet-list">
-          <h6>Tax evidence inventory</h6>
-          <div class="table-responsive">
-            <table class="table table-sm table-striped">
-              <thead>
-                <tr>
-                  <th>Year</th>
-                  <th>Status</th>
-                  <th>What Gainz Found</th>
-                  <th>What Gainz Needs</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for row in audit_readiness.missing_records.filed_totals %}
-                <tr>
-                  <td>{{ row.year }}</td>
-                  <td><span class="gainz-status-badge {{ row.status_class }}">{{ row.status }}</span></td>
-                  <td>{{ row.what_gainz_found }}</td>
-                  <td>{{ row.what_gainz_needs }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('tax_filing_review_blueprint.index') }}">Open Tax Filing Review</a>
-        </div>
-        {% endif %}
-
-        <div class="audit-packet-list">
-          <h6>Audit packet includes</h6>
-          <ul>
-            {% for item in audit_readiness.packet_includes %}
-            <li>{{ item }}</li>
-            {% endfor %}
-          </ul>
-        </div>
       </div>
     </div>
   </div>
@@ -312,7 +151,7 @@
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
-        <h4 class="card-title">Output Location</h4>
+        <h2 class="gainz-section-title">Output Location</h2>
         <p class="card-category">Choose where Gainz writes the Excel workbook or audit packet on this computer.</p>
 
         <div class="form-group">
@@ -330,8 +169,8 @@
         </div>
 
         <div class="alert alert-info mt-3" role="alert">
-          <i class="nc-icon nc-alert-circle-i"></i>
-          <strong>Note:</strong> Your Audit Packet or Excel Workbook will be directly saved to the folder specified above.
+          <i class="nc-icon nc-alert-circle-i" aria-hidden="true"></i>
+          <strong>Note:</strong> Your audit packet or Excel workbook will be saved directly to the folder specified above.
         </div>
 
         {% if detected_tax_folder %}
@@ -366,6 +205,248 @@
 </div>
 <!-- /Output Location -->
 
+<!-- Export Button -->
+<div class="row" id="export_actions">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="gainz-section-title">Generate Files</h2>
+        <p class="text-muted">Create a workbook or audit packet in the output folder above.</p>
+        <p id="export_button_text"></p>
+        <button type="button" id="export_button" class="btn btn-success">Generate Workbook</button>
+        <button type="button" id="audit_packet_button" class="btn btn-info">
+          {% if audit_readiness.is_ready %}Generate Audit Packet{% else %}Generate Draft Audit Packet{% endif %}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Export Button End -->
+
+<!-- Detail Tables -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div id="auditDetailAccordion" role="tablist" aria-multiselectable="true" class="card-collapse">
+          <h2 class="gainz-section-title">Review Details</h2>
+          <div class="card card-plain">
+            <div class="card-header" role="tab" id="auditDetailHeading">
+              <a data-toggle="collapse" data-parent="#auditDetailAccordion" href="#auditDetailCollapse" aria-expanded="false" aria-controls="auditDetailCollapse">
+                Show detailed evidence tables
+                <i class="nc-icon nc-minimal-down" aria-hidden="true"></i>
+              </a>
+            </div>
+            <div id="auditDetailCollapse" class="collapse" role="tabpanel" aria-labelledby="auditDetailHeading">
+              <div class="card-body">
+                {% if audit_readiness.missing_records.basis_summary %}
+                <div class="audit-packet-list">
+                  <h3 class="gainz-section-title">Missing acquisition basis summary</h3>
+                  <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                      <thead>
+                        <tr>
+                          <th>Asset</th>
+                          <th>Year</th>
+                          <th>Source</th>
+                          <th>Rows</th>
+                          <th>Unlinked Quantity</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for row in audit_readiness.missing_records.basis_summary %}
+                        <tr>
+                          <td>{{ row.asset }}</td>
+                          <td>{{ row.year }}</td>
+                          <td>{{ row.source }}</td>
+                          <td>{{ row.rows }}</td>
+                          <td>{{ row.unlinked_quantity }}</td>
+                          <td>
+                            <span class="gainz-status-badge {% if row.status == 'Needs user research' %}status-needs-user-research{% else %}status-needs-review{% endif %}">
+                              {{ row.status }}
+                            </span>
+                          </td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                {% endif %}
+
+                {% if audit_readiness.missing_records.basis %}
+                <div class="audit-packet-list">
+                  <h3 class="gainz-section-title">Missing acquisition basis row details</h3>
+                  <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                      <thead>
+                        <tr>
+                          <th>Asset</th>
+                          <th>Sale date</th>
+                          <th>Unlinked quantity</th>
+                          <th>Source</th>
+                          <th>Status</th>
+                          <th>Message</th>
+                          <th>Note</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for row in audit_readiness.missing_records.basis %}
+                        <tr>
+                          <td>{{ row.asset }}</td>
+                          <td>{{ row.date }}</td>
+                          <td>{{ row.unlinked_quantity }}</td>
+                          <td>{{ row.source }}</td>
+                          <td>
+                            <span class="gainz-status-badge {% if row.status == 'Needs user research' %}status-needs-user-research{% else %}status-needs-review{% endif %}">
+                              {{ row.status }}
+                            </span>
+                          </td>
+                          <td>{{ row.message }}</td>
+                          <td>{{ row.note }}</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                {% endif %}
+
+                {% if audit_readiness.missing_records.current_holdings or audit_readiness.missing_records.holdings_explanations %}
+                <div class="audit-packet-list">
+                  <h3 class="gainz-section-title">Current holdings explanations</h3>
+                  <ul>
+                    {% for row in audit_readiness.missing_records.current_holdings %}
+                    <li>{{ row.message }}</li>
+                    {% endfor %}
+                    {% for row in audit_readiness.missing_records.holdings_explanations %}
+                    <li>{{ row.message }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                {% endif %}
+
+                {% if audit_readiness.unresolved_import_warning_rows %}
+                <div class="audit-packet-list">
+                  <h3 class="gainz-section-title">Unresolved import-warning decisions</h3>
+                  <div class="table-responsive">
+                    <table class="table table-sm table-striped import-warning-table">
+                      <thead>
+                        <tr>
+                          <th>Source</th>
+                          <th>Row</th>
+                          <th>Date</th>
+                          <th>Type</th>
+                          <th>Asset</th>
+                          <th>Quantity</th>
+                          <th>Issue</th>
+                          <th>Likely category</th>
+                          <th>Status</th>
+                          <th>Decision</th>
+                          <th>Note</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for warning in audit_readiness.unresolved_import_warning_rows %}
+                        <tr>
+                          <td>{{ warning.source }}</td>
+                          <td>{{ warning.row }}</td>
+                          <td>{{ warning.row_date }}</td>
+                          <td>{{ warning.row_type }}</td>
+                          <td>{{ warning.asset }}</td>
+                          <td>{{ warning.quantity }}</td>
+                          <td>{{ warning.issue }}</td>
+                          <td>{{ warning.likely_category }}</td>
+                          <td><span class="gainz-status-badge status-needs-review">{{ warning.review_status }}</span></td>
+                          <td>{{ warning.decision_label }}</td>
+                          <td>{{ warning.review_note }}</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                {% endif %}
+
+                {% if audit_readiness.missing_records.source_overlaps %}
+                <div class="audit-packet-list">
+                  <h3 class="gainz-section-title">Possible overlapping source files</h3>
+                  <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                      <thead>
+                        <tr>
+                          <th>Source A</th>
+                          <th>Source B</th>
+                          <th>Matching rows</th>
+                          <th>Status</th>
+                          <th>Why it matters</th>
+                          <th>Next action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for overlap in audit_readiness.missing_records.source_overlaps %}
+                        <tr>
+                          <td title="{{ overlap.source_a }}">{{ overlap.name_a }}<br><small>{{ overlap.date_range_a }}</small></td>
+                          <td title="{{ overlap.source_b }}">{{ overlap.name_b }}<br><small>{{ overlap.date_range_b }}</small></td>
+                          <td>{{ overlap.matching_rows }} ({{ overlap.overlap_percent }})</td>
+                          <td><span class="gainz-status-badge status-needs-review">{{ overlap.status }}</span></td>
+                          <td>{{ overlap.message }}</td>
+                          <td>{{ overlap.next_action }}</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                {% endif %}
+
+                {% if audit_readiness.missing_records.filed_totals %}
+                <div class="audit-packet-list">
+                  <h3 class="gainz-section-title">Tax evidence inventory</h3>
+                  <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                      <thead>
+                        <tr>
+                          <th>Year</th>
+                          <th>Status</th>
+                          <th>What Gainz Found</th>
+                          <th>What Gainz Needs</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for row in audit_readiness.missing_records.filed_totals %}
+                        <tr>
+                          <td>{{ row.year }}</td>
+                          <td><span class="gainz-status-badge {{ row.status_class }}">{{ row.status }}</span></td>
+                          <td>{{ row.what_gainz_found }}</td>
+                          <td>{{ row.what_gainz_needs }}</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('tax_filing_review_blueprint.index') }}">Open Tax Filing Review</a>
+                </div>
+                {% endif %}
+
+                <div class="audit-packet-list">
+                  <h3 class="gainz-section-title">Audit packet includes</h3>
+                  <ul>
+                    {% for item in audit_readiness.packet_includes %}
+                    <li>{{ item }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Detail Tables End -->
 
 <!-- All Asset Stats Table -->
 <div class="row">
@@ -373,36 +454,32 @@
     <div class="card">
       <div class="card-body">
         <div id="assetStatsAccordion" role="tablist" aria-multiselectable="true" class="card-collapse">
-          <h4 class="card-title">Advanced Asset Stats</h4>
+          <h2 class="gainz-section-title">Advanced Asset Stats</h2>
           <div class="card card-plain">
             <div class="card-header" role="tab" id="assetStatsHeading">
               <a data-toggle="collapse" data-parent="#assetStatsAccordion" href="#assetStatsCollapse" aria-expanded="false" aria-controls="assetStatsCollapse">
                 Show asset totals used by this export
-                <i class="nc-icon nc-minimal-down"></i>
+                <i class="nc-icon nc-minimal-down" aria-hidden="true"></i>
               </a>
             </div>
             <div id="assetStatsCollapse" class="collapse" role="tabpanel" aria-labelledby="assetStatsHeading">
-
-              <!-- Card Body -->
-              <div class="card-body ">
+              <div class="card-body">
                 <table id="exportpage_stats_datatable" class="table table-striped table-bordered" style="width:100%">
                   <thead>
-                      <tr>
-                        <th>Asset</th>
-                        <th>Quantity Purchased</th>
-                        <th>Quantity Sold</th>
-                        <th>Quantity Sold Unlinked</th>
-                        <th>Quantity Purchased Unlinked</th>
-                        <th>Purchased in USD</th>
-                        <th>Sold in USD</th>
-                        <th>Profit</th>
-                        <th>Holdings</th>
-                      </tr>
-                    </thead>
-
+                    <tr>
+                      <th>Asset</th>
+                      <th>Quantity Purchased</th>
+                      <th>Quantity Sold</th>
+                      <th>Quantity Sold Unlinked</th>
+                      <th>Quantity Purchased Unlinked</th>
+                      <th>Purchased in USD</th>
+                      <th>Sold in USD</th>
+                      <th>Profit</th>
+                      <th>Holdings</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {% for row in stats_table_data %}
-
                     <tr>
                       <td>{{ row['symbol'] }}</td>
                       <td>{{ row['total_purchased_quantity'] }}</td>
@@ -410,18 +487,14 @@
                       <td>{{ row['total_sold_unlinked_quantity'] }}</td>
                       <td>{{ row['total_purchased_unlinked_quantity'] }}</td>
                       <td>{{ row['total_purchased_usd'] }}</td>
-                      <td>{{ row['total_sold_usd']  }}</td>
-                      <td>{{ row['total_profit_loss']  }}</td>
+                      <td>{{ row['total_sold_usd'] }}</td>
+                      <td>{{ row['total_profit_loss'] }}</td>
                       <td>{{ row['holdings'] }}</td>
                     </tr>
-
                     {% endfor %}
-
                   </tbody>
-
                 </table>
               </div>
-              <!-- /Card Body -->
             </div>
           </div>
         </div>
@@ -431,49 +504,8 @@
 </div>
 <!-- All Asset Stats Table End -->
 
-
-
-
-<!-- Export Button  -->
-<div class="row" id="export_actions">
-  <div class="col-md-12">
-    <div class="card">
-      <div class="card-body">
-        <div id="exportActionsAccordion" role="tablist" aria-multiselectable="true" class="card-collapse">
-          <h4 class="card-title">Generate Files</h4>
-          <div class="card card-plain">
-            <div class="card-header" role="tab" id="exportActionsHeading">
-              <a data-toggle="collapse" data-parent="#exportActionsAccordion" href="#exportActionsCollapse" aria-expanded="true" aria-controls="exportActionsCollapse">
-                <i class="nc-icon nc-minimal-down"></i>
-              </a>
-            </div>
-            <div id="exportActionsCollapse" class="collapse show" role="tabpanel" aria-labelledby="exportActionsHeading">
-
-              <!-- Card Body -->
-              <div class="card-body ">
-                <p id="export_button_text"></p>
-                <button type="button" id="export_button" class="btn btn-success">Generate Workbook</button>
-                <button type="button" id="audit_packet_button" class="btn btn-info">
-                  {% if audit_readiness.is_ready %}Generate Audit Packet{% else %}Generate Draft Audit Packet{% endif %}
-                </button>
-              </div>
-              <!-- /Card Body -->
-
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-<!-- Export Button End -->
-
-
 {% endblock content %}
 
 {% block javascripts %}
   {{ super()}}
 {% endblock javascripts %}
-
-
-
