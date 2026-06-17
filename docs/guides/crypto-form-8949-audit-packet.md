@@ -13,13 +13,15 @@ Crypto tax work is easier to review when generated totals can be traced back to 
 
 A Gainz audit packet can include:
 
-- Excel workbook export.
+- `README_FIRST.md` and `PACKET_STATUS.md` at the packet root.
+- Excel workbook export with a visible packet status sheet.
 - Form 8949 short-term detail CSV.
 - Form 8949 long-term detail CSV.
 - Form 8949 totals CSV and JSON.
 - Tax filing review CSV and JSON.
 - Tax evidence inventory CSV and JSON.
 - Suggested filed totals CSV and JSON.
+- Reconciliation work order CSV and Markdown.
 - Holdings reconciliation CSV.
 - Current holdings lots CSV.
 - Import warnings CSV with active warnings and preserved review decisions for warnings that were later cleared by source updates.
@@ -29,7 +31,11 @@ A Gainz audit packet can include:
 - Source file manifest.
 - SHA-256 hashes.
 - Methodology memo.
-- A draft memo when unresolved blockers or warnings remain.
+- Draft markings in the packet name, workbook, and status files when unresolved blockers or warnings remain.
+
+Before packet generation, the Reports & Export page shows an audit packet preview with copied file counts, reference-only counts, unresolved items, output folder, packet name, and draft status.
+
+Reference only means the local path or label is listed, but the file is not copied. Copied means the file is included in the packet and listed in the manifest with hashes.
 
 ## Why Links Come First
 
@@ -49,6 +55,7 @@ Before generating a packet, check:
 - Missing basis items marked Needs user research are understood as draft-only blockers.
 - Filed totals and payment records have been entered where you want prior-year alignment.
 - Source files are preserved when possible.
+- The packet preview shows only the files you expect to copy.
 
 ## Who This Helps
 

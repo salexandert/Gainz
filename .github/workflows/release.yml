@@ -176,3 +176,19 @@ jobs:
             "release-artifacts/Gainz-macOS-v${{ needs.validate.outputs.version }}.zip.sha256" \
             --title "Gainz ${{ needs.validate.outputs.version }}" \
             --notes-file release_notes.md
+
+  post-release-smoke:
+    needs:
+      - validate
+      - publish
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify published Windows ZIP
+        run: |
+          python scripts/test_downloaded_release_zip.py \
+            --version "${{ needs.validate.outputs.version }}" \
+            --tag "${{ needs.validate.outputs.tag }}"

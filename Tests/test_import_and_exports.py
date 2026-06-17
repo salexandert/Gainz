@@ -24,6 +24,8 @@ from app.import_transactions.routes import (
 from app.services.audit_packet_service import AuditPacketService
 from app.services.import_service import ImportService
 from app.services.import_warning_service import import_warning_review_rows
+from app.services.packet_plan_service import get_packet_preview
+from app_version import APP_VERSION
 from transaction import Buy, Sell, Send
 from transactions import Transactions
 from utils import (
@@ -1094,6 +1096,13 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertTrue((Path(packet_payload["path"]) / "03_manifests" / "audit_packet_summary.json").exists())
             self.assertTrue(Path(export_payload["path"]).name.startswith("DRAFT_"))
             self.assertIn("gainz_audit_packet_DRAFT_", Path(packet_payload["path"]).name)
+            workbook = load_workbook(export_payload["path"], read_only=True)
+            self.assertIn("Packet Status", workbook.sheetnames)
+            self.assertEqual(
+                "DRAFT - NOT FILING READY",
+                workbook["Packet Status"]["A1"].value,
+            )
+            workbook.close()
 
             with app.app_context():
                 db.drop_all()
@@ -1136,6 +1145,14 @@ class ImportAndExportTests(unittest.TestCase):
                 db.drop_all()
                 db.session.remove()
                 db.engine.dispose()
+
+    def test_health_check_reports_app_version(self):
+        app = create_app(config_dict["Debug"], selenium=True)
+        with app.test_client() as client:
+            response = client.get("/healthz")
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"status": "ok", "version": APP_VERSION}, response.get_json())
 
     def test_form_8949_rows_are_built_from_links_with_prorated_fees(self):
         transactions = empty_transactions()
@@ -1196,6 +1213,8 @@ class ImportAndExportTests(unittest.TestCase):
             packet_path = Path(AuditPacketService(packet_root, export_root).create_packet(transactions))
 
             self.assertTrue((packet_path / "00_memos" / "METHODOLOGY.md").exists())
+            self.assertTrue((packet_path / "README_FIRST.md").exists())
+            self.assertTrue((packet_path / "PACKET_STATUS.md").exists())
             self.assertTrue((packet_path / "03_manifests" / "evidence_manifest.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "form_8949_short_term.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "form_8949_totals.csv").exists())
@@ -1207,6 +1226,8 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertTrue((packet_path / "01_reports" / "tax_evidence_inventory.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "tax_evidence_items.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "suggested_filed_totals.csv").exists())
+            self.assertTrue((packet_path / "01_reports" / "reconciliation_work_order.csv").exists())
+            self.assertTrue((packet_path / "01_reports" / "reconciliation_work_order.md").exists())
             self.assertTrue((packet_path / "03_manifests" / "tax_evidence_inventory.json").exists())
             self.assertTrue((packet_path / "03_manifests" / "suggested_filed_totals.json").exists())
             self.assertEqual(1, len(list((packet_path / "01_reports").glob("*.xlsx"))))
@@ -1253,6 +1274,20 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual("REFERENCE_ONLY", tax_evidence_rows[0]["status"])
             self.assertFalse((packet_path / "02_source_files" / "tax_evidence" / tax_evidence_path.name).exists())
             self.assertTrue((packet_path / "00_memos" / "DRAFT_NOT_FILING_READY.md").exists())
+            packet_status = (packet_path / "PACKET_STATUS.md").read_text(encoding="utf-8")
+            self.assertIn("DRAFT - NOT FILING READY", packet_status)
+            self.assertIn("Reference-only tax evidence records: 1", packet_status)
+
+            workbook_path = next((packet_path / "01_reports").glob("*.xlsx"))
+            workbook = load_workbook(workbook_path, read_only=True)
+            self.assertIn("Packet Status", workbook.sheetnames)
+            status_sheet = workbook["Packet Status"]
+            self.assertEqual("DRAFT - NOT FILING READY", status_sheet["A1"].value)
+            workbook.close()
+
+            with open(packet_path / "01_reports" / "reconciliation_work_order.csv", newline="", encoding="utf-8") as file:
+                work_order_rows = list(csv.DictReader(file))
+            self.assertTrue(any(row["blocker_type"] == "Import warning decision" for row in work_order_rows))
 
     def test_audit_packet_copies_tax_evidence_only_when_explicitly_enabled(self):
         transactions = empty_transactions()
@@ -1287,6 +1322,43 @@ class ImportAndExportTests(unittest.TestCase):
                 manifest_rows = list(csv.DictReader(file))
             tax_evidence_rows = [row for row in manifest_rows if row["category"] == "tax_evidence"]
             self.assertEqual("COPIED", tax_evidence_rows[0]["status"])
+
+    def test_packet_preview_counts_copied_and_reference_only_files(self):
+        transactions = empty_transactions()
+        buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "demo_data/cash_app_sample.csv")
+        sell = Sell("BTC", 1, datetime.datetime(2024, 6, 1), 300, "demo_data/cash_app_sample.csv")
+        sell.link_transaction(buy, 1)
+        transactions.transactions = [buy, sell]
+        transactions.set_holdings("BTC", 0)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            copied_path = Path(temp_dir) / "2024_filed_return.pdf"
+            reference_path = Path(temp_dir) / "2024_crypto_workbook.csv"
+            copied_path.write_text("filed return", encoding="utf-8")
+            reference_path.write_text("crypto workbook", encoding="utf-8")
+            transactions.set_tax_evidence_record(
+                year=2024,
+                evidence_type="filed_return",
+                evidence_label=copied_path.name,
+                evidence_path=str(copied_path),
+                copy_to_packet=True,
+            )
+            transactions.set_tax_evidence_record(
+                year=2024,
+                evidence_type="crypto_workbook",
+                evidence_label=reference_path.name,
+                evidence_path=str(reference_path),
+            )
+
+            readiness = get_audit_readiness_summary(transactions)
+            preview = get_packet_preview(transactions, readiness, temp_dir)
+
+            self.assertTrue(preview["is_draft"])
+            self.assertEqual(2, preview["copied_files_count"])
+            self.assertEqual(1, preview["transaction_source_files_count"])
+            self.assertEqual(1, preview["copied_tax_evidence_count"])
+            self.assertEqual(1, preview["reference_only_files_count"])
+            self.assertIn("gainz_audit_packet_DRAFT_", preview["packet_name"])
 
     def test_audit_packet_preserves_cleared_import_warning_review_records(self):
         transactions = empty_transactions()

@@ -214,7 +214,7 @@
                 </div>
               </div>
               <small class="form-text text-muted">
-                Scanned files are referenced by path by default. They are not copied into audit packets unless you explicitly choose that below.
+                Reference only: Gainz lists the local file path, but does not copy the file. Copied: Gainz includes the file in the audit packet. Scans default to reference only.
               </small>
               <div class="row mt-3">
                 <div class="col-md-4">
@@ -253,7 +253,7 @@
                   Copy scanned evidence files into audit packets
                   <span class="form-check-sign"></span>
                 </label>
-                <small class="form-text text-muted">Leave this off for broad folder scans. Turn it on only for a curated evidence folder.</small>
+                <small class="form-text text-muted">Leave this off for broad folder scans. Turn it on only for a curated evidence folder you intend to hand off.</small>
               </div>
             </form>
           </div>
@@ -296,7 +296,7 @@
                   Copy this evidence file into audit packets
                   <span class="form-check-sign"></span>
                 </label>
-                <small class="form-text text-muted">Use this only for evidence you intentionally want bundled. Otherwise Gainz records a local reference.</small>
+                <small class="form-text text-muted">Unchecked means reference only: the path is listed, but the file is not copied.</small>
               </div>
             </form>
           </div>
@@ -362,7 +362,13 @@
                   <td>{{ record.evidence_type_label }}</td>
                   <td>{{ record.evidence_label }}</td>
                   <td>{{ record.evidence_path or "Reference only" }}</td>
-                  <td>{% if record.copy_to_packet %}Copy into packet{% else %}Reference only{% endif %}</td>
+                  <td>
+                    {% if record.copy_to_packet %}
+                    <strong>Copied</strong><br><span class="text-muted">File will be included in audit packets.</span>
+                    {% else %}
+                    <strong>Reference only</strong><br><span class="text-muted">Path is listed; file is not copied.</span>
+                    {% endif %}
+                  </td>
                   <td>{{ record.notes }}</td>
                   <td>{{ record.updated_at }}</td>
                 </tr>

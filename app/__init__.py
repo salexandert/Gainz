@@ -6,6 +6,7 @@ from .base.models import User, is_local_admin
 from os import path
 import logging
 from transactions import Transactions
+from app_version import APP_VERSION
 
 
 def register_extensions(app):
@@ -113,7 +114,7 @@ def create_app(config, selenium=False):
 
     @app.route('/healthz')
     def healthz():
-        return {'status': 'ok'}
+        return {'status': 'ok', 'version': APP_VERSION}
 
     register_extensions(app)
     register_blueprints(app)

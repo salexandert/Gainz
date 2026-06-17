@@ -14,6 +14,12 @@ from app.services.tax_evidence_service import (
     tax_evidence_type_label,
 )
 from app.services.tax_total_extraction_service import get_suggested_filed_totals
+from app.services.packet_plan_service import (
+    reconciliation_work_order_markdown,
+    reconciliation_work_order_rows,
+    tax_evidence_packet_counts,
+    transaction_source_paths,
+)
 from utils import (
     FORM_8949_COLUMNS,
     format_quantity,
@@ -49,7 +55,10 @@ class AuditPacketService:
 
         manifest_rows = []
 
-        report_path = ExportService(self.export_folder).export_to_excel(transactions)
+        report_path = ExportService(self.export_folder).export_to_excel(
+            transactions,
+            readiness=readiness,
+        )
         report_dest = packet_dir / "01_reports" / Path(report_path).name
         if not readiness["is_ready"]:
             report_dest = packet_dir / "01_reports" / f"DRAFT_{Path(report_path).name}"
@@ -108,6 +117,8 @@ class AuditPacketService:
         self._write_holdings_reports(packet_dir, transactions)
         self._write_import_warnings(packet_dir, transactions)
         self._write_source_overlap_review(packet_dir, transactions)
+        self._write_reconciliation_work_order(packet_dir, readiness)
+        self._write_packet_status_files(packet_dir, readiness, manifest_rows)
         self._write_manifest(packet_dir, manifest_rows)
         self._write_inventory(packet_dir)
         self._write_summary(packet_dir, manifest_rows, transactions)
@@ -140,12 +151,61 @@ class AuditPacketService:
         )
 
     def _source_paths(self, transactions):
-        sources = set()
-        for transaction in transactions:
-            source = getattr(transaction, "source", "")
-            if source and os.path.exists(str(source)):
-                sources.add(str(source))
-        return sorted(sources)
+        return transaction_source_paths(transactions)
+
+    def _write_packet_status_files(self, packet_dir, readiness, manifest_rows):
+        copied_transaction_sources = len([
+            row for row in manifest_rows
+            if row["category"] == "source_file" and row["status"] == "COPIED"
+        ])
+        copied_tax_evidence = len([
+            row for row in manifest_rows
+            if row["category"] == "tax_evidence" and row["status"] == "COPIED"
+        ])
+        reference_only_evidence = len([
+            row for row in manifest_rows
+            if row["category"] == "tax_evidence" and row["status"] in ("REFERENCE", "REFERENCE_ONLY")
+        ])
+        missing_evidence = len([
+            row for row in manifest_rows
+            if row["category"] == "tax_evidence" and row["status"] == "MISSING"
+        ])
+        status = "FILING-READY REVIEW PACKET" if readiness["is_ready"] else "DRAFT - NOT FILING READY"
+        lines = [
+            "# Gainz Packet Status",
+            "",
+            f"Status: {status}",
+            f"Readiness: {readiness['status']}",
+            f"Summary: {readiness['summary']}",
+            f"Next action: {readiness['next_action']}",
+            "",
+            "## Evidence Handling",
+            "",
+            f"- Copied transaction source files: {copied_transaction_sources}",
+            f"- Copied tax evidence files: {copied_tax_evidence}",
+            f"- Reference-only tax evidence records: {reference_only_evidence}",
+            f"- Missing tax evidence file paths: {missing_evidence}",
+            "",
+            "Reference only means the local file path or label is listed in the packet, but the file itself is not copied.",
+            "Copied means the file is included inside `02_source_files/` and appears in the manifest with hashes.",
+            "",
+            "## Open Blockers",
+            "",
+        ]
+        lines.extend([f"- {blocker}" for blocker in readiness.get("blockers", [])] or ["- None"])
+        lines.extend(["", "## Open Warnings", ""])
+        lines.extend([f"- {warning}" for warning in readiness.get("warnings", [])] or ["- None"])
+        lines.extend([
+            "",
+            "## Important",
+            "",
+            "Gainz is documentation support only. It is not legal, financial, accounting, filing, or tax advice.",
+            "Review generated files and source records with a qualified tax professional before filing.",
+            "",
+        ])
+        content = "\n".join(lines)
+        (packet_dir / "README_FIRST.md").write_text(content, encoding="utf-8")
+        (packet_dir / "PACKET_STATUS.md").write_text(content, encoding="utf-8")
 
     def _copy_tax_evidence_files(self, packet_dir, transactions):
         rows = []
@@ -597,6 +657,28 @@ class AuditPacketService:
                     "next_action": row["next_action"],
                 })
 
+    def _write_reconciliation_work_order(self, packet_dir, readiness):
+        rows = reconciliation_work_order_rows(readiness)
+        fieldnames = [
+            "blocker_type",
+            "asset",
+            "year",
+            "date",
+            "source_file",
+            "suspected_issue",
+            "next_action",
+            "status",
+        ]
+        with open(packet_dir / "01_reports" / "reconciliation_work_order.csv", "w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+
+        (packet_dir / "01_reports" / "reconciliation_work_order.md").write_text(
+            reconciliation_work_order_markdown(rows),
+            encoding="utf-8",
+        )
+
     def _write_inventory(self, packet_dir):
         rows = []
         for path in sorted(packet_dir.rglob("*")):
@@ -623,11 +705,13 @@ class AuditPacketService:
         missing_sources = len([row for row in manifest_rows if row["status"] == "MISSING"])
         form_8949_totals = get_form_8949_totals(transactions)
         readiness = get_audit_readiness_summary(transactions)
+        evidence_counts = tax_evidence_packet_counts(transactions)
         summary = {
             "created_at": datetime.now().isoformat(timespec="seconds"),
             "packet_path": str(packet_dir),
             "copied_source_files": copied_sources,
             "missing_source_files": missing_sources,
+            "tax_evidence_packet_counts": evidence_counts,
             "manifest_entries": len(manifest_rows),
             "form_8949_totals": form_8949_totals,
             "tax_filing_alignment": get_tax_filing_alignment_summary(transactions),

@@ -2613,10 +2613,18 @@ $(document).ready(function() {
         return false;
     }
 
+    function updatePacketPreviewOutputFolder() {
+        $('#packet_preview_output_folder').text($('#export_output_dir').val() || 'Not selected');
+    }
+
     $('#use_detected_tax_folder_button').click(function() {
         $('#export_output_dir').val($(this).data('folder'));
         $('#export_button_text').text('Output folder set to detected tax folder.');
+        updatePacketPreviewOutputFolder();
     });
+
+    $('#export_output_dir').on('input change', updatePacketPreviewOutputFolder);
+    updatePacketPreviewOutputFolder();
 
     // $('#exportpage_stats_datatable tbody').on( 'click', 'tr', function () {
     //     console.log( table.row( this ).data() );

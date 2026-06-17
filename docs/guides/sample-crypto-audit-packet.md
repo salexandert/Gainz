@@ -16,7 +16,10 @@ This sample packet uses synthetic demo data only. It is meant to show the shape 
 
 The sample ZIP contains:
 
+- `README_FIRST.md`: packet status, draft/readiness state, evidence-copy summary, and open blockers.
+- `PACKET_STATUS.md`: the same packet status information for review workflows that look for a status file.
 - `00_memos/METHODOLOGY.md`: a short explanation of how the synthetic records were prepared.
+- `01_reports/reconciliation_work_order.csv`: a review queue of blockers, suspected issues, and next actions.
 - `01_reports/form_8949_totals.csv`: short-term, long-term, and total proceeds, basis, and gain/loss totals.
 - `01_reports/holdings_reconciliation.csv`: declared holdings compared with calculated holdings.
 - `01_reports/import_warnings.csv`: a visible place for unsupported or skipped rows.
@@ -37,6 +40,7 @@ The sample ZIP contains:
 - You can see the expected packet structure before trusting the workflow with real data.
 - Totals are separated from source files, warnings, and methodology notes.
 - The manifest creates a review trail for which source files were used.
+- Reference-only evidence is listed without copying private files into the packet unless the user explicitly chooses packet copy.
 - Holdings reconciliation sits beside tax-output totals instead of being a separate mental exercise.
 
 ## What Still Needs Professional Review
