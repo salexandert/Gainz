@@ -159,44 +159,6 @@ Current public screenshots live under `docs/assets/screenshots/`, including Dash
 
 When a product change affects public documentation, update `docs/` first. Regenerate the GitHub Wiki from these docs, then sync selected public docs/screenshots into the separate Gainz website repository before Netlify deploys.
 
-## Public Site And SEO
-
-The public website is live at <https://cryptogainz.store>. The site is tracked separately in `salexandert/Gainz-Website`, but most public documentation changes should still start in this repository's `docs/` folder so the app docs and wiki remain the source of truth.
-
-The `docs/` folder remains the source for project guides and SEO-oriented documentation. It includes:
-
-- A local-first landing page.
-- Focused guides for Cash App, Coinbase, Coinbase Convert, Form 8949 audit packets, and private local crypto tax software.
-- Page titles, meta descriptions, canonical URLs, Open Graph metadata, a crawler-friendly sitemap, and `robots.txt`.
-
-The public docs focus on specific reconciliation problems such as Cash App CSVs, Coinbase imports, Coinbase Convert rows, Form 8949 audit packets, and current holdings review.
-
-The website also includes a public learning path for crypto cost basis that links to external educational material and then routes users into the Gainz import, reconciliation, and audit packet workflow.
-
-For contributor workflow details, see [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Analytics And Discovery
-
-Use privacy-friendly aggregate tracking rather than user-level app telemetry:
-
-- Website traffic: Netlify Web Analytics is enabled for `cryptogainz.store`.
-- SEO: verify `cryptogainz.store` in Google Search Console and submit `https://cryptogainz.store/sitemap.xml`.
-- GitHub visits: use [GitHub repository Traffic](https://github.com/salexandert/Gainz/graphs/traffic) for views, clones, referrers, and popular paths. The website GitHub nav link includes UTM tags so traffic from the site is easier to identify.
-- Downloads: GitHub Release assets expose download counts for `Gainz-Windows.zip`, `Gainz-macOS.zip`, and checksums.
-
-To check GitHub release downloads from the command line:
-
-```powershell
-python .\scripts\github_metrics.py
-```
-
-To include private repository traffic endpoints, create a GitHub token with access to the repository and run:
-
-```powershell
-$env:GITHUB_TOKEN="github_pat_..."
-python .\scripts\github_metrics.py
-```
-
 ## Support Gainz
 
 Gainz is free to run locally. If it saves you time, helps you organize a tax review, or gives you a clearer audit packet, donations help keep the project moving without requiring a hosted service.
