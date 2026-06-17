@@ -319,6 +319,104 @@ def _candidate_from_record(record):
     return candidate
 
 
+def _candidate_dedupe_key(candidate):
+    return (
+        candidate.get("year"),
+        str(candidate.get("source_label") or "").strip().lower(),
+        str(candidate.get("evidence_type") or "").strip().lower(),
+        tuple(candidate.get("matched_fields") or []),
+    )
+
+
+def _split_notes(notes):
+    parts = []
+    for note in str(notes or "").split(";"):
+        note = note.strip()
+        if note and note not in parts:
+            parts.append(note)
+    return parts
+
+
+def _merge_unique_values(candidates, field):
+    values = []
+    for candidate in candidates:
+        value = candidate.get(field)
+        if value is None:
+            continue
+        rounded = round(float(value), 2)
+        if all(round(float(existing), 2) != rounded for existing in values):
+            values.append(value)
+    return values
+
+
+def _merge_candidate_group(candidates):
+    if len(candidates) == 1:
+        return candidates[0]
+
+    confidence_rank = {"High": 0, "Medium": 1, "Low": 2}
+    ordered = sorted(
+        candidates,
+        key=lambda item: (
+            confidence_rank.get(item.get("confidence"), 9),
+            str(item.get("source_path") or ""),
+            str(item.get("evidence_id") or ""),
+        ),
+    )
+    merged = dict(ordered[0])
+    merged["duplicate_count"] = len(candidates)
+
+    notes = []
+    for candidate in candidates:
+        for note in _split_notes(candidate.get("notes")):
+            if note not in notes:
+                notes.append(note)
+
+    for field in ("reported_proceeds", "reported_cost_basis", "reported_gain_loss", "tax_paid"):
+        values = _merge_unique_values(candidates, field)
+        if not values:
+            merged[field] = None
+            continue
+        merged[field] = values[0]
+        if len(values) > 1:
+            label = field.replace("_", " ")
+            notes.append(
+                f"Multiple {label} values found across duplicate evidence rows "
+                f"({len(values)} values); review source."
+            )
+
+    source_paths = []
+    evidence_ids = []
+    for candidate in candidates:
+        source_path = str(candidate.get("source_path") or "").strip()
+        if source_path and source_path not in source_paths:
+            source_paths.append(source_path)
+        evidence_id = str(candidate.get("evidence_id") or "").strip()
+        if evidence_id and evidence_id not in evidence_ids:
+            evidence_ids.append(evidence_id)
+
+    if len(source_paths) == 1:
+        merged["source_path"] = source_paths[0]
+    elif source_paths:
+        merged["source_path"] = "; ".join(source_paths)
+
+    if len(evidence_ids) == 1:
+        merged["evidence_id"] = evidence_ids[0]
+    elif evidence_ids:
+        merged["evidence_id"] = "; ".join(evidence_ids)
+
+    notes.append(f"Merged {len(candidates)} duplicate suggested rows for this source/year/type.")
+    merged["notes"] = "; ".join(note for note in notes if note)
+    _apply_confidence(merged)
+    return merged
+
+
+def _dedupe_candidates(candidates):
+    grouped = {}
+    for candidate in candidates:
+        grouped.setdefault(_candidate_dedupe_key(candidate), []).append(candidate)
+    return [_merge_candidate_group(group) for group in grouped.values()]
+
+
 def get_suggested_filed_totals(transactions):
     candidates = []
     records_by_key = {}
@@ -337,6 +435,7 @@ def get_suggested_filed_totals(transactions):
             candidates.append(candidate)
 
     confidence_rank = {"High": 0, "Medium": 1, "Low": 2}
+    candidates = _dedupe_candidates(candidates)
     return sorted(
         candidates,
         key=lambda item: (

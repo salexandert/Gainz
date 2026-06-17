@@ -13,6 +13,7 @@ from app.services.tax_evidence_service import (
     get_tax_evidence_inventory_summary,
 )
 from app.services.tax_total_extraction_service import get_suggested_filed_totals
+from app.services.packet_plan_service import reconciliation_work_order_rows
 from app.stats.routes import _auto_fix_safe_issues
 from openpyxl import Workbook
 from transaction import Buy, Receive, Sell, Send
@@ -488,6 +489,32 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual(1, notes.count("Multiple reported gain loss values found"))
         self.assertIn("3 candidates", notes)
 
+    def test_suggested_filed_totals_deduplicates_rows_by_source_year_type_and_fields(self):
+        transactions = empty_transactions()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            evidence_path = Path(temp_dir) / "2024_crypto_tax_workbook.csv"
+            evidence_path.write_text(
+                "Year,Reported Proceeds,Reported Cost Basis,Reported Gain Loss\n"
+                "2024,300.00,100.00,200.00\n",
+                encoding="utf-8",
+            )
+            for evidence_id in ("duplicate-a", "duplicate-b"):
+                transactions.set_tax_evidence_record(
+                    year=2024,
+                    evidence_type="crypto_workbook",
+                    evidence_label=evidence_path.name,
+                    evidence_path=str(evidence_path),
+                    evidence_id=evidence_id,
+                )
+
+            suggestions = get_suggested_filed_totals(transactions)
+
+        self.assertEqual(1, len(suggestions))
+        suggestion = suggestions[0]
+        self.assertEqual(2, suggestion["duplicate_count"])
+        self.assertEqual("$300.00", suggestion["reported_proceeds_display"])
+        self.assertIn("Merged 2 duplicate suggested rows", suggestion["notes"])
+
     def test_audit_readiness_distinguishes_reviewed_blocking_import_warnings(self):
         transactions = empty_transactions()
         warning = "Imported row 299 from cash_app_report.csv with $0 USD spot price."
@@ -511,6 +538,70 @@ class TransactionsEngineTests(unittest.TestCase):
         )
         self.assertEqual("Reviewed blocker", import_warning_group["status"])
         self.assertIn("reviewed but still blocking", import_warning_group["detail"])
+        checklist = {item["label"]: item for item in readiness["checklist"]}
+        self.assertTrue(checklist["Import warning decisions recorded"]["complete"])
+        self.assertFalse(checklist["Import warning blockers resolved"]["complete"])
+        self.assertIn(
+            "Needs manual USD value",
+            checklist["Import warning blockers resolved"]["detail"],
+        )
+
+    def test_reconciliation_work_order_prioritizes_actionable_blockers(self):
+        readiness = {
+            "is_ready": False,
+            "missing_records": {
+                "current_holdings": [
+                    {"asset": "ETH", "message": "Current holdings missing."},
+                ],
+                "holdings_explanations": [
+                    {"asset": "BTC", "message": "Holdings explanation needed."},
+                ],
+                "basis": [
+                    {
+                        "asset": "BCH",
+                        "date": "2019-01-07",
+                        "source": "coinbase.csv",
+                        "message": "This sale needs earlier acquisition basis.",
+                        "status": "Needs research",
+                    },
+                ],
+                "source_overlaps": [
+                    {
+                        "source_a": "Coinbase_All.csv",
+                        "source_b": "Coinbase_2025.csv",
+                        "message": "Possible overlapping source exports.",
+                        "next_action": "Review duplicate coverage.",
+                        "status": "Review",
+                    },
+                ],
+                "filed_totals": [
+                    {
+                        "year": 2022,
+                        "status": "Workbook totals found, filed return missing",
+                        "what_gainz_found": "Workbook found.",
+                        "what_gainz_needs": "Upload filed return.",
+                    },
+                ],
+            },
+            "unresolved_import_warning_rows": [
+                {
+                    "source": "cash_app_report.csv",
+                    "issue": "$0 USD spot price",
+                    "decision": "needs_manual_usd_value",
+                    "decision_label": "Needs manual USD value",
+                    "next_action": "Map USD value.",
+                },
+            ],
+        }
+
+        rows = reconciliation_work_order_rows(readiness)
+
+        self.assertEqual("Missing acquisition basis", rows[0]["blocker_type"])
+        self.assertEqual("Reviewed import warning blocker", rows[1]["blocker_type"])
+        self.assertEqual(10, rows[0]["priority"])
+        self.assertEqual(20, rows[1]["priority"])
+        self.assertTrue(rows[0]["priority_label"].startswith("P1"))
+        self.assertTrue(rows[-1]["priority_label"].startswith("P5"))
 
     def test_partial_tax_year_research_record_stays_needs_research(self):
         transactions = empty_transactions()

@@ -61,11 +61,29 @@ def get_packet_preview(transactions, readiness, output_dir):
     }
 
 
+WORK_ORDER_PRIORITIES = {
+    "Missing acquisition basis": (10, "P1 missing acquisition basis"),
+    "Reviewed import warning blocker": (20, "P2 reviewed import warning blocker"),
+    "Import warning decision": (20, "P2 import warning decision"),
+    "Current holdings missing": (30, "P3 holdings explanation gap"),
+    "Holdings explanation needed": (30, "P3 holdings explanation gap"),
+    "Tax evidence review": (40, "P4 tax evidence review"),
+    "Possible overlapping source files": (50, "P5 advisory/documentation item"),
+    "No open blockers": (90, "Ready"),
+}
+
+
 def reconciliation_work_order_rows(readiness):
     rows = []
 
     def add_row(blocker_type, asset="", year="", date="", source_file="", suspected_issue="", next_action="", status="Open"):
+        priority, priority_label = WORK_ORDER_PRIORITIES.get(
+            blocker_type,
+            (80, "P5 advisory/documentation item"),
+        )
         rows.append({
+            "priority": priority,
+            "priority_label": priority_label,
             "blocker_type": blocker_type,
             "asset": asset,
             "year": year,
@@ -105,11 +123,18 @@ def reconciliation_work_order_rows(readiness):
         )
 
     for row in readiness.get("unresolved_import_warning_rows", []) or []:
+        has_decision = bool(row.get("decision"))
+        decision_label = row.get("decision_label") or row.get("review_status") or "Review needed"
         add_row(
-            "Import warning decision",
+            "Reviewed import warning blocker" if has_decision else "Import warning decision",
             source_file=row.get("source", ""),
             suspected_issue=row.get("issue", "") or row.get("warning", ""),
-            next_action=row.get("next_action", "") or "Choose a review decision or add a note.",
+            next_action=(
+                f"Resolve reviewed blocker: {decision_label}. {row.get('next_action', '')}".strip()
+                if has_decision
+                else row.get("next_action", "") or "Choose a review decision or add a note."
+            ),
+            status=decision_label if has_decision else "Needs decision",
         )
 
     for row in readiness.get("missing_records", {}).get("source_overlaps", []) or []:
@@ -138,7 +163,17 @@ def reconciliation_work_order_rows(readiness):
             status="Ready for review",
         )
 
-    return rows
+    return sorted(
+        rows,
+        key=lambda row: (
+            int(row.get("priority") or 80),
+            str(row.get("year") or ""),
+            str(row.get("asset") or ""),
+            str(row.get("date") or ""),
+            str(row.get("source_file") or ""),
+            str(row.get("blocker_type") or ""),
+        ),
+    )
 
 
 def reconciliation_work_order_markdown(rows):
@@ -150,8 +185,9 @@ def reconciliation_work_order_markdown(rows):
     ]
     for index, row in enumerate(rows, start=1):
         lines.extend([
-            f"## {index}. {row['blocker_type']}",
+            f"## {index}. {row['priority_label']}: {row['blocker_type']}",
             "",
+            f"- Priority: {row['priority']}",
             f"- Status: {row['status']}",
             f"- Asset: {row['asset'] or 'N/A'}",
             f"- Year: {row['year'] or 'N/A'}",

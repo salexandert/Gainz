@@ -668,6 +668,7 @@ def _reconciliation_checklist(
     transactions,
     holdings_rows,
     missing_basis_rows,
+    warning_rows,
     unresolved_warning_rows,
     source_overlap_rows,
     tax_alignment,
@@ -678,20 +679,38 @@ def _reconciliation_checklist(
     has_transactions = transaction_count > 0
     current_holdings_entered = has_transactions and not any(row[6] == "Needs declared holdings" for row in holdings_rows)
     fifo_run = has_transactions and len(missing_basis_rows) == 0
-    import_warnings_reviewed = len(unresolved_warning_rows) == 0
+    active_warning_rows = list(warning_rows or [])
+    unreviewed_warning_rows = [row for row in active_warning_rows if not row.get("decision")]
+    reviewed_warning_rows = [row for row in active_warning_rows if row.get("decision")]
+    blocking_warning_rows = [row for row in active_warning_rows if not row.get("is_resolved")]
+    import_warning_decisions_recorded = len(unreviewed_warning_rows) == 0
+    import_warning_blockers_resolved = len(blocking_warning_rows) == 0
     import_warning_count = len(getattr(transactions, "import_warnings", []) or [])
     import_warning_review_count = len(getattr(transactions, "import_warning_reviews", []) or [])
     source_overlaps_reviewed = has_transactions and len(source_overlap_rows) == 0
     missing_basis_reviewed = has_transactions and len(missing_basis_rows) == 0
     tax_evidence_reviewed = tax_evidence_inventory["metrics"]["years_needing_review"] == 0
-    if not import_warnings_reviewed:
-        import_warning_detail = "Review each active warning and choose a decision."
+    if not import_warning_decisions_recorded:
+        import_warning_decision_detail = (
+            f"Choose review decisions for {_count_label(len(unreviewed_warning_rows), 'active import warning')}."
+        )
     elif import_warning_count == 0 and import_warning_review_count > 0:
-        import_warning_detail = "No active import warnings; prior review decisions are preserved for the audit trail."
+        import_warning_decision_detail = "No active import warnings; prior review decisions are preserved for the audit trail."
     elif import_warning_count == 0:
-        import_warning_detail = "No active import warnings in this save."
+        import_warning_decision_detail = "No active import warnings in this save."
     else:
-        import_warning_detail = "All active import warnings have reviewed decisions."
+        import_warning_decision_detail = (
+            f"Review decisions recorded for {_count_label(len(reviewed_warning_rows), 'active import warning')}."
+        )
+
+    if import_warning_blockers_resolved:
+        import_warning_blocker_detail = (
+            "No active import warning blockers remain."
+            if import_warning_count == 0
+            else "All active import warning decisions are resolved or non-blocking."
+        )
+    else:
+        import_warning_blocker_detail = _import_warning_state_summary(blocking_warning_rows)["detail"]
     transaction_detail = (
         f"{_count_label(transaction_count, 'source transaction')} loaded."
         if has_transactions
@@ -751,9 +770,14 @@ def _reconciliation_checklist(
             "detail": fifo_detail,
         },
         {
-            "label": "Import warnings reviewed",
-            "complete": import_warnings_reviewed,
-            "detail": import_warning_detail,
+            "label": "Import warning decisions recorded",
+            "complete": import_warning_decisions_recorded,
+            "detail": import_warning_decision_detail,
+        },
+        {
+            "label": "Import warning blockers resolved",
+            "complete": import_warning_blockers_resolved,
+            "detail": import_warning_blocker_detail,
         },
         {
             "label": "Source overlap reviewed",
@@ -1259,6 +1283,7 @@ def get_audit_readiness_summary(transactions):
             transactions,
             holdings_rows,
             missing_basis_rows,
+            warning_rows,
             unresolved_warning_rows,
             source_overlap_rows,
             tax_alignment,

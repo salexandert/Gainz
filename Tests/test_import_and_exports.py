@@ -1201,6 +1201,40 @@ class ImportAndExportTests(unittest.TestCase):
                 db.session.remove()
                 db.engine.dispose()
 
+    def test_packet_preview_json_defaults_to_export_page_output_folder(self):
+        transactions = empty_transactions()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            detected_tax_folder = Path(temp_dir) / "DetectedTaxes"
+            detected_tax_folder.mkdir()
+
+            class PreviewDefaultRouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+                EXPORT_FOLDER = str(Path(temp_dir) / "default-exports")
+                AUDIT_PACKET_FOLDER = str(Path(temp_dir) / "default-packets")
+
+            app = create_app(PreviewDefaultRouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client, patch(
+                "app.export.routes._detected_tax_folder",
+                return_value=str(detected_tax_folder),
+            ):
+                response = client.get("/export/packet_preview.json")
+
+            self.assertEqual(200, response.status_code)
+            preview = response.get_json()["packet_preview"]
+            self.assertEqual(str(detected_tax_folder.resolve()), preview["output_folder"])
+            self.assertFalse(detected_tax_folder.joinpath("gainz_audit_packet_DRAFT_YYYY-MM-DD_HH-MM-SS").exists())
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
     def test_health_check_reports_app_version(self):
         app = create_app(config_dict["Debug"], selenium=True)
         with app.test_client() as client:

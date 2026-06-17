@@ -660,6 +660,8 @@ class AuditPacketService:
     def _write_reconciliation_work_order(self, packet_dir, readiness):
         rows = reconciliation_work_order_rows(readiness)
         fieldnames = [
+            "priority",
+            "priority_label",
             "blocker_type",
             "asset",
             "year",

@@ -18,6 +18,10 @@ def _detected_tax_folder():
     return str(candidate) if candidate.exists() and candidate.is_dir() else ""
 
 
+def _default_packet_output_folder():
+    return _detected_tax_folder() or current_app.config['AUDIT_PACKET_FOLDER']
+
+
 def _requested_output_dir(default_folder):
     payload = request.get_json(silent=True) or {}
     requested = str(payload.get("output_dir") or "").strip()
@@ -101,9 +105,7 @@ def index():
     transactions = current_app.config['transactions']
     stats_table_data = get_stats_table_data(transactions)
     audit_readiness = get_audit_readiness_summary(transactions)
-    default_output_folder = _path_for_display(
-        _detected_tax_folder() or current_app.config['AUDIT_PACKET_FOLDER']
-    )
+    default_output_folder = _path_for_display(_default_packet_output_folder())
 
     return render_template(
         'export.html',
@@ -121,7 +123,7 @@ def index():
 def packet_preview_json():
     transactions = current_app.config['transactions']
     try:
-        output_dir = _preview_output_dir(current_app.config['AUDIT_PACKET_FOLDER'])
+        output_dir = _preview_output_dir(_default_packet_output_folder())
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
 
