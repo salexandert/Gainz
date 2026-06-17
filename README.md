@@ -29,7 +29,7 @@ Always review outputs with a qualified tax professional before filing.
 - Click-by-click app walkthrough: [docs/user-walkthrough.md](docs/user-walkthrough.md)
 - Crypto cost basis learning guide: [docs/guides/crypto-cost-basis-learning.md](docs/guides/crypto-cost-basis-learning.md)
 
-The `docs/` folder is the public documentation source of truth. The website is built from `docs/`, and the GitHub Wiki is a generated hub that points back to the current docs so the public surfaces do not drift apart.
+The `docs/` folder is the public documentation source of truth for the app repository. The GitHub Wiki is generated from these docs. The public website lives in the separate `salexandert/Gainz-Website` repository and syncs selected screenshots, links, and guide references from this repo so website hosting stays separate from the local-first app code.
 
 ## Supported Inputs
 
@@ -129,9 +129,9 @@ A good demo run is:
 7. Run **FIFO** in **Auto Link** only when Dashboard or Reports & Export says basis links are blocking readiness.
 8. Open **Reports & Export** and review the **Readiness Review** checklist.
 9. Expand **Review Details** only when you need row-level evidence.
-10. Generate the workbook or draft audit packet.
+10. Review the audit packet preview, then generate the workbook or draft audit packet.
 
-The audit packet includes the Excel workbook, Form 8949 detail CSVs, Form 8949 totals, tax filing review, tax evidence inventory, suggested filed totals, holdings reconciliation, current holdings lots, active and preserved import-warning decisions, missing-basis review, source-overlap review, copied transaction source files when available, tax evidence references, explicitly selected tax evidence copies, hashes, and a methodology memo.
+The audit packet includes root `README_FIRST.md` and `PACKET_STATUS.md` files, the Excel workbook with a visible packet status sheet, Form 8949 detail CSVs, Form 8949 totals, tax filing review, tax evidence inventory, suggested filed totals, reconciliation work order CSV/Markdown, holdings reconciliation, current holdings lots, active and preserved import-warning decisions, missing-basis review, source-overlap review, copied transaction source files when available, tax evidence references, explicitly selected tax evidence copies, hashes, and a methodology memo.
 
 ## Documentation
 
@@ -157,11 +157,11 @@ Public screenshots are captured from synthetic demo data so they can show the fi
 
 Current public screenshots live under `docs/assets/screenshots/`, including Dashboard, Import, Reconcile, Reports & Export, advanced Stats & Charts, Model Sell, and blank batch manual entry screens captured from synthetic demo data.
 
-When a product change affects public documentation, update `docs/` first. Netlify builds the website from those files, and the wiki sync workflow regenerates the GitHub Wiki from the same source.
+When a product change affects public documentation, update `docs/` first. Regenerate the GitHub Wiki from these docs, then sync selected public docs/screenshots into the separate Gainz website repository before Netlify deploys.
 
 ## Public Site And SEO
 
-The public website is live at <https://cryptogainz.store>. The site is built from the same `docs/` Markdown used by the repository, so most public documentation changes should start there.
+The public website is live at <https://cryptogainz.store>. The site is tracked separately in `salexandert/Gainz-Website`, but most public documentation changes should still start in this repository's `docs/` folder so the app docs and wiki remain the source of truth.
 
 The `docs/` folder remains the source for project guides and SEO-oriented documentation. It includes:
 
@@ -226,7 +226,7 @@ Gainz is distributed as a local desktop-style build, not a hosted SaaS product. 
 .\scripts\set_version.ps1 0.2.0
 ```
 
-Public releases are created from Git tags. After merging a version bump to `main`, the `Auto Tag Release Version` workflow creates the matching tag such as `v0.2.0`. That tag triggers the release workflow, which validates that the tag and version files match, builds Windows and macOS packages, verifies the release zips and checksums, then publishes them to GitHub Releases. The website download buttons point at GitHub's latest release assets, so they update when the release publishes.
+Public releases are created from Git tags. After merging a version bump to `main`, the `Auto Tag Release Version` workflow creates the matching tag such as `v0.2.0` and dispatches the release workflow for that tag. The release workflow validates that the tag and version files match, builds Windows and macOS packages, verifies the release zips and checksums, publishes them to GitHub Releases, then downloads the published Windows ZIP by tag to verify the public package. The website download buttons point at GitHub's latest release assets, so they update when the release publishes.
 
 For a clickable Windows build, install PyInstaller in the build environment and run:
 
@@ -254,6 +254,18 @@ python scripts/test_release_artifacts.py --platform windows --version 0.2.0
 
 ```bash
 python3 scripts/test_release_artifacts.py --platform macos --version 0.2.0
+```
+
+To verify the public Windows ZIP after a release publishes:
+
+```powershell
+python scripts/test_downloaded_release_zip.py --version 0.2.0 --tag v0.2.0
+```
+
+For a manual packaged-launch smoke test, first stop any local Gainz process on port 5000, then run:
+
+```powershell
+python scripts/test_downloaded_release_zip.py --version 0.2.0 --tag v0.2.0 --launch
 ```
 
 ## License

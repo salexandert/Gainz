@@ -1227,10 +1227,11 @@ def get_audit_readiness_summary(transactions):
             "Import warnings CSV with review decisions",
             "Missing basis review CSV",
             "Source overlap review CSV",
+            "Reconciliation work order CSV and Markdown",
             "Copied source files when still available on disk",
-            "Copied tax evidence files when evidence paths are available on disk",
+            "Tax evidence references by default, with copied tax evidence only when explicitly selected",
             "Evidence manifest, packet inventory, and SHA-256 hashes",
-            "Methodology memo",
+            "README_FIRST, packet status, and methodology memos",
         ],
     }
 

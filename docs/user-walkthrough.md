@@ -194,16 +194,30 @@ On **Reports & Export**, choose an output folder and create:
 - Excel workbook export.
 - Audit packet.
 
-If blockers remain, Gainz can generate draft output only after you acknowledge that unresolved review items remain.
+Before generating an audit packet, review **Audit Packet Preview**. It shows:
+
+- Copied files count.
+- Reference-only tax evidence count.
+- Missing evidence paths count.
+- Draft or filing-ready status.
+- Unresolved blockers and warnings.
+- Output folder.
+- Packet name pattern.
+
+Reference only means the file path or label is listed, but the file is not copied. Copied means the file is included inside the audit packet and appears in the manifest with hashes.
+
+If blockers remain, Gainz can generate draft output only after you acknowledge that unresolved review items remain. Draft output is marked in the filename and inside the generated workbook or packet status files.
 
 The audit packet includes:
 
-- Excel workbook with transactions, stats, links, sales, and 8949 sheets.
+- `README_FIRST.md` and `PACKET_STATUS.md` at the packet root.
+- Excel workbook with a visible `Packet Status` sheet plus transactions, stats, links, sales, and 8949 sheets.
 - Form 8949 short-term and long-term detail CSVs.
 - Form 8949 totals CSV and JSON.
 - Tax filing review CSV and JSON.
 - Tax evidence inventory CSV and JSON.
 - Suggested filed totals CSV and JSON.
+- Reconciliation work order CSV and Markdown.
 - Holdings reconciliation CSV.
 - Current holdings lots CSV.
 - Import warnings CSV with active warnings and preserved review decisions for warnings that were later cleared by source updates.

@@ -6,6 +6,7 @@ from flask_login import login_required
 from utils import *
 from app.services.export_service import ExportService
 from app.services.audit_packet_service import AuditPacketService
+from app.services.packet_plan_service import get_packet_preview
 
 
 def _path_for_display(path):
@@ -81,6 +82,9 @@ def index():
     transactions = current_app.config['transactions']
     stats_table_data = get_stats_table_data(transactions)
     audit_readiness = get_audit_readiness_summary(transactions)
+    default_output_folder = _path_for_display(
+        _detected_tax_folder() or current_app.config['AUDIT_PACKET_FOLDER']
+    )
 
     return render_template(
         'export.html',
@@ -89,6 +93,7 @@ def index():
         export_folder=_path_for_display(current_app.config['EXPORT_FOLDER']),
         audit_packet_folder=_path_for_display(current_app.config['AUDIT_PACKET_FOLDER']),
         detected_tax_folder=_detected_tax_folder(),
+        packet_preview=get_packet_preview(transactions, audit_readiness, default_output_folder),
     )
 
 
@@ -105,8 +110,12 @@ def save():
     except ValueError as exc:
         return jsonify({"message": str(exc)}), 400
 
-    save_as_filename = ExportService(str(output_dir)).export_to_excel(transactions)
-    if not get_audit_readiness_summary(transactions)["is_ready"]:
+    readiness = get_audit_readiness_summary(transactions)
+    save_as_filename = ExportService(str(output_dir)).export_to_excel(
+        transactions,
+        readiness=readiness,
+    )
+    if not readiness["is_ready"]:
         save_as_filename = _draft_workbook_path(save_as_filename)
 
     print(f"exporting to {save_as_filename}")

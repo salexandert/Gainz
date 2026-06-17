@@ -205,6 +205,68 @@
 </div>
 <!-- /Output Location -->
 
+<!-- Packet Preview -->
+<div class="row" id="packet_preview">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between align-items-start">
+          <div>
+            <h2 class="gainz-section-title">Audit Packet Preview</h2>
+            <p class="card-category">Review what Gainz will copy, reference, and mark before generating an audit packet.</p>
+          </div>
+          <span class="gainz-status-badge {{ packet_preview.status_class }}">{{ packet_preview.status }}</span>
+        </div>
+
+        <div class="audit-readiness-grid">
+          <div class="audit-readiness-item">
+            <span>Copied Files</span>
+            <strong>{{ packet_preview.copied_files_count }}</strong>
+            <small>{{ packet_preview.transaction_source_files_count }} transaction source, {{ packet_preview.copied_tax_evidence_count }} tax evidence</small>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Reference Only</span>
+            <strong>{{ packet_preview.reference_only_files_count }}</strong>
+            <small>Path or label listed, file not copied</small>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Missing Evidence Paths</span>
+            <strong>{{ packet_preview.missing_tax_evidence_count }}</strong>
+            <small>Listed as missing in the manifest</small>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Unresolved Items</span>
+            <strong>{{ packet_preview.unresolved_blocker_count }}</strong>
+            <small>Blockers and warnings carried into output</small>
+          </div>
+        </div>
+
+        <div class="alert alert-light border" role="status">
+          <p class="mb-1"><strong>Output folder:</strong> <span id="packet_preview_output_folder">{{ packet_preview.output_folder }}</span></p>
+          <p class="mb-1"><strong>Packet name:</strong> {{ packet_preview.packet_name }}</p>
+          <p class="mb-1"><strong>Reference only:</strong> file path is listed, file is not copied.</p>
+          <p class="mb-0"><strong>Copied:</strong> file will be included inside the audit packet and listed with hashes.</p>
+        </div>
+
+        {% if packet_preview.unresolved_blockers %}
+        <div class="alert alert-warning" role="alert">
+          <strong>Unresolved output will be marked draft:</strong>
+          <ul class="mb-0">
+            {% for blocker in packet_preview.unresolved_blockers[:5] %}
+            <li>{{ blocker }}</li>
+            {% endfor %}
+            {% if packet_preview.unresolved_blockers|length > 5 %}
+            <li>{{ packet_preview.unresolved_blockers|length - 5 }} more item{% if packet_preview.unresolved_blockers|length - 5 != 1 %}s{% endif %} listed in the packet status files.</li>
+            {% endif %}
+          </ul>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Packet Preview -->
+
 <!-- Export Button -->
 <div class="row" id="export_actions">
   <div class="col-md-12">
