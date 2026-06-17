@@ -47,42 +47,7 @@ If automatic detection cannot identify the needed columns, Gainz can pause for c
 
 See `demo_data/` for small sample files that are safe to use for testing.
 
-## Quick Start From Source
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python launcher.py
-```
-
-The launcher opens a small desktop window that shows the local web interface link. Click **Open Gainz** or open:
-
-```text
-http://127.0.0.1:5000/
-```
-
-For developer console output, you can still run:
-
-```powershell
-python run.py
-```
-
-On first run, Gainz asks you to create a local admin account in the browser. The password is hashed into the local database and is not written to a plaintext credentials file.
-
-If you forget the local password, click **Reset Password** in the launcher. It resets the configured local admin account to the temporary password `gainz-local-reset` so you can sign in and set a new password from the gear menu. From a source checkout, you can also run `python .\scripts\reset_admin_password.py` or double-click `reset_password.bat`.
-
-The Gainz password gates the local browser UI. It does not encrypt imported CSVs, XLSX saves, exports, or audit packets, which remain normal local files. See [Reset your local Gainz password](docs/guides/local-password-reset.md).
-
-Set these environment variables to pre-create the first local admin account instead:
-
-```powershell
-$env:GAINZ_ADMIN_USERNAME="admin"
-$env:GAINZ_ADMIN_PASSWORD="choose-a-local-password"
-python run.py
-```
-
-## Download Packaged Builds
+## Quick Start With Packaged Builds
 
 Public desktop packages are published through GitHub Releases:
 
@@ -93,7 +58,32 @@ Public desktop packages are published through GitHub Releases:
 
 Unzip the package and open `Gainz.exe` on Windows or `Gainz.app` on macOS. The launcher starts the local server, shows the web interface link, and keeps your transaction data on your machine.
 
+On first run, Gainz asks you to create a local admin account in the browser. The password is hashed into the local database and is not written to a plaintext credentials file.
+
+If you forget the local password, click **Reset Password** in the launcher. It resets the configured local admin account to the temporary password `gainz-local-reset` so you can sign in and set a new password from the gear menu.
+
+The Gainz password gates the local browser UI. It does not encrypt imported CSVs, XLSX saves, exports, or audit packets, which remain normal local files. See [Reset your local Gainz password](docs/guides/local-password-reset.md).
+
 Windows may show a Microsoft Defender SmartScreen warning while Gainz is young and unsigned. Before clicking through that warning, verify that you downloaded Gainz from the official website or GitHub Releases and compare the SHA-256 checksum. See [Windows SmartScreen Warning For Gainz](docs/guides/windows-smartscreen.md).
+
+## Developer Start From Source
+
+Use source checkout commands only when developing or testing Gainz locally:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python run.py
+```
+
+Open:
+
+```text
+http://127.0.0.1:5000/
+```
+
+From a source checkout, you can reset the local password with `python .\scripts\reset_admin_password.py` or by double-clicking `reset_password.bat`.
 
 ## Common Workflow
 
@@ -120,7 +110,7 @@ The `demo_data/` folder contains synthetic CSVs that are safe to use for testing
 
 A good demo run is:
 
-1. Start Gainz with `python launcher.py`.
+1. Start Gainz from the packaged app by unzipping `Gainz-Windows.zip` and opening `Gainz.exe` on Windows, or unzipping `Gainz-macOS.zip` and opening `Gainz.app` on macOS.
 2. Open **Import**.
 3. Click **Try Demo Data**, or upload each demo CSV one file at a time.
 4. Return to **Dashboard** and follow **Continue reconciliation**.
@@ -166,15 +156,6 @@ Gainz is free to run locally. If it saves you time, helps you organize a tax rev
 - Donate: <https://cash.app/$SAl3xander>
 - BTC: `bc1q5ptf8aylwauthxr80x60k554c3xdv2lpe046t4`
 - Website: <https://cryptogainz.store>
-
-For custom builds or forks, set these environment variables before starting Gainz:
-
-```powershell
-$env:GAINZ_SUPPORT_URL="https://your-donation-link.example"
-$env:GAINZ_STORE_URL="https://your-project-site.example"
-$env:GAINZ_BTC_RECEIVE_ADDRESS="your-btc-address"
-python launcher.py
-```
 
 ## Packaging
 

@@ -8,11 +8,11 @@ If cost basis is new to you, start with the [crypto cost basis learning path]({{
 
 ## 1. Start Gainz
 
-From source:
+Download the latest package from the [Gainz download page]({{ '/download/' | relative_url }}), then:
 
-```powershell
-python launcher.py
-```
+1. Unzip `Gainz-Windows.zip` and double-click `Gainz.exe` on Windows, or unzip `Gainz-macOS.zip` and open `Gainz.app` on macOS.
+2. Keep the launcher window open while using Gainz.
+3. Click **Open Gainz** in the launcher window.
 
 The launcher opens a small desktop window with the local web address, usually:
 
