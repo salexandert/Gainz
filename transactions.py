@@ -32,6 +32,7 @@ TAX_EVIDENCE_RECORD_COLUMNS = [
     "evidence_type",
     "evidence_label",
     "evidence_path",
+    "copy_to_packet",
     "notes",
     "updated_at",
 ]
@@ -91,6 +92,16 @@ def _string_or_empty(value):
         pass
 
     return str(value)
+
+
+def _bool_from_cell(value):
+    if value in (True, 1):
+        return True
+    if value in (False, None, ""):
+        return False
+
+    normalized = str(value).strip().lower()
+    return normalized in {"1", "true", "yes", "y", "on"}
 
 
 def _save_dir():
@@ -508,6 +519,7 @@ class Transactions:
             evidence_type = _string_or_empty(record.get("evidence_type")) or "other"
             evidence_label = _string_or_empty(record.get("evidence_label"))
             evidence_path = _string_or_empty(record.get("evidence_path"))
+            copy_to_packet = _bool_from_cell(record.get("copy_to_packet"))
             notes = _string_or_empty(record.get("notes"))
             evidence_id = _string_or_empty(record.get("evidence_id")) or self._tax_evidence_id(
                 year,
@@ -521,6 +533,7 @@ class Transactions:
                 "evidence_type": evidence_type,
                 "evidence_label": evidence_label,
                 "evidence_path": evidence_path,
+                "copy_to_packet": copy_to_packet,
                 "notes": notes,
                 "updated_at": _string_or_empty(record.get("updated_at")),
             })
@@ -700,6 +713,7 @@ class Transactions:
         evidence_type="other",
         evidence_label="",
         evidence_path="",
+        copy_to_packet=False,
         notes="",
         evidence_id=None,
     ):
@@ -719,6 +733,7 @@ class Transactions:
             "evidence_type": evidence_type or "other",
             "evidence_label": evidence_label or "",
             "evidence_path": evidence_path or "",
+            "copy_to_packet": bool(copy_to_packet),
             "notes": notes or "",
             "updated_at": strftime("%Y-%m-%d %H:%M:%S"),
         }

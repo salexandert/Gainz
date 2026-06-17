@@ -130,6 +130,8 @@ Open **Tax Evidence** before generating a packet for a real filing review.
 
 Use **Tax Evidence Inventory** to scan a local tax evidence folder or add one item at a time. Gainz classifies filenames and notes as filed returns, Form 8949, Schedule D, payment receipts, crypto workbooks, broker forms, transaction CSVs, estimates, or zero/not-applicable confirmations.
 
+For broad folder scans, use the year, file type, include-keyword, and exclude-keyword filters. Scanned files are recorded as local references by default; Gainz does not copy them into audit packets unless you explicitly choose packet copy for a curated folder or evidence item.
+
 Review **Confirm Suggested Filed Totals**. When Gainz can read clear values from local CSV, XLSX, or readable PDF evidence, it shows possible filed proceeds, cost basis, gain/loss, and tax-paid values with a confidence label and source file. Confirm, edit, or mark the year as needs research. Suggested totals are not treated as recorded filed totals until you save a review decision.
 
 Use **Import Filed Totals from CSV** when you already have a year-by-year filed-total CSV. Gainz reports the actual number of rows imported and skipped. If a CSV only contains three years, Gainz imports three years and leaves the other evidence years visible for review.
@@ -208,11 +210,12 @@ The audit packet includes:
 - Missing basis review CSV.
 - Source overlap review CSV.
 - Source files copied into the packet when they are still available on disk.
-- Tax evidence files copied into the packet when evidence paths are available on disk.
+- Tax evidence references by default, plus tax evidence files copied only when explicitly marked for packet copy.
 - Evidence manifest.
 - Packet inventory.
 - SHA-256 hashes.
 - Methodology memo.
+- `DRAFT_NOT_FILING_READY.md` when unresolved blockers or warnings remain.
 
 ## 12. Review Before Filing
 

@@ -34,7 +34,9 @@ class AuditPacketService:
 
     def create_packet(self, transactions):
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        packet_dir = self.packet_root / f"gainz_audit_packet_{timestamp}"
+        readiness = get_audit_readiness_summary(transactions)
+        packet_prefix = "gainz_audit_packet" if readiness["is_ready"] else "gainz_audit_packet_DRAFT"
+        packet_dir = self.packet_root / f"{packet_prefix}_{timestamp}"
         packet_dir.mkdir(parents=True, exist_ok=False)
 
         for folder in (
@@ -49,6 +51,8 @@ class AuditPacketService:
 
         report_path = ExportService(self.export_folder).export_to_excel(transactions)
         report_dest = packet_dir / "01_reports" / Path(report_path).name
+        if not readiness["is_ready"]:
+            report_dest = packet_dir / "01_reports" / f"DRAFT_{Path(report_path).name}"
         shutil.copy2(report_path, report_dest)
         manifest_rows.append(
             self._manifest_row(
@@ -94,6 +98,8 @@ class AuditPacketService:
 
         manifest_rows.extend(self._copy_tax_evidence_files(packet_dir, transactions))
 
+        if not readiness["is_ready"]:
+            self._write_draft_not_ready_memo(packet_dir, readiness)
         self._write_methodology(packet_dir, transactions)
         self._write_tax_reports(packet_dir, transactions)
         self._write_tax_filing_alignment(packet_dir, transactions)
@@ -107,6 +113,31 @@ class AuditPacketService:
         self._write_summary(packet_dir, manifest_rows, transactions)
 
         return str(packet_dir)
+
+    def _write_draft_not_ready_memo(self, packet_dir, readiness):
+        lines = [
+            "# Draft Output: Not Filing Ready",
+            "",
+            "This audit packet was generated while Gainz still had unresolved review items.",
+            "Use it for reconciliation review only. Do not treat it as filing-ready until blockers and warnings are resolved or documented.",
+            "",
+            f"Readiness status: {readiness['status']}",
+            f"Summary: {readiness['summary']}",
+            f"Next action: {readiness['next_action']}",
+            "",
+            "Open blockers:",
+        ]
+        blockers = readiness.get("blockers") or []
+        lines.extend([f"- {blocker}" for blocker in blockers] or ["- None"])
+        lines.extend(["", "Open warnings:"])
+        warnings = readiness.get("warnings") or []
+        lines.extend([f"- {warning}" for warning in warnings] or ["- None"])
+        lines.append("")
+
+        (packet_dir / "00_memos" / "DRAFT_NOT_FILING_READY.md").write_text(
+            "\n".join(lines),
+            encoding="utf-8",
+        )
 
     def _source_paths(self, transactions):
         sources = set()
@@ -146,6 +177,20 @@ class AuditPacketService:
                     "category": "tax_evidence",
                     "role": role,
                     "status": "MISSING",
+                    "source_path": str(source_path),
+                    "packet_relative_path": "",
+                    "source_sha256": "",
+                    "packet_sha256": "",
+                    "size_bytes": "",
+                    "last_write_time": "",
+                })
+                continue
+
+            if not record.get("copy_to_packet"):
+                rows.append({
+                    "category": "tax_evidence",
+                    "role": role,
+                    "status": "REFERENCE_ONLY",
                     "source_path": str(source_path),
                     "packet_relative_path": "",
                     "source_sha256": "",
@@ -333,7 +378,15 @@ class AuditPacketService:
         with open(packet_dir / "01_reports" / "tax_evidence_items.csv", "w", newline="", encoding="utf-8") as file:
             writer = csv.DictWriter(
                 file,
-                fieldnames=["year", "evidence_type", "evidence_label", "evidence_path", "notes", "updated_at"],
+                fieldnames=[
+                    "year",
+                    "evidence_type",
+                    "evidence_label",
+                    "evidence_path",
+                    "packet_handling",
+                    "notes",
+                    "updated_at",
+                ],
             )
             writer.writeheader()
             for record in inventory["evidence_records"]:
@@ -342,6 +395,11 @@ class AuditPacketService:
                     "evidence_type": record["evidence_type_label"],
                     "evidence_label": record.get("evidence_label", ""),
                     "evidence_path": record.get("evidence_path", ""),
+                    "packet_handling": (
+                        "Copy into packet"
+                        if record.get("copy_to_packet")
+                        else "Reference only"
+                    ),
                     "notes": record.get("notes", ""),
                     "updated_at": record.get("updated_at", ""),
                 })
