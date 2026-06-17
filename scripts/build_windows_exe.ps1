@@ -59,7 +59,9 @@ if (Test-Path -LiteralPath $packageDir) {
 New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
 
 Copy-Item -LiteralPath (Join-Path $distDir "Gainz.exe") -Destination $packageDir
-Copy-Item -LiteralPath (Join-Path $repoRoot "README.md") -Destination $packageDir
+$packageReadme = Join-Path $packageDir "README.md"
+Copy-Item -LiteralPath (Join-Path $repoRoot "README.md") -Destination $packageReadme
+Add-Content -LiteralPath $packageReadme -Value "`nCurrent packaged version: $version"
 Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE") -Destination $packageDir
 Copy-Item -LiteralPath (Join-Path $repoRoot "VERSION") -Destination $packageDir
 

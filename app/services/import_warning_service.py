@@ -146,7 +146,7 @@ def _likely_category(issue, row_details):
 
 
 def _review_for_warning(transactions, raw_message):
-    if transactions and hasattr(transactions, "get_import_warning_review"):
+    if transactions is not None and hasattr(transactions, "get_import_warning_review"):
         return transactions.get_import_warning_review(raw_message) or {}
 
     return {}

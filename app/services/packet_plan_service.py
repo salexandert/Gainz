@@ -41,6 +41,7 @@ def get_packet_preview(transactions, readiness, output_dir):
     is_ready = bool(readiness.get("is_ready"))
     packet_prefix = "gainz_audit_packet" if is_ready else "gainz_audit_packet_DRAFT"
     unresolved_items = list(readiness.get("blockers") or []) + list(readiness.get("warnings") or [])
+    unresolved_groups = list(readiness.get("blocker_groups") or [])
 
     return {
         "status": "Filing-ready review packet" if is_ready else "Draft packet",
@@ -53,6 +54,8 @@ def get_packet_preview(transactions, readiness, output_dir):
         "missing_tax_evidence_count": evidence_counts["missing"],
         "unresolved_blocker_count": len(unresolved_items),
         "unresolved_blockers": unresolved_items,
+        "unresolved_blocker_group_count": len(unresolved_groups),
+        "unresolved_blocker_groups": unresolved_groups,
         "output_folder": str(output_dir or ""),
         "packet_name": f"{packet_prefix}_YYYY-MM-DD_HH-MM-SS",
     }

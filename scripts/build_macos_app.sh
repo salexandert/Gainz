@@ -48,6 +48,7 @@ mkdir -p "$package_dir"
 
 cp -R "$dist_dir/Gainz.app" "$package_dir/"
 cp README.md LICENSE VERSION "$package_dir/"
+printf "\nCurrent packaged version: %s\n" "$version" >> "$package_dir/README.md"
 
 rm -f "$versioned_zip" "$latest_zip"
 (

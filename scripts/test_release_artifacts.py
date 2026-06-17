@@ -31,6 +31,16 @@ def assert_zip_members(zip_path, required_members):
                 raise AssertionError(f"{zip_path.name} is missing {member}")
 
 
+def assert_readme_mentions_version(zip_path, version):
+    with zipfile.ZipFile(zip_path) as archive:
+        readme_name = next((name for name in archive.namelist() if name.endswith("README.md")), None)
+        if not readme_name:
+            raise AssertionError(f"{zip_path.name} is missing README.md")
+        readme = archive.read(readme_name).decode("utf-8", errors="replace")
+    if version not in readme:
+        raise AssertionError(f"{zip_path.name} README.md does not mention version {version}")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dist", default="dist")
@@ -61,6 +71,7 @@ def main():
             raise AssertionError(f"Missing release zip: {zip_path}")
         assert_checksum(zip_path)
         assert_zip_members(zip_path, required)
+        assert_readme_mentions_version(zip_path, args.version)
 
     print(f"{args.platform} release artifacts look valid.")
 

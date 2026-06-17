@@ -77,6 +77,7 @@ def _empty_candidate(record):
         "confidence": "Low",
         "confidence_class": "status-needs-review",
         "notes": "",
+        "_conflict_counts": {},
         "matched_fields": [],
     }
 
@@ -141,11 +142,23 @@ def _merge_candidate_value(candidate, field, value, source_note):
     if round(float(current), 2) == round(float(value), 2):
         return
 
-    candidate["notes"] = "; ".join(
-        note
-        for note in (candidate["notes"], f"Multiple {source_note} values found; review source.")
-        if note
-    )
+    conflict_counts = candidate.setdefault("_conflict_counts", {})
+    conflict_label = str(source_note or field.replace("_", " ")).strip()
+    conflict_counts[conflict_label] = conflict_counts.get(conflict_label, 1) + 1
+
+
+def _finalize_candidate_notes(candidate):
+    notes = []
+    for note in str(candidate.get("notes") or "").split(";"):
+        note = note.strip()
+        if note and note not in notes:
+            notes.append(note)
+
+    for label, count in sorted(candidate.get("_conflict_counts", {}).items()):
+        notes.append(f"Multiple {label} values found ({count} candidates); review source.")
+
+    candidate["notes"] = "; ".join(notes)
+    candidate.pop("_conflict_counts", None)
 
 
 def _scan_rows_for_totals(rows, candidate):
@@ -299,6 +312,7 @@ def _candidate_from_record(record):
         return None
 
     candidate["matched_fields"] = sorted(set(candidate["matched_fields"]))
+    _finalize_candidate_notes(candidate)
     if not candidate["notes"]:
         candidate["notes"] = "Review source before confirming; extracted values are suggestions."
     _apply_confidence(candidate)

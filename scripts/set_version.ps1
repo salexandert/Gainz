@@ -26,6 +26,7 @@ function Write-Utf8NoBom {
 
 Write-Utf8NoBom -Path (Join-Path $repoRoot "VERSION") -Content $Version
 Write-Utf8NoBom -Path (Join-Path $repoRoot "app_version.py") -Content "APP_VERSION = `"$Version`""
+Write-Utf8NoBom -Path (Join-Path $repoRoot "scripts\release_version.env") -Content "version=$Version`ntag=v$Version"
 
 $docsConfigPath = Join-Path $repoRoot "docs\_config.yml"
 $docsConfig = Get-Content -LiteralPath $docsConfigPath -Raw

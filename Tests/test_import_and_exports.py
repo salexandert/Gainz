@@ -1146,6 +1146,61 @@ class ImportAndExportTests(unittest.TestCase):
                 db.session.remove()
                 db.engine.dispose()
 
+    def test_packet_preview_json_returns_machine_readable_counts(self):
+        transactions = empty_transactions()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_path = Path(temp_dir) / "source.csv"
+            source_path.write_text("demo source", encoding="utf-8")
+            evidence_path = Path(temp_dir) / "2024_crypto_workbook.csv"
+            evidence_path.write_text("Year,Total\n2024,1\n", encoding="utf-8")
+            transactions.transactions = [
+                Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, str(source_path))
+            ]
+            transactions.set_tax_evidence_record(
+                year=2024,
+                evidence_type="crypto_workbook",
+                evidence_label=evidence_path.name,
+                evidence_path=str(evidence_path),
+            )
+            output_dir = Path(temp_dir) / "preview-output"
+
+            class PreviewRouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+                EXPORT_FOLDER = str(Path(temp_dir) / "default-exports")
+                AUDIT_PACKET_FOLDER = str(Path(temp_dir) / "default-packets")
+
+            app = create_app(PreviewRouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/export/packet_preview.json",
+                    json={"output_dir": str(output_dir)},
+                )
+
+            self.assertEqual(200, response.status_code)
+            payload = response.get_json()
+            preview = payload["packet_preview"]
+            self.assertEqual(str(output_dir.resolve()), preview["output_folder"])
+            self.assertEqual(1, preview["copied_files_count"])
+            self.assertEqual(1, preview["transaction_source_files_count"])
+            self.assertEqual(1, preview["reference_only_files_count"])
+            self.assertEqual(0, preview["missing_tax_evidence_count"])
+            self.assertEqual(
+                len(payload["readiness"]["blocker_groups"]),
+                preview["unresolved_blocker_group_count"],
+            )
+            self.assertFalse(output_dir.exists())
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
     def test_health_check_reports_app_version(self):
         app = create_app(config_dict["Debug"], selenium=True)
         with app.test_client() as client:

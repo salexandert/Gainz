@@ -462,6 +462,56 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual(25.0, suggestion["tax_paid"])
         self.assertEqual("High", suggestion["confidence"])
 
+    def test_suggested_filed_totals_deduplicates_repeated_conflict_notes(self):
+        transactions = empty_transactions()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            evidence_path = Path(temp_dir) / "2024_crypto_tax_workbook.csv"
+            evidence_path.write_text(
+                "Year,Reported Proceeds,Reported Cost Basis,Reported Gain Loss\n"
+                "2024,300.00,100.00,200.00\n"
+                "2024,301.00,100.00,201.00\n"
+                "2024,302.00,100.00,202.00\n",
+                encoding="utf-8",
+            )
+            transactions.set_tax_evidence_record(
+                year=2024,
+                evidence_type="crypto_workbook",
+                evidence_label=evidence_path.name,
+                evidence_path=str(evidence_path),
+            )
+
+            suggestions = get_suggested_filed_totals(transactions)
+
+        self.assertEqual(1, len(suggestions))
+        notes = suggestions[0]["notes"]
+        self.assertEqual(1, notes.count("Multiple reported proceeds values found"))
+        self.assertEqual(1, notes.count("Multiple reported gain loss values found"))
+        self.assertIn("3 candidates", notes)
+
+    def test_audit_readiness_distinguishes_reviewed_blocking_import_warnings(self):
+        transactions = empty_transactions()
+        warning = "Imported row 299 from cash_app_report.csv with $0 USD spot price."
+        transactions.import_warnings = [warning]
+        transactions.set_import_warning_review(
+            warning,
+            decision="needs_manual_usd_value",
+            note="Needs source USD value.",
+        )
+
+        readiness = get_audit_readiness_summary(transactions)
+
+        self.assertIn(
+            "1 import warning reviewed but still blocking: Needs manual USD value.",
+            readiness["warnings"],
+        )
+        self.assertNotIn("Choose review decisions for 1 import warning.", readiness["warnings"])
+        import_warning_group = next(
+            group for group in readiness["blocker_groups"]
+            if group["key"] == "import_warnings"
+        )
+        self.assertEqual("Reviewed blocker", import_warning_group["status"])
+        self.assertIn("reviewed but still blocking", import_warning_group["detail"])
+
     def test_partial_tax_year_research_record_stays_needs_research(self):
         transactions = empty_transactions()
         buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange")

@@ -33,6 +33,25 @@ def _requested_output_dir(default_folder):
     return output_dir.resolve()
 
 
+def _preview_output_dir(default_folder):
+    payload = request.get_json(silent=True) or {}
+    requested = str(
+        payload.get("output_dir")
+        or request.args.get("output_dir")
+        or request.form.get("output_dir")
+        or ""
+    ).strip()
+    output_dir = Path(requested).expanduser() if requested else Path(default_folder)
+
+    if not output_dir.is_absolute():
+        output_dir = Path.cwd() / output_dir
+
+    if output_dir.exists() and not output_dir.is_dir():
+        raise ValueError("Output location must be a folder, not a file.")
+
+    return output_dir.resolve()
+
+
 def _truthy_payload_value(value):
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -95,6 +114,30 @@ def index():
         detected_tax_folder=_detected_tax_folder(),
         packet_preview=get_packet_preview(transactions, audit_readiness, default_output_folder),
     )
+
+
+@blueprint.route('/packet_preview.json', methods=['GET', 'POST'])
+@login_required
+def packet_preview_json():
+    transactions = current_app.config['transactions']
+    try:
+        output_dir = _preview_output_dir(current_app.config['AUDIT_PACKET_FOLDER'])
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+
+    readiness = get_audit_readiness_summary(transactions)
+    return jsonify({
+        "packet_preview": get_packet_preview(transactions, readiness, output_dir),
+        "readiness": {
+            "status": readiness["status"],
+            "status_class": readiness["status_class"],
+            "is_ready": readiness["is_ready"],
+            "summary": readiness["summary"],
+            "next_action": readiness["next_action"],
+            "blocker_groups": readiness["blocker_groups"],
+            "metrics": readiness["metrics"],
+        },
+    })
 
 
 @blueprint.route('/save',  methods=['POST'])

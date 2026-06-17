@@ -912,13 +912,14 @@ def _audit_readiness_groups(
         ))
 
     if unresolved_warning_rows:
+        warning_state = _import_warning_state_summary(unresolved_warning_rows)
         groups.append(_readiness_group(
             "import_warnings",
             "Import warning decisions",
             len(unresolved_warning_rows),
-            "Needs decisions",
+            warning_state["status"],
             "status-unlinked-sales",
-            "Review each skipped or assumption-based import row, then choose a decision or add a note.",
+            warning_state["detail"],
             "Review warnings",
             "/import_transactions/#import_warning_workflow",
             severity="warning",
@@ -1047,6 +1048,75 @@ def _readiness_summary_text(blocker_groups, blockers, warnings, is_ready):
     return blockers[0] if blockers else "Review the checklist before generating files."
 
 
+def _import_warning_state_summary(unresolved_warning_rows):
+    not_reviewed = [
+        row for row in unresolved_warning_rows
+        if not row.get("decision")
+    ]
+    reviewed_blocking = [
+        row for row in unresolved_warning_rows
+        if row.get("decision")
+    ]
+
+    decision_counts = {}
+    for row in reviewed_blocking:
+        label = row.get("decision_label") or row.get("review_status") or "Reviewed"
+        decision_counts[label] = decision_counts.get(label, 0) + 1
+
+    def decision_summary():
+        parts = []
+        for label, count in sorted(decision_counts.items()):
+            if count == 1:
+                parts.append(label)
+            else:
+                parts.append(f"{label} ({count})")
+        return ", ".join(parts)
+
+    if reviewed_blocking and not not_reviewed:
+        count = len(reviewed_blocking)
+        return {
+            "status": "Reviewed blocker",
+            "detail": (
+                f"{_count_label(count, 'import warning')} reviewed but still blocking: "
+                f"{decision_summary()}."
+            ),
+            "warning": (
+                f"{_count_label(count, 'import warning')} reviewed but still blocking: "
+                f"{decision_summary()}."
+            ),
+        }
+
+    if not_reviewed and reviewed_blocking:
+        return {
+            "status": "Needs decisions",
+            "detail": (
+                f"{_count_label(len(not_reviewed), 'import warning')} still "
+                f"{'needs' if len(not_reviewed) == 1 else 'need'} a review decision; "
+                f"{_count_label(len(reviewed_blocking), 'warning')} "
+                f"{'is' if len(reviewed_blocking) == 1 else 'are'} reviewed but still blocking: "
+                f"{decision_summary()}."
+            ),
+            "warning": (
+                f"Choose review decisions for {_count_label(len(not_reviewed), 'import warning')}; "
+                f"{_count_label(len(reviewed_blocking), 'warning')} reviewed but still blocking: "
+                f"{decision_summary()}."
+            ),
+        }
+
+    count = len(not_reviewed)
+    return {
+        "status": "Needs decisions",
+        "detail": (
+            f"{_count_label(count, 'import warning')} "
+            f"{'needs' if count == 1 else 'need'} review before generated reports are reliable."
+        ),
+        "warning": (
+            f"Choose review decisions for {count} import warning"
+            f"{'s' if count != 1 else ''}."
+        ),
+    }
+
+
 def get_audit_readiness_summary(transactions):
     if len(getattr(transactions, "transactions", [])) == 0:
         stats_rows = []
@@ -1114,11 +1184,9 @@ def get_audit_readiness_summary(transactions):
             "Missing basis left as needs user research for: " + ", ".join(basis_assets_needing_research)
         )
 
-    if unresolved_warning_rows:
-        warnings.append(
-            f"Choose review decisions for {len(unresolved_warning_rows)} import warning"
-            f"{'s' if len(unresolved_warning_rows) != 1 else ''}."
-        )
+    warning_state = _import_warning_state_summary(unresolved_warning_rows) if unresolved_warning_rows else None
+    if warning_state:
+        warnings.append(warning_state["warning"])
 
     if source_overlap_rows:
         warnings.append(
