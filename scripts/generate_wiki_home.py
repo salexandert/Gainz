@@ -8,13 +8,12 @@ DOCS_ROOT = REPO_ROOT / "docs"
 DEFAULT_SITE_URL = "https://cryptogainz.store"
 REPO_URL = "https://github.com/salexandert/Gainz"
 RAW_REPO_URL = "https://raw.githubusercontent.com/salexandert/Gainz/main"
-
-ROOT_DOCS = [
-    "download.md",
-    "user-walkthrough.md",
-    "how-gainz-calculates-basis.md",
-    "donations.md",
-]
+WEBSITE_ROUTES = {
+    "/",
+    "/download/",
+    "/guides/",
+    "/user-walkthrough/",
+}
 
 SCREENSHOTS = [
     (
@@ -114,7 +113,7 @@ def _title_from_path(path):
     return path.stem.replace("-", " ").title()
 
 
-def _site_url_for(path, site_url):
+def _route_for(path):
     relative = path.relative_to(DOCS_ROOT)
     if relative.name == "index.md":
         if len(relative.parts) == 1:
@@ -123,7 +122,32 @@ def _site_url_for(path, site_url):
             route = "/" + "/".join(relative.parts[:-1]) + "/"
     else:
         route = "/" + "/".join(relative.with_suffix("").parts) + "/"
-    return f"{site_url.rstrip('/')}{route}"
+    return route
+
+
+def _site_url_for(path, site_url):
+    return f"{site_url.rstrip('/')}{_route_for(path)}"
+
+
+def _repo_doc_url(path):
+    relative = path.relative_to(REPO_ROOT).as_posix()
+    return f"{REPO_URL}/blob/main/{relative}"
+
+
+def _route_to_repo_doc_url(route):
+    route = "/" + str(route or "").strip().strip("/") + "/"
+    if route == "/":
+        doc_path = DOCS_ROOT / "index.md"
+    elif route == "/guides/":
+        doc_path = DOCS_ROOT / "guides" / "index.md"
+    elif route.startswith("/guides/"):
+        doc_path = DOCS_ROOT / "guides" / f"{route.strip('/').split('/')[-1]}.md"
+    else:
+        doc_path = DOCS_ROOT / f"{route.strip('/')}.md"
+
+    if doc_path.exists():
+        return _repo_doc_url(doc_path)
+    return ""
 
 
 def _asset_url(asset_path, site_url):
@@ -134,16 +158,24 @@ def _relative_url(path, site_url):
     if path.startswith("/assets/"):
         return f"{RAW_REPO_URL}/docs{path}"
 
-    return f"{site_url.rstrip('/')}{path}"
+    normalized = "/" + path.strip("/")
+    if not normalized.endswith("/"):
+        normalized += "/"
+    if normalized in WEBSITE_ROUTES:
+        return f"{site_url.rstrip('/')}{normalized}"
+
+    return _route_to_repo_doc_url(normalized) or f"{site_url.rstrip('/')}{normalized}"
 
 
 def _screenshot_url(filename, site_url):
     return _asset_url(f"screenshots/{filename}", site_url)
 
 
-def _link_line(path, site_url):
+def _link_line(path, site_url, prefer_site=False):
     title = _title_from_path(path)
-    return f"- [{title}]({_site_url_for(path, site_url)})"
+    if prefer_site and _route_for(path) in WEBSITE_ROUTES:
+        return f"- [{title}]({_site_url_for(path, site_url)})"
+    return f"- [{title}]({_repo_doc_url(path)})"
 
 
 def _guide_paths():
@@ -212,7 +244,6 @@ def _screenshot_block(title, filename, caption, site_url):
 def build_home():
     site_url = _config_value("url", DEFAULT_SITE_URL)
     version = _config_value("version", "")
-    root_paths = [DOCS_ROOT / name for name in ROOT_DOCS if (DOCS_ROOT / name).exists()]
     guide_paths = _guide_paths()
 
     lines = [
@@ -235,9 +266,12 @@ def build_home():
             "",
             "## Start Here",
             "",
+            f"- [Download Gainz]({_site_url_for(DOCS_ROOT / 'download.md', site_url)})",
+            f"- {_wiki_link('Using Gainz From Import To Audit Packet', 'Using-Gainz-From-Import-To-Audit-Packet')}",
+            f"- [How Gainz Calculates Basis]({_repo_doc_url(DOCS_ROOT / 'how-gainz-calculates-basis.md')})",
+            f"- [Support Gainz]({site_url.rstrip('/')}/#donate)",
         ]
     )
-    lines.extend(_link_line(path, site_url) for path in root_paths)
 
     lines.extend(
         [
@@ -305,7 +339,7 @@ def build_guides():
         "",
         f"- {_wiki_link('Using Gainz From Import To Audit Packet', 'Using-Gainz-From-Import-To-Audit-Packet')}",
         f"- [Download Gainz]({_site_url_for(DOCS_ROOT / 'download.md', site_url)})",
-        f"- [How Gainz Calculates Basis]({_site_url_for(DOCS_ROOT / 'how-gainz-calculates-basis.md', site_url)})",
+        f"- [How Gainz Calculates Basis]({_repo_doc_url(DOCS_ROOT / 'how-gainz-calculates-basis.md')})",
         "",
         "## Public Guides",
         "",
