@@ -32,6 +32,49 @@ def _requested_output_dir(default_folder):
     return output_dir.resolve()
 
 
+def _truthy_payload_value(value):
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _draft_acknowledged():
+    payload = request.get_json(silent=True) or {}
+    return _truthy_payload_value(payload.get("draft_acknowledged") or request.form.get("draft_acknowledged"))
+
+
+def _draft_ack_error(transactions, output_label):
+    readiness = get_audit_readiness_summary(transactions)
+    if readiness["is_ready"] or _draft_acknowledged():
+        return None
+
+    return jsonify({
+        "message": (
+            f"{output_label} is draft-only because Gainz still has unresolved review items. "
+            "Check the draft acknowledgement before generating files."
+        ),
+        "status": readiness["status"],
+        "requires_draft_acknowledgement": True,
+    }), 400
+
+
+def _draft_workbook_path(path):
+    path = Path(path)
+    if path.name.startswith("DRAFT_"):
+        return str(path)
+
+    candidate = path.with_name(f"DRAFT_{path.name}")
+    if not candidate.exists():
+        path.replace(candidate)
+        return str(candidate)
+
+    index = 2
+    while True:
+        candidate = path.with_name(f"DRAFT_{path.stem}_{index}{path.suffix}")
+        if not candidate.exists():
+            path.replace(candidate)
+            return str(candidate)
+        index += 1
+
+
 @blueprint.route('/',  methods=['GET', 'POST'])
 @login_required
 def index():
@@ -53,6 +96,9 @@ def index():
 @login_required
 def save():
     transactions = current_app.config['transactions']
+    draft_error = _draft_ack_error(transactions, "Workbook export")
+    if draft_error:
+        return draft_error
 
     try:
         output_dir = _requested_output_dir(current_app.config['EXPORT_FOLDER'])
@@ -60,6 +106,8 @@ def save():
         return jsonify({"message": str(exc)}), 400
 
     save_as_filename = ExportService(str(output_dir)).export_to_excel(transactions)
+    if not get_audit_readiness_summary(transactions)["is_ready"]:
+        save_as_filename = _draft_workbook_path(save_as_filename)
 
     print(f"exporting to {save_as_filename}")
 
@@ -73,6 +121,9 @@ def save():
 @login_required
 def audit_packet():
     transactions = current_app.config['transactions']
+    draft_error = _draft_ack_error(transactions, "Audit packet")
+    if draft_error:
+        return draft_error
 
     try:
         output_dir = _requested_output_dir(current_app.config['AUDIT_PACKET_FOLDER'])

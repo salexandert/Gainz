@@ -131,7 +131,7 @@ A good demo run is:
 9. Expand **Review Details** only when you need row-level evidence.
 10. Generate the workbook or draft audit packet.
 
-The audit packet includes the Excel workbook, Form 8949 detail CSVs, Form 8949 totals, tax filing review, tax evidence inventory, suggested filed totals, holdings reconciliation, current holdings lots, active and preserved import-warning decisions, missing-basis review, source-overlap review, copied source files when available, hashes, and a methodology memo.
+The audit packet includes the Excel workbook, Form 8949 detail CSVs, Form 8949 totals, tax filing review, tax evidence inventory, suggested filed totals, holdings reconciliation, current holdings lots, active and preserved import-warning decisions, missing-basis review, source-overlap review, copied transaction source files when available, tax evidence references, explicitly selected tax evidence copies, hashes, and a methodology memo.
 
 ## Documentation
 

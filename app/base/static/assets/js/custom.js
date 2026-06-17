@@ -2588,8 +2588,10 @@ $(document).ready(function() {
     });
 
     function exportOutputPayload() {
+        var isReady = String($('#draft_export_ack_panel').data('ready')) == '1';
         return {
-            'output_dir': $('#export_output_dir').val()
+            'output_dir': $('#export_output_dir').val(),
+            'draft_acknowledged': isReady || $('#draft_export_ack').is(':checked')
         };
     }
 

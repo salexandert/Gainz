@@ -1074,11 +1074,11 @@ class ImportAndExportTests(unittest.TestCase):
             with app.test_client() as client:
                 export_response = client.post(
                     "/export/save",
-                    json={"output_dir": str(output_dir)},
+                    json={"output_dir": str(output_dir), "draft_acknowledged": True},
                 )
                 packet_response = client.post(
                     "/export/audit_packet",
-                    json={"output_dir": str(output_dir)},
+                    json={"output_dir": str(output_dir), "draft_acknowledged": True},
                 )
 
             export_payload = export_response.get_json()
@@ -1092,6 +1092,45 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual(output_dir.resolve(), Path(packet_payload["path"]).parent)
             self.assertTrue(Path(export_payload["path"]).exists())
             self.assertTrue((Path(packet_payload["path"]) / "03_manifests" / "audit_packet_summary.json").exists())
+            self.assertTrue(Path(export_payload["path"]).name.startswith("DRAFT_"))
+            self.assertIn("gainz_audit_packet_DRAFT_", Path(packet_payload["path"]).name)
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_export_routes_require_draft_acknowledgement_when_not_ready(self):
+        transactions = empty_transactions()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "tax-review-output"
+
+            class ExportRouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+                EXPORT_FOLDER = str(Path(temp_dir) / "default-exports")
+                AUDIT_PACKET_FOLDER = str(Path(temp_dir) / "default-packets")
+
+            app = create_app(ExportRouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                export_response = client.post(
+                    "/export/save",
+                    json={"output_dir": str(output_dir)},
+                )
+                packet_response = client.post(
+                    "/export/audit_packet",
+                    json={"output_dir": str(output_dir)},
+                )
+
+            self.assertEqual(400, export_response.status_code)
+            self.assertEqual(400, packet_response.status_code)
+            self.assertTrue(export_response.get_json()["requires_draft_acknowledgement"])
+            self.assertTrue(packet_response.get_json()["requires_draft_acknowledgement"])
 
             with app.app_context():
                 db.drop_all()
@@ -1207,6 +1246,47 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual("Aligned", summary["tax_filing_alignment"]["overall_status"])
             self.assertIn("tax_evidence_inventory", summary)
             self.assertEqual(1, len(summary["suggested_filed_totals"]))
+
+            with open(packet_path / "03_manifests" / "evidence_manifest.csv", newline="", encoding="utf-8") as file:
+                manifest_rows = list(csv.DictReader(file))
+            tax_evidence_rows = [row for row in manifest_rows if row["category"] == "tax_evidence"]
+            self.assertEqual("REFERENCE_ONLY", tax_evidence_rows[0]["status"])
+            self.assertFalse((packet_path / "02_source_files" / "tax_evidence" / tax_evidence_path.name).exists())
+            self.assertTrue((packet_path / "00_memos" / "DRAFT_NOT_FILING_READY.md").exists())
+
+    def test_audit_packet_copies_tax_evidence_only_when_explicitly_enabled(self):
+        transactions = empty_transactions()
+        buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "demo_data/cash_app_sample.csv")
+        sell = Sell("BTC", 1, datetime.datetime(2024, 6, 1), 300, "demo_data/cash_app_sample.csv")
+        sell.link_transaction(buy, 1)
+        transactions.transactions = [buy, sell]
+        transactions.set_holdings("BTC", 0)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            tax_evidence_path = Path(temp_dir) / "2024_filed_return.pdf"
+            tax_evidence_path.write_text("synthetic filed return", encoding="utf-8")
+            transactions.set_tax_evidence_record(
+                year=2024,
+                evidence_type="filed_return",
+                evidence_label=tax_evidence_path.name,
+                evidence_path=str(tax_evidence_path),
+                copy_to_packet=True,
+            )
+
+            packet_path = Path(
+                AuditPacketService(
+                    Path(temp_dir) / "packets",
+                    Path(temp_dir) / "exports",
+                ).create_packet(transactions)
+            )
+
+            copied_evidence = packet_path / "02_source_files" / "tax_evidence" / tax_evidence_path.name
+            self.assertTrue(copied_evidence.exists())
+
+            with open(packet_path / "03_manifests" / "evidence_manifest.csv", newline="", encoding="utf-8") as file:
+                manifest_rows = list(csv.DictReader(file))
+            tax_evidence_rows = [row for row in manifest_rows if row["category"] == "tax_evidence"]
+            self.assertEqual("COPIED", tax_evidence_rows[0]["status"])
 
     def test_audit_packet_preserves_cleared_import_warning_review_records(self):
         transactions = empty_transactions()

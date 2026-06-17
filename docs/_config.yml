@@ -2,7 +2,7 @@ title: Gainz
 description: Local-first crypto tax audit packet and cost-basis reconciliation software.
 url: https://cryptogainz.store
 baseurl: ""
-version: 0.2.6
+version: 0.2.7
 github_url: "https://github.com/salexandert/Gainz?utm_source=cryptogainz.store&utm_medium=website&utm_campaign=site_nav"
 download_url: https://github.com/salexandert/Gainz/releases/latest/download/Gainz-Windows.zip
 checksum_url: https://github.com/salexandert/Gainz/releases/latest/download/Gainz-Windows.zip.sha256

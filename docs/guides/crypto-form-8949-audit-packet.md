@@ -25,10 +25,11 @@ A Gainz audit packet can include:
 - Import warnings CSV with active warnings and preserved review decisions for warnings that were later cleared by source updates.
 - Missing basis review CSV.
 - Source overlap review CSV.
-- Tax evidence files copied when evidence paths are available on disk.
+- Tax evidence references by default, with evidence files copied only when the user explicitly marks them for packet copy.
 - Source file manifest.
 - SHA-256 hashes.
 - Methodology memo.
+- A draft memo when unresolved blockers or warnings remain.
 
 ## Why Links Come First
 

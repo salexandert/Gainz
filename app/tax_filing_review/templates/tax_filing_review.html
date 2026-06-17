@@ -213,12 +213,47 @@
                   <button type="submit" class="btn btn-info">Scan Folder</button>
                 </div>
               </div>
+              <small class="form-text text-muted">
+                Scanned files are referenced by path by default. They are not copied into audit packets unless you explicitly choose that below.
+              </small>
+              <div class="row mt-3">
+                <div class="col-md-4">
+                  <label for="evidence_years">Years</label>
+                  <input id="evidence_years" name="evidence_years" type="text" class="form-control" placeholder="2019, 2020">
+                </div>
+                <div class="col-md-4">
+                  <label for="include_keywords">Include Keywords</label>
+                  <input id="include_keywords" name="include_keywords" type="text" class="form-control" placeholder="crypto, 8949, payment">
+                </div>
+                <div class="col-md-4">
+                  <label for="exclude_keywords">Exclude Keywords</label>
+                  <input id="exclude_keywords" name="exclude_keywords" type="text" class="form-control" placeholder="personal, w2, mortgage">
+                </div>
+              </div>
+              <div class="mt-3">
+                <span class="d-block text-muted small mb-1">File Types</span>
+                {% for extension in [".pdf", ".csv", ".xlsx", ".xls", ".txt", ".png", ".jpg", ".jpeg"] %}
+                <label class="form-check-label mr-3">
+                  <input class="form-check-input" type="checkbox" name="evidence_file_types" value="{{ extension }}" checked>
+                  {{ extension }}
+                  <span class="form-check-sign"></span>
+                </label>
+                {% endfor %}
+              </div>
               <div class="form-check mt-2">
                 <label class="form-check-label">
                   <input class="form-check-input" type="checkbox" name="recursive" value="1" checked>
                   Include subfolders
                   <span class="form-check-sign"></span>
                 </label>
+              </div>
+              <div class="form-check mt-2">
+                <label class="form-check-label">
+                  <input class="form-check-input" type="checkbox" name="copy_scanned_evidence" value="1">
+                  Copy scanned evidence files into audit packets
+                  <span class="form-check-sign"></span>
+                </label>
+                <small class="form-text text-muted">Leave this off for broad folder scans. Turn it on only for a curated evidence folder.</small>
               </div>
             </form>
           </div>
@@ -254,6 +289,14 @@
                 <div class="col-md-2 d-flex align-items-end">
                   <button type="submit" class="btn btn-success btn-block">Add Evidence</button>
                 </div>
+              </div>
+              <div class="form-check mt-3">
+                <label class="form-check-label">
+                  <input class="form-check-input" type="checkbox" name="copy_to_packet" value="1">
+                  Copy this evidence file into audit packets
+                  <span class="form-check-sign"></span>
+                </label>
+                <small class="form-text text-muted">Use this only for evidence you intentionally want bundled. Otherwise Gainz records a local reference.</small>
               </div>
             </form>
           </div>
@@ -307,6 +350,7 @@
                   <th>Type</th>
                   <th>Label</th>
                   <th>Path</th>
+                  <th>Packet Handling</th>
                   <th>Notes</th>
                   <th>Updated</th>
                 </tr>
@@ -318,12 +362,13 @@
                   <td>{{ record.evidence_type_label }}</td>
                   <td>{{ record.evidence_label }}</td>
                   <td>{{ record.evidence_path or "Reference only" }}</td>
+                  <td>{% if record.copy_to_packet %}Copy into packet{% else %}Reference only{% endif %}</td>
                   <td>{{ record.notes }}</td>
                   <td>{{ record.updated_at }}</td>
                 </tr>
                 {% else %}
                 <tr>
-                  <td colspan="6" class="text-muted">No tax evidence items have been recorded yet.</td>
+                  <td colspan="7" class="text-muted">No tax evidence items have been recorded yet.</td>
                 </tr>
                 {% endfor %}
               </tbody>

@@ -43,6 +43,58 @@ def _tax_evidence_upload_dir():
     return upload_dir
 
 
+def _split_filter_values(value):
+    raw_values = value if isinstance(value, list) else [value]
+    values = []
+    for raw_value in raw_values:
+        for part in str(raw_value or "").replace(";", ",").replace("\n", ",").split(","):
+            part = part.strip().lower()
+            if part:
+                values.append(part)
+    return values
+
+
+def _scan_year_filters():
+    years = set()
+    for value in _split_filter_values(request.form.get("evidence_years") or ""):
+        try:
+            year = int(value)
+        except ValueError:
+            continue
+        if 2009 <= year <= 2100:
+            years.add(year)
+    return years
+
+
+def _scan_extension_filters():
+    requested = _split_filter_values(request.form.getlist("evidence_file_types"))
+    if not requested:
+        return TAX_EVIDENCE_SCAN_EXTENSIONS
+
+    extensions = set()
+    for value in requested:
+        extension = value if value.startswith(".") else f".{value}"
+        if extension in TAX_EVIDENCE_SCAN_EXTENSIONS:
+            extensions.add(extension)
+
+    return extensions or TAX_EVIDENCE_SCAN_EXTENSIONS
+
+
+def _path_matches_scan_filters(path, years, include_keywords, exclude_keywords):
+    inferred_year = infer_tax_evidence_year(path.name, path.parent.name)
+    if years and inferred_year not in years:
+        return False
+
+    searchable_text = str(path).lower()
+    if include_keywords and not any(keyword in searchable_text for keyword in include_keywords):
+        return False
+
+    if exclude_keywords and any(keyword in searchable_text for keyword in exclude_keywords):
+        return False
+
+    return True
+
+
 def _save_uploaded_evidence(file_storage):
     if not file_storage or not file_storage.filename:
         return ""
@@ -64,16 +116,18 @@ def _save_uploaded_evidence(file_storage):
     return str(destination)
 
 
-def _add_tax_evidence_record(transactions, year, reference, evidence_type, notes):
+def _add_tax_evidence_record(transactions, year, reference, evidence_type, notes, copy_to_packet=False):
     evidence_type = classify_tax_evidence(reference, notes, evidence_type)
     record_year = _optional_year(year, reference, notes)
     label = os.path.basename(str(reference)) if reference else tax_evidence_type_label(evidence_type)
+    evidence_path = reference if os.path.exists(str(reference)) else ""
 
     return transactions.set_tax_evidence_record(
         year=record_year,
         evidence_type=evidence_type,
         evidence_label=label,
-        evidence_path=reference if os.path.exists(str(reference)) else "",
+        evidence_path=evidence_path,
+        copy_to_packet=bool(copy_to_packet and evidence_path),
         notes=notes,
     )
 
@@ -204,6 +258,7 @@ def save_tax_evidence_record():
     uploaded_path = _save_uploaded_evidence(request.files.get("evidence_file"))
     reference = uploaded_path or request.form.get("evidence_reference") or ""
     notes = request.form.get("evidence_notes") or ""
+    copy_to_packet = request.form.get("copy_to_packet") == "1"
 
     if not reference and not notes:
         return redirect(url_for('tax_filing_review_blueprint.index'))
@@ -213,6 +268,7 @@ def save_tax_evidence_record():
         year=request.form.get("evidence_year"),
         reference=reference,
         evidence_type=request.form.get("evidence_type") or "auto",
+        copy_to_packet=copy_to_packet,
         notes=notes,
     )
     transactions.save(description="Added tax evidence inventory item")
@@ -230,6 +286,11 @@ def scan_tax_evidence_folder():
 
     folder = Path(folder_value)
     recursive = request.form.get("recursive") == "1"
+    year_filters = _scan_year_filters()
+    extension_filters = _scan_extension_filters()
+    include_keywords = _split_filter_values(request.form.get("include_keywords") or "")
+    exclude_keywords = _split_filter_values(request.form.get("exclude_keywords") or "")
+    copy_scanned_evidence = request.form.get("copy_scanned_evidence") == "1"
 
     if not folder.exists() or not folder.is_dir():
         return redirect(url_for('tax_filing_review_blueprint.index', saved_evidence=0))
@@ -239,7 +300,9 @@ def scan_tax_evidence_folder():
     for path in sorted(paths):
         if added >= 500:
             break
-        if not path.is_file() or path.suffix.lower() not in TAX_EVIDENCE_SCAN_EXTENSIONS:
+        if not path.is_file() or path.suffix.lower() not in extension_filters:
+            continue
+        if not _path_matches_scan_filters(path, year_filters, include_keywords, exclude_keywords):
             continue
 
         evidence_type = classify_tax_evidence(str(path))
@@ -248,7 +311,11 @@ def scan_tax_evidence_folder():
             evidence_type=evidence_type,
             evidence_label=path.name,
             evidence_path=str(path),
-            notes="Scanned from local evidence folder.",
+            copy_to_packet=copy_scanned_evidence,
+            notes=(
+                "Scanned from local evidence folder. "
+                "Reference only unless marked for packet copy."
+            ),
         )
         added += 1
 
