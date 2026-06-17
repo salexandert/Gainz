@@ -2,6 +2,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -37,6 +38,32 @@ def assert_port_available(host, port):
             raise AssertionError(
                 f"{host}:{port} is already in use. Stop Gainz before running launch smoke."
             )
+
+
+def stop_gainz_processes_from_dir(root_dir):
+    if os.name != "nt":
+        return
+
+    script = r"""
+$root = [System.IO.Path]::GetFullPath($env:GAINZ_RELEASE_QA_ROOT)
+Get-Process -Name Gainz -ErrorAction SilentlyContinue |
+    Where-Object {
+        $_.Path -and
+        ([System.IO.Path]::GetFullPath($_.Path)).StartsWith(
+            $root,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )
+    } |
+    Stop-Process -Force
+"""
+    env = {**os.environ, "GAINZ_RELEASE_QA_ROOT": str(Path(root_dir))}
+    subprocess.run(
+        ["powershell", "-NoProfile", "-Command", script],
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
 
 
 def wait_for_healthz(expected_version, timeout):
@@ -86,7 +113,9 @@ def main():
     parser.add_argument("--timeout", type=int, default=90)
     args = parser.parse_args()
 
-    with tempfile.TemporaryDirectory(prefix="gainz-release-qa-") as temp_dir:
+    temp_dir = tempfile.mkdtemp(prefix="gainz-release-qa-")
+    launched = False
+    try:
         temp_path = Path(temp_dir)
         zip_path = temp_path / args.asset
         checksum_path = temp_path / f"{args.asset}.sha256"
@@ -118,6 +147,7 @@ def main():
 
         if args.launch:
             assert_port_available(DEFAULT_HOST, DEFAULT_PORT)
+            launched = True
             env = {
                 **os.environ,
                 "GAINZ_AUTO_OPEN": "0",
@@ -134,6 +164,10 @@ def main():
                     process.kill()
 
         print(f"{args.asset} release ZIP verified for Gainz {args.version}.")
+    finally:
+        if launched:
+            stop_gainz_processes_from_dir(temp_dir)
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 if __name__ == "__main__":
     try:
