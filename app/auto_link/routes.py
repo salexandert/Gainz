@@ -89,24 +89,20 @@ def auto_link():
 @login_required
 def auto_link_asset():
     transactions = current_app.config['transactions']
+    payload = request.get_json(silent=True) or {}
 
-    print(request.json)
-
-    if 'asset' in request.json:
-        asset = request.json['asset'][0]
+    if 'asset' in payload:
+        asset_value = payload['asset']
+        asset = asset_value[0] if isinstance(asset_value, list) else asset_value
     else:
         asset = None
 
-    year = request.json['year']
+    service = AutoLinkService()
+    year = service.selected_year(payload.get('year', 'All Time'))
 
-    if year == 'All Time':
-        year = None
-    else:
-        year = int(year)  # Ensure year is an integer
+    algo_type = payload.get('algo', 'fifo')
 
-    algo_type = request.json['algo']
-
-    message = AutoLinkService().auto_link(transactions, asset=asset, algo=algo_type, year=year)
+    message = service.auto_link(transactions, asset=asset, algo=algo_type, year=year)
 
     return jsonify(message)
 

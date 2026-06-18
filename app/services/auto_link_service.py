@@ -18,10 +18,14 @@ class AutoLinkService:
         return f"Auto Link using {algo} completed. Review generated links before using reports."
 
     def selected_year(self, year_value):
-        if year_value in (None, "", "All Time"):
+        if year_value is None:
             return None
 
-        return int(year_value)
+        normalized = str(year_value).strip()
+        if normalized in ("", "All Time"):
+            return None
+
+        return int(normalized)
 
     def assets_with_unlinked_sales(self, transactions, year=None, min_unlinked=None):
         min_unlinked = min_unlinked or self.MIN_UNLINKED_QUANTITY

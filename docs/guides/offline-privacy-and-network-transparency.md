@@ -46,8 +46,8 @@ Missing means Gainz had a saved local path for the evidence file, but the file w
 
 Audit packets include root-level status and handoff files:
 
-- `README_FIRST.md`: readiness status, open blockers, warnings, and evidence counts.
-- `PACKET_STATUS.md`: same status information for review workflows that look for a status file.
+- `README_FIRST.md`: human orientation, review order, folder map, and sharing reminder.
+- `PACKET_STATUS.md`: detailed status, evidence counts, blockers, warnings, and work order review counts.
 - `CPA_HANDOFF.md`: how the packet was generated and suggested review order.
 - `PRIVACY_AND_EVIDENCE_HANDLING.md`: local storage and evidence-copy explanation.
 

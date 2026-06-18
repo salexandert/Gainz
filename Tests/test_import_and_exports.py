@@ -803,6 +803,111 @@ class ImportAndExportTests(unittest.TestCase):
                 db.session.remove()
                 db.engine.dispose()
 
+    def test_auto_link_asset_normalizes_whitespace_all_time_year(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "demo"),
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class RouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(RouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            for payload in (
+                {"asset": ["BTC"], "algo": "fifo", "year": " All Time "},
+                {"asset": ["BTC"], "algo": "fifo"},
+            ):
+                with app.test_client() as client, patch(
+                    "app.auto_link.routes.AutoLinkService.auto_link",
+                    return_value="ok",
+                ) as auto_link_mock:
+                    response = client.post(
+                        "/auto_link/auto_link_asset",
+                        json=payload,
+                    )
+
+                self.assertEqual(200, response.status_code)
+                self.assertEqual("ok", response.get_json())
+                self.assertIsNone(auto_link_mock.call_args.kwargs["year"])
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_auto_link_all_fifo_normalizes_empty_and_missing_year_values(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "demo"),
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class RouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(RouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            for payload in ({"year": ""}, {}):
+                with app.test_client() as client, patch(
+                    "app.auto_link.routes.AutoLinkService.auto_link_unlinked_sales",
+                    return_value={
+                        "message": "ok",
+                        "links_created": 0,
+                        "fixed_assets": [],
+                        "failures": [],
+                        "algo": "fifo",
+                        "year": None,
+                    },
+                ) as auto_link_mock:
+                    response = client.post("/auto_link/auto_link_all_fifo", json=payload)
+
+                self.assertEqual(200, response.status_code)
+                self.assertIsNone(auto_link_mock.call_args.kwargs["year"])
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_auto_link_page_uses_explicit_year_option_values(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "demo"),
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class RouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(RouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.get("/auto_link/")
+
+            self.assertEqual(200, response.status_code)
+            self.assertIn(b'<option value="All Time">All Time</option>', response.data)
+            self.assertIn(b'<option value="2024">2024</option>', response.data)
+            self.assertNotIn(b"<option> All Time </option>", response.data)
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
     def test_bulk_holdings_sets_primary_asset_and_zeroes_others(self):
         transactions = empty_transactions()
         transactions.transactions = [
@@ -1141,6 +1246,8 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertTrue((Path(packet_payload["path"]) / "03_manifests" / "audit_packet_summary.json").exists())
             self.assertTrue(Path(export_payload["path"]).name.startswith("DRAFT_"))
             self.assertIn("gainz_audit_packet_DRAFT_", Path(packet_payload["path"]).name)
+            direct_workbooks = [path.resolve() for path in output_dir.glob("DRAFT_Export_*.xlsx")]
+            self.assertEqual([Path(export_payload["path"]).resolve()], direct_workbooks)
             workbook = load_workbook(export_payload["path"], read_only=True)
             self.assertIn("Packet Status", workbook.sheetnames)
             self.assertEqual(
@@ -1450,6 +1557,12 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertFalse((packet_path / "02_source_files" / "tax_evidence" / tax_evidence_path.name).exists())
             self.assertTrue((packet_path / "00_memos" / "DRAFT_NOT_FILING_READY.md").exists())
             packet_status = (packet_path / "PACKET_STATUS.md").read_text(encoding="utf-8")
+            readme_first = (packet_path / "README_FIRST.md").read_text(encoding="utf-8")
+            self.assertNotEqual(readme_first, packet_status)
+            self.assertIn("Read This First", readme_first)
+            self.assertIn("Folder Map", readme_first)
+            self.assertIn("Gainz Packet Status", packet_status)
+            self.assertIn("Open Blockers", packet_status)
             self.assertIn("DRAFT - NOT FILING READY", packet_status)
             self.assertIn("Reference-only tax evidence records: 1", packet_status)
             self.assertIn("CPA_HANDOFF.md", packet_status)
@@ -1472,8 +1585,34 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertTrue(any(row["blocker_type"] == "Import warning decision" for row in work_order_rows))
             self.assertIn("item_id", work_order_rows[0])
             self.assertIn("review_decision", work_order_rows[0])
-            self.assertEqual([], list(export_root.glob("Export_*.xlsx")))
-            self.assertEqual(1, len(list(export_root.glob("DRAFT_Export_*.xlsx"))))
+            self.assertEqual([], list(export_root.glob("*.xlsx")))
+
+    def test_audit_packet_manifest_uses_reference_only_for_label_only_tax_evidence(self):
+        transactions = empty_transactions()
+        buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "demo_data/cash_app_sample.csv")
+        transactions.transactions = [buy]
+        transactions.set_holdings("BTC", 1)
+        transactions.set_tax_evidence_record(
+            year=2024,
+            evidence_type="payment_receipt",
+            evidence_label="2024 payment confirmation",
+            evidence_path="",
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            packet_path = Path(
+                AuditPacketService(
+                    Path(temp_dir) / "packets",
+                    Path(temp_dir) / "exports",
+                ).create_packet(transactions)
+            )
+
+            with open(packet_path / "03_manifests" / "evidence_manifest.csv", newline="", encoding="utf-8") as file:
+                manifest_rows = list(csv.DictReader(file))
+
+            tax_evidence_rows = [row for row in manifest_rows if row["category"] == "tax_evidence"]
+            self.assertEqual(1, len(tax_evidence_rows))
+            self.assertEqual("REFERENCE_ONLY", tax_evidence_rows[0]["status"])
 
     def test_audit_packet_copies_tax_evidence_only_when_explicitly_enabled(self):
         transactions = empty_transactions()

@@ -55,14 +55,15 @@ class AuditPacketService:
 
         manifest_rows = []
 
-        report_path = ExportService(self.export_folder).export_to_excel(
+        report_path = ExportService(str(packet_dir / "01_reports")).export_to_excel(
             transactions,
             readiness=readiness,
         )
         if not readiness["is_ready"]:
             report_path = self._draft_report_path(report_path)
         report_dest = packet_dir / "01_reports" / Path(report_path).name
-        shutil.copy2(report_path, report_dest)
+        if Path(report_path).resolve() != report_dest.resolve():
+            shutil.copy2(report_path, report_dest)
         manifest_rows.append(
             self._manifest_row(
                 source_path=report_path,
@@ -196,7 +197,7 @@ class AuditPacketService:
     def _write_packet_status_files(self, packet_dir, readiness, manifest_rows):
         counts = self._manifest_evidence_counts(manifest_rows)
         status = "FILING-READY REVIEW PACKET" if readiness["is_ready"] else "DRAFT - NOT FILING READY"
-        lines = [
+        status_lines = [
             "# Gainz Packet Status",
             "",
             f"Status: {status}",
@@ -218,11 +219,11 @@ class AuditPacketService:
             "## Open Blockers",
             "",
         ]
-        lines.extend([f"- {blocker}" for blocker in readiness.get("blockers", [])] or ["- None"])
-        lines.extend(["", "## Open Warnings", ""])
-        lines.extend([f"- {warning}" for warning in readiness.get("warnings", [])] or ["- None"])
+        status_lines.extend([f"- {blocker}" for blocker in readiness.get("blockers", [])] or ["- None"])
+        status_lines.extend(["", "## Open Warnings", ""])
+        status_lines.extend([f"- {warning}" for warning in readiness.get("warnings", [])] or ["- None"])
         work_order_summary = readiness.get("work_order_review_summary") or {}
-        lines.extend([
+        status_lines.extend([
             "",
             "## Work Order Review Decisions",
             "",
@@ -234,7 +235,7 @@ class AuditPacketService:
             f"- Ignored for draft: {work_order_summary.get('ignored_for_draft_count', 0)}",
             f"- Sent to CPA: {work_order_summary.get('sent_to_cpa_count', 0)}",
         ])
-        lines.extend([
+        status_lines.extend([
             "",
             "## Important",
             "",
@@ -242,9 +243,42 @@ class AuditPacketService:
             "Review generated files and source records with a qualified tax professional before filing.",
             "",
         ])
-        content = "\n".join(lines)
-        (packet_dir / "README_FIRST.md").write_text(content, encoding="utf-8")
-        (packet_dir / "PACKET_STATUS.md").write_text(content, encoding="utf-8")
+        readme_lines = [
+            "# Read This First",
+            "",
+            "This folder is a Gainz audit packet generated from local transaction records and review decisions.",
+            "",
+            f"Packet status: {status}",
+            f"Readiness summary: {readiness['summary']}",
+            "",
+            "## Start Here",
+            "",
+            "1. Open `PACKET_STATUS.md` for the exact blocker, warning, and evidence counts.",
+            "2. Open `CPA_HANDOFF.md` for the review order and generation notes.",
+            "3. Open `PRIVACY_AND_EVIDENCE_HANDLING.md` before sharing the packet.",
+            "4. Review `01_reports/reconciliation_work_order.csv` for the itemized work queue.",
+            "",
+            "## Folder Map",
+            "",
+            "- `01_reports/`: generated workbook, Form 8949-style CSVs, holdings reconciliation, tax evidence inventory, and work order outputs.",
+            "- `02_source_files/`: copied transaction source files and explicitly copied tax evidence files.",
+            "- `03_manifests/`: evidence manifest, packet inventory, hashes, and JSON summaries.",
+            "- `00_memos/`: methodology and draft-status notes.",
+            "",
+            "## Evidence Handling",
+            "",
+            f"- Copied transaction source files: {counts['copied_transaction_sources']}",
+            f"- Copied tax evidence files: {counts['copied_tax_evidence']}",
+            f"- Reference-only tax evidence records: {counts['reference_only_evidence']}",
+            f"- Missing tax evidence file paths: {counts['missing_evidence']}",
+            "",
+            "Reference-only evidence is listed for review but is not copied into this packet.",
+            "",
+            "Gainz is documentation support only. It is not legal, financial, accounting, filing, or tax advice.",
+            "",
+        ]
+        (packet_dir / "README_FIRST.md").write_text("\n".join(readme_lines), encoding="utf-8")
+        (packet_dir / "PACKET_STATUS.md").write_text("\n".join(status_lines), encoding="utf-8")
 
     def _write_cpa_handoff(self, packet_dir, readiness, manifest_rows, transactions):
         counts = self._manifest_evidence_counts(manifest_rows)
@@ -335,7 +369,7 @@ class AuditPacketService:
                 rows.append({
                     "category": "tax_evidence",
                     "role": role,
-                    "status": "REFERENCE",
+                    "status": "REFERENCE_ONLY",
                     "source_path": record.get("evidence_label", ""),
                     "packet_relative_path": "",
                     "source_sha256": "",

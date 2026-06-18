@@ -918,6 +918,14 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual(1, eth_sell.unlinked_quantity)
         self.assertEqual(["test guided link"], transactions.saved_descriptions)
 
+    def test_auto_link_service_normalizes_year_values(self):
+        service = AutoLinkService()
+
+        self.assertIsNone(service.selected_year(None))
+        self.assertIsNone(service.selected_year(""))
+        self.assertIsNone(service.selected_year(" All Time "))
+        self.assertEqual(2024, service.selected_year(" 2024 "))
+
     def test_model_sell_defaults_to_fifo(self):
         transactions = empty_transactions()
         old_buy = Buy("BTC", 1, datetime.datetime(2020, 1, 1), 100, "old")

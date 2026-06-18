@@ -170,7 +170,11 @@ def count_manifest_rows(packet_path):
         ]),
         "reference_only_tax_evidence": len([
             row for row in rows
-            if row["category"] == "tax_evidence" and row["status"] in {"REFERENCE", "REFERENCE_ONLY"}
+            if row["category"] == "tax_evidence" and row["status"] == "REFERENCE_ONLY"
+        ]),
+        "legacy_reference_tax_evidence": len([
+            row for row in rows
+            if row["category"] == "tax_evidence" and row["status"] == "REFERENCE"
         ]),
         "missing_tax_evidence": len([
             row for row in rows
@@ -252,6 +256,8 @@ def run_packaged_workflow_smoke(temp_path, expected_version):
         raise AssertionError("Copied file count did not match packet preview.")
     if manifest_counts["reference_only_tax_evidence"] != preview["reference_only_files_count"]:
         raise AssertionError("Reference-only evidence count did not match packet preview.")
+    if manifest_counts["legacy_reference_tax_evidence"] != 0:
+        raise AssertionError("Manifest should use REFERENCE_ONLY, not legacy REFERENCE, for referenced tax evidence.")
     if manifest_counts["missing_tax_evidence"] != preview["missing_tax_evidence_count"]:
         raise AssertionError("Missing evidence count did not match packet preview.")
 
