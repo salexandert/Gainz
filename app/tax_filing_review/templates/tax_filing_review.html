@@ -133,6 +133,7 @@
                 <th>Reported Cost Basis</th>
                 <th>Reported Gain/Loss</th>
                 <th>Tax Paid</th>
+                <th>Combined</th>
                 <th>Review Note</th>
                 <th>Action</th>
               </tr>
@@ -157,6 +158,7 @@
                 <td><input form="{{ suggested_form_id }}" name="reported_cost_basis" type="number" step="0.01" class="form-control" value="{{ candidate.reported_cost_basis if candidate.reported_cost_basis is not none else '' }}"></td>
                 <td><input form="{{ suggested_form_id }}" name="reported_gain_loss" type="number" step="0.01" class="form-control" value="{{ candidate.reported_gain_loss if candidate.reported_gain_loss is not none else '' }}"></td>
                 <td><input form="{{ suggested_form_id }}" name="tax_paid" type="number" step="0.01" class="form-control" value="{{ candidate.tax_paid if candidate.tax_paid is not none else '' }}"></td>
+                <td>{{ candidate.combined_suggestions_count or 1 }}</td>
                 <td>
                   <input form="{{ suggested_form_id }}" name="notes" type="text" class="form-control" placeholder="Optional review note">
                   <small class="text-muted">{{ candidate.notes }}</small>
@@ -169,7 +171,7 @@
               </tr>
               {% else %}
               <tr>
-                <td colspan="9" class="text-muted">
+                <td colspan="10" class="text-muted">
                   No suggested totals found yet. Add or scan tax evidence files, then review any suggestions here.
                 </td>
               </tr>
@@ -216,6 +218,18 @@
               <small class="form-text text-muted">
                 Reference only: Gainz lists the local file path, but does not copy the file. Copied: Gainz includes the file in the audit packet. Scans default to reference only.
               </small>
+              <div class="form-group mt-3">
+                <label for="scan_preset">Scan Preset</label>
+                <select id="scan_preset" name="scan_preset" class="form-control">
+                  <option value="">Custom scan</option>
+                  {% for preset in evidence_scan_presets %}
+                  <option value="{{ preset.value }}">{{ preset.label }}</option>
+                  {% endfor %}
+                </select>
+                <small class="form-text text-muted">
+                  Presets apply common file-type and keyword filters so broad folders stay reference-only and easier to review.
+                </small>
+              </div>
               <div class="row mt-3">
                 <div class="col-md-4">
                   <label for="evidence_years">Years</label>

@@ -1,3 +1,4 @@
+import hashlib
 import os
 from pathlib import Path
 
@@ -56,6 +57,7 @@ def get_packet_preview(transactions, readiness, output_dir):
         "unresolved_blockers": unresolved_items,
         "unresolved_blocker_group_count": len(unresolved_groups),
         "unresolved_blocker_groups": unresolved_groups,
+        "work_order_review_summary": readiness.get("work_order_review_summary", {}),
         "output_folder": str(output_dir or ""),
         "packet_name": f"{packet_prefix}_YYYY-MM-DD_HH-MM-SS",
     }
@@ -72,8 +74,85 @@ WORK_ORDER_PRIORITIES = {
     "No open blockers": (90, "Ready"),
 }
 
+WORK_ORDER_REVIEW_DECISIONS = {
+    "resolved": "Resolved",
+    "needs_research": "Needs research",
+    "ignored_for_draft": "Ignored for draft",
+    "sent_to_cpa": "Sent to CPA",
+}
 
-def reconciliation_work_order_rows(readiness):
+
+def work_order_review_choices():
+    return [
+        {"value": value, "label": label}
+        for value, label in WORK_ORDER_REVIEW_DECISIONS.items()
+    ]
+
+
+def work_order_item_id(blocker_type, asset="", year="", date="", source_file="", suspected_issue=""):
+    identity = "|".join([
+        str(blocker_type or "").strip().lower(),
+        str(asset or "").strip().upper(),
+        str(year or "").strip(),
+        str(date or "").strip(),
+        str(source_file or "").strip().lower(),
+        str(suspected_issue or "").strip().lower(),
+    ])
+    return hashlib.sha256(identity.encode("utf-8")).hexdigest()[:16]
+
+
+def _work_order_review(transactions, item_id):
+    if transactions is None or not hasattr(transactions, "get_work_order_review"):
+        return None
+
+    return transactions.get_work_order_review(item_id)
+
+
+def _apply_work_order_review(row, transactions=None):
+    item_id = work_order_item_id(
+        row.get("blocker_type", ""),
+        asset=row.get("asset", ""),
+        year=row.get("year", ""),
+        date=row.get("date", ""),
+        source_file=row.get("source_file", ""),
+        suspected_issue=row.get("suspected_issue", ""),
+    )
+    review = _work_order_review(transactions, item_id) or {}
+    decision = str(review.get("decision") or "").strip()
+    decision_label = WORK_ORDER_REVIEW_DECISIONS.get(decision, "")
+
+    row["item_id"] = item_id
+    row["review_decision"] = decision
+    row["review_decision_label"] = decision_label
+    row["review_note"] = review.get("note", "")
+    row["review_updated_at"] = review.get("updated_at", "")
+    if decision_label:
+        row["status"] = decision_label
+
+    return row
+
+
+def work_order_review_summary(rows):
+    actionable_rows = [
+        row for row in rows
+        if row.get("blocker_type") != "No open blockers"
+    ]
+    decisions = [row.get("review_decision") for row in actionable_rows]
+    reviewed_count = len([decision for decision in decisions if decision])
+    summary = {
+        "total_items": len(actionable_rows),
+        "reviewed_count": reviewed_count,
+        "unreviewed_count": len(actionable_rows) - reviewed_count,
+        "resolved_count": decisions.count("resolved"),
+        "needs_research_count": decisions.count("needs_research"),
+        "ignored_for_draft_count": decisions.count("ignored_for_draft"),
+        "sent_to_cpa_count": decisions.count("sent_to_cpa"),
+    }
+    summary["is_complete"] = summary["unreviewed_count"] == 0
+    return summary
+
+
+def reconciliation_work_order_rows(readiness, transactions=None):
     rows = []
 
     def add_row(blocker_type, asset="", year="", date="", source_file="", suspected_issue="", next_action="", status="Open"):
@@ -163,8 +242,10 @@ def reconciliation_work_order_rows(readiness):
             status="Ready for review",
         )
 
+    reviewed_rows = [_apply_work_order_review(row, transactions=transactions) for row in rows]
+
     return sorted(
-        rows,
+        reviewed_rows,
         key=lambda row: (
             int(row.get("priority") or 80),
             str(row.get("year") or ""),
@@ -187,8 +268,11 @@ def reconciliation_work_order_markdown(rows):
         lines.extend([
             f"## {index}. {row['priority_label']}: {row['blocker_type']}",
             "",
+            f"- Item ID: {row.get('item_id') or 'N/A'}",
             f"- Priority: {row['priority']}",
             f"- Status: {row['status']}",
+            f"- Review decision: {row.get('review_decision_label') or 'Not reviewed'}",
+            f"- Review note: {row.get('review_note') or 'N/A'}",
             f"- Asset: {row['asset'] or 'N/A'}",
             f"- Year: {row['year'] or 'N/A'}",
             f"- Date: {row['date'] or 'N/A'}",

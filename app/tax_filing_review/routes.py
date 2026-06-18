@@ -20,6 +20,43 @@ from . import blueprint
 
 
 TAX_EVIDENCE_SCAN_EXTENSIONS = {".pdf", ".csv", ".xlsx", ".xls", ".txt", ".png", ".jpg", ".jpeg"}
+EVIDENCE_SCAN_PRESETS = {
+    "crypto_tax_evidence": {
+        "label": "Crypto tax evidence only",
+        "extensions": {".pdf", ".csv", ".xlsx", ".xls"},
+        "include_keywords": [
+            "crypto",
+            "bitcoin",
+            "btc",
+            "coinbase",
+            "cash app",
+            "8949",
+            "schedule d",
+            "capital gain",
+            "gain loss",
+            "tax workbook",
+        ],
+        "exclude_keywords": ["w2", "1098", "1099-int", "mortgage", "paystub"],
+    },
+    "filed_returns": {
+        "label": "Filed returns only",
+        "extensions": {".pdf"},
+        "include_keywords": ["1040", "return", "filed", "form 8949", "schedule d"],
+        "exclude_keywords": ["estimate", "worksheet", "workbook"],
+    },
+    "payment_receipts": {
+        "label": "Payment receipts only",
+        "extensions": {".pdf", ".txt", ".png", ".jpg", ".jpeg"},
+        "include_keywords": ["payment", "receipt", "confirmation", "direct pay", "eftps", "paid"],
+        "exclude_keywords": ["worksheet", "workbook"],
+    },
+    "transaction_csvs": {
+        "label": "Transaction CSVs only",
+        "extensions": {".csv"},
+        "include_keywords": ["coinbase", "cash app", "gdax", "transaction", "trades", "fills", "tax"],
+        "exclude_keywords": [],
+    },
+}
 
 
 def _available_years(alignment):
@@ -67,6 +104,10 @@ def _scan_year_filters():
 
 
 def _scan_extension_filters():
+    preset = EVIDENCE_SCAN_PRESETS.get(request.form.get("scan_preset") or "")
+    if preset:
+        return set(preset["extensions"])
+
     requested = _split_filter_values(request.form.getlist("evidence_file_types"))
     if not requested:
         return TAX_EVIDENCE_SCAN_EXTENSIONS
@@ -78,6 +119,20 @@ def _scan_extension_filters():
             extensions.add(extension)
 
     return extensions or TAX_EVIDENCE_SCAN_EXTENSIONS
+
+
+def _scan_keyword_filters(form_name, preset_key):
+    preset = EVIDENCE_SCAN_PRESETS.get(request.form.get("scan_preset") or "")
+    values = []
+    if preset:
+        values.extend(preset.get(preset_key, []))
+    values.extend(_split_filter_values(request.form.get(form_name) or ""))
+    deduped = []
+    for value in values:
+        normalized = str(value or "").strip().lower()
+        if normalized and normalized not in deduped:
+            deduped.append(normalized)
+    return deduped
 
 
 def _path_matches_scan_filters(path, years, include_keywords, exclude_keywords):
@@ -162,6 +217,10 @@ def index():
         evidence_inventory=evidence_inventory,
         suggested_totals=suggested_totals,
         evidence_type_choices=TAX_EVIDENCE_TYPE_CHOICES,
+        evidence_scan_presets=[
+            {"value": value, "label": preset["label"]}
+            for value, preset in EVIDENCE_SCAN_PRESETS.items()
+        ],
         available_years=_available_years(alignment),
         saved_year=request.args.get("saved_year"),
         saved_evidence=request.args.get("saved_evidence"),
@@ -286,10 +345,12 @@ def scan_tax_evidence_folder():
 
     folder = Path(folder_value)
     recursive = request.form.get("recursive") == "1"
+    scan_preset = request.form.get("scan_preset") or ""
+    scan_preset_label = EVIDENCE_SCAN_PRESETS.get(scan_preset, {}).get("label", "")
     year_filters = _scan_year_filters()
     extension_filters = _scan_extension_filters()
-    include_keywords = _split_filter_values(request.form.get("include_keywords") or "")
-    exclude_keywords = _split_filter_values(request.form.get("exclude_keywords") or "")
+    include_keywords = _scan_keyword_filters("include_keywords", "include_keywords")
+    exclude_keywords = _scan_keyword_filters("exclude_keywords", "exclude_keywords")
     copy_scanned_evidence = request.form.get("copy_scanned_evidence") == "1"
 
     if not folder.exists() or not folder.is_dir():
@@ -313,8 +374,12 @@ def scan_tax_evidence_folder():
             evidence_path=str(path),
             copy_to_packet=copy_scanned_evidence,
             notes=(
-                "Scanned from local evidence folder. "
-                "Reference only unless marked for packet copy."
+                (
+                    f"Scanned from local evidence folder using preset: {scan_preset_label}. "
+                    if scan_preset_label
+                    else "Scanned from local evidence folder. "
+                )
+                + "Reference only unless marked for packet copy."
             ),
         )
         added += 1

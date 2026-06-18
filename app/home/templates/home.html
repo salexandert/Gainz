@@ -65,6 +65,10 @@
             <span>Tax Evidence Years</span>
             <strong>{{ audit_readiness.metrics.tax_evidence_years_needing_review }}</strong>
           </div>
+          <div class="audit-readiness-item">
+            <span>Work Order Open</span>
+            <strong>{{ audit_readiness.metrics.work_order_unreviewed_items }}</strong>
+          </div>
         </div>
 
         {% if audit_readiness.blocker_groups %}

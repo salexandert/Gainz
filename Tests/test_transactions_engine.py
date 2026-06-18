@@ -42,6 +42,7 @@ def empty_transactions():
     transactions.basis_review_notes = []
     transactions.tax_year_records = []
     transactions.tax_evidence_records = []
+    transactions.work_order_reviews = []
     transactions.view = ""
     transactions.transactions = []
     transactions.saved_descriptions = []
@@ -113,6 +114,7 @@ class TransactionsEngineTests(unittest.TestCase):
             transactions.basis_review_notes = []
             transactions.tax_year_records = []
             transactions.tax_evidence_records = []
+            transactions.work_order_reviews = []
             transactions.view = ""
             transactions.transactions = []
 
@@ -512,8 +514,10 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual(1, len(suggestions))
         suggestion = suggestions[0]
         self.assertEqual(2, suggestion["duplicate_count"])
+        self.assertEqual(2, suggestion["combined_suggestions_count"])
         self.assertEqual("$300.00", suggestion["reported_proceeds_display"])
-        self.assertIn("Merged 2 duplicate suggested rows", suggestion["notes"])
+        self.assertIn("Similar suggestions were combined for this source.", suggestion["notes"])
+        self.assertNotIn("Merged 2 duplicate suggested rows", suggestion["notes"])
 
     def test_audit_readiness_distinguishes_reviewed_blocking_import_warnings(self):
         transactions = empty_transactions()
@@ -598,10 +602,50 @@ class TransactionsEngineTests(unittest.TestCase):
 
         self.assertEqual("Missing acquisition basis", rows[0]["blocker_type"])
         self.assertEqual("Reviewed import warning blocker", rows[1]["blocker_type"])
+        self.assertTrue(rows[0]["item_id"])
         self.assertEqual(10, rows[0]["priority"])
         self.assertEqual(20, rows[1]["priority"])
         self.assertTrue(rows[0]["priority_label"].startswith("P1"))
         self.assertTrue(rows[-1]["priority_label"].startswith("P5"))
+
+    def test_reconciliation_work_order_applies_saved_review_state(self):
+        transactions = empty_transactions()
+        readiness = {
+            "is_ready": False,
+            "missing_records": {
+                "current_holdings": [],
+                "holdings_explanations": [],
+                "basis": [
+                    {
+                        "asset": "BCH",
+                        "date": "2019-01-07",
+                        "source": "coinbase.csv",
+                        "message": "This sale needs earlier acquisition basis.",
+                        "status": "Missing acquisition basis",
+                    },
+                ],
+                "source_overlaps": [],
+                "filed_totals": [],
+            },
+            "unresolved_import_warning_rows": [],
+        }
+
+        initial_rows = reconciliation_work_order_rows(readiness, transactions)
+        transactions.set_work_order_review(
+            initial_rows[0]["item_id"],
+            decision="needs_research",
+            note="User will investigate source records later.",
+        )
+
+        reviewed_rows = reconciliation_work_order_rows(readiness, transactions)
+
+        self.assertEqual("needs_research", reviewed_rows[0]["review_decision"])
+        self.assertEqual("Needs research", reviewed_rows[0]["review_decision_label"])
+        self.assertEqual("Needs research", reviewed_rows[0]["status"])
+        self.assertEqual(
+            "User will investigate source records later.",
+            reviewed_rows[0]["review_note"],
+        )
 
     def test_partial_tax_year_research_record_stays_needs_research(self):
         transactions = empty_transactions()
@@ -683,6 +727,34 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual(2024, record["year"])
         self.assertEqual("payment_receipt", record["evidence_type"])
         self.assertEqual("2024 payment receipt", record["evidence_label"])
+
+    def test_work_order_reviews_round_trip_through_save_file(self):
+        original_basedir = transactions_module.basedir
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            (temp_path / "saves").mkdir()
+            transactions = empty_transactions()
+            transactions.save = Transactions.save.__get__(transactions, Transactions)
+            transactions.transactions = [
+                Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange")
+            ]
+            transactions.set_work_order_review(
+                "abc123",
+                decision="sent_to_cpa",
+                note="Asked CPA to review missing basis.",
+            )
+
+            try:
+                transactions_module.basedir = str(temp_path)
+                save_path = transactions.save(description="Work order review test")
+                loaded = Transactions(save_path)
+            finally:
+                transactions_module.basedir = original_basedir
+
+        record = loaded.get_work_order_review("abc123")
+        self.assertIsNotNone(record)
+        self.assertEqual("sent_to_cpa", record["decision"])
+        self.assertEqual("Asked CPA to review missing basis.", record["note"])
 
     def test_review_decisions_round_trip_through_save_file(self):
         original_basedir = transactions_module.basedir

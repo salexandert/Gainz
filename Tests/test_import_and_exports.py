@@ -50,9 +50,15 @@ def empty_transactions():
     transactions.basis_review_notes = []
     transactions.tax_year_records = []
     transactions.tax_evidence_records = []
+    transactions.work_order_reviews = []
     transactions.view = ""
     transactions.transactions = []
-    transactions.save = lambda description=None: None
+    transactions.saved_descriptions = []
+
+    def fake_save(description=None):
+        transactions.saved_descriptions.append(description)
+
+    transactions.save = fake_save
     return transactions
 
 
@@ -999,6 +1005,45 @@ class ImportAndExportTests(unittest.TestCase):
                 db.session.remove()
                 db.engine.dispose()
 
+    def test_tax_evidence_scan_preset_limits_file_types_and_keywords(self):
+        transactions = empty_transactions()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            evidence_dir = Path(temp_dir) / "evidence"
+            evidence_dir.mkdir()
+            (evidence_dir / "coinbase_transactions_2024.csv").write_text("Date,Asset,Amount\n", encoding="utf-8")
+            (evidence_dir / "2024_filed_return.pdf").write_text("synthetic return", encoding="utf-8")
+            (evidence_dir / "random_notes.txt").write_text("coinbase transaction notes", encoding="utf-8")
+
+            class RouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(RouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/tax_filing_review/scan_evidence_folder",
+                    data={
+                        "evidence_folder": str(evidence_dir),
+                        "scan_preset": "transaction_csvs",
+                        "recursive": "1",
+                    },
+                )
+
+            self.assertEqual(302, response.status_code)
+            self.assertIn("saved_evidence=1", response.location)
+            self.assertEqual(1, len(transactions.tax_evidence_records))
+            self.assertEqual("coinbase_transactions_2024.csv", transactions.tax_evidence_records[0]["evidence_label"])
+            self.assertIn("Transaction CSVs only", transactions.tax_evidence_records[0]["notes"])
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
     def test_tax_filing_review_imports_filed_totals_csv_with_unicode_hyphen_headers(self):
         transactions = empty_transactions()
         csv_text = (
@@ -1103,6 +1148,44 @@ class ImportAndExportTests(unittest.TestCase):
                 workbook["Packet Status"]["A1"].value,
             )
             workbook.close()
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_export_route_saves_work_order_review_state(self):
+        transactions = empty_transactions()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class ExportRouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(ExportRouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/export/work_order_review",
+                    json={
+                        "item_id": "work-item-1",
+                        "decision": "sent_to_cpa",
+                        "note": "Asked CPA to review this item.",
+                    },
+                )
+
+            self.assertEqual(200, response.status_code)
+            record = transactions.get_work_order_review("work-item-1")
+            self.assertIsNotNone(record)
+            self.assertEqual("sent_to_cpa", record["decision"])
+            self.assertEqual("Asked CPA to review this item.", record["note"])
+            self.assertIn(
+                "Updated work order item: Sent to CPA",
+                transactions.saved_descriptions,
+            )
 
             with app.app_context():
                 db.drop_all()
@@ -1349,6 +1432,7 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual("2024", suggested_rows[0]["year"])
             self.assertEqual("High", suggested_rows[0]["confidence"])
             self.assertEqual("200.00", suggested_rows[0]["reported_gain_loss"])
+            self.assertEqual("1", suggested_rows[0]["combined_suggestions_count"])
 
             summary = json.loads((packet_path / "03_manifests" / "audit_packet_summary.json").read_text(encoding="utf-8"))
             self.assertEqual(200, summary["form_8949_totals"]["total"]["gain_loss"])
@@ -1377,6 +1461,10 @@ class ImportAndExportTests(unittest.TestCase):
             with open(packet_path / "01_reports" / "reconciliation_work_order.csv", newline="", encoding="utf-8") as file:
                 work_order_rows = list(csv.DictReader(file))
             self.assertTrue(any(row["blocker_type"] == "Import warning decision" for row in work_order_rows))
+            self.assertIn("item_id", work_order_rows[0])
+            self.assertIn("review_decision", work_order_rows[0])
+            self.assertEqual([], list(export_root.glob("Export_*.xlsx")))
+            self.assertEqual(1, len(list(export_root.glob("DRAFT_Export_*.xlsx"))))
 
     def test_audit_packet_copies_tax_evidence_only_when_explicitly_enabled(self):
         transactions = empty_transactions()

@@ -802,6 +802,27 @@ def _reconciliation_checklist(
     ]
 
 
+def _work_order_checklist_item(work_order_summary):
+    total = work_order_summary.get("total_items", 0)
+    unreviewed = work_order_summary.get("unreviewed_count", 0)
+    reviewed = work_order_summary.get("reviewed_count", 0)
+    if total == 0:
+        detail = "No reconciliation work-order items are open."
+    elif unreviewed == 0:
+        detail = f"Review state recorded for {_count_label(reviewed, 'work-order item')}."
+    else:
+        detail = (
+            f"Choose a review state for {_count_label(unreviewed, 'work-order item')} "
+            "before treating the work order as complete."
+        )
+
+    return {
+        "label": "Work order review states recorded",
+        "complete": unreviewed == 0,
+        "detail": detail,
+    }
+
+
 def _compact_names(names, max_items=5):
     unique_names = sorted({str(name) for name in names if str(name).strip()})
     if len(unique_names) <= max_items:
@@ -1257,7 +1278,7 @@ def get_audit_readiness_summary(transactions):
         status_class = "status-verified"
         next_action = "Generate the audit packet, then review exported files against source records."
 
-    return {
+    summary = {
         "status": status,
         "status_class": status_class,
         "is_ready": is_ready,
@@ -1327,6 +1348,17 @@ def get_audit_readiness_summary(transactions):
             "README_FIRST, packet status, and methodology memos",
         ],
     }
+    from app.services.packet_plan_service import (
+        reconciliation_work_order_rows,
+        work_order_review_summary,
+    )
+
+    work_order_rows = reconciliation_work_order_rows(summary, transactions)
+    summary["work_order_review_summary"] = work_order_review_summary(work_order_rows)
+    summary["metrics"]["work_order_items"] = summary["work_order_review_summary"]["total_items"]
+    summary["metrics"]["work_order_unreviewed_items"] = summary["work_order_review_summary"]["unreviewed_count"]
+    summary["checklist"].append(_work_order_checklist_item(summary["work_order_review_summary"]))
+    return summary
 
 
 def fetch_crypto_price(trans):

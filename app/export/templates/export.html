@@ -74,6 +74,10 @@
             <span>Tax Evidence</span>
             <strong>{{ audit_readiness.metrics.tax_evidence_years_needing_review }}</strong>
           </div>
+          <div class="audit-readiness-item">
+            <span>Work Order Open</span>
+            <strong>{{ audit_readiness.metrics.work_order_unreviewed_items }}</strong>
+          </div>
         </div>
 
         <div class="audit-next-action">
@@ -118,6 +122,79 @@
             {% endfor %}
           </div>
         </div>
+
+        {% if work_order_rows %}
+        <div class="audit-packet-list" id="reconciliation-work-order">
+          <div class="d-flex flex-wrap justify-content-between align-items-start">
+            <div>
+              <h3 class="gainz-section-title">Reconciliation Work Order</h3>
+              <p class="card-category">Mark each open item as resolved, needs research, ignored for draft, or sent to a CPA.</p>
+            </div>
+            <span class="gainz-status-badge {% if audit_readiness.work_order_review_summary.unreviewed_count == 0 %}status-verified{% else %}status-needs-review{% endif %}">
+              {{ audit_readiness.work_order_review_summary.unreviewed_count }} unreviewed
+            </span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-striped">
+              <thead>
+                <tr>
+                  <th>Priority</th>
+                  <th>Item</th>
+                  <th>Issue</th>
+                  <th>Next Action</th>
+                  <th>Review State</th>
+                  <th>Note</th>
+                  <th>Save</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in work_order_rows %}
+                {% set work_order_form_id = "work-order-review-" ~ loop.index %}
+                <tr>
+                  <td>
+                    <strong>{{ row.priority_label }}</strong><br>
+                    <small>{{ row.asset or row.year or row.source_file or "General" }}</small>
+                  </td>
+                  <td>
+                    {{ row.blocker_type }}<br>
+                    <small class="text-muted">{{ row.date or row.source_file or row.year or row.item_id }}</small>
+                    <input form="{{ work_order_form_id }}" type="hidden" name="item_id" value="{{ row.item_id }}">
+                  </td>
+                  <td>{{ row.suspected_issue }}</td>
+                  <td>{{ row.next_action }}</td>
+                  <td>
+                    <select form="{{ work_order_form_id }}" name="decision" class="form-control" aria-label="Review state for {{ row.blocker_type }}">
+                      <option value="">Choose state</option>
+                      {% for choice in work_order_review_choices %}
+                      <option value="{{ choice.value }}" {% if row.review_decision == choice.value %}selected{% endif %}>{{ choice.label }}</option>
+                      {% endfor %}
+                    </select>
+                    {% if row.review_decision_label %}
+                    <small class="text-muted">Current: {{ row.review_decision_label }}</small>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <input
+                      form="{{ work_order_form_id }}"
+                      name="note"
+                      type="text"
+                      class="form-control"
+                      value="{{ row.review_note }}"
+                      placeholder="Optional note"
+                      aria-label="Work order review note"
+                    >
+                  </td>
+                  <td>
+                    <form id="{{ work_order_form_id }}" method="POST" action="{{ url_for('export_blueprint.work_order_review') }}"></form>
+                    <button form="{{ work_order_form_id }}" type="submit" class="btn btn-sm btn-outline-primary">Save</button>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
 
         {% if audit_readiness.blockers %}
         <div class="alert alert-warning" role="alert">

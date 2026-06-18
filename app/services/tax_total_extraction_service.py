@@ -77,6 +77,8 @@ def _empty_candidate(record):
         "confidence": "Low",
         "confidence_class": "status-needs-review",
         "notes": "",
+        "combined_suggestions_count": 1,
+        "duplicate_count": 1,
         "_conflict_counts": {},
         "matched_fields": [],
     }
@@ -363,6 +365,7 @@ def _merge_candidate_group(candidates):
         ),
     )
     merged = dict(ordered[0])
+    merged["combined_suggestions_count"] = len(candidates)
     merged["duplicate_count"] = len(candidates)
 
     notes = []
@@ -404,7 +407,8 @@ def _merge_candidate_group(candidates):
     elif evidence_ids:
         merged["evidence_id"] = "; ".join(evidence_ids)
 
-    notes.append(f"Merged {len(candidates)} duplicate suggested rows for this source/year/type.")
+    if "Similar suggestions were combined for this source." not in notes:
+        notes.append("Similar suggestions were combined for this source.")
     merged["notes"] = "; ".join(note for note in notes if note)
     _apply_confidence(merged)
     return merged

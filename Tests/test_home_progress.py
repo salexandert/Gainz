@@ -18,6 +18,7 @@ def empty_transactions():
     transactions.basis_review_notes = []
     transactions.tax_year_records = []
     transactions.tax_evidence_records = []
+    transactions.work_order_reviews = []
     transactions.saves = []
     transactions.conversions = []
     return transactions

@@ -49,6 +49,12 @@ BASIS_REVIEW_NOTE_COLUMNS = [
     "note",
     "updated_at",
 ]
+WORK_ORDER_REVIEW_COLUMNS = [
+    "item_id",
+    "decision",
+    "note",
+    "updated_at",
+]
 
 
 def _optional_cell(row, column):
@@ -133,6 +139,7 @@ class Transactions:
         self.basis_review_notes = []
         self.tax_year_records = []
         self.tax_evidence_records = []
+        self.work_order_reviews = []
 
         if view is not None:
             self.transactions = self.load(view)
@@ -274,6 +281,7 @@ class Transactions:
         self.basis_review_notes = self._load_basis_review_notes(workbook)
         self.tax_year_records = self._load_tax_year_records(workbook)
         self.tax_evidence_records = self._load_tax_evidence_records(workbook)
+        self.work_order_reviews = self._load_work_order_reviews(workbook)
 
         # Read Previously saved data into pandas df - Transactions
         trans_df = pd.read_excel(filename, sheet_name='All Transactions', converters = {'my_str_column': list})
@@ -567,6 +575,13 @@ class Transactions:
 
         return records
 
+    def _load_work_order_reviews(self, workbook):
+        return self._load_records_sheet(
+            workbook,
+            "Work Order Reviews",
+            WORK_ORDER_REVIEW_COLUMNS,
+        )
+
     def _load_tax_year_records(self, workbook):
         if 'Tax Year Records' not in workbook.sheetnames:
             return []
@@ -656,6 +671,33 @@ class Transactions:
         records.append(record)
         records.sort(key=lambda item: item["asset"])
         self.basis_review_notes = records
+        return record
+
+    def get_work_order_review(self, item_id):
+        item_id = str(item_id or "")
+        for record in getattr(self, "work_order_reviews", []) or []:
+            if str(record.get("item_id", "")) == item_id:
+                return record
+
+        return None
+
+    def set_work_order_review(self, item_id, decision="", note=""):
+        item_id = str(item_id or "")
+        record = {
+            "item_id": item_id,
+            "decision": str(decision or "").strip(),
+            "note": str(note or "").strip(),
+            "updated_at": strftime("%Y-%m-%d %H:%M:%S"),
+        }
+
+        records = [
+            existing
+            for existing in getattr(self, "work_order_reviews", []) or []
+            if str(existing.get("item_id", "")) != item_id
+        ]
+        records.append(record)
+        records.sort(key=lambda item: item["item_id"])
+        self.work_order_reviews = records
         return record
 
     def get_tax_year_record(self, year):
@@ -794,6 +836,10 @@ class Transactions:
             getattr(self, "tax_evidence_records", []),
             columns=TAX_EVIDENCE_RECORD_COLUMNS,
         )
+        work_order_reviews_df = pd.DataFrame(
+            getattr(self, "work_order_reviews", []),
+            columns=WORK_ORDER_REVIEW_COLUMNS,
+        )
 
         # Extract all links to ensure they're saved properly
         links_data = []
@@ -820,6 +866,7 @@ class Transactions:
             basis_review_notes_df.to_excel(writer, sheet_name="Basis Review Notes", index=False)
             tax_year_records_df.to_excel(writer, sheet_name="Tax Year Records", index=False)
             tax_evidence_records_df.to_excel(writer, sheet_name="Tax Evidence Records", index=False)
+            work_order_reviews_df.to_excel(writer, sheet_name="Work Order Reviews", index=False)
 
         # Open file to add description and update revision number
         workbook = load_workbook(filename=save_as_filename)

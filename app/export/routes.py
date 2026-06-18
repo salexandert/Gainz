@@ -1,12 +1,17 @@
 from pathlib import Path
 
 from . import blueprint
-from flask import render_template, request, jsonify, current_app
+from flask import render_template, request, jsonify, current_app, redirect, url_for
 from flask_login import login_required
 from utils import *
 from app.services.export_service import ExportService
 from app.services.audit_packet_service import AuditPacketService
-from app.services.packet_plan_service import get_packet_preview
+from app.services.packet_plan_service import (
+    WORK_ORDER_REVIEW_DECISIONS,
+    get_packet_preview,
+    reconciliation_work_order_rows,
+    work_order_review_choices,
+)
 
 
 def _path_for_display(path):
@@ -106,6 +111,10 @@ def index():
     stats_table_data = get_stats_table_data(transactions)
     audit_readiness = get_audit_readiness_summary(transactions)
     default_output_folder = _path_for_display(_default_packet_output_folder())
+    work_order_rows = [
+        row for row in reconciliation_work_order_rows(audit_readiness, transactions)
+        if row.get("blocker_type") != "No open blockers"
+    ]
 
     return render_template(
         'export.html',
@@ -115,7 +124,41 @@ def index():
         audit_packet_folder=_path_for_display(current_app.config['AUDIT_PACKET_FOLDER']),
         detected_tax_folder=_detected_tax_folder(),
         packet_preview=get_packet_preview(transactions, audit_readiness, default_output_folder),
+        work_order_rows=work_order_rows,
+        work_order_review_choices=work_order_review_choices(),
     )
+
+
+@blueprint.route('/work_order_review', methods=['POST'])
+@login_required
+def work_order_review():
+    transactions = current_app.config['transactions']
+    payload = request.get_json(silent=True) or {}
+    item_id = str(payload.get("item_id") or request.form.get("item_id") or "").strip()
+    decision = str(payload.get("decision") or request.form.get("decision") or "").strip()
+    note = str(payload.get("note") or request.form.get("note") or "").strip()
+
+    if not item_id:
+        if request.is_json:
+            return jsonify({"message": "Work order item id is required."}), 400
+        return redirect(url_for('export_blueprint.index', work_order_reviewed=0))
+
+    if decision not in WORK_ORDER_REVIEW_DECISIONS:
+        if request.is_json:
+            return jsonify({"message": "Choose a valid work order review state."}), 400
+        return redirect(url_for('export_blueprint.index', work_order_reviewed=0))
+
+    transactions.set_work_order_review(item_id, decision=decision, note=note)
+    transactions.save(description=f"Updated work order item: {WORK_ORDER_REVIEW_DECISIONS[decision]}")
+
+    if request.is_json:
+        return jsonify({
+            "item_id": item_id,
+            "decision": decision,
+            "decision_label": WORK_ORDER_REVIEW_DECISIONS[decision],
+        })
+
+    return redirect(url_for('export_blueprint.index', work_order_reviewed=1))
 
 
 @blueprint.route('/packet_preview.json', methods=['GET', 'POST'])

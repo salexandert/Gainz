@@ -59,9 +59,9 @@ class AuditPacketService:
             transactions,
             readiness=readiness,
         )
-        report_dest = packet_dir / "01_reports" / Path(report_path).name
         if not readiness["is_ready"]:
-            report_dest = packet_dir / "01_reports" / f"DRAFT_{Path(report_path).name}"
+            report_path = self._draft_report_path(report_path)
+        report_dest = packet_dir / "01_reports" / Path(report_path).name
         shutil.copy2(report_path, report_dest)
         manifest_rows.append(
             self._manifest_row(
@@ -117,7 +117,7 @@ class AuditPacketService:
         self._write_holdings_reports(packet_dir, transactions)
         self._write_import_warnings(packet_dir, transactions)
         self._write_source_overlap_review(packet_dir, transactions)
-        self._write_reconciliation_work_order(packet_dir, readiness)
+        self._write_reconciliation_work_order(packet_dir, readiness, transactions)
         self._write_packet_status_files(packet_dir, readiness, manifest_rows)
         self._write_manifest(packet_dir, manifest_rows)
         self._write_inventory(packet_dir)
@@ -152,6 +152,24 @@ class AuditPacketService:
 
     def _source_paths(self, transactions):
         return transaction_source_paths(transactions)
+
+    def _draft_report_path(self, report_path):
+        report_path = Path(report_path)
+        if report_path.name.startswith("DRAFT_"):
+            return str(report_path)
+
+        candidate = report_path.with_name(f"DRAFT_{report_path.name}")
+        if not candidate.exists():
+            report_path.replace(candidate)
+            return str(candidate)
+
+        index = 2
+        while True:
+            candidate = report_path.with_name(f"DRAFT_{report_path.stem}_{index}{report_path.suffix}")
+            if not candidate.exists():
+                report_path.replace(candidate)
+                return str(candidate)
+            index += 1
 
     def _write_packet_status_files(self, packet_dir, readiness, manifest_rows):
         copied_transaction_sources = len([
@@ -195,6 +213,19 @@ class AuditPacketService:
         lines.extend([f"- {blocker}" for blocker in readiness.get("blockers", [])] or ["- None"])
         lines.extend(["", "## Open Warnings", ""])
         lines.extend([f"- {warning}" for warning in readiness.get("warnings", [])] or ["- None"])
+        work_order_summary = readiness.get("work_order_review_summary") or {}
+        lines.extend([
+            "",
+            "## Work Order Review Decisions",
+            "",
+            f"- Work order items: {work_order_summary.get('total_items', 0)}",
+            f"- Reviewed items: {work_order_summary.get('reviewed_count', 0)}",
+            f"- Unreviewed items: {work_order_summary.get('unreviewed_count', 0)}",
+            f"- Resolved: {work_order_summary.get('resolved_count', 0)}",
+            f"- Needs research: {work_order_summary.get('needs_research_count', 0)}",
+            f"- Ignored for draft: {work_order_summary.get('ignored_for_draft_count', 0)}",
+            f"- Sent to CPA: {work_order_summary.get('sent_to_cpa_count', 0)}",
+        ])
         lines.extend([
             "",
             "## Important",
@@ -480,6 +511,7 @@ class AuditPacketService:
             "reported_cost_basis",
             "reported_gain_loss",
             "tax_paid",
+            "combined_suggestions_count",
             "matched_fields",
             "notes",
         ]
@@ -496,6 +528,7 @@ class AuditPacketService:
                     "reported_cost_basis": self._format_optional_money(row.get("reported_cost_basis")),
                     "reported_gain_loss": self._format_optional_money(row.get("reported_gain_loss")),
                     "tax_paid": self._format_optional_money(row.get("tax_paid")),
+                    "combined_suggestions_count": row.get("combined_suggestions_count", 1),
                     "matched_fields": ", ".join(row.get("matched_fields", [])),
                     "notes": row.get("notes", ""),
                 })
@@ -657,9 +690,10 @@ class AuditPacketService:
                     "next_action": row["next_action"],
                 })
 
-    def _write_reconciliation_work_order(self, packet_dir, readiness):
-        rows = reconciliation_work_order_rows(readiness)
+    def _write_reconciliation_work_order(self, packet_dir, readiness, transactions):
+        rows = reconciliation_work_order_rows(readiness, transactions)
         fieldnames = [
+            "item_id",
             "priority",
             "priority_label",
             "blocker_type",
@@ -670,6 +704,10 @@ class AuditPacketService:
             "suspected_issue",
             "next_action",
             "status",
+            "review_decision",
+            "review_decision_label",
+            "review_note",
+            "review_updated_at",
         ]
         with open(packet_dir / "01_reports" / "reconciliation_work_order.csv", "w", newline="", encoding="utf-8") as file:
             writer = csv.DictWriter(file, fieldnames=fieldnames)
@@ -730,6 +768,8 @@ class AuditPacketService:
             "missing_basis_rows": readiness["missing_records"]["basis"],
             "source_overlap_rows": readiness["missing_records"]["source_overlaps"],
             "reconciliation_checklist": readiness["checklist"],
+            "work_order_review_summary": readiness.get("work_order_review_summary", {}),
+            "reconciliation_work_order_rows": reconciliation_work_order_rows(readiness, transactions),
         }
         (packet_dir / "03_manifests" / "audit_packet_summary.json").write_text(
             json.dumps(summary, indent=2),
