@@ -140,7 +140,7 @@ jobs:
           cat > release_notes.md <<EOF
           # Gainz ${{ needs.validate.outputs.version }}
 
-          Gainz is a local-first crypto tax audit packet and reconciliation tool.
+          Gainz is a private offline crypto tax audit packet and reconciliation tool.
 
           ## Downloads
 

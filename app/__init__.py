@@ -26,6 +26,7 @@ def register_blueprints(app):
         'home',
         'import_transactions',
         'model',
+        'privacy',
         'setting',
         'stats',
         'tax_filing_review',

@@ -210,7 +210,7 @@ If blockers remain, Gainz can generate draft output only after you acknowledge t
 
 The audit packet includes:
 
-- `README_FIRST.md` and `PACKET_STATUS.md` at the packet root.
+- `README_FIRST.md`, `PACKET_STATUS.md`, `CPA_HANDOFF.md`, and `PRIVACY_AND_EVIDENCE_HANDLING.md` at the packet root.
 - Excel workbook with a visible `Packet Status` sheet plus transactions, stats, links, sales, and 8949 sheets.
 - Form 8949 short-term and long-term detail CSVs.
 - Form 8949 totals CSV and JSON.

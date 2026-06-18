@@ -1387,6 +1387,8 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertTrue((packet_path / "00_memos" / "METHODOLOGY.md").exists())
             self.assertTrue((packet_path / "README_FIRST.md").exists())
             self.assertTrue((packet_path / "PACKET_STATUS.md").exists())
+            self.assertTrue((packet_path / "CPA_HANDOFF.md").exists())
+            self.assertTrue((packet_path / "PRIVACY_AND_EVIDENCE_HANDLING.md").exists())
             self.assertTrue((packet_path / "03_manifests" / "evidence_manifest.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "form_8949_short_term.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "form_8949_totals.csv").exists())
@@ -1450,6 +1452,13 @@ class ImportAndExportTests(unittest.TestCase):
             packet_status = (packet_path / "PACKET_STATUS.md").read_text(encoding="utf-8")
             self.assertIn("DRAFT - NOT FILING READY", packet_status)
             self.assertIn("Reference-only tax evidence records: 1", packet_status)
+            self.assertIn("CPA_HANDOFF.md", packet_status)
+            cpa_handoff = (packet_path / "CPA_HANDOFF.md").read_text(encoding="utf-8")
+            self.assertIn("How This Packet Was Generated", cpa_handoff)
+            self.assertIn("Tax evidence is reference-only by default", cpa_handoff)
+            privacy_handling = (packet_path / "PRIVACY_AND_EVIDENCE_HANDLING.md").read_text(encoding="utf-8")
+            self.assertIn("does not require a hosted account", privacy_handling)
+            self.assertIn("Reference only means", privacy_handling)
 
             workbook_path = next((packet_path / "01_reports").glob("*.xlsx"))
             workbook = load_workbook(workbook_path, read_only=True)
@@ -1565,6 +1574,35 @@ class ImportAndExportTests(unittest.TestCase):
             summary = json.loads((packet_path / "03_manifests" / "audit_packet_summary.json").read_text(encoding="utf-8"))
             self.assertEqual(0, summary["import_warning_count"])
             self.assertEqual(1, summary["import_warning_review_count"])
+
+    def test_privacy_mode_page_lists_local_storage_and_open_folder_action(self):
+        transactions = empty_transactions()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class PrivacyRouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+                INSTANCE_PATH = str(Path(temp_dir) / "instance")
+                UPLOAD_FOLDER = str(Path(temp_dir) / "uploads")
+                EXPORT_FOLDER = str(Path(temp_dir) / "exports")
+                AUDIT_PACKET_FOLDER = str(Path(temp_dir) / "packets")
+
+            app = create_app(PrivacyRouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.get("/privacy/")
+
+                self.assertEqual(200, response.status_code)
+                self.assertIn(b"Offline / Privacy Mode", response.data)
+                self.assertIn(b"What Gainz Stores Locally", response.data)
+                self.assertIn(b"database.db", response.data)
+                self.assertIn(b"No Upload Required", response.data)
+
+                with patch("app.privacy.routes._open_folder") as open_folder:
+                    post_response = client.post("/privacy/open_data_folder")
+
+                self.assertEqual(302, post_response.status_code)
+                open_folder.assert_called_once()
 
 
 if __name__ == "__main__":

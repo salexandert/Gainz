@@ -266,6 +266,21 @@ def run_packaged_workflow_smoke(temp_path, expected_version):
     if summary["tax_evidence_packet_counts"]["missing"] != preview["missing_tax_evidence_count"]:
         raise AssertionError("Summary missing evidence count did not match packet preview.")
 
+    cpa_handoff_path = packet_path / "CPA_HANDOFF.md"
+    privacy_handling_path = packet_path / "PRIVACY_AND_EVIDENCE_HANDLING.md"
+    if not cpa_handoff_path.exists():
+        raise AssertionError("Audit packet is missing CPA_HANDOFF.md.")
+    if not privacy_handling_path.exists():
+        raise AssertionError("Audit packet is missing PRIVACY_AND_EVIDENCE_HANDLING.md.")
+    cpa_handoff = cpa_handoff_path.read_text(encoding="utf-8")
+    privacy_handling = privacy_handling_path.read_text(encoding="utf-8")
+    if "How This Packet Was Generated" not in cpa_handoff:
+        raise AssertionError("CPA_HANDOFF.md is missing packet generation notes.")
+    if "does not require a hosted account" not in privacy_handling:
+        raise AssertionError("Privacy handling memo is missing offline/no-upload language.")
+    if "Reference only means" not in privacy_handling:
+        raise AssertionError("Privacy handling memo is missing reference-only evidence language.")
+
     health_payload = wait_for_healthz(expected_version, timeout=5)
     if health_payload.get("version") != expected_version:
         raise AssertionError("Packaged workflow smoke finished against the wrong app version.")

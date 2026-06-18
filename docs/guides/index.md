@@ -1,6 +1,6 @@
 ---
 title: Crypto Tax Reconciliation Guides
-description: Practical Gainz guides for Cash App, Coinbase, Coinbase Convert, local crypto tax software, and Form 8949 audit packet workflows.
+description: Practical Gainz guides for Cash App, Coinbase, Coinbase Convert, private offline crypto tax reconciliation, and Form 8949 audit packet workflows.
 ---
 
 # Crypto Tax Reconciliation Guides
@@ -24,6 +24,7 @@ Use these guides when you are trying to turn exchange CSVs into reviewable crypt
 - [Synthetic crypto audit packet sample](sample-crypto-audit-packet/)
 - [What to give your CPA for crypto CSV reconciliation](crypto-cpa-checklist/)
 - [Local crypto tax software for private tax data](local-crypto-tax-software/)
+- [Offline privacy and evidence handling](offline-privacy-and-network-transparency/)
 
 ## Troubleshooting Guides
 

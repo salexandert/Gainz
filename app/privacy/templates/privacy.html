@@ -1,0 +1,103 @@
+{% extends "base_site.html" %}
+
+{% block title %} Privacy Mode {% endblock title %}
+
+{% block stylesheets %}
+  {{ super() }}
+{% endblock stylesheets %}
+
+{% block content %}
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div class="gainz-page-hero">
+          <div>
+            <h1 class="gainz-page-title">Offline / Privacy Mode</h1>
+            <p class="card-category">Private offline crypto tax reconciliation without uploading transaction history.</p>
+            <p class="mb-0">
+              Gainz runs in your browser at <code>127.0.0.1</code> and stores imported CSVs, saves, exports, and audit packets as local files on this computer.
+              Website, support, and download links only open externally when you click them.
+            </p>
+          </div>
+          <form method="POST" action="{{ url_for('privacy_blueprint.open_data_folder') }}">
+            <button type="submit" class="btn btn-primary btn-round">Open Local Data Folder</button>
+          </form>
+        </div>
+        {% if opened %}
+        <div class="alert alert-success mt-3" role="status">
+          Local data folder open request sent to the operating system.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="gainz-section-title">What Gainz Stores Locally</h2>
+        <p class="text-muted">
+          The local Gainz password gates the browser UI. It does not encrypt the CSV, XLSX, JSON, Markdown, or audit packet files stored on disk.
+          Protect these folders like other sensitive tax records.
+        </p>
+        <div class="table-responsive">
+          <table class="table table-sm table-striped">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Local Path</th>
+                <th>Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in storage_rows %}
+              <tr>
+                <td><strong>{{ row.label }}</strong></td>
+                <td><code>{{ row.path }}</code></td>
+                <td>{{ row.detail }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="gainz-section-title">No Upload Required</h2>
+        <ul class="gainz-plain-list">
+          <li>No hosted Gainz account is required.</li>
+          <li>No exchange API connection is required.</li>
+          <li>No wallet address sync is required.</li>
+          <li>Tax evidence scans default to reference-only records.</li>
+          <li>Audit packets copy tax evidence only when you explicitly select packet copy.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="gainz-section-title">What To Review Before Sharing</h2>
+        <ul class="gainz-plain-list">
+          <li>Audit packets may include copied transaction source files.</li>
+          <li>Copied evidence files appear in the packet manifest with hashes.</li>
+          <li>Reference-only evidence lists a local path or label but does not copy the file.</li>
+          <li>Draft packets preserve unresolved blockers and warnings for review.</li>
+          <li>Review generated files with a qualified tax professional before relying on them.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}

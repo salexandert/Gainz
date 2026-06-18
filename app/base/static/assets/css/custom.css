@@ -23,6 +23,31 @@
     text-align: center;
 }
 
+.first-run-privacy-summary {
+    background: #f7fbfb;
+    border: 1px solid rgba(15, 118, 110, 0.24);
+    border-radius: 8px;
+    color: #20313a;
+    margin: 0 0 18px;
+    padding: 14px;
+    text-align: left;
+}
+
+.first-run-privacy-summary strong {
+    display: block;
+    margin-bottom: 6px;
+}
+
+.first-run-privacy-summary p {
+    font-size: 14px;
+    line-height: 1.45;
+    margin-bottom: 8px;
+}
+
+.first-run-privacy-summary p:last-child {
+    margin-bottom: 0;
+}
+
 .login-field-label {
     color: #3f4a54;
     display: block;
@@ -45,6 +70,15 @@
     font-size: 20px;
     font-weight: 600;
     line-height: 1.25;
+    margin-bottom: 8px;
+}
+
+.gainz-plain-list {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.gainz-plain-list li {
     margin-bottom: 8px;
 }
 

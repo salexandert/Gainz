@@ -1,6 +1,6 @@
 ---
 title: Support Gainz
-description: Optional ways to support Gainz, a free local-first crypto tax documentation tool.
+description: Optional ways to support Gainz, a free private offline crypto tax documentation tool.
 ---
 
 # Support Gainz

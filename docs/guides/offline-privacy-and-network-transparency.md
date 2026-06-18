@@ -1,0 +1,64 @@
+---
+title: Offline Privacy And Evidence Handling
+description: Understand what Gainz stores locally, what it does not upload, and how reference-only evidence differs from copied evidence in audit packets.
+---
+
+# Offline Privacy And Evidence Handling
+
+Gainz is designed for private offline crypto tax reconciliation. The normal workflow does not require a hosted account, exchange API sync, wallet sync, or transaction-history upload.
+
+## What Gainz Stores Locally
+
+Gainz stores working files on your computer:
+
+- Imported transaction CSV copies.
+- Saved revisions and workbook-style `.xlsx` saves.
+- Generated Excel reports, CSV reports, JSON summaries, and Markdown notes.
+- Audit packet folders.
+- Tax evidence records, which are references by default.
+- A local database for the app account and settings.
+
+The local Gainz password gates the browser UI. It does not encrypt CSV, XLSX, JSON, Markdown, or audit packet files on disk. Protect the local data folder, export folders, backups, and synced folders the same way you protect other sensitive tax documents.
+
+## What Gainz Does Not Require
+
+Gainz does not require:
+
+- Uploading transaction history to a hosted Gainz account.
+- Connecting exchange API keys.
+- Connecting wallets.
+- Sending tax documents to a cloud parser.
+- Storing your crypto history on a Gainz server.
+
+External links such as the public website, GitHub Releases, docs, donation links, or update checks open only when you choose those actions outside the local reconciliation workflow.
+
+## Reference-Only Evidence Vs Copied Evidence
+
+Tax evidence scans default to reference-only handling.
+
+Reference only means Gainz records the local file path or label in the tax evidence inventory and audit packet, but does not copy the file into the packet.
+
+Copied means the file is included inside the audit packet and listed in `03_manifests/evidence_manifest.csv` with hashes.
+
+Missing means Gainz had a saved local path for the evidence file, but the file was not present when the packet was generated.
+
+## What Audit Packets Include
+
+Audit packets include root-level status and handoff files:
+
+- `README_FIRST.md`: readiness status, open blockers, warnings, and evidence counts.
+- `PACKET_STATUS.md`: same status information for review workflows that look for a status file.
+- `CPA_HANDOFF.md`: how the packet was generated and suggested review order.
+- `PRIVACY_AND_EVIDENCE_HANDLING.md`: local storage and evidence-copy explanation.
+
+Review these files before sharing a packet with a CPA or anyone else.
+
+## Before Sharing A Packet
+
+1. Open `03_manifests/evidence_manifest.csv`.
+2. Check every copied source file and tax evidence file.
+3. Confirm that reference-only paths are acceptable to share.
+4. Remove files that should not be included.
+5. Treat the packet like sensitive tax data.
+
+Gainz is documentation support only. It is not legal, financial, accounting, filing, or tax advice.

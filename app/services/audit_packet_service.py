@@ -119,6 +119,8 @@ class AuditPacketService:
         self._write_source_overlap_review(packet_dir, transactions)
         self._write_reconciliation_work_order(packet_dir, readiness, transactions)
         self._write_packet_status_files(packet_dir, readiness, manifest_rows)
+        self._write_cpa_handoff(packet_dir, readiness, manifest_rows, transactions)
+        self._write_privacy_and_evidence_handling(packet_dir, manifest_rows)
         self._write_manifest(packet_dir, manifest_rows)
         self._write_inventory(packet_dir)
         self._write_summary(packet_dir, manifest_rows, transactions)
@@ -171,23 +173,28 @@ class AuditPacketService:
                 return str(candidate)
             index += 1
 
+    def _manifest_evidence_counts(self, manifest_rows):
+        return {
+            "copied_transaction_sources": len([
+                row for row in manifest_rows
+                if row["category"] == "source_file" and row["status"] == "COPIED"
+            ]),
+            "copied_tax_evidence": len([
+                row for row in manifest_rows
+                if row["category"] == "tax_evidence" and row["status"] == "COPIED"
+            ]),
+            "reference_only_evidence": len([
+                row for row in manifest_rows
+                if row["category"] == "tax_evidence" and row["status"] in ("REFERENCE", "REFERENCE_ONLY")
+            ]),
+            "missing_evidence": len([
+                row for row in manifest_rows
+                if row["category"] == "tax_evidence" and row["status"] == "MISSING"
+            ]),
+        }
+
     def _write_packet_status_files(self, packet_dir, readiness, manifest_rows):
-        copied_transaction_sources = len([
-            row for row in manifest_rows
-            if row["category"] == "source_file" and row["status"] == "COPIED"
-        ])
-        copied_tax_evidence = len([
-            row for row in manifest_rows
-            if row["category"] == "tax_evidence" and row["status"] == "COPIED"
-        ])
-        reference_only_evidence = len([
-            row for row in manifest_rows
-            if row["category"] == "tax_evidence" and row["status"] in ("REFERENCE", "REFERENCE_ONLY")
-        ])
-        missing_evidence = len([
-            row for row in manifest_rows
-            if row["category"] == "tax_evidence" and row["status"] == "MISSING"
-        ])
+        counts = self._manifest_evidence_counts(manifest_rows)
         status = "FILING-READY REVIEW PACKET" if readiness["is_ready"] else "DRAFT - NOT FILING READY"
         lines = [
             "# Gainz Packet Status",
@@ -199,13 +206,14 @@ class AuditPacketService:
             "",
             "## Evidence Handling",
             "",
-            f"- Copied transaction source files: {copied_transaction_sources}",
-            f"- Copied tax evidence files: {copied_tax_evidence}",
-            f"- Reference-only tax evidence records: {reference_only_evidence}",
-            f"- Missing tax evidence file paths: {missing_evidence}",
+            f"- Copied transaction source files: {counts['copied_transaction_sources']}",
+            f"- Copied tax evidence files: {counts['copied_tax_evidence']}",
+            f"- Reference-only tax evidence records: {counts['reference_only_evidence']}",
+            f"- Missing tax evidence file paths: {counts['missing_evidence']}",
             "",
             "Reference only means the local file path or label is listed in the packet, but the file itself is not copied.",
             "Copied means the file is included inside `02_source_files/` and appears in the manifest with hashes.",
+            "See `CPA_HANDOFF.md` and `PRIVACY_AND_EVIDENCE_HANDLING.md` before sharing this packet.",
             "",
             "## Open Blockers",
             "",
@@ -237,6 +245,81 @@ class AuditPacketService:
         content = "\n".join(lines)
         (packet_dir / "README_FIRST.md").write_text(content, encoding="utf-8")
         (packet_dir / "PACKET_STATUS.md").write_text(content, encoding="utf-8")
+
+    def _write_cpa_handoff(self, packet_dir, readiness, manifest_rows, transactions):
+        counts = self._manifest_evidence_counts(manifest_rows)
+        status = "FILING-READY REVIEW PACKET" if readiness["is_ready"] else "DRAFT - NOT FILING READY"
+        assets = ", ".join(sorted(transactions.assets)) if transactions.assets else "None"
+        lines = [
+            "# CPA Handoff",
+            "",
+            f"Status: {status}",
+            f"Readiness: {readiness['status']}",
+            f"Summary: {readiness['summary']}",
+            f"Next action: {readiness['next_action']}",
+            "",
+            "## How This Packet Was Generated",
+            "",
+            "- Gainz generated this packet locally from imported transaction records, user-entered holdings, review decisions, and tax evidence references stored on this computer.",
+            "- The workbook in `01_reports/` was generated from the current Gainz save.",
+            "- Transaction source files that still existed on disk were copied into `02_source_files/`.",
+            "- Tax evidence is reference-only by default. Tax evidence files are copied only when the user explicitly marks them for packet copy.",
+            "- Open blockers and warning decisions are preserved in `README_FIRST.md`, `PACKET_STATUS.md`, and the reconciliation work order files.",
+            "",
+            "## Packet Contents To Review",
+            "",
+            f"- Transactions: {len(transactions.transactions)}",
+            f"- Assets: {assets}",
+            f"- Copied transaction source files: {counts['copied_transaction_sources']}",
+            f"- Copied tax evidence files: {counts['copied_tax_evidence']}",
+            f"- Reference-only tax evidence records: {counts['reference_only_evidence']}",
+            f"- Missing tax evidence file paths: {counts['missing_evidence']}",
+            "",
+            "## Suggested Review Order",
+            "",
+            "1. Open `README_FIRST.md` or `PACKET_STATUS.md` for readiness and open blockers.",
+            "2. Review `01_reports/reconciliation_work_order.csv` for the itemized work queue.",
+            "3. Review Form 8949-style detail and totals in the workbook and CSV reports.",
+            "4. Review source files and evidence references before relying on generated totals.",
+            "",
+            "Gainz is documentation support only. It is not legal, financial, accounting, filing, or tax advice.",
+            "",
+        ]
+        (packet_dir / "CPA_HANDOFF.md").write_text("\n".join(lines), encoding="utf-8")
+
+    def _write_privacy_and_evidence_handling(self, packet_dir, manifest_rows):
+        counts = self._manifest_evidence_counts(manifest_rows)
+        lines = [
+            "# Privacy And Evidence Handling",
+            "",
+            "Gainz is private offline crypto tax reconciliation software. This packet was generated locally on the user's computer.",
+            "",
+            "## Network And Storage Model",
+            "",
+            "- Gainz does not require a hosted account, exchange API sync, wallet sync, or transaction-history upload for this workflow.",
+            "- Imported CSVs, saves, exports, audit packets, and evidence references are local files.",
+            "- Local files remain on this computer unless the user shares, uploads, syncs, or backs them up through another service.",
+            "- The local Gainz password gates the browser UI. It does not encrypt local CSV, XLSX, JSON, Markdown, or packet files.",
+            "",
+            "## Evidence Handling In This Packet",
+            "",
+            f"- Copied transaction source files: {counts['copied_transaction_sources']}",
+            f"- Copied tax evidence files: {counts['copied_tax_evidence']}",
+            f"- Reference-only tax evidence records: {counts['reference_only_evidence']}",
+            f"- Missing tax evidence file paths: {counts['missing_evidence']}",
+            "",
+            "Reference only means the local file path or label is listed in the packet, but the file itself is not copied.",
+            "Copied means the file is included inside `02_source_files/` and appears in `03_manifests/evidence_manifest.csv` with hashes.",
+            "Missing means Gainz had a saved local path for the evidence file, but the file was not present when the packet was generated.",
+            "",
+            "## Before Sharing",
+            "",
+            "- Review `03_manifests/evidence_manifest.csv` for every copied or referenced file.",
+            "- Remove any source files or evidence copies that should not be shared.",
+            "- Treat this packet like sensitive tax data.",
+            "",
+        ]
+        (packet_dir / "PRIVACY_AND_EVIDENCE_HANDLING.md").write_text("\n".join(lines), encoding="utf-8")
 
     def _copy_tax_evidence_files(self, packet_dir, transactions):
         rows = []

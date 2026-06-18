@@ -1,6 +1,6 @@
 ---
 title: Download Gainz
-description: Download the latest local Windows or macOS build of Gainz, a crypto tax audit packet and cost-basis reconciliation tool.
+description: Download the latest private offline Windows or macOS build of Gainz, a crypto tax audit packet and cost-basis reconciliation tool.
 schema_type: SoftwareApplication
 ---
 
@@ -18,7 +18,7 @@ schema_type: SoftwareApplication
   <aside class="download-meta" aria-label="Download details">
     <div><span>Version</span><strong>{{ site.version }}</strong></div>
     <div><span>Platform</span><strong>Windows</strong></div>
-    <div><span>Data model</span><strong>Local-first</strong></div>
+    <div><span>Data model</span><strong>Offline/private</strong></div>
     <div><span>Price</span><strong>Free, donations optional</strong></div>
   </aside>
 </section>
@@ -35,7 +35,7 @@ schema_type: SoftwareApplication
   <aside class="download-meta" aria-label="macOS download details">
     <div><span>Version</span><strong>{{ site.version }}</strong></div>
     <div><span>Platform</span><strong>macOS</strong></div>
-    <div><span>Data model</span><strong>Local-first</strong></div>
+    <div><span>Data model</span><strong>Offline/private</strong></div>
     <div><span>Price</span><strong>Free, donations optional</strong></div>
   </aside>
 </section>
@@ -44,7 +44,7 @@ schema_type: SoftwareApplication
 
 Windows may show a SmartScreen warning and macOS may show an unidentified developer warning while Gainz is young because the packages are not code-signed yet. Only download Gainz from `cryptogainz.store` or the official GitHub repository. See [Windows SmartScreen Warning For Gainz]({{ '/guides/windows-smartscreen/' | relative_url }}) before clicking through the Windows warning.
 
-Gainz runs on your machine. Imported CSVs, saves, exports, and audit packets stay local unless you choose to share them.
+Gainz runs on your machine without requiring a hosted account, exchange API sync, wallet sync, or transaction-history upload. Imported CSVs, saves, exports, and audit packets stay local unless you choose to share them.
 
 ## First Run On Windows
 

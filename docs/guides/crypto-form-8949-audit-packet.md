@@ -13,7 +13,7 @@ Crypto tax work is easier to review when generated totals can be traced back to 
 
 A Gainz audit packet can include:
 
-- `README_FIRST.md` and `PACKET_STATUS.md` at the packet root.
+- `README_FIRST.md`, `PACKET_STATUS.md`, `CPA_HANDOFF.md`, and `PRIVACY_AND_EVIDENCE_HANDLING.md` at the packet root.
 - Excel workbook export with a visible packet status sheet.
 - Form 8949 short-term detail CSV.
 - Form 8949 long-term detail CSV.

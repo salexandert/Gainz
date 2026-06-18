@@ -250,7 +250,7 @@ def build_home():
         _generated_header("Home.md").rstrip(),
         "# Gainz Wiki",
         "",
-        "Gainz is a local-first crypto tax review and audit-packet tool. The public documentation is maintained in the main repository under `docs/`, published to the website, and mirrored here as generated wiki pages.",
+        "Gainz is a private offline crypto tax review and audit-packet tool. The public documentation is maintained in the main repository under `docs/`, published to the website, and mirrored here as generated wiki pages.",
         "",
         f"- Public website and docs: <{site_url}>",
         f"- Main repository: <{REPO_URL}>",

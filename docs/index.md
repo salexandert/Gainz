@@ -1,14 +1,14 @@
 ---
-title: Local Crypto Tax Audit Packet Tool
-description: Gainz is local-first crypto tax software for reconciling exchange CSVs, linking cost basis, reviewing current holdings, and generating audit packets for CPA review.
+title: Private Offline Crypto Tax Reconciliation
+description: Gainz is private offline crypto tax software for reconciling exchange CSVs, linking cost basis, reviewing current holdings, and generating audit packets for CPA review.
 schema_type: SoftwareApplication
 ---
 
 <section class="hero">
   <div>
-    <p class="eyebrow">Local-first crypto tax reconciliation</p>
+    <p class="eyebrow">Private offline crypto tax reconciliation</p>
     <h1>Gainz</h1>
-    <p>Turn messy crypto exports into linked basis, Form 8949-style rows, current holdings reconciliation, and an audit packet you can review with a qualified tax professional.</p>
+    <p>Import CSVs, review missing basis and holdings gaps, scan tax evidence by reference, and generate CPA-ready draft audit packets without uploading your transaction history.</p>
     <div class="button-row">
       <a class="button" href="{{ '/download/' | relative_url }}">Download Gainz for Windows</a>
       <a class="button-secondary" href="{{ '/guides/' | relative_url }}">Read the docs</a>
@@ -24,6 +24,39 @@ schema_type: SoftwareApplication
       <div class="metric"><span>Data</span><strong>Stays on your machine</strong></div>
     </div>
   </aside>
+</section>
+
+<section class="section-band">
+  <h2>Why Offline And Private</h2>
+  <p class="section-intro">Hosted crypto tax tools are useful when you want quick exchange sync and filing. Gainz is for privacy-sensitive reconciliation work where the important job is explaining old records, evidence gaps, current holdings, and CPA handoff without first uploading raw tax history.</p>
+  <div class="grid">
+    <div class="card">
+      <h3>Cloud crypto tax apps</h3>
+      <p>Best for fast sync, hosted workflows, and direct filing paths when you are comfortable connecting accounts or uploading history.</p>
+    </div>
+    <div class="card">
+      <h3>Open-source calculators</h3>
+      <p>Private and powerful, but often technical. They can be harder for non-developers to use as a review queue for messy records.</p>
+    </div>
+    <div class="card">
+      <h3>Gainz</h3>
+      <p>Offline reconciliation, holdings gap review, tax evidence inventory, work order output, and CPA packet generation from local files.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section-band">
+  <h2>Who Gainz Is For</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Good fit</h3>
+      <p>Users with historical CSVs, missing basis questions, current-holdings gaps, privacy concerns, or a CPA who needs organized evidence.</p>
+    </div>
+    <div class="card">
+      <h3>Not the goal</h3>
+      <p>One-click exchange sync, hosted tax filing, automatic tax advice, or a replacement for professional review.</p>
+    </div>
+  </div>
 </section>
 
 <section class="section-band">
@@ -79,6 +112,7 @@ These pages target the moments where people are stuck with exchange exports, mis
   <li><a href="{{ '/guides/sample-crypto-audit-packet/' | relative_url }}">Download a synthetic crypto audit packet sample</a></li>
   <li><a href="{{ '/guides/crypto-cpa-checklist/' | relative_url }}">What to give your CPA for crypto CSV reconciliation</a></li>
   <li><a href="{{ '/guides/local-crypto-tax-software/' | relative_url }}">Why local crypto tax software matters for private tax data</a></li>
+  <li><a href="{{ '/guides/offline-privacy-and-network-transparency/' | relative_url }}">Offline privacy and evidence handling</a></li>
   <li><a href="{{ '/guides/local-password-reset/' | relative_url }}">How to reset your local Gainz password</a></li>
   <li><a href="{{ '/guides/windows-smartscreen/' | relative_url }}">Why Windows may show a SmartScreen warning for Gainz</a></li>
 </ul>

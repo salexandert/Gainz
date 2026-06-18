@@ -18,6 +18,8 @@ The sample ZIP contains:
 
 - `README_FIRST.md`: packet status, draft/readiness state, evidence-copy summary, and open blockers.
 - `PACKET_STATUS.md`: the same packet status information for review workflows that look for a status file.
+- `CPA_HANDOFF.md`: how the packet was generated and suggested review order.
+- `PRIVACY_AND_EVIDENCE_HANDLING.md`: reference-only vs copied evidence and local storage notes.
 - `00_memos/METHODOLOGY.md`: a short explanation of how the synthetic records were prepared.
 - `01_reports/reconciliation_work_order.csv`: a review queue of blockers, suspected issues, and next actions.
 - `01_reports/form_8949_totals.csv`: short-term, long-term, and total proceeds, basis, and gain/loss totals.

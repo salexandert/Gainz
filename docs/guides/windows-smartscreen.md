@@ -13,7 +13,7 @@ This does not mean Windows found malware in Gainz. It usually means the executab
 
 Microsoft Defender SmartScreen checks downloaded apps before they run. Microsoft says SmartScreen evaluates publisher reputation and file hash reputation. A new app, a new build, an unsigned file, or a file without enough download history can show a warning even when the file is legitimate.
 
-Gainz is currently a young local-first project. Until Gainz releases are code-signed and build reputation over time, Windows users may see this warning.
+Gainz is currently a young private offline project. Until Gainz releases are code-signed and build reputation over time, Windows users may see this warning.
 
 Microsoft references:
 

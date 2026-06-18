@@ -1345,7 +1345,7 @@ def get_audit_readiness_summary(transactions):
             "Copied source files when still available on disk",
             "Tax evidence references by default, with copied tax evidence only when explicitly selected",
             "Evidence manifest, packet inventory, and SHA-256 hashes",
-            "README_FIRST, packet status, and methodology memos",
+            "README_FIRST, packet status, CPA handoff, privacy/evidence handling, and methodology memos",
         ],
     }
     from app.services.packet_plan_service import (

@@ -20,7 +20,17 @@
         {% if setup_required %}
         <form data-parsley-validate method="post">
           <h1>Create Local Admin</h1>
-          <p class="text-muted">First run only. This account is stored locally on this computer.</p>
+          <div class="first-run-privacy-summary">
+            <strong>Private offline setup</strong>
+            <p>
+              This creates a local browser login only. Gainz does not require a hosted account,
+              exchange API connection, wallet sync, or transaction upload.
+            </p>
+            <p>
+              Imported CSVs, xlsx saves, exports, and audit packets remain normal local files on this computer.
+              The password gates the local UI; it does not encrypt those files.
+            </p>
+          </div>
           {% for field in create_form if field.widget.input_type != 'hidden'  %}
             <div>
               {{ field.label(class="login-field-label") }}

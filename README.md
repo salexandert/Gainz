@@ -4,12 +4,12 @@ Gainz is a local, offline crypto accounting workbench for people who want to rec
 
 It helps import transactions, link sells to buys, estimate cost basis, review unresolved sends/receives, and export Excel reports for documentation or CPA review.
 
-Gainz is best understood as a **local-first crypto tax audit packet tool**. It does not try to be a hosted tax service. It helps you turn messy exchange exports into traceable basis links, Form 8949-style rows, current holdings reconciliation, and a documentation packet you can review with a qualified tax professional.
+Gainz is best understood as **private offline crypto tax reconciliation**. It does not try to be a hosted tax service. It helps you turn messy exchange exports into traceable basis links, Form 8949-style rows, current holdings reconciliation, and a documentation packet you can review with a qualified tax professional without uploading your transaction history.
 
 ## What Gainz Is
 
-- Offline-first: runs locally on your machine.
-- Privacy-oriented: imported files stay on your machine unless you choose to share exports.
+- Private offline workflow: runs locally on your machine without requiring a hosted account or transaction-history upload.
+- Privacy-oriented: imported files, saved revisions, reports, and audit packets stay on your machine unless you choose to share exports.
 - Reconciliation-focused: designed to help explain messy crypto history, not just produce a final number.
 - Spreadsheet-friendly: exports Excel reports, Form 8949-style sheets, transaction history, and audit packets.
 
@@ -29,7 +29,7 @@ Always review outputs with a qualified tax professional before filing.
 - Click-by-click app walkthrough: [docs/user-walkthrough.md](docs/user-walkthrough.md)
 - Crypto cost basis learning guide: [docs/guides/crypto-cost-basis-learning.md](docs/guides/crypto-cost-basis-learning.md)
 
-The `docs/` folder is the public documentation source of truth for the app repository. The GitHub Wiki is generated from these docs. The public website lives in the separate `salexandert/Gainz-Website` repository and syncs selected screenshots, links, and guide references from this repo so website hosting stays separate from the local-first app code.
+The `docs/` folder is the public documentation source of truth for the app repository. The GitHub Wiki is generated from these docs. The public website lives in the separate `salexandert/Gainz-Website` repository and syncs selected screenshots, links, and guide references from this repo so website hosting stays separate from the offline app code.
 
 ## Supported Inputs
 
@@ -121,7 +121,7 @@ A good demo run is:
 9. Expand **Review Details** only when you need row-level evidence.
 10. Review the audit packet preview, then generate the workbook or draft audit packet.
 
-The audit packet includes root `README_FIRST.md` and `PACKET_STATUS.md` files, the Excel workbook with a visible packet status sheet, Form 8949 detail CSVs, Form 8949 totals, tax filing review, tax evidence inventory, suggested filed totals, reconciliation work order CSV/Markdown, holdings reconciliation, current holdings lots, active and preserved import-warning decisions, missing-basis review, source-overlap review, copied transaction source files when available, tax evidence references, explicitly selected tax evidence copies, hashes, and a methodology memo.
+The audit packet includes root `README_FIRST.md`, `PACKET_STATUS.md`, `CPA_HANDOFF.md`, and `PRIVACY_AND_EVIDENCE_HANDLING.md` files, the Excel workbook with a visible packet status sheet, Form 8949 detail CSVs, Form 8949 totals, tax filing review, tax evidence inventory, suggested filed totals, reconciliation work order CSV/Markdown, holdings reconciliation, current holdings lots, active and preserved import-warning decisions, missing-basis review, source-overlap review, copied transaction source files when available, tax evidence references, explicitly selected tax evidence copies, hashes, and a methodology memo.
 
 ## Documentation
 
@@ -130,6 +130,7 @@ The audit packet includes root `README_FIRST.md` and `PACKET_STATUS.md` files, t
 - [Crypto cost basis learning path](docs/guides/crypto-cost-basis-learning.md)
 - [Using Gainz from import to audit packet](docs/user-walkthrough.md)
 - [How Gainz calculates basis](docs/how-gainz-calculates-basis.md)
+- [Offline privacy and evidence handling](docs/guides/offline-privacy-and-network-transparency.md)
 - [Synthetic crypto audit packet sample](docs/guides/sample-crypto-audit-packet.md)
 - [What to give your CPA checklist](docs/guides/crypto-cpa-checklist.md)
 - [Coinbase missing cost basis troubleshooting](docs/guides/coinbase-missing-cost-basis.md)

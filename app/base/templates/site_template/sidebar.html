@@ -36,6 +36,12 @@
         <p>Tax Evidence</p>
       </a>
     </li>
+    <li class="{% if current_path.startswith('/privacy') %}active{% endif %}">
+      <a href="{{ url_for('privacy_blueprint.index') }}" {% if current_path.startswith('/privacy') %}aria-current="page"{% endif %}>
+        <i class="nc-icon nc-lock-circle-open" aria-hidden="true"></i>
+        <p>Privacy Mode</p>
+      </a>
+    </li>
     <li class="{% if current_path.startswith('/export') %}active{% endif %}">
       <a href="{{ url_for('export_blueprint.index') }}" {% if current_path.startswith('/export') %}aria-current="page"{% endif %}>
         <i class="nc-icon nc-share-66" aria-hidden="true"></i>
