@@ -32,6 +32,18 @@ Gainz does not require:
 
 External links such as the public website, GitHub Releases, docs, donation links, or update checks open only when you choose those actions outside the local reconciliation workflow.
 
+## Privacy Proof Checklist
+
+Use this checklist to verify the private offline workflow:
+
+- Gainz runs at `127.0.0.1`, which points back to your own computer.
+- The app account is stored in the local database, not a hosted Gainz account.
+- The core workflow uses CSV imports and manual review, not required exchange API keys or wallet connections.
+- Tax evidence scans default to reference-only records.
+- Audit packets include `PRIVACY_AND_EVIDENCE_HANDLING.md` and `FOR_CPAS.md`.
+- The local password gates the browser UI but does not encrypt files on disk.
+- Website, support, donation, and GitHub links open only when clicked.
+
 ## Reference-Only Evidence Vs Copied Evidence
 
 Tax evidence scans default to reference-only handling.
@@ -48,6 +60,7 @@ Audit packets include root-level status and handoff files:
 
 - `README_FIRST.md`: human orientation, review order, folder map, and sharing reminder.
 - `PACKET_STATUS.md`: detailed status, evidence counts, blockers, warnings, and work order review counts.
+- `FOR_CPAS.md`: CPA-facing review order and evidence-handling orientation.
 - `CPA_HANDOFF.md`: how the packet was generated and suggested review order.
 - `PRIVACY_AND_EVIDENCE_HANDLING.md`: local storage and evidence-copy explanation.
 

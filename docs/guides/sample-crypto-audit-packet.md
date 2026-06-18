@@ -18,6 +18,7 @@ The sample ZIP contains:
 
 - `README_FIRST.md`: human orientation, review order, folder map, and sharing reminder.
 - `PACKET_STATUS.md`: detailed status, evidence counts, blockers, warnings, and work order review counts.
+- `FOR_CPAS.md`: CPA-facing review order, evidence-handling summary, and common professional judgment items.
 - `CPA_HANDOFF.md`: how the packet was generated and suggested review order.
 - `PRIVACY_AND_EVIDENCE_HANDLING.md`: reference-only vs copied evidence and local storage notes.
 - `00_memos/METHODOLOGY.md`: a short explanation of how the synthetic records were prepared.
@@ -27,7 +28,7 @@ The sample ZIP contains:
 - `01_reports/import_warnings.csv`: a visible place for unsupported or skipped rows.
 - `02_source_files/*.csv`: synthetic source CSVs for Cash App, Coinbase, and Coinbase Convert examples.
 - `03_manifests/evidence_manifest.csv`: source file names, row counts, and SHA-256 hashes.
-- `03_manifests/packet_inventory.txt`: a plain inventory of packet contents.
+- `03_manifests/packet_inventory.csv`: a plain inventory of packet contents.
 
 ## Demo Totals
 
@@ -43,6 +44,7 @@ The sample ZIP contains:
 - Totals are separated from source files, warnings, and methodology notes.
 - The manifest creates a review trail for which source files were used.
 - Reference-only evidence is listed without copying private files into the packet unless the user explicitly chooses packet copy.
+- The CPA-facing orientation file gives a tax professional a short review order without hiding unresolved blockers.
 - Holdings reconciliation sits beside tax-output totals instead of being a separate mental exercise.
 
 ## What Still Needs Professional Review

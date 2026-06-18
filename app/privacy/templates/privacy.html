@@ -39,6 +39,59 @@
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
+        <h2 class="gainz-section-title">Privacy Proof Checklist</h2>
+        <p class="text-muted">
+          These are the practical checks behind Gainz's private offline workflow.
+        </p>
+        <div class="table-responsive">
+          <table class="table table-sm table-striped">
+            <thead>
+              <tr>
+                <th>Proof Point</th>
+                <th>What To Check</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Local web address</strong></td>
+                <td>Gainz runs at <code>127.0.0.1</code>, which points back to this computer.</td>
+              </tr>
+              <tr>
+                <td><strong>No hosted account required</strong></td>
+                <td>The app account is stored in the local database listed below.</td>
+              </tr>
+              <tr>
+                <td><strong>No exchange or wallet sync required</strong></td>
+                <td>The core workflow uses CSV imports and manual review instead of API keys or wallet connections.</td>
+              </tr>
+              <tr>
+                <td><strong>Reference-only evidence by default</strong></td>
+                <td>Tax evidence paths are listed for review and copied into packets only when you explicitly choose packet copy.</td>
+              </tr>
+              <tr>
+                <td><strong>Packet privacy notes</strong></td>
+                <td>Generated audit packets include <code>PRIVACY_AND_EVIDENCE_HANDLING.md</code> and <code>FOR_CPAS.md</code>.</td>
+              </tr>
+              <tr>
+                <td><strong>Local password scope</strong></td>
+                <td>The local password gates the browser UI, but it does not encrypt files on disk.</td>
+              </tr>
+              <tr>
+                <td><strong>External links are user initiated</strong></td>
+                <td>Website, support, donation, and GitHub links open only when clicked.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
         <h2 class="gainz-section-title">What Gainz Stores Locally</h2>
         <p class="text-muted">
           The local Gainz password gates the browser UI. It does not encrypt the CSV, XLSX, JSON, Markdown, or audit packet files stored on disk.

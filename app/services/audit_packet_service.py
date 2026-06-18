@@ -121,6 +121,7 @@ class AuditPacketService:
         self._write_reconciliation_work_order(packet_dir, readiness, transactions)
         self._write_packet_status_files(packet_dir, readiness, manifest_rows)
         self._write_cpa_handoff(packet_dir, readiness, manifest_rows, transactions)
+        self._write_for_cpas(packet_dir, readiness, manifest_rows, transactions)
         self._write_privacy_and_evidence_handling(packet_dir, manifest_rows)
         self._write_manifest(packet_dir, manifest_rows)
         self._write_inventory(packet_dir)
@@ -214,7 +215,7 @@ class AuditPacketService:
             "",
             "Reference only means the local file path or label is listed in the packet, but the file itself is not copied.",
             "Copied means the file is included inside `02_source_files/` and appears in the manifest with hashes.",
-            "See `CPA_HANDOFF.md` and `PRIVACY_AND_EVIDENCE_HANDLING.md` before sharing this packet.",
+            "See `FOR_CPAS.md`, `CPA_HANDOFF.md`, and `PRIVACY_AND_EVIDENCE_HANDLING.md` before sharing this packet.",
             "",
             "## Open Blockers",
             "",
@@ -254,9 +255,10 @@ class AuditPacketService:
             "## Start Here",
             "",
             "1. Open `PACKET_STATUS.md` for the exact blocker, warning, and evidence counts.",
-            "2. Open `CPA_HANDOFF.md` for the review order and generation notes.",
-            "3. Open `PRIVACY_AND_EVIDENCE_HANDLING.md` before sharing the packet.",
-            "4. Review `01_reports/reconciliation_work_order.csv` for the itemized work queue.",
+            "2. Open `FOR_CPAS.md` for the CPA-facing review order.",
+            "3. Open `CPA_HANDOFF.md` for the generation notes.",
+            "4. Open `PRIVACY_AND_EVIDENCE_HANDLING.md` before sharing the packet.",
+            "5. Review `01_reports/reconciliation_work_order.csv` for the itemized work queue.",
             "",
             "## Folder Map",
             "",
@@ -275,6 +277,7 @@ class AuditPacketService:
             "Reference-only evidence is listed for review but is not copied into this packet.",
             "",
             "Gainz is documentation support only. It is not legal, financial, accounting, filing, or tax advice.",
+            "If sharing this packet with a tax professional, start with `FOR_CPAS.md`.",
             "",
         ]
         (packet_dir / "README_FIRST.md").write_text("\n".join(readme_lines), encoding="utf-8")
@@ -320,6 +323,54 @@ class AuditPacketService:
             "",
         ]
         (packet_dir / "CPA_HANDOFF.md").write_text("\n".join(lines), encoding="utf-8")
+
+    def _write_for_cpas(self, packet_dir, readiness, manifest_rows, transactions):
+        counts = self._manifest_evidence_counts(manifest_rows)
+        status = "FILING-READY REVIEW PACKET" if readiness["is_ready"] else "DRAFT - NOT FILING READY"
+        assets = ", ".join(sorted(transactions.assets)) if transactions.assets else "None"
+        lines = [
+            "# For CPAs",
+            "",
+            "This file is a concise orientation note for a tax professional reviewing a Gainz packet.",
+            "Gainz is documentation support only. It does not provide legal, financial, accounting, filing, or tax advice.",
+            "",
+            "## Packet Status",
+            "",
+            f"- Status: {status}",
+            f"- Readiness: {readiness['status']}",
+            f"- Summary: {readiness['summary']}",
+            f"- Next action: {readiness['next_action']}",
+            f"- Transactions: {len(transactions.transactions)}",
+            f"- Assets: {assets}",
+            "",
+            "## Suggested Review Order",
+            "",
+            "1. `PACKET_STATUS.md` for readiness, blockers, warnings, and evidence counts.",
+            "2. `01_reports/reconciliation_work_order.csv` for the itemized unresolved work queue.",
+            "3. `01_reports/tax_filing_alignment.csv` for calculated totals compared with user-entered filed totals.",
+            "4. `01_reports/form_8949_totals.csv` and the Form 8949 detail CSVs for proceeds, basis, and gain/loss.",
+            "5. `01_reports/holdings_reconciliation.csv` and `01_reports/current_holdings_lots.csv` for holdings explanation.",
+            "6. `03_manifests/evidence_manifest.csv` for copied files, reference-only evidence, missing paths, and hashes.",
+            "",
+            "## Evidence Handling",
+            "",
+            f"- Copied transaction source files: {counts['copied_transaction_sources']}",
+            f"- Copied tax evidence files: {counts['copied_tax_evidence']}",
+            f"- Reference-only tax evidence records: {counts['reference_only_evidence']}",
+            f"- Missing tax evidence file paths: {counts['missing_evidence']}",
+            "",
+            "Reference-only tax evidence records list a local path or label but do not include the file in this packet.",
+            "Copied files are present in `02_source_files/` and are listed with hashes in the evidence manifest.",
+            "",
+            "## Items That Commonly Need Professional Judgment",
+            "",
+            "- Whether sends, receives, lost assets, transfers, conversions, and missing records were classified correctly.",
+            "- Whether imported CSVs represent complete exchange, wallet, and brokerage history for the reviewed years.",
+            "- Whether the user's filed totals and payment evidence align with generated Gainz totals.",
+            "- Whether unresolved blockers make this packet draft-only.",
+            "",
+        ]
+        (packet_dir / "FOR_CPAS.md").write_text("\n".join(lines), encoding="utf-8")
 
     def _write_privacy_and_evidence_handling(self, packet_dir, manifest_rows):
         counts = self._manifest_evidence_counts(manifest_rows)

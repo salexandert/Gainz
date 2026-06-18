@@ -870,6 +870,17 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual(first_buy.uid, sell.links[0].buy.uid)
         self.assertAlmostEqual(200, sell.links[0].profit_loss)
 
+    def test_fifo_auto_link_treats_all_time_year_as_unfiltered(self):
+        transactions = empty_transactions()
+        buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "test")
+        sell = Sell("BTC", 1, datetime.datetime(2024, 2, 1), 300, "test")
+        transactions.transactions = [buy, sell]
+
+        failures = transactions.auto_link(asset="BTC", algo="fifo", year=" All Time ")
+
+        self.assertEqual([], failures)
+        self.assertEqual(0, sell.unlinked_quantity)
+
     def test_stats_safe_auto_fix_links_unlinked_sales_only(self):
         transactions = empty_transactions()
         buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "test")

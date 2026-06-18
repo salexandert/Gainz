@@ -1571,6 +1571,11 @@ class Transactions:
         sells = {}
         failures = []
 
+        if isinstance(year, str):
+            year = year.strip()
+            if year in ("", "All Time"):
+                year = None
+
         if year is not None and date_range is None:
             date_range = {
                 'start_date': f"01/01/{year} 12:00 AM",

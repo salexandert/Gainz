@@ -272,14 +272,20 @@ def run_packaged_workflow_smoke(temp_path, expected_version):
     if summary["tax_evidence_packet_counts"]["missing"] != preview["missing_tax_evidence_count"]:
         raise AssertionError("Summary missing evidence count did not match packet preview.")
 
+    for_cpas_path = packet_path / "FOR_CPAS.md"
     cpa_handoff_path = packet_path / "CPA_HANDOFF.md"
     privacy_handling_path = packet_path / "PRIVACY_AND_EVIDENCE_HANDLING.md"
+    if not for_cpas_path.exists():
+        raise AssertionError("Audit packet is missing FOR_CPAS.md.")
     if not cpa_handoff_path.exists():
         raise AssertionError("Audit packet is missing CPA_HANDOFF.md.")
     if not privacy_handling_path.exists():
         raise AssertionError("Audit packet is missing PRIVACY_AND_EVIDENCE_HANDLING.md.")
+    for_cpas = for_cpas_path.read_text(encoding="utf-8")
     cpa_handoff = cpa_handoff_path.read_text(encoding="utf-8")
     privacy_handling = privacy_handling_path.read_text(encoding="utf-8")
+    if "Suggested Review Order" not in for_cpas:
+        raise AssertionError("FOR_CPAS.md is missing CPA review guidance.")
     if "How This Packet Was Generated" not in cpa_handoff:
         raise AssertionError("CPA_HANDOFF.md is missing packet generation notes.")
     if "does not require a hosted account" not in privacy_handling:
