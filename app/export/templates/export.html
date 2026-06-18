@@ -130,9 +130,12 @@
               <h3 class="gainz-section-title">Reconciliation Work Order</h3>
               <p class="card-category">Mark each open item as resolved, needs research, ignored for draft, or sent to a CPA.</p>
             </div>
-            <span class="gainz-status-badge {% if audit_readiness.work_order_review_summary.unreviewed_count == 0 %}status-verified{% else %}status-needs-review{% endif %}">
-              {{ audit_readiness.work_order_review_summary.unreviewed_count }} unreviewed
-            </span>
+            <div class="d-flex flex-wrap align-items-center">
+              <span class="gainz-status-badge {% if audit_readiness.work_order_review_summary.unreviewed_count == 0 %}status-verified{% else %}status-needs-review{% endif %}">
+                {{ audit_readiness.work_order_review_summary.unreviewed_count }} unreviewed
+              </span>
+              <a class="btn btn-sm btn-primary ml-2" href="{{ url_for('export_blueprint.review_queue') }}">Start guided review</a>
+            </div>
           </div>
           <div class="table-responsive">
             <table class="table table-sm table-striped">

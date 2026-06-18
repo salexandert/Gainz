@@ -24,7 +24,7 @@ from app.import_transactions.routes import (
 from app.services.audit_packet_service import AuditPacketService
 from app.services.import_service import ImportService
 from app.services.import_warning_service import import_warning_review_rows
-from app.services.packet_plan_service import get_packet_preview
+from app.services.packet_plan_service import get_packet_preview, reconciliation_work_order_rows
 from app_version import APP_VERSION
 from transaction import Buy, Sell, Send
 from transactions import Transactions
@@ -1240,6 +1240,7 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual(200, packet_response.status_code)
             self.assertEqual(output_dir.resolve(), Path(export_payload["output_dir"]))
             self.assertEqual(output_dir.resolve(), Path(packet_payload["output_dir"]))
+            self.assertIn("/export/packet_success", packet_payload["success_url"])
             self.assertEqual(output_dir.resolve(), Path(export_payload["path"]).parent)
             self.assertEqual(output_dir.resolve(), Path(packet_payload["path"]).parent)
             self.assertTrue(Path(export_payload["path"]).exists())
@@ -1255,6 +1256,12 @@ class ImportAndExportTests(unittest.TestCase):
                 workbook["Packet Status"]["A1"].value,
             )
             workbook.close()
+
+            with app.test_client() as client:
+                success_response = client.get(packet_payload["success_url"])
+            self.assertEqual(200, success_response.status_code)
+            self.assertIn(b"Audit Packet Generated", success_response.data)
+            self.assertIn(b"FOR_CPAS.md", success_response.data)
 
             with app.app_context():
                 db.drop_all()
@@ -1293,6 +1300,59 @@ class ImportAndExportTests(unittest.TestCase):
                 "Updated work order item: Sent to CPA",
                 transactions.saved_descriptions,
             )
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_guided_review_queue_saves_and_advances_work_order_items(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "source.csv")
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class ExportRouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(ExportRouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.get("/export/review_queue")
+
+            self.assertEqual(200, response.status_code)
+            self.assertIn(b"Guided Review Queue", response.data)
+            self.assertIn(b"Current holdings missing", response.data)
+
+            readiness = get_audit_readiness_summary(transactions)
+            rows = [
+                row for row in reconciliation_work_order_rows(readiness, transactions)
+                if row.get("blocker_type") != "No open blockers"
+            ]
+            self.assertTrue(rows)
+            item_id = rows[0]["item_id"]
+
+            with app.test_client() as client:
+                save_response = client.post(
+                    "/export/review_queue/save",
+                    data={
+                        "item_id": item_id,
+                        "decision": "needs_research",
+                        "note": "User will research source records.",
+                    },
+                    follow_redirects=True,
+                )
+
+            self.assertEqual(200, save_response.status_code)
+            self.assertIn(b"Review Queue Complete", save_response.data)
+            record = transactions.get_work_order_review(item_id)
+            self.assertEqual("needs_research", record["decision"])
+            self.assertEqual("User will research source records.", record["note"])
 
             with app.app_context():
                 db.drop_all()
@@ -1741,7 +1801,9 @@ class ImportAndExportTests(unittest.TestCase):
                 self.assertIn(b"Offline / Privacy Mode", response.data)
                 self.assertIn(b"What Gainz Stores Locally", response.data)
                 self.assertIn(b"database.db", response.data)
-                self.assertIn(b"No Upload Required", response.data)
+                self.assertIn(b"What Gainz Does Not Upload", response.data)
+                self.assertIn(b"Synced Folders", response.data)
+                self.assertIn(b"Delete Local Data", response.data)
 
                 with patch("app.privacy.routes._open_folder") as open_folder:
                     post_response = client.post("/privacy/open_data_folder")

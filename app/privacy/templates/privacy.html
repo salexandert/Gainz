@@ -126,11 +126,13 @@
   <div class="col-md-6">
     <div class="card">
       <div class="card-body">
-        <h2 class="gainz-section-title">No Upload Required</h2>
+        <h2 class="gainz-section-title">What Gainz Does Not Upload</h2>
         <ul class="gainz-plain-list">
           <li>No hosted Gainz account is required.</li>
           <li>No exchange API connection is required.</li>
           <li>No wallet address sync is required.</li>
+          <li>No transaction history is uploaded to Gainz.</li>
+          <li>No tax evidence files are sent to a cloud parser by Gainz.</li>
           <li>Tax evidence scans default to reference-only records.</li>
           <li>Audit packets copy tax evidence only when you explicitly select packet copy.</li>
         </ul>
@@ -147,6 +149,46 @@
           <li>Reference-only evidence lists a local path or label but does not copy the file.</li>
           <li>Draft packets preserve unresolved blockers and warnings for review.</li>
           <li>Review generated files with a qualified tax professional before relying on them.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="gainz-section-title">Network Access</h2>
+        <ul class="gainz-plain-list">
+          <li>The normal reconciliation workflow runs locally at <code>127.0.0.1</code>.</li>
+          <li>Website, GitHub, support, donation, and update links may use the network when clicked.</li>
+          <li>If your browser loads external links, that happens outside the local Gainz data workflow.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="gainz-section-title">Synced Folders</h2>
+        <ul class="gainz-plain-list">
+          <li>Gainz keeps files local to the path shown above.</li>
+          <li>If that path is inside OneDrive, iCloud, Dropbox, or another sync folder, that provider may sync the files.</li>
+          <li>Use a non-synced folder for outputs you do not want backed up or shared by another service.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="gainz-section-title">Delete Local Data</h2>
+        <ul class="gainz-plain-list">
+          <li>Close Gainz first so files are not in use.</li>
+          <li>Back up anything you need to keep.</li>
+          <li>Delete the local data folder, saved exports, and any audit packet folders you created.</li>
+          <li>Clearing the local data folder removes app saves and account metadata for that Gainz install.</li>
         </ul>
       </div>
     </div>

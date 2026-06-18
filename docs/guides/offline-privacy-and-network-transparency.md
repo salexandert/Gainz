@@ -32,6 +32,34 @@ Gainz does not require:
 
 External links such as the public website, GitHub Releases, docs, donation links, or update checks open only when you choose those actions outside the local reconciliation workflow.
 
+## What Gainz Does Not Upload
+
+Gainz does not upload imported transaction history, saved revisions, tax evidence files, generated workbooks, or audit packets to a Gainz-hosted service. Tax evidence scans record references by default. Evidence files are copied into audit packets only when you explicitly choose packet copy.
+
+## Network Access That May Happen
+
+The normal reconciliation workflow runs locally at `127.0.0.1`. Network access may happen when you intentionally open:
+
+- The public website.
+- GitHub Releases.
+- Documentation or wiki links.
+- Support or donation links.
+- Any external resource opened from your browser outside the local Gainz workflow.
+
+## OneDrive, iCloud, Dropbox, And Backups
+
+Gainz stores files at the local paths shown in Privacy Mode. If those paths are inside OneDrive, iCloud, Dropbox, Google Drive, or another synced folder, that provider may sync the files according to your system settings. Use a non-synced folder for exports or audit packets you do not want synced by another service.
+
+## How To Delete Local Data
+
+1. Close Gainz so files are not in use.
+2. Back up anything you need to keep.
+3. Open Privacy Mode and note the local data, export, save, and audit packet folders.
+4. Delete the local data folder, saved exports, and audit packet folders you no longer want.
+5. Empty the recycle bin if you need those local copies removed from normal desktop recovery.
+
+Deleting the local data folder removes app saves and account metadata for that Gainz install. It does not delete copies you already moved, uploaded, emailed, backed up, or synced through another service.
+
 ## Privacy Proof Checklist
 
 Use this checklist to verify the private offline workflow:

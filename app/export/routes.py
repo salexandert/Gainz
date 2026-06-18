@@ -1,3 +1,8 @@
+import csv
+import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 from . import blueprint
@@ -104,6 +109,153 @@ def _draft_workbook_path(path):
         index += 1
 
 
+def _open_folder(path):
+    path = Path(path).expanduser().resolve()
+    if path.is_file():
+        path = path.parent
+    path.mkdir(parents=True, exist_ok=True)
+
+    if os.name == "nt":
+        os.startfile(str(path))  # type: ignore[attr-defined]
+        return
+
+    opener = "open" if sys.platform == "darwin" else "xdg-open"
+    subprocess.Popen([opener, str(path)])
+
+
+def _work_order_rows(transactions):
+    readiness = get_audit_readiness_summary(transactions)
+    return [
+        row for row in reconciliation_work_order_rows(readiness, transactions)
+        if row.get("blocker_type") != "No open blockers"
+    ]
+
+
+def _work_order_why_it_matters(row):
+    blocker_type = row.get("blocker_type")
+    return {
+        "Missing acquisition basis": (
+            "Gainz cannot fully support gain/loss for this disposal until earlier acquisition "
+            "records are found, documented, or intentionally left for professional review."
+        ),
+        "Reviewed import warning blocker": (
+            "A decision was recorded, but the condition still affects generated reports or audit packet readiness."
+        ),
+        "Import warning decision": (
+            "Skipped rows or imported rows with missing values can change holdings, proceeds, basis, or evidence review."
+        ),
+        "Current holdings missing": (
+            "Declared holdings let Gainz compare imported activity against what the user actually holds today."
+        ),
+        "Holdings explanation needed": (
+            "A holdings gap usually means missing transfers, disposals, losses, source files, or classification decisions."
+        ),
+        "Tax evidence review": (
+            "Generated totals are easier to review when filed-return evidence, payment evidence, or user confirmations are recorded by year."
+        ),
+        "Possible overlapping source files": (
+            "Overlapping source files can duplicate activity and make holdings or basis look wrong."
+        ),
+    }.get(blocker_type, "This item should be documented before treating the packet as complete.")
+
+
+def _work_order_related_url(row):
+    blocker_type = row.get("blocker_type")
+    if blocker_type in {"Current holdings missing", "Holdings explanation needed", "Missing acquisition basis"}:
+        return url_for("holdings_accounting_blueprint.holdings_accounting")
+    if blocker_type in {"Import warning decision", "Reviewed import warning blocker", "Possible overlapping source files"}:
+        return url_for("import_transactions_blueprint.import_wizard")
+    if blocker_type == "Tax evidence review":
+        return url_for("tax_filing_review_blueprint.index")
+    return url_for("export_blueprint.index")
+
+
+def _review_queue_context(transactions, item_id=""):
+    rows = _work_order_rows(transactions)
+    unreviewed = [row for row in rows if not row.get("review_decision")]
+    current = None
+
+    if item_id:
+        current = next((row for row in rows if row.get("item_id") == item_id), None)
+
+    if current is None:
+        current = unreviewed[0] if unreviewed else None
+
+    index = rows.index(current) + 1 if current in rows else 0
+    if current:
+        current["why_it_matters"] = _work_order_why_it_matters(current)
+        current["related_url"] = _work_order_related_url(current)
+
+    return {
+        "rows": rows,
+        "item": current,
+        "index": index,
+        "total": len(rows),
+        "unreviewed_count": len(unreviewed),
+        "reviewed_count": len(rows) - len(unreviewed),
+        "choices": work_order_review_choices(),
+    }
+
+
+def _packet_manifest_counts(packet_path):
+    counts = {
+        "copied_files": 0,
+        "reference_only_tax_evidence": 0,
+        "missing_tax_evidence": 0,
+    }
+    manifest_path = packet_path / "03_manifests" / "evidence_manifest.csv"
+    if not manifest_path.exists():
+        return counts
+
+    with open(manifest_path, newline="", encoding="utf-8") as file:
+        for row in csv.DictReader(file):
+            if row.get("status") == "COPIED":
+                counts["copied_files"] += 1
+            if row.get("category") == "tax_evidence" and row.get("status") == "REFERENCE_ONLY":
+                counts["reference_only_tax_evidence"] += 1
+            if row.get("category") == "tax_evidence" and row.get("status") == "MISSING":
+                counts["missing_tax_evidence"] += 1
+    return counts
+
+
+def _packet_success_context(packet_path_value):
+    packet_path = Path(packet_path_value or "").expanduser()
+    if not packet_path.is_absolute():
+        packet_path = Path.cwd() / packet_path
+    packet_path = packet_path.resolve()
+
+    summary = {}
+    summary_path = packet_path / "03_manifests" / "audit_packet_summary.json"
+    if summary_path.exists():
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    counts = _packet_manifest_counts(packet_path)
+    is_ready = bool(summary.get("readiness_is_ready"))
+    blocker_groups = summary.get("readiness_blocker_groups") or []
+    review_first = [
+        "README_FIRST.md for the human packet orientation.",
+        "PACKET_STATUS.md for readiness, blockers, warnings, and evidence counts.",
+        "FOR_CPAS.md for the CPA-facing review order.",
+        "03_manifests/evidence_manifest.csv for copied, reference-only, and missing evidence.",
+        "01_reports/reconciliation_work_order.csv for unresolved review items.",
+    ]
+
+    return {
+        "packet_path": str(packet_path),
+        "packet_name": packet_path.name,
+        "packet_exists": packet_path.exists() and packet_path.is_dir(),
+        "status": "Filing-ready review packet" if is_ready else "Draft packet",
+        "status_class": "status-verified" if is_ready else "status-needs-review",
+        "is_draft": not is_ready,
+        "summary": summary.get("readiness_summary", "Open the packet status file for details."),
+        "copied_files_count": counts["copied_files"],
+        "reference_only_files_count": counts["reference_only_tax_evidence"],
+        "missing_evidence_count": counts["missing_tax_evidence"],
+        "open_blocker_groups": blocker_groups,
+        "review_first": review_first,
+    }
+
+
 @blueprint.route('/',  methods=['GET', 'POST'])
 @login_required
 def index():
@@ -111,10 +263,7 @@ def index():
     stats_table_data = get_stats_table_data(transactions)
     audit_readiness = get_audit_readiness_summary(transactions)
     default_output_folder = _path_for_display(_default_packet_output_folder())
-    work_order_rows = [
-        row for row in reconciliation_work_order_rows(audit_readiness, transactions)
-        if row.get("blocker_type") != "No open blockers"
-    ]
+    work_order_rows = _work_order_rows(transactions)
 
     return render_template(
         'export.html',
@@ -159,6 +308,31 @@ def work_order_review():
         })
 
     return redirect(url_for('export_blueprint.index', work_order_reviewed=1))
+
+
+@blueprint.route('/review_queue', methods=['GET'])
+@login_required
+def review_queue():
+    transactions = current_app.config['transactions']
+    context = _review_queue_context(transactions, item_id=request.args.get("item_id", ""))
+    return render_template("review_queue.html", **context)
+
+
+@blueprint.route('/review_queue/save', methods=['POST'])
+@login_required
+def review_queue_save():
+    transactions = current_app.config['transactions']
+    item_id = str(request.form.get("item_id") or "").strip()
+    decision = str(request.form.get("decision") or "").strip()
+    note = str(request.form.get("note") or "").strip()
+
+    if not item_id or decision not in WORK_ORDER_REVIEW_DECISIONS:
+        return redirect(url_for('export_blueprint.review_queue', item_id=item_id, saved=0))
+
+    transactions.set_work_order_review(item_id, decision=decision, note=note)
+    transactions.save(description=f"Updated review queue item: {WORK_ORDER_REVIEW_DECISIONS[decision]}")
+
+    return redirect(url_for('export_blueprint.review_queue', saved=1))
 
 
 @blueprint.route('/packet_preview.json', methods=['GET', 'POST'])
@@ -235,6 +409,28 @@ def audit_packet():
     return jsonify({
         "path": packet_path,
         "output_dir": str(output_dir),
+        "success_url": url_for("export_blueprint.packet_success", packet_path=packet_path),
     })
-    
+
+
+@blueprint.route('/packet_success', methods=['GET'])
+@login_required
+def packet_success():
+    packet_path = request.args.get("packet_path", "")
+    if not packet_path:
+        return redirect(url_for("export_blueprint.index"))
+
+    return render_template(
+        "packet_success.html",
+        packet=_packet_success_context(packet_path),
+    )
+
+
+@blueprint.route('/open_folder', methods=['POST'])
+@login_required
+def open_folder():
+    folder = request.form.get("folder") or request.form.get("path") or ""
+    if folder:
+        _open_folder(folder)
+    return redirect(request.referrer or url_for("export_blueprint.index"))
 

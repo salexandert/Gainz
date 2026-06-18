@@ -242,6 +242,15 @@ def run_packaged_workflow_smoke(temp_path, expected_version):
         {"output_dir": str(output_dir), "draft_acknowledged": True},
         200,
     )
+    success_url = packet_payload.get("success_url")
+    if not success_url:
+        raise AssertionError("Audit packet response did not include a packet success URL.")
+    success_response = opener.open(urllib.parse.urljoin(base_url, success_url), timeout=30)
+    success_html = success_response.read().decode("utf-8")
+    if "Audit Packet Generated" not in success_html:
+        raise AssertionError("Packet success screen did not render after packet generation.")
+    if "FOR_CPAS.md" not in success_html:
+        raise AssertionError("Packet success screen is missing CPA-first review guidance.")
 
     packet_path = Path(packet_payload["path"])
     if packet_path.parent != output_dir.resolve():

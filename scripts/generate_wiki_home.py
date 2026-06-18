@@ -12,6 +12,7 @@ WEBSITE_ROUTES = {
     "/",
     "/download/",
     "/guides/",
+    "/sample-packet/",
     "/user-walkthrough/",
 }
 

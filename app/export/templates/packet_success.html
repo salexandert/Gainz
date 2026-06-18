@@ -1,0 +1,109 @@
+{% extends "base_site.html" %}
+
+{% block title %} Packet Generated {% endblock title %}
+
+{% block stylesheets %}
+  {{ super() }}
+{% endblock stylesheets %}
+
+{% block content %}
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div class="gainz-page-hero">
+          <div>
+            <div class="d-flex flex-wrap align-items-center mb-2">
+              <h1 class="gainz-page-title mb-0 mr-2">Audit Packet Generated</h1>
+              <span class="gainz-status-badge {{ packet.status_class }}">{{ packet.status }}</span>
+            </div>
+            <p class="mb-2">{{ packet.summary }}</p>
+            <p class="mb-0"><strong>Packet path:</strong> <code>{{ packet.packet_path }}</code></p>
+          </div>
+          <form method="POST" action="{{ url_for('export_blueprint.open_folder') }}">
+            <input type="hidden" name="folder" value="{{ packet.packet_path }}">
+            <button type="submit" class="btn btn-primary btn-round">Open Packet Folder</button>
+          </form>
+        </div>
+        {% if not packet.packet_exists %}
+        <div class="alert alert-warning mt-3" role="alert">
+          Gainz could not confirm this packet folder still exists. Check the output folder and generate again if needed.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="gainz-section-title">Packet Summary</h2>
+        <div class="audit-readiness-grid">
+          <div class="audit-readiness-item">
+            <span>Status</span>
+            <strong>{% if packet.is_draft %}Draft{% else %}Ready{% endif %}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Copied Files</span>
+            <strong>{{ packet.copied_files_count }}</strong>
+            <small>Copied source and evidence files</small>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Reference Only</span>
+            <strong>{{ packet.reference_only_files_count }}</strong>
+            <small>Listed but not copied</small>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Missing Evidence Paths</span>
+            <strong>{{ packet.missing_evidence_count }}</strong>
+            <small>Saved paths not found</small>
+          </div>
+        </div>
+
+        {% if packet.open_blocker_groups %}
+        <div class="alert alert-warning" role="alert">
+          <strong>Still draft/not-ready until these are reviewed:</strong>
+          <ul class="mb-0">
+            {% for group in packet.open_blocker_groups %}
+            <li>{{ group.title }}{% if group.count %}: {{ group.count }} item{% if group.count != 1 %}s{% endif %}{% endif %}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% else %}
+        <div class="alert alert-success" role="status">
+          No unresolved blocker groups were recorded in the packet summary.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="gainz-section-title">What To Review First</h2>
+        <ol class="packet-success-list">
+          {% for item in packet.review_first %}
+          <li>{{ item }}</li>
+          {% endfor %}
+        </ol>
+        <div class="packet-success-actions">
+          <a class="btn btn-outline-primary btn-round" href="{{ url_for('export_blueprint.review_queue') }}">Open Guided Review Queue</a>
+          <a class="btn btn-outline-primary btn-round" href="{{ url_for('export_blueprint.index') }}">Back to Reports & Export</a>
+          <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index') }}">Back to Dashboard</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}
+
+{% block javascripts %}
+  {{ super() }}
+{% endblock javascripts %}

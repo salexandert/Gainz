@@ -172,7 +172,28 @@ If the status is `Not ready`, review the listed blockers before using the packet
 ![Gainz Reports and Export readiness panel]({{ '/assets/screenshots/gainz-export-audit-readiness.png' | relative_url }})
 {: .screenshot-frame }
 
-## 10. Expand Review Details Only When Needed
+## 10. Use The Guided Review Queue
+
+If **Reports & Export** shows open work order items, click **Start guided review**.
+
+The guided queue shows one unresolved item at a time:
+
+- Issue.
+- Why it matters.
+- Recommended action.
+- Asset, year, date, and source file when available.
+- A link to the related page.
+
+Choose the review decision that matches what you found:
+
+- `Resolved`
+- `Needs research`
+- `Ignored for draft`
+- `Sent to CPA`
+
+Add a short note when helpful. After saving, Gainz moves to the next open item. These decisions are saved into the reconciliation work order, dashboard readiness state, and generated audit packet files.
+
+## 11. Expand Review Details Only When Needed
 
 Reports & Export keeps raw evidence tables collapsed under **Review Details** so the page starts with the decision-making workflow.
 
@@ -187,7 +208,7 @@ Expand **Review Details** when you need row-level evidence for:
 
 Use those tables for review and documentation, not as the first place to decide what to do next.
 
-## 11. Generate Outputs
+## 12. Generate Outputs
 
 On **Reports & Export**, choose an output folder and create:
 
@@ -207,6 +228,16 @@ Before generating an audit packet, review **Audit Packet Preview**. It shows:
 Reference only means the file path or label is listed, but the file is not copied. Copied means the file is included inside the audit packet and appears in the manifest with hashes.
 
 If blockers remain, Gainz can generate draft output only after you acknowledge that unresolved review items remain. Draft output is marked in the filename and inside the generated workbook or packet status files.
+
+After Gainz generates an audit packet, it opens a packet success screen with:
+
+- Packet path.
+- Draft or filing-ready status.
+- Copied files count.
+- Reference-only evidence count.
+- Missing evidence paths count.
+- Open folder button.
+- The first files to review.
 
 The audit packet includes:
 
@@ -231,7 +262,7 @@ The audit packet includes:
 - Methodology memo.
 - `DRAFT_NOT_FILING_READY.md` when unresolved blockers or warnings remain.
 
-## 12. Review Before Filing
+## 13. Review Before Filing
 
 Gainz is documentation support. It is not tax, legal, accounting, filing, or financial advice.
 

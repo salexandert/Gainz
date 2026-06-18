@@ -96,7 +96,8 @@ From a source checkout, you can reset the local password with `python .\scripts\
 7. Review import warnings, source overlaps, and transfer questions that affect the reconciliation.
 8. Run FIFO or another basis-linking review in **Auto Link** when Dashboard or Reports & Export says sales still need basis.
 9. Open **Tax Evidence**, build the year-by-year tax evidence inventory, and confirm or mark suggested filed totals for research.
-10. Open **Reports & Export**, review readiness, expand **Review Details** only when needed, and generate the workbook or audit packet.
+10. Open **Reports & Export**, then use **Start guided review** to work unresolved items one at a time.
+11. Review packet preview, generate the workbook or audit packet, then use the packet success screen to open the output folder and review the first files.
 
 For a complete click-by-click guide, see [Using Gainz from import to audit packet](docs/user-walkthrough.md).
 
@@ -118,8 +119,10 @@ A good demo run is:
 6. Review warnings or tax evidence if Dashboard shows them.
 7. Run **FIFO** in **Auto Link** only when Dashboard or Reports & Export says basis links are blocking readiness.
 8. Open **Reports & Export** and review the **Readiness Review** checklist.
-9. Expand **Review Details** only when you need row-level evidence.
-10. Review the audit packet preview, then generate the workbook or draft audit packet.
+9. Use **Start guided review** if the work order has open items.
+10. Expand **Review Details** only when you need row-level evidence.
+11. Review the audit packet preview, then generate the workbook or draft audit packet.
+12. Use the packet success screen to open the packet folder and review `README_FIRST.md`, `PACKET_STATUS.md`, and `FOR_CPAS.md`.
 
 The audit packet includes root `README_FIRST.md`, `PACKET_STATUS.md`, `FOR_CPAS.md`, `CPA_HANDOFF.md`, and `PRIVACY_AND_EVIDENCE_HANDLING.md` files, the Excel workbook with a visible packet status sheet, Form 8949 detail CSVs, Form 8949 totals, tax filing review, tax evidence inventory, suggested filed totals, reconciliation work order CSV/Markdown, holdings reconciliation, current holdings lots, active and preserved import-warning decisions, missing-basis review, source-overlap review, copied transaction source files when available, tax evidence references, explicitly selected tax evidence copies, hashes, and a methodology memo.
 

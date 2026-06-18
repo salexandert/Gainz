@@ -7,6 +7,8 @@ description: Download a synthetic Gainz audit packet sample and see how Form 894
 
 This sample packet uses synthetic demo data only. It is meant to show the shape of a review packet without exposing anyone's real exchange exports, wallet history, tax return, or private holdings.
 
+<p><a class="button" href="https://cryptogainz.store/sample-packet/">View the public sample packet page</a></p>
+
 <p><a class="button" href="{{ '/assets/downloads/gainz-synthetic-audit-packet-sample.zip' | relative_url }}">Download the synthetic sample packet</a></p>
 
 ![Gainz Reports and Export readiness panel]({{ '/assets/screenshots/gainz-export-audit-readiness.png' | relative_url }})

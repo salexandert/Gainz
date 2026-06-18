@@ -2691,7 +2691,11 @@ $(document).ready(function() {
             success: function (data) {
                 var outputPath = exportResponsePath(data);
                 $('#export_button_text').text("Audit packet saved to " + outputPath);
-                alert("Audit packet saved to " + outputPath)
+                if (data && data.success_url) {
+                    window.location.href = data.success_url;
+                } else {
+                    alert("Audit packet saved to " + outputPath)
+                }
             },
             error: function (xhr) {
                 var message = "Audit packet failed. Check the readiness blockers, output folder, and app log, then try again.";

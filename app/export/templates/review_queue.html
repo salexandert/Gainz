@@ -1,0 +1,140 @@
+{% extends "base_site.html" %}
+
+{% block title %} Guided Review Queue {% endblock title %}
+
+{% block stylesheets %}
+  {{ super() }}
+{% endblock stylesheets %}
+
+{% block content %}
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div class="gainz-page-hero">
+          <div>
+            <h1 class="gainz-page-title">Guided Review Queue</h1>
+            <p class="card-category">Review one unresolved packet item at a time.</p>
+            <p class="mb-0">
+              Mark each item based on what you found. Decisions are saved into the reconciliation work order,
+              dashboard readiness state, and generated audit packet files.
+            </p>
+          </div>
+          <a class="btn btn-outline-primary btn-round" href="{{ url_for('export_blueprint.index') }}">Back to Reports & Export</a>
+        </div>
+        {% if request.args.get("saved") == "1" %}
+        <div class="alert alert-success mt-3" role="status">
+          Review decision saved. Gainz moved to the next open item.
+        </div>
+        {% elif request.args.get("saved") == "0" %}
+        <div class="alert alert-warning mt-3" role="alert">
+          Choose a review decision before saving this item.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if item %}
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <div class="guided-review-meta">
+          <span class="gainz-status-badge {% if item.review_decision %}status-verified{% else %}status-needs-review{% endif %}">
+            {% if item.review_decision_label %}{{ item.review_decision_label }}{% else %}Not reviewed{% endif %}
+          </span>
+          <span>Item {{ index }} of {{ total }}</span>
+          <span>{{ reviewed_count }} reviewed, {{ unreviewed_count }} still open</span>
+        </div>
+
+        <h2 class="gainz-section-title">{{ item.blocker_type }}</h2>
+        <div class="guided-review-grid">
+          <section class="guided-review-panel">
+            <h3>Issue</h3>
+            <p>{{ item.suspected_issue or "Review needed." }}</p>
+            <dl class="guided-review-details">
+              <div>
+                <dt>Priority</dt>
+                <dd>{{ item.priority_label }}</dd>
+              </div>
+              <div>
+                <dt>Asset</dt>
+                <dd>{{ item.asset or "N/A" }}</dd>
+              </div>
+              <div>
+                <dt>Year</dt>
+                <dd>{{ item.year or "N/A" }}</dd>
+              </div>
+              <div>
+                <dt>Date</dt>
+                <dd>{{ item.date or "N/A" }}</dd>
+              </div>
+              <div>
+                <dt>Source</dt>
+                <dd>{{ item.source_file or "N/A" }}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="guided-review-panel">
+            <h3>Why It Matters</h3>
+            <p>{{ item.why_it_matters }}</p>
+            <h3>Recommended Action</h3>
+            <p>{{ item.next_action or "Review source records and document the decision." }}</p>
+            <a class="btn btn-sm btn-outline-primary" href="{{ item.related_url }}">Open related page</a>
+          </section>
+        </div>
+
+        <form method="POST" action="{{ url_for('export_blueprint.review_queue_save') }}" class="guided-review-form">
+          <input type="hidden" name="item_id" value="{{ item.item_id }}">
+          <div class="form-group">
+            <label for="guided_review_note">Review note</label>
+            <textarea
+              id="guided_review_note"
+              name="note"
+              class="form-control"
+              rows="3"
+              placeholder="Optional: write what you checked or what still needs research."
+            >{{ item.review_note }}</textarea>
+          </div>
+          <div class="guided-review-actions" role="group" aria-label="Review decisions">
+            {% for choice in choices %}
+            <button
+              type="submit"
+              name="decision"
+              value="{{ choice.value }}"
+              class="btn {% if item.review_decision == choice.value %}btn-primary{% else %}btn-outline-primary{% endif %}"
+            >
+              {{ choice.label }}
+            </button>
+            {% endfor %}
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="gainz-section-title">Review Queue Complete</h2>
+        <p class="text-muted">
+          Gainz does not currently have open work order items. Review the packet preview, then generate output when ready.
+        </p>
+        <a class="btn btn-primary btn-round" href="{{ url_for('export_blueprint.index') }}#packet_preview">Review packet preview</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock content %}
+
+{% block javascripts %}
+  {{ super() }}
+{% endblock javascripts %}
