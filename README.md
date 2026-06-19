@@ -49,12 +49,13 @@ See `demo_data/` for small sample files that are safe to use for testing.
 
 ## Quick Start With Packaged Builds
 
-Public desktop packages are published through GitHub Releases:
+Public desktop packages are linked from the website download page with version, checksum, and SmartScreen notes:
 
-- Windows download: <https://github.com/salexandert/Gainz/releases/latest/download/Gainz-Windows.zip>
-- Windows checksum: <https://github.com/salexandert/Gainz/releases/latest/download/Gainz-Windows.zip.sha256>
-- macOS download: <https://github.com/salexandert/Gainz/releases/latest/download/Gainz-macOS.zip>
-- macOS checksum: <https://github.com/salexandert/Gainz/releases/latest/download/Gainz-macOS.zip.sha256>
+- Download page: <https://cryptogainz.store/download/>
+- Windows download: <https://github.com/salexandert/Gainz/releases/download/v0.2.16/Gainz-Windows.zip>
+- Windows checksum: <https://github.com/salexandert/Gainz/releases/download/v0.2.16/Gainz-Windows.zip.sha256>
+- macOS download: <https://github.com/salexandert/Gainz/releases/download/v0.2.16/Gainz-macOS.zip>
+- macOS checksum: <https://github.com/salexandert/Gainz/releases/download/v0.2.16/Gainz-macOS.zip.sha256>
 
 Unzip the package and open `Gainz.exe` on Windows or `Gainz.app` on macOS. The launcher starts the local server, shows the web interface link, and keeps your transaction data on your machine.
 
@@ -129,6 +130,10 @@ The audit packet includes root `README_FIRST.md`, `PACKET_STATUS.md`, `FOR_CPAS.
 ## Documentation
 
 - Official website: <https://cryptogainz.store>
+- Start here: <https://cryptogainz.store/start-here/>
+- Download and checksums: <https://cryptogainz.store/download/>
+- Privacy model: <https://cryptogainz.store/privacy/>
+- Sample audit packet: <https://cryptogainz.store/sample-packet/>
 - [Public site and guide hub](docs/index.md)
 - [Crypto cost basis learning path](docs/guides/crypto-cost-basis-learning.md)
 - [Using Gainz from import to audit packet](docs/user-walkthrough.md)
