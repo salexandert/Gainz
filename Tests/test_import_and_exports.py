@@ -1262,6 +1262,11 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual(200, success_response.status_code)
             self.assertIn(b"Audit Packet Generated", success_response.data)
             self.assertIn(b"FOR_CPAS.md", success_response.data)
+            self.assertIn(b"Copy Packet Path", success_response.data)
+            self.assertIn(b"Copy CPA Summary", success_response.data)
+            self.assertIn(b"Open README_FIRST", success_response.data)
+            self.assertIn(b"Packet Size", success_response.data)
+            self.assertIn(b"Generated", success_response.data)
 
             with app.app_context():
                 db.drop_all()
@@ -1328,6 +1333,8 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual(200, response.status_code)
             self.assertIn(b"Guided Review Queue", response.data)
             self.assertIn(b"Current holdings missing", response.data)
+            self.assertIn(b"This decision and note will appear in the audit packet", response.data)
+            self.assertIn(b"Return to full work order", response.data)
 
             readiness = get_audit_readiness_summary(transactions)
             rows = [
@@ -1349,7 +1356,8 @@ class ImportAndExportTests(unittest.TestCase):
                 )
 
             self.assertEqual(200, save_response.status_code)
-            self.assertIn(b"Review Queue Complete", save_response.data)
+            self.assertIn(b"All Queue Items Reviewed", save_response.data)
+            self.assertIn(b"Generate or refresh the packet", save_response.data)
             record = transactions.get_work_order_review(item_id)
             self.assertEqual("needs_research", record["decision"])
             self.assertEqual("User will research source records.", record["note"])
@@ -1635,6 +1643,8 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertIn("For CPAs", for_cpas)
             self.assertIn("Suggested Review Order", for_cpas)
             self.assertIn("Reference-only tax evidence records: 1", for_cpas)
+            self.assertIn("Questions For The Taxpayer", for_cpas)
+            self.assertIn("Can you provide source records", for_cpas)
             privacy_handling = (packet_path / "PRIVACY_AND_EVIDENCE_HANDLING.md").read_text(encoding="utf-8")
             self.assertIn("does not require a hosted account", privacy_handling)
             self.assertIn("Reference only means", privacy_handling)

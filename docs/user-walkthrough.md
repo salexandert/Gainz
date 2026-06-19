@@ -193,6 +193,8 @@ Choose the review decision that matches what you found:
 
 Add a short note when helpful. After saving, Gainz moves to the next open item. These decisions are saved into the reconciliation work order, dashboard readiness state, and generated audit packet files.
 
+Use **Skip for now** when you need to keep moving without recording a decision yet. When every current work order item has a decision, Gainz shows an all-reviewed completion state and points you back to packet preview.
+
 ## 11. Expand Review Details Only When Needed
 
 Reports & Export keeps raw evidence tables collapsed under **Review Details** so the page starts with the decision-making workflow.
@@ -236,7 +238,11 @@ After Gainz generates an audit packet, it opens a packet success screen with:
 - Copied files count.
 - Reference-only evidence count.
 - Missing evidence paths count.
-- Open folder button.
+- Packet size and generated timestamp.
+- Copy packet path.
+- Copy CPA summary.
+- Open packet folder.
+- Open `README_FIRST.md`.
 - The first files to review.
 
 The audit packet includes:

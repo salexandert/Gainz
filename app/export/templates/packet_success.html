@@ -21,16 +21,20 @@
             <p class="mb-2">{{ packet.summary }}</p>
             <p class="mb-0"><strong>Packet path:</strong> <code>{{ packet.packet_path }}</code></p>
           </div>
-          <form method="POST" action="{{ url_for('export_blueprint.open_folder') }}">
-            <input type="hidden" name="folder" value="{{ packet.packet_path }}">
-            <button type="submit" class="btn btn-primary btn-round">Open Packet Folder</button>
-          </form>
+          <div class="packet-success-actions packet-success-actions-top">
+            <button type="button" class="btn btn-outline-primary btn-round js-copy-text" data-copy-target="packet_path_copy">Copy Packet Path</button>
+            <form method="POST" action="{{ url_for('export_blueprint.open_folder') }}">
+              <input type="hidden" name="folder" value="{{ packet.packet_path }}">
+              <button type="submit" class="btn btn-primary btn-round">Open Packet Folder</button>
+            </form>
+          </div>
         </div>
         {% if not packet.packet_exists %}
         <div class="alert alert-warning mt-3" role="alert">
           Gainz could not confirm this packet folder still exists. Check the output folder and generate again if needed.
         </div>
         {% endif %}
+        <textarea id="packet_path_copy" class="gainz-copy-source" readonly>{{ packet.packet_path }}</textarea>
       </div>
     </div>
   </div>
@@ -60,6 +64,16 @@
             <span>Missing Evidence Paths</span>
             <strong>{{ packet.missing_evidence_count }}</strong>
             <small>Saved paths not found</small>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Packet Size</span>
+            <strong>{{ packet.packet_size }}</strong>
+            <small>Current folder size</small>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Generated</span>
+            <strong>{{ packet.generated_at }}</strong>
+            <small>Local file timestamp</small>
           </div>
         </div>
 
@@ -93,10 +107,17 @@
           {% endfor %}
         </ol>
         <div class="packet-success-actions">
+          <button type="button" class="btn btn-primary btn-round js-copy-text" data-copy-target="cpa_summary_copy">Copy CPA Summary</button>
+          <form method="POST" action="{{ url_for('export_blueprint.open_path') }}">
+            <input type="hidden" name="path" value="{{ packet.readme_first_path }}">
+            <button type="submit" class="btn btn-outline-primary btn-round">Open README_FIRST</button>
+          </form>
           <a class="btn btn-outline-primary btn-round" href="{{ url_for('export_blueprint.review_queue') }}">Open Guided Review Queue</a>
           <a class="btn btn-outline-primary btn-round" href="{{ url_for('export_blueprint.index') }}">Back to Reports & Export</a>
           <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index') }}">Back to Dashboard</a>
         </div>
+        <textarea id="cpa_summary_copy" class="gainz-copy-source" readonly>{{ packet.cpa_summary }}</textarea>
+        <div id="packet_copy_status" class="text-muted mt-2" role="status" aria-live="polite"></div>
       </div>
     </div>
   </div>
@@ -106,4 +127,35 @@
 
 {% block javascripts %}
   {{ super() }}
+  <script>
+    document.querySelectorAll('.js-copy-text').forEach(function(button) {
+      button.addEventListener('click', function() {
+        var target = document.getElementById(button.getAttribute('data-copy-target'));
+        var status = document.getElementById('packet_copy_status');
+        if (!target) {
+          return;
+        }
+        target.select();
+        target.setSelectionRange(0, target.value.length);
+        function markCopied() {
+          if (status) {
+            status.textContent = 'Copied.';
+          }
+        }
+        function fallbackCopy() {
+          document.execCommand('copy');
+          markCopied();
+        }
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(target.value).then(function() {
+            markCopied();
+          }).catch(function() {
+            fallbackCopy();
+          });
+        } else {
+          fallbackCopy();
+        }
+      });
+    });
+  </script>
 {% endblock javascripts %}

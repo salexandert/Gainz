@@ -48,6 +48,44 @@ if (-not (Test-Path -LiteralPath $iconPath)) {
     --hidden-import app.stats.routes `
     launcher.py
 
+$exePath = Join-Path $distDir "Gainz.exe"
+if ($env:GAINZ_WINDOWS_PFX_BASE64) {
+    if (-not $env:GAINZ_WINDOWS_PFX_PASSWORD) {
+        throw "GAINZ_WINDOWS_PFX_BASE64 was provided without GAINZ_WINDOWS_PFX_PASSWORD."
+    }
+
+    $tempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
+    $certificatePath = Join-Path $tempRoot "gainz-code-signing.pfx"
+    [System.IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:GAINZ_WINDOWS_PFX_BASE64))
+    try {
+        $signtool = Get-Command signtool.exe -ErrorAction SilentlyContinue
+        if (-not $signtool) {
+            throw "signtool.exe was not found on this runner."
+        }
+
+        & $signtool.Source sign `
+            /fd SHA256 `
+            /tr "http://timestamp.digicert.com" `
+            /td SHA256 `
+            /f $certificatePath `
+            /p $env:GAINZ_WINDOWS_PFX_PASSWORD `
+            $exePath
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "Windows code signing failed."
+        }
+        Write-Host "Signed dist\Gainz.exe"
+    }
+    finally {
+        if (Test-Path -LiteralPath $certificatePath) {
+            Remove-Item -LiteralPath $certificatePath -Force
+        }
+    }
+}
+else {
+    Write-Host "No Windows code-signing certificate configured; packaging unsigned executable."
+}
+
 $resolvedDist = Resolve-Path -LiteralPath $distDir
 if (-not $resolvedDist.Path.StartsWith((Resolve-Path -LiteralPath $repoRoot).Path)) {
     throw "Refusing to package outside the repository dist directory."
@@ -58,7 +96,7 @@ if (Test-Path -LiteralPath $packageDir) {
 }
 New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
 
-Copy-Item -LiteralPath (Join-Path $distDir "Gainz.exe") -Destination $packageDir
+Copy-Item -LiteralPath $exePath -Destination $packageDir
 $packageReadme = Join-Path $packageDir "README.md"
 Copy-Item -LiteralPath (Join-Path $repoRoot "README.md") -Destination $packageReadme
 Add-Content -LiteralPath $packageReadme -Value "`nCurrent packaged version: $version"

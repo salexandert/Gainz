@@ -251,6 +251,12 @@ def run_packaged_workflow_smoke(temp_path, expected_version):
         raise AssertionError("Packet success screen did not render after packet generation.")
     if "FOR_CPAS.md" not in success_html:
         raise AssertionError("Packet success screen is missing CPA-first review guidance.")
+    if "Copy Packet Path" not in success_html:
+        raise AssertionError("Packet success screen is missing copy packet path action.")
+    if "Copy CPA Summary" not in success_html:
+        raise AssertionError("Packet success screen is missing copy CPA summary action.")
+    if "Open README_FIRST" not in success_html:
+        raise AssertionError("Packet success screen is missing README_FIRST open action.")
 
     packet_path = Path(packet_payload["path"])
     if packet_path.parent != output_dir.resolve():
@@ -295,6 +301,8 @@ def run_packaged_workflow_smoke(temp_path, expected_version):
     privacy_handling = privacy_handling_path.read_text(encoding="utf-8")
     if "Suggested Review Order" not in for_cpas:
         raise AssertionError("FOR_CPAS.md is missing CPA review guidance.")
+    if "Questions For The Taxpayer" not in for_cpas:
+        raise AssertionError("FOR_CPAS.md is missing taxpayer questions for CPA review.")
     if "How This Packet Was Generated" not in cpa_handoff:
         raise AssertionError("CPA_HANDOFF.md is missing packet generation notes.")
     if "does not require a hosted account" not in privacy_handling:

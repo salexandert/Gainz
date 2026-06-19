@@ -1026,6 +1026,14 @@
     gap: 8px;
 }
 
+.guided-review-secondary-actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
 .packet-success-list {
     color: #4f5962;
     padding-left: 20px;
@@ -1036,15 +1044,40 @@
 }
 
 .packet-success-actions {
+    align-items: center;
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     margin-top: 18px;
 }
 
+.packet-success-actions form {
+    display: inline-flex;
+    margin: 0;
+}
+
+.packet-success-actions-top {
+    justify-content: flex-end;
+    margin-top: 0;
+}
+
+.gainz-copy-source {
+    height: 1px;
+    left: -9999px;
+    opacity: 0;
+    position: absolute;
+    top: auto;
+    width: 1px;
+}
+
 @media (max-width: 768px) {
     .guided-review-grid {
         grid-template-columns: 1fr;
+    }
+
+    .packet-success-actions-top {
+        justify-content: flex-start;
+        margin-top: 14px;
     }
 }
 

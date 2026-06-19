@@ -11,6 +11,8 @@ This sample packet uses synthetic demo data only. It is meant to show the shape 
 
 <p><a class="button" href="{{ '/assets/downloads/gainz-synthetic-audit-packet-sample.zip' | relative_url }}">Download the synthetic sample packet</a></p>
 
+The public sample page includes a visual folder tree so users and CPAs can see how the packet is organized before downloading the ZIP.
+
 ![Gainz Reports and Export readiness panel]({{ '/assets/screenshots/gainz-export-audit-readiness.png' | relative_url }})
 {: .screenshot-frame }
 

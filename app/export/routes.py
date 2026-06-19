@@ -1,4 +1,5 @@
 import csv
+import datetime
 import json
 import os
 import subprocess
@@ -123,6 +124,20 @@ def _open_folder(path):
     subprocess.Popen([opener, str(path)])
 
 
+def _open_path(path):
+    path = Path(path).expanduser().resolve()
+    if not path.exists():
+        return False
+
+    if os.name == "nt":
+        os.startfile(str(path))  # type: ignore[attr-defined]
+        return True
+
+    opener = "open" if sys.platform == "darwin" else "xdg-open"
+    subprocess.Popen([opener, str(path)])
+    return True
+
+
 def _work_order_rows(transactions):
     readiness = get_audit_readiness_summary(transactions)
     return [
@@ -182,6 +197,17 @@ def _review_queue_context(transactions, item_id=""):
         current = unreviewed[0] if unreviewed else None
 
     index = rows.index(current) + 1 if current in rows else 0
+    next_item = None
+    if current and unreviewed:
+        current_position = rows.index(current)
+        later_unreviewed = [
+            row for row in rows[current_position + 1 :]
+            if not row.get("review_decision") and row.get("item_id") != current.get("item_id")
+        ]
+        next_item = later_unreviewed[0] if later_unreviewed else next(
+            (row for row in unreviewed if row.get("item_id") != current.get("item_id")),
+            None,
+        )
     if current:
         current["why_it_matters"] = _work_order_why_it_matters(current)
         current["related_url"] = _work_order_related_url(current)
@@ -193,6 +219,7 @@ def _review_queue_context(transactions, item_id=""):
         "total": len(rows),
         "unreviewed_count": len(unreviewed),
         "reviewed_count": len(rows) - len(unreviewed),
+        "next_item_id": next_item.get("item_id") if next_item else "",
         "choices": work_order_review_choices(),
     }
 
@@ -218,6 +245,23 @@ def _packet_manifest_counts(packet_path):
     return counts
 
 
+def _folder_size(path):
+    if not path.exists():
+        return 0
+    return sum(file.stat().st_size for file in path.rglob("*") if file.is_file())
+
+
+def _format_bytes(size):
+    value = float(size)
+    for unit in ("B", "KB", "MB", "GB"):
+        if value < 1024 or unit == "GB":
+            if unit == "B":
+                return f"{int(value)} {unit}"
+            return f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{value:.1f} GB"
+
+
 def _packet_success_context(packet_path_value):
     packet_path = Path(packet_path_value or "").expanduser()
     if not packet_path.is_absolute():
@@ -232,6 +276,10 @@ def _packet_success_context(packet_path_value):
     counts = _packet_manifest_counts(packet_path)
     is_ready = bool(summary.get("readiness_is_ready"))
     blocker_groups = summary.get("readiness_blocker_groups") or []
+    packet_size = _folder_size(packet_path)
+    generated_at = ""
+    if packet_path.exists():
+        generated_at = datetime.datetime.fromtimestamp(packet_path.stat().st_mtime).strftime("%Y-%m-%d %I:%M %p")
     review_first = [
         "README_FIRST.md for the human packet orientation.",
         "PACKET_STATUS.md for readiness, blockers, warnings, and evidence counts.",
@@ -243,16 +291,29 @@ def _packet_success_context(packet_path_value):
     return {
         "packet_path": str(packet_path),
         "packet_name": packet_path.name,
+        "readme_first_path": str(packet_path / "README_FIRST.md"),
         "packet_exists": packet_path.exists() and packet_path.is_dir(),
         "status": "Filing-ready review packet" if is_ready else "Draft packet",
         "status_class": "status-verified" if is_ready else "status-needs-review",
         "is_draft": not is_ready,
         "summary": summary.get("readiness_summary", "Open the packet status file for details."),
+        "generated_at": generated_at or "Unknown",
+        "packet_size": _format_bytes(packet_size),
         "copied_files_count": counts["copied_files"],
         "reference_only_files_count": counts["reference_only_tax_evidence"],
         "missing_evidence_count": counts["missing_tax_evidence"],
         "open_blocker_groups": blocker_groups,
         "review_first": review_first,
+        "cpa_summary": (
+            f"Gainz audit packet: {'filing-ready review packet' if is_ready else 'draft packet'}. "
+            f"Packet path: {packet_path}. "
+            f"Summary: {summary.get('readiness_summary', 'Open PACKET_STATUS.md for details.')}. "
+            f"Copied files: {counts['copied_files']}. "
+            f"Reference-only tax evidence records: {counts['reference_only_tax_evidence']}. "
+            f"Missing evidence paths: {counts['missing_tax_evidence']}. "
+            "Recommended first files: README_FIRST.md, PACKET_STATUS.md, FOR_CPAS.md, "
+            "03_manifests/evidence_manifest.csv, and 01_reports/reconciliation_work_order.csv."
+        ),
     }
 
 
@@ -432,5 +493,14 @@ def open_folder():
     folder = request.form.get("folder") or request.form.get("path") or ""
     if folder:
         _open_folder(folder)
+    return redirect(request.referrer or url_for("export_blueprint.index"))
+
+
+@blueprint.route('/open_path', methods=['POST'])
+@login_required
+def open_path():
+    path = request.form.get("path") or ""
+    if path:
+        _open_path(path)
     return redirect(request.referrer or url_for("export_blueprint.index"))
 

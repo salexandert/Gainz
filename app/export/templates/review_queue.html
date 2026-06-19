@@ -88,6 +88,10 @@
           </section>
         </div>
 
+        <div class="alert alert-info" role="note">
+          This decision and note will appear in the audit packet work order so you and a CPA can see what was reviewed.
+        </div>
+
         <form method="POST" action="{{ url_for('export_blueprint.review_queue_save') }}" class="guided-review-form">
           <input type="hidden" name="item_id" value="{{ item.item_id }}">
           <div class="form-group">
@@ -112,6 +116,12 @@
             </button>
             {% endfor %}
           </div>
+          <div class="guided-review-secondary-actions">
+            {% if next_item_id %}
+            <a class="btn btn-link" href="{{ url_for('export_blueprint.review_queue', item_id=next_item_id) }}">Skip for now</a>
+            {% endif %}
+            <a class="btn btn-link" href="{{ url_for('export_blueprint.index') }}">Return to full work order</a>
+          </div>
         </form>
       </div>
     </div>
@@ -122,11 +132,37 @@
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
-        <h2 class="gainz-section-title">Review Queue Complete</h2>
+        {% if total > 0 %}
+        <h2 class="gainz-section-title">All Queue Items Reviewed</h2>
         <p class="text-muted">
-          Gainz does not currently have open work order items. Review the packet preview, then generate output when ready.
+          Every current work order item has a saved review decision. Generate or refresh the packet so those decisions appear in
+          the packet status files and reconciliation work order.
         </p>
-        <a class="btn btn-primary btn-round" href="{{ url_for('export_blueprint.index') }}#packet_preview">Review packet preview</a>
+        <div class="audit-readiness-grid">
+          <div class="audit-readiness-item">
+            <span>Reviewed Items</span>
+            <strong>{{ reviewed_count }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Unreviewed Items</span>
+            <strong>{{ unreviewed_count }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Next Step</span>
+            <strong>Refresh Packet</strong>
+            <small>Open Reports & Export to preview the packet status.</small>
+          </div>
+        </div>
+        {% else %}
+        <h2 class="gainz-section-title">No Review Items Found</h2>
+        <p class="text-muted">
+          Gainz does not currently have work order items to review. Review the packet preview, then generate output when ready.
+        </p>
+        {% endif %}
+        <div class="packet-success-actions">
+          <a class="btn btn-primary btn-round" href="{{ url_for('export_blueprint.index') }}#packet_preview">Review packet preview</a>
+          <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index') }}">Back to Dashboard</a>
+        </div>
       </div>
     </div>
   </div>

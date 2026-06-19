@@ -369,6 +369,14 @@ class AuditPacketService:
             "- Whether the user's filed totals and payment evidence align with generated Gainz totals.",
             "- Whether unresolved blockers make this packet draft-only.",
             "",
+            "## Questions For The Taxpayer",
+            "",
+            "- Can you provide source records for missing acquisition-basis rows listed in `01_reports/reconciliation_work_order.csv`?",
+            "- Do holdings discrepancies represent transfers, disposals, losses, gifts, unsupported rows, or missing imports?",
+            "- Were filed totals based on another software package, exchange report, CPA adjustment, or manual calculation?",
+            "- Which reference-only evidence files should be copied or shared for professional review?",
+            "- Are any unresolved review decisions intentionally left for draft discussion rather than filing support?",
+            "",
         ]
         (packet_dir / "FOR_CPAS.md").write_text("\n".join(lines), encoding="utf-8")
 
