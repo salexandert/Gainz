@@ -30,7 +30,7 @@ def progress_for(transactions):
         return _home_progress(transactions)
 
 
-def render_home_page(transactions):
+def render_home_page(transactions, selected_stage_number=None):
     app = create_app(config_dict["Debug"], selenium=True)
     with app.test_request_context("/home/"):
         home_progress = _home_progress(transactions)
@@ -38,7 +38,11 @@ def render_home_page(transactions):
         return app.jinja_env.get_template("home.html").render(
             home_progress=home_progress,
             audit_readiness=audit_readiness,
-            stage_context=_stage_context(home_progress, audit_readiness),
+            stage_context=_stage_context(
+                home_progress,
+                audit_readiness,
+                selected_stage_number=selected_stage_number,
+            ),
             store_url=None,
             support_url=None,
             btc_receive_address=None,
@@ -139,7 +143,8 @@ class HomeProgressTests(unittest.TestCase):
 
         self.assertIn("Guided Reconciliation", rendered)
         self.assertIn("Reconciliation stages", rendered)
-        self.assertIn("Review dashboard details", rendered)
+        self.assertIn("Show status details", rendered)
+        self.assertIn("Done when", rendered)
         self.assertIn("Open Review Groups", rendered)
         self.assertNotIn("gainz-home-flow-heading", rendered)
         self.assertNotIn("gainz-home-flow-detail", rendered)
@@ -157,8 +162,10 @@ class HomeProgressTests(unittest.TestCase):
         self.assertEqual("Import", context["selected_step"]["title"])
         self.assertFalse(context["is_future_step"])
         self.assertEqual("Open import", context["primary_action"]["label"])
+        self.assertIsNone(context["next_stage"])
+        self.assertTrue(context["next_stage_locked"])
 
-    def test_home_stage_context_allows_future_stage_but_points_back_to_current(self):
+    def test_home_stage_context_treats_future_stage_as_preview(self):
         transactions = empty_transactions()
         progress = progress_for(transactions)
         audit_readiness = get_audit_readiness_summary(transactions)
@@ -168,7 +175,27 @@ class HomeProgressTests(unittest.TestCase):
 
         self.assertEqual("Review & Export", context["selected_step"]["title"])
         self.assertTrue(context["is_future_step"])
+        self.assertEqual(1, context["rail_active_number"])
+        self.assertEqual(4, context["preview_step_number"])
         self.assertEqual("Go to Step 1", context["primary_action"]["label"])
+        self.assertIsNone(context["previous_stage"])
+        self.assertIsNone(context["next_stage"])
+
+    def test_home_page_renders_locked_preview_without_alternate_active_stage(self):
+        rendered = render_home_page(empty_transactions(), selected_stage_number=4)
+
+        self.assertIn("Preview: ", rendered)
+        self.assertIn("This step is locked for now.", rendered)
+        self.assertIn("is-waiting is-previewed", rendered)
+        self.assertIn("gainz-stage-step is-current is-selected", rendered)
+        self.assertNotIn("Previous step", rendered)
+        self.assertNotIn("Next step", rendered)
+
+    def test_home_page_hides_advanced_sidebar_tools_during_guided_reconciliation(self):
+        rendered = render_home_page(empty_transactions())
+
+        self.assertNotIn("Advanced tools", rendered)
+        self.assertNotIn("Stats &amp; Charts", rendered)
 
 
 if __name__ == "__main__":

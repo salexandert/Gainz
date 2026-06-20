@@ -33,8 +33,8 @@
           {% for step in home_progress.steps %}
           <a
             href="{{ url_for('home_blueprint.index', stage=step.number) }}"
-            class="gainz-stage-step is-{{ step.state }}{% if stage_context.selected_step.number == step.number %} is-selected{% endif %}"
-            aria-current="{% if stage_context.selected_step.number == step.number %}step{% else %}false{% endif %}"
+            class="gainz-stage-step is-{{ step.state }}{% if stage_context.rail_active_number == step.number %} is-selected{% endif %}{% if stage_context.preview_step_number == step.number %} is-previewed{% endif %}"
+            aria-current="{% if stage_context.rail_active_number == step.number %}step{% else %}false{% endif %}"
           >
             <span class="gainz-stage-number">{{ step.number }}</span>
             <span>
@@ -45,11 +45,18 @@
           {% endfor %}
         </nav>
 
-        <section class="gainz-stage-workspace" aria-labelledby="current_stage_title">
+        <section class="gainz-stage-workspace{% if stage_context.is_future_step %} is-preview-mode{% endif %}" aria-labelledby="current_stage_title">
           <div class="gainz-stage-main">
-            <p class="gainz-stage-kicker">Step {{ stage_context.selected_step.number }} of {{ stage_context.step_count }}</p>
+            <p class="gainz-stage-kicker">
+              {% if stage_context.is_future_step %}
+              Previewing Step {{ stage_context.selected_step.number }}; current step is {{ stage_context.current_step.number }}
+              {% else %}
+              Step {{ stage_context.selected_step.number }} of {{ stage_context.step_count }}
+              {% endif %}
+            </p>
             <div class="d-flex flex-wrap align-items-center mb-2">
               <h2 id="current_stage_title" class="gainz-stage-title mb-0 mr-2">
+                {% if stage_context.is_future_step %}Preview: {% endif %}
                 {{ stage_context.selected_step.title }}
               </h2>
               <span class="gainz-status-badge {{ stage_context.selected_status_class }}">
@@ -60,9 +67,9 @@
 
             {% if stage_context.is_future_step %}
             <div class="gainz-stage-callout is-waiting">
-              <strong>This step comes later.</strong>
+              <strong>This step is locked for now.</strong>
               <p>
-                Your current task is Step {{ stage_context.current_step.number }}:
+                You can preview what comes later, but the active task is Step {{ stage_context.current_step.number }}:
                 {{ stage_context.current_step.detail }}
               </p>
             </div>
@@ -92,9 +99,22 @@
               <li>{{ task }}</li>
               {% endfor %}
             </ul>
+            <h3 class="gainz-stage-done-heading">Done when</h3>
+            <ul>
+              {% for item in stage_context.done_criteria %}
+              <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
           </aside>
         </section>
 
+        {% if stage_context.is_future_step %}
+        <div class="gainz-stage-nav" aria-label="Stage navigation">
+          <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index', stage=stage_context.current_step.number) }}">
+            Back to current step
+          </a>
+        </div>
+        {% else %}
         <div class="gainz-stage-nav" aria-label="Stage navigation">
           {% if stage_context.previous_stage %}
           <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index', stage=stage_context.previous_stage) }}">
@@ -107,11 +127,16 @@
           <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index', stage=stage_context.next_stage) }}">
             Next step
           </a>
+          {% elif stage_context.next_stage_locked %}
+          <span class="btn btn-outline-secondary btn-round disabled" aria-disabled="true">
+            Next step locked
+          </span>
           {% endif %}
         </div>
+        {% endif %}
 
         <details class="gainz-dashboard-details">
-          <summary>Review dashboard details</summary>
+          <summary>Show status details</summary>
           <p class="mb-2">
             <strong>Summary:</strong> {{ audit_readiness.summary }}
           </p>

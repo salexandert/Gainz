@@ -35,9 +35,9 @@ The first screen is split into four numbered stages:
 - **3 Reconcile**: review holdings gaps, missing basis, transfer questions, and research notes.
 - **4 Review & Export**: review readiness and generate the workbook or audit packet.
 
-Gainz opens the stage that needs your attention now. You can click a lower or higher numbered stage, or use **Previous step** and **Next step**, but future stages point you back to the current task until earlier work is ready.
+Gainz opens the stage that needs your attention now. You can click a lower stage to review what already happened. Future stages open as previews only and point you back to the current task until earlier work is ready. **Next step** stays locked when Gainz still needs the current stage completed.
 
-The old dashboard counts and review groups are still available under **Review dashboard details**, but they are collapsed by default so the first thing you see is the current step.
+Each stage includes **Done when** criteria so you know what has to be true before moving on. The old dashboard counts and review groups are still available under **Show status details**, but they are collapsed by default so the first thing you see is the current step.
 
 ![Gainz Guided Reconciliation]({{ '/assets/screenshots/gainz-home.png' | relative_url }})
 {: .screenshot-frame }

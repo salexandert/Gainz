@@ -199,6 +199,32 @@ def _stage_tasks(step_number):
     return tasks.get(step_number, [])
 
 
+def _stage_done_criteria(step_number):
+    criteria = {
+        1: [
+            "At least one exchange CSV, demo file, or source-backed manual row is loaded.",
+            "Import warnings and possible overlapping source files are reviewed or noted.",
+            "Known missing rows are added manually or left for later research with source notes.",
+        ],
+        2: [
+            "Current holdings are saved for every imported asset.",
+            "Assets you no longer hold are intentionally confirmed as zero.",
+            "You have a current balance source you can review later if needed.",
+        ],
+        3: [
+            "Holdings differences, transfer questions, and missing-basis items have decisions or notes.",
+            "FIFO or another basis-linking review has been run when sales need linked lots.",
+            "Anything still unresolved is marked for research, draft, or CPA review.",
+        ],
+        4: [
+            "Readiness and packet preview are reviewed before generating files.",
+            "Draft acknowledgement is used when unresolved blockers remain.",
+            "The generated workbook or packet is opened and checked against source records.",
+        ],
+    }
+    return criteria.get(step_number, [])
+
+
 def _stage_status_class(step, current_step, audit_readiness):
     if step["number"] == current_step["number"]:
         return audit_readiness["status_class"]
@@ -221,6 +247,8 @@ def _stage_context(progress, audit_readiness, selected_stage_number=None):
         selected_step["number"] > current_step["number"]
         and selected_step["state"] == "waiting"
     )
+    rail_active_number = current_step["number"] if is_future_step else selected_step["number"]
+    preview_step_number = selected_step["number"] if is_future_step else None
 
     if is_future_step:
         primary_action = {
@@ -239,10 +267,25 @@ def _stage_context(progress, audit_readiness, selected_stage_number=None):
             "detail": selected_step["detail"],
         }
 
+    previous_stage = None
+    next_stage = None
+    next_stage_locked = False
+    if not is_future_step:
+        if selected_number > 1:
+            previous_stage = selected_number - 1
+        if selected_number < len(steps):
+            next_step = next(step for step in steps if step["number"] == selected_number + 1)
+            if next_step["state"] == "waiting" and selected_number >= current_step["number"]:
+                next_stage_locked = True
+            else:
+                next_stage = next_step["number"]
+
     return {
         "selected_step": selected_step,
         "current_step": current_step,
         "is_future_step": is_future_step,
+        "rail_active_number": rail_active_number,
+        "preview_step_number": preview_step_number,
         "selected_status_class": _stage_status_class(
             selected_step,
             current_step,
@@ -250,8 +293,10 @@ def _stage_context(progress, audit_readiness, selected_stage_number=None):
         ),
         "primary_action": primary_action,
         "tasks": _stage_tasks(selected_step["number"]),
-        "previous_stage": selected_number - 1 if selected_number > 1 else None,
-        "next_stage": selected_number + 1 if selected_number < len(steps) else None,
+        "done_criteria": _stage_done_criteria(selected_step["number"]),
+        "previous_stage": previous_stage,
+        "next_stage": next_stage,
+        "next_stage_locked": next_stage_locked,
         "step_count": len(steps),
     }
 

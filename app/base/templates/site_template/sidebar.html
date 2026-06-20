@@ -49,6 +49,7 @@
       </a>
     </li>
 
+    {% if not current_path.startswith('/home') %}
     <li class="sidebar-nav-label" aria-hidden="true">Advanced tools</li>
     <li class="{% if current_path.startswith('/auto_link') %}active{% endif %}">
       <a href="{{ url_for('auto_link_blueprint.auto_link') }}" {% if current_path.startswith('/auto_link') %}aria-current="page"{% endif %}>
@@ -80,5 +81,6 @@
         <p>Manage Links</p>
       </a>
     </li>
+    {% endif %}
   </ul>
 </div>
