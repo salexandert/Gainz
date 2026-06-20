@@ -17,7 +17,7 @@ File names should include `coinbase`, `coinbase_pro`, or `gdax` when appropriate
 
 ## After Import
 
-Return to **Dashboard** and follow **Continue reconciliation**. The dashboard shows the next review group instead of making you guess which page to open.
+Return to **Dashboard** and follow the highlighted current stage. Guided Reconciliation shows the next review group instead of making you guess which page to open.
 
 Use **Import** and **Reconcile** to check:
 

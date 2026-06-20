@@ -18,9 +18,9 @@ WEBSITE_ROUTES = {
 
 SCREENSHOTS = [
     (
-        "Reconciliation Dashboard",
+        "Guided Reconciliation",
         "gainz-home.png",
-        "Dashboard shows the readiness summary, next action, and review queue.",
+        "Dashboard opens a numbered staged flow with the current task first and detailed counts collapsed by default.",
     ),
     (
         "Import",

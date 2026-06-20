@@ -92,11 +92,11 @@ From a source checkout, you can reset the local password with `python .\scripts\
 ## Common Workflow
 
 1. Learn the cost-basis question and collect source files.
-2. Start on **Dashboard** and use it as the control center.
+2. Start on **Dashboard** and use **Guided Reconciliation** as the control center.
 3. Import transaction CSVs in **Import**.
 4. Add source-backed manual rows in the batch table when a CSV is missing known buys or sells.
-5. Return to **Dashboard** and follow **Continue reconciliation**.
-6. Declare current holdings in **Reconcile** before deeper basis work unless Dashboard points somewhere else.
+5. Return to **Dashboard** and follow the highlighted current stage.
+6. Declare current holdings in **Reconcile** before deeper basis work unless Guided Reconciliation points somewhere else.
 7. Review import warnings, source overlaps, and transfer questions that affect the reconciliation.
 8. Run FIFO or another basis-linking review in **Auto Link** when Dashboard or Reports & Export says sales still need basis.
 9. Open **Tax Evidence**, build the year-by-year tax evidence inventory, and confirm or mark suggested filed totals for research.
@@ -118,9 +118,9 @@ A good demo run is:
 1. Start Gainz from the packaged app by unzipping `Gainz-Windows.zip` and opening `Gainz.exe` on Windows, or unzipping `Gainz-macOS.zip` and opening `Gainz.app` on macOS.
 2. Open **Import**.
 3. Click **Try Demo Data**, or upload each demo CSV one file at a time.
-4. Return to **Dashboard** and follow **Continue reconciliation**.
+4. Return to **Dashboard** and follow the highlighted current stage.
 5. Enter current holdings in **Reconcile**.
-6. Review warnings or tax evidence if Dashboard shows them.
+6. Review warnings or tax evidence when Guided Reconciliation highlights them.
 7. Run **FIFO** in **Auto Link** only when Dashboard or Reports & Export says basis links are blocking readiness.
 8. Open **Reports & Export** and review the **Readiness Review** checklist.
 9. Use **Start guided review** if the work order has open items.

@@ -24,20 +24,22 @@ On first run, Gainz asks you to create a local admin account in the browser. The
 
 If you forget the local password, use **Reset Password** in the launcher. The local password gates the browser UI; it does not encrypt imported CSVs, XLSX saves, exports, or audit packets. See [Reset Your Local Gainz Password]({{ '/guides/local-password-reset/' | relative_url }}).
 
-## 2. Use The Reconciliation Dashboard
+## 2. Use Guided Reconciliation
 
-After sign-in, start on **Dashboard**. This is the control center for the workflow.
+After sign-in, start on **Dashboard**. This opens the **Guided Reconciliation** flow.
 
-The dashboard shows:
+The first screen is split into four numbered stages:
 
-- **Summary**: the open review groups Gainz found.
-- **Next action**: the most useful next step.
-- **Continue reconciliation**: a button that takes you to the right page for that step.
-- **Review Queue**: grouped blockers such as holdings, import warnings, missing basis, source overlaps, and tax evidence.
+- **1 Import**: load exchange CSVs, demo data, or source-backed manual rows.
+- **2 Declare Holdings**: enter what you currently hold.
+- **3 Reconcile**: review holdings gaps, missing basis, transfer questions, and research notes.
+- **4 Review & Export**: review readiness and generate the workbook or audit packet.
 
-If you are not sure what to do next, return to Dashboard and follow **Continue reconciliation**.
+Gainz opens the stage that needs your attention now. You can click a lower or higher numbered stage, or use **Previous step** and **Next step**, but future stages point you back to the current task until earlier work is ready.
 
-![Gainz Reconciliation Dashboard]({{ '/assets/screenshots/gainz-home.png' | relative_url }})
+The old dashboard counts and review groups are still available under **Review dashboard details**, but they are collapsed by default so the first thing you see is the current step.
+
+![Gainz Guided Reconciliation]({{ '/assets/screenshots/gainz-home.png' | relative_url }})
 {: .screenshot-frame }
 
 ## 3. Import Transaction Files
@@ -85,7 +87,7 @@ demo_data/coinbase_convert_sample.csv
 
 ## 5. Follow Next Action And Declare Holdings
 
-Return to **Dashboard** after importing and follow **Continue reconciliation**.
+Return to **Dashboard** after importing and follow the highlighted current stage.
 
 For most new imports, Gainz sends you to **Reconcile** first because current holdings tell Gainz whether imported buys and sells explain what you actually still hold.
 

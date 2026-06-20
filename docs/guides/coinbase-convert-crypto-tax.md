@@ -28,7 +28,7 @@ Coinbase export formats can change. If Gainz cannot confidently interpret a conv
 
 1. Import the Coinbase file.
 2. Check import warnings on **Import**.
-3. Return to **Dashboard** and follow **Continue reconciliation**.
+3. Return to **Dashboard** and follow the highlighted current stage.
 4. Reconcile current holdings across all converted assets.
 5. Confirm both sides of expected converts appear in the ledger.
 6. Run auto-linking for assets with sells when Dashboard or Reports & Export says basis links are blocking readiness.

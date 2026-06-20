@@ -49,7 +49,7 @@ Use the table this way:
 ## Review Workflow
 
 1. Import every exchange and wallet file you can obtain.
-2. Return to **Dashboard** and follow **Continue reconciliation**.
+2. Return to **Dashboard** and follow the highlighted current stage.
 3. Open **Reconcile** and declare the amount you currently hold for each asset.
 4. Click an asset marked **Needs Review** to inspect the selected asset workbench.
 5. Review import warnings, unlinked sales, available lots, and the Transfer Classification Review table.

@@ -714,6 +714,215 @@
     margin-top: 22px;
 }
 
+.gainz-dashboard-intro {
+    margin-bottom: 18px;
+}
+
+.gainz-stage-rail {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 18px 0;
+}
+
+.gainz-stage-step {
+    align-items: flex-start;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    color: inherit;
+    display: flex;
+    gap: 12px;
+    min-height: 92px;
+    padding: 14px;
+    text-decoration: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.gainz-stage-step:hover,
+.gainz-stage-step:focus {
+    border-color: #51cbce;
+    box-shadow: 0 6px 18px rgba(81, 203, 206, 0.18);
+    color: inherit;
+    outline: none;
+    text-decoration: none;
+    transform: translateY(-1px);
+}
+
+.gainz-stage-step.is-selected {
+    border-color: #2b6cb0;
+    box-shadow: 0 10px 28px rgba(43, 108, 176, 0.16);
+}
+
+.gainz-stage-step.is-complete {
+    background: #eefaf4;
+    border-color: rgba(65, 171, 122, 0.45);
+}
+
+.gainz-stage-step.is-review {
+    background: #fff8e8;
+    border-color: rgba(251, 198, 88, 0.7);
+}
+
+.gainz-stage-step.is-waiting {
+    background: #f8f9fa;
+    color: #5d6770;
+}
+
+.gainz-stage-step.is-ready {
+    background: #eef7ff;
+    border-color: rgba(43, 108, 176, 0.35);
+}
+
+.gainz-stage-number {
+    align-items: center;
+    background: #51cbce;
+    border-radius: 999px;
+    color: #fff;
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-size: 14px;
+    font-weight: 800;
+    height: 34px;
+    justify-content: center;
+    width: 34px;
+}
+
+.gainz-stage-step.is-complete .gainz-stage-number {
+    background: #41ab7a;
+}
+
+.gainz-stage-step.is-waiting .gainz-stage-number {
+    background: #adb5bd;
+}
+
+.gainz-stage-step strong,
+.gainz-stage-step small {
+    display: block;
+}
+
+.gainz-stage-step strong {
+    font-weight: 800;
+    margin-bottom: 4px;
+}
+
+.gainz-stage-step small {
+    color: #6c757d;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.gainz-stage-workspace {
+    background: #f8f9fa;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    display: grid;
+    gap: 18px;
+    grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.55fr);
+    margin: 18px 0 12px;
+    padding: 18px;
+}
+
+.gainz-stage-kicker {
+    color: #2b6cb0;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    margin: 0 0 8px;
+    text-transform: uppercase;
+}
+
+.gainz-stage-title {
+    color: #252422;
+    font-size: 30px;
+    font-weight: 700;
+}
+
+.gainz-stage-lede {
+    color: #4f5962;
+    font-size: 16px;
+    margin-bottom: 14px;
+}
+
+.gainz-stage-callout {
+    background: #fff;
+    border: 1px solid rgba(43, 108, 176, 0.18);
+    border-left: 4px solid #2b6cb0;
+    border-radius: 8px;
+    padding: 14px;
+}
+
+.gainz-stage-callout.is-waiting {
+    border-color: rgba(251, 198, 88, 0.45);
+    border-left-color: #fbc658;
+}
+
+.gainz-stage-callout strong {
+    color: #252422;
+    display: block;
+    font-weight: 800;
+    margin-bottom: 4px;
+}
+
+.gainz-stage-callout p {
+    color: #4f5962;
+    margin-bottom: 0;
+}
+
+.gainz-stage-actions,
+.gainz-stage-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.gainz-stage-actions {
+    margin-top: 16px;
+}
+
+.gainz-stage-nav {
+    justify-content: space-between;
+    margin: 12px 0 18px;
+}
+
+.gainz-stage-sidebar {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.gainz-stage-sidebar h3 {
+    font-size: 16px;
+    font-weight: 800;
+    margin: 0 0 10px;
+}
+
+.gainz-stage-sidebar ul {
+    color: #4f5962;
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding-left: 18px;
+}
+
+.gainz-dashboard-details {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    margin: 18px 0;
+    padding: 14px;
+}
+
+.gainz-dashboard-details summary {
+    cursor: pointer;
+    font-weight: 800;
+}
+
+.gainz-dashboard-details[open] summary {
+    margin-bottom: 12px;
+}
+
 .gainz-home-review-queue {
     background: #f8f9fa;
     border: 1px solid rgba(0, 0, 0, 0.08);
@@ -837,8 +1046,14 @@
 
 @media (max-width: 768px) {
     .gainz-page-hero,
-    .gainz-dashboard-hero {
+    .gainz-dashboard-hero,
+    .gainz-stage-workspace {
         flex-direction: column;
+        grid-template-columns: 1fr;
+    }
+
+    .gainz-stage-rail {
+        grid-template-columns: 1fr;
     }
 
     .gainz-dashboard-actions {

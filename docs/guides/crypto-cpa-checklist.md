@@ -36,7 +36,7 @@ This checklist is for organizing crypto records before a tax professional review
 
 ## Where This Happens In Gainz
 
-- [Use the Reconciliation Dashboard]({{ '/user-walkthrough/#2-use-the-reconciliation-dashboard' | relative_url }}) to follow the current next action.
+- [Use Guided Reconciliation]({{ '/user-walkthrough/#2-use-guided-reconciliation' | relative_url }}) to follow the current next action.
 - [Import transaction files]({{ '/user-walkthrough/#3-import-transaction-files' | relative_url }}) in **Import**.
 - [Declare current holdings]({{ '/user-walkthrough/#5-follow-next-action-and-declare-holdings' | relative_url }}) in **Reconcile**.
 - [Review import warnings and source issues]({{ '/user-walkthrough/#6-review-import-warnings-and-source-issues' | relative_url }}) in **Import** and **Reconcile**.

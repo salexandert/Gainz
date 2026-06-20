@@ -31,7 +31,7 @@ Sells need basis links before generated reports are review-ready. Sends and rece
 1. Start Gainz locally.
 2. Open **Import**.
 3. Upload the Cash App CSV.
-4. Return to **Dashboard** and follow **Continue reconciliation**.
+4. Return to **Dashboard** and follow the highlighted current stage.
 5. Declare current BTC holdings in **Reconcile**.
 6. Review import warnings on **Import** and source gaps on **Reconcile**.
 7. Run FIFO in **Auto Link** when Dashboard or Reports & Export says BTC sales still need basis links.

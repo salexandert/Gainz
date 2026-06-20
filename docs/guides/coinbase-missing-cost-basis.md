@@ -26,7 +26,7 @@ Missing Coinbase basis usually means the sale exists, but the earlier acquisitio
 2. Review **Import** for warnings, skipped rows, data sources, and possible overlapping source files.
 3. If automatic detection cannot find the needed fields, use the column mapper to select the header row and map date, type, asset, quantity, and USD value columns.
 4. Confirm Coinbase Convert rows appear as both the disposed asset and the acquired asset.
-5. Return to **Dashboard** and follow **Continue reconciliation**.
+5. Return to **Dashboard** and follow the highlighted current stage.
 6. Declare current holdings in **Reconcile** and review whether the calculated balance matches what you actually hold.
 7. Run FIFO auto-link for the affected asset when Dashboard or Reports & Export says sales still need basis links.
 8. Use **Stats & Charts** only for deeper asset-level inspection after the dashboard points to a specific issue.

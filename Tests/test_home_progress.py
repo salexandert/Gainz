@@ -2,7 +2,7 @@ import datetime
 import unittest
 
 from app import create_app
-from app.home.routes import _home_progress
+from app.home.routes import _home_progress, _stage_context
 from configs.config import config_dict
 from transaction import Buy, Sell
 from transactions import Transactions
@@ -33,9 +33,12 @@ def progress_for(transactions):
 def render_home_page(transactions):
     app = create_app(config_dict["Debug"], selenium=True)
     with app.test_request_context("/home/"):
+        home_progress = _home_progress(transactions)
+        audit_readiness = get_audit_readiness_summary(transactions)
         return app.jinja_env.get_template("home.html").render(
-            home_progress=_home_progress(transactions),
-            audit_readiness=get_audit_readiness_summary(transactions),
+            home_progress=home_progress,
+            audit_readiness=audit_readiness,
+            stage_context=_stage_context(home_progress, audit_readiness),
             store_url=None,
             support_url=None,
             btc_receive_address=None,
@@ -134,15 +137,38 @@ class HomeProgressTests(unittest.TestCase):
 
         rendered = render_home_page(transactions)
 
-        self.assertIn("Load exchange CSVs or demo data.", rendered)
-        self.assertIn("Review missing activity before using reports.", rendered)
-        self.assertIn("Reconciliation Dashboard", rendered)
+        self.assertIn("Guided Reconciliation", rendered)
+        self.assertIn("Reconciliation stages", rendered)
+        self.assertIn("Review dashboard details", rendered)
         self.assertIn("Open Review Groups", rendered)
         self.assertNotIn("gainz-home-flow-heading", rendered)
         self.assertNotIn("gainz-home-flow-detail", rendered)
         self.assertNotIn("Start by importing source files.", rendered)
-        self.assertNotIn("is-ready", rendered)
-        self.assertEqual(3, rendered.count("gainz-home-flow-step is-complete"))
+        self.assertIn("gainz-stage-step is-ready is-selected", rendered)
+        self.assertEqual(3, rendered.count("gainz-stage-step is-complete"))
+
+    def test_home_stage_context_defaults_to_import_for_empty_state(self):
+        progress = progress_for(empty_transactions())
+        audit_readiness = get_audit_readiness_summary(empty_transactions())
+
+        with create_app(config_dict["Debug"], selenium=True).test_request_context("/home/"):
+            context = _stage_context(progress, audit_readiness)
+
+        self.assertEqual("Import", context["selected_step"]["title"])
+        self.assertFalse(context["is_future_step"])
+        self.assertEqual("Open import", context["primary_action"]["label"])
+
+    def test_home_stage_context_allows_future_stage_but_points_back_to_current(self):
+        transactions = empty_transactions()
+        progress = progress_for(transactions)
+        audit_readiness = get_audit_readiness_summary(transactions)
+
+        with create_app(config_dict["Debug"], selenium=True).test_request_context("/home/"):
+            context = _stage_context(progress, audit_readiness, selected_stage_number=4)
+
+        self.assertEqual("Review & Export", context["selected_step"]["title"])
+        self.assertTrue(context["is_future_step"])
+        self.assertEqual("Go to Step 1", context["primary_action"]["label"])
 
 
 if __name__ == "__main__":

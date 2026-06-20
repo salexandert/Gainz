@@ -16,60 +16,139 @@
         <p class="card-category">Offline crypto accounting and cost-basis reconciliation</p>
       </div>
       <div class="card-body">
-        <div class="gainz-dashboard-hero">
+        <div class="gainz-dashboard-hero gainz-dashboard-intro">
           <div>
             <div class="d-flex flex-wrap align-items-center mb-2">
-              <h1 class="gainz-page-title mb-0 mr-2">Reconciliation Dashboard</h1>
+              <h1 class="gainz-page-title mb-0 mr-2">Guided Reconciliation</h1>
               <span class="gainz-status-badge {{ audit_readiness.status_class }}">{{ audit_readiness.status }}</span>
             </div>
             <p class="mb-2">
-              Gainz helps you import exchange CSVs, link sale records to earlier buys, review unresolved transfers,
-              and export documentation for review with a qualified tax professional.
+              Work through Gainz one step at a time: import source data, declare holdings, reconcile gaps,
+              then review and export a packet for professional review.
             </p>
-            <p class="mb-2">
-              <strong>Summary:</strong> {{ audit_readiness.summary }}
-            </p>
-            <p class="mb-0">
-              <strong>Next action:</strong> {{ audit_readiness.next_action }}
-            </p>
-          </div>
-          <div class="gainz-dashboard-actions">
-            <a class="btn btn-primary btn-round" href="{{ audit_readiness.primary_action.url }}">
-              Continue reconciliation
-            </a>
           </div>
         </div>
 
-        <div class="audit-readiness-grid gainz-dashboard-metrics" aria-label="Current reconciliation summary">
-          <div class="audit-readiness-item">
-            <span>Transactions</span>
-            <strong>{{ audit_readiness.metrics.transactions }}</strong>
+        <nav class="gainz-stage-rail" aria-label="Reconciliation stages">
+          {% for step in home_progress.steps %}
+          <a
+            href="{{ url_for('home_blueprint.index', stage=step.number) }}"
+            class="gainz-stage-step is-{{ step.state }}{% if stage_context.selected_step.number == step.number %} is-selected{% endif %}"
+            aria-current="{% if stage_context.selected_step.number == step.number %}step{% else %}false{% endif %}"
+          >
+            <span class="gainz-stage-number">{{ step.number }}</span>
+            <span>
+              <strong>{{ step.title }}</strong>
+              <small>{{ step.status }}</small>
+            </span>
+          </a>
+          {% endfor %}
+        </nav>
+
+        <section class="gainz-stage-workspace" aria-labelledby="current_stage_title">
+          <div class="gainz-stage-main">
+            <p class="gainz-stage-kicker">Step {{ stage_context.selected_step.number }} of {{ stage_context.step_count }}</p>
+            <div class="d-flex flex-wrap align-items-center mb-2">
+              <h2 id="current_stage_title" class="gainz-stage-title mb-0 mr-2">
+                {{ stage_context.selected_step.title }}
+              </h2>
+              <span class="gainz-status-badge {{ stage_context.selected_status_class }}">
+                {{ stage_context.selected_step.status }}
+              </span>
+            </div>
+            <p class="gainz-stage-lede">{{ stage_context.selected_step.description }}</p>
+
+            {% if stage_context.is_future_step %}
+            <div class="gainz-stage-callout is-waiting">
+              <strong>This step comes later.</strong>
+              <p>
+                Your current task is Step {{ stage_context.current_step.number }}:
+                {{ stage_context.current_step.detail }}
+              </p>
+            </div>
+            {% else %}
+            <div class="gainz-stage-callout">
+              <strong>Do this now.</strong>
+              <p>{{ stage_context.primary_action.detail }}</p>
+            </div>
+            {% endif %}
+
+            <div class="gainz-stage-actions">
+              <a class="btn btn-primary btn-round" href="{{ stage_context.primary_action.url }}">
+                {{ stage_context.primary_action.label }}
+              </a>
+              {% if stage_context.selected_step.number != stage_context.current_step.number %}
+              <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index', stage=stage_context.current_step.number) }}">
+                Back to current step
+              </a>
+              {% endif %}
+            </div>
           </div>
-          <div class="audit-readiness-item">
-            <span>Assets</span>
-            <strong>{{ audit_readiness.metrics.assets }}</strong>
-          </div>
-          <div class="audit-readiness-item">
-            <span>Basis Links</span>
-            <strong>{{ audit_readiness.metrics.links }}</strong>
-          </div>
-          <div class="audit-readiness-item">
-            <span>Open Review Groups</span>
-            <strong>{{ audit_readiness.blocker_groups|length }}</strong>
-          </div>
-          <div class="audit-readiness-item">
-            <span>Import Warnings</span>
-            <strong>{{ audit_readiness.metrics.unresolved_import_warnings }}</strong>
-          </div>
-          <div class="audit-readiness-item">
-            <span>Tax Evidence Years</span>
-            <strong>{{ audit_readiness.metrics.tax_evidence_years_needing_review }}</strong>
-          </div>
-          <div class="audit-readiness-item">
-            <span>Work Order Open</span>
-            <strong>{{ audit_readiness.metrics.work_order_unreviewed_items }}</strong>
-          </div>
+
+          <aside class="gainz-stage-sidebar" aria-label="What this step includes">
+            <h3>In this step</h3>
+            <ul>
+              {% for task in stage_context.tasks %}
+              <li>{{ task }}</li>
+              {% endfor %}
+            </ul>
+          </aside>
+        </section>
+
+        <div class="gainz-stage-nav" aria-label="Stage navigation">
+          {% if stage_context.previous_stage %}
+          <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index', stage=stage_context.previous_stage) }}">
+            Previous step
+          </a>
+          {% else %}
+          <span></span>
+          {% endif %}
+          {% if stage_context.next_stage %}
+          <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index', stage=stage_context.next_stage) }}">
+            Next step
+          </a>
+          {% endif %}
         </div>
+
+        <details class="gainz-dashboard-details">
+          <summary>Review dashboard details</summary>
+          <p class="mb-2">
+            <strong>Summary:</strong> {{ audit_readiness.summary }}
+          </p>
+          <p class="mb-0">
+            <strong>Next action:</strong> {{ audit_readiness.next_action }}
+          </p>
+
+          <div class="audit-readiness-grid gainz-dashboard-metrics" aria-label="Current reconciliation summary">
+            <div class="audit-readiness-item">
+              <span>Transactions</span>
+              <strong>{{ audit_readiness.metrics.transactions }}</strong>
+            </div>
+            <div class="audit-readiness-item">
+              <span>Assets</span>
+              <strong>{{ audit_readiness.metrics.assets }}</strong>
+            </div>
+            <div class="audit-readiness-item">
+              <span>Basis Links</span>
+              <strong>{{ audit_readiness.metrics.links }}</strong>
+            </div>
+            <div class="audit-readiness-item">
+              <span>Open Review Groups</span>
+              <strong>{{ audit_readiness.blocker_groups|length }}</strong>
+            </div>
+            <div class="audit-readiness-item">
+              <span>Import Warnings</span>
+              <strong>{{ audit_readiness.metrics.unresolved_import_warnings }}</strong>
+            </div>
+            <div class="audit-readiness-item">
+              <span>Tax Evidence Years</span>
+              <strong>{{ audit_readiness.metrics.tax_evidence_years_needing_review }}</strong>
+            </div>
+            <div class="audit-readiness-item">
+              <span>Work Order Open</span>
+              <strong>{{ audit_readiness.metrics.work_order_unreviewed_items }}</strong>
+            </div>
+          </div>
 
         {% if audit_readiness.blocker_groups %}
         <div class="gainz-home-review-queue">
@@ -97,20 +176,7 @@
           </div>
         </div>
         {% endif %}
-
-        <div class="gainz-home-flow">
-          {% for step in home_progress.steps %}
-          <a
-            href="{{ step.url }}"
-            class="gainz-home-flow-step{% if step.state == 'complete' %} is-complete{% endif %}"
-            aria-label="Step {{ step.number }}: {{ step.title }}. {{ step.status }}."
-          >
-            <span aria-hidden="true">{{ step.number }}</span>
-            <strong>{{ step.title }}</strong>
-            <p>{{ step.description }}</p>
-          </a>
-          {% endfor %}
-        </div>
+        </details>
 
         <p class="gainz-home-advice-note">
           Gainz runs offline on this computer and does not require transaction uploads. It does not provide legal, financial, or tax advice. Validate reports and source records before filing.
