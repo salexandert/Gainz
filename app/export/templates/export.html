@@ -232,17 +232,21 @@
     <div class="card">
       <div class="card-body">
         <h2 class="gainz-section-title">Output Location</h2>
-        <p class="card-category">Choose where Gainz writes the Excel workbook or audit packet on this computer.</p>
+        <p class="card-category">Choose one of Gainz's local output locations for the Excel workbook or audit packet.</p>
 
         <div class="form-group">
-          <label for="export_output_dir">Folder</label>
-          <input
-            id="export_output_dir"
-            type="text"
-            class="form-control"
-            value="{{ detected_tax_folder or audit_packet_folder }}"
-            aria-describedby="export_output_help"
-          >
+          <label for="export_output_location">Folder</label>
+          <select id="export_output_location" class="form-control" aria-describedby="export_output_help">
+            {% for location in output_location_choices %}
+            <option
+              value="{{ location.value }}"
+              data-folder="{{ location.path }}"
+              {% if location.selected %}selected{% endif %}
+            >
+              {{ location.label }} - {{ location.path }}
+            </option>
+            {% endfor %}
+          </select>
           <small id="export_output_help" class="form-text text-muted">
             Default workbook folder: {{ export_folder }}. Default audit packet folder: {{ audit_packet_folder }}.
           </small>
@@ -250,19 +254,8 @@
 
         <div class="alert alert-info mt-3" role="alert">
           <i class="nc-icon nc-alert-circle-i" aria-hidden="true"></i>
-          <strong>Note:</strong> Your audit packet or Excel workbook will be saved directly to the folder specified above.
+          <strong>Note:</strong> Your audit packet or Excel workbook will be saved directly to the selected local folder.
         </div>
-
-        {% if detected_tax_folder %}
-        <button
-          type="button"
-          id="use_detected_tax_folder_button"
-          class="btn btn-sm btn-outline-primary"
-          data-folder="{{ detected_tax_folder }}"
-        >
-          Use Detected Tax Folder
-        </button>
-        {% endif %}
 
         {% if not audit_readiness.is_ready %}
         <div id="draft_export_ack_panel" class="alert alert-warning mt-3" role="alert" data-ready="0">

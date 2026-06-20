@@ -24,7 +24,6 @@
           <div class="packet-success-actions packet-success-actions-top">
             <button type="button" class="btn btn-outline-primary btn-round js-copy-text" data-copy-target="packet_path_copy">Copy Packet Path</button>
             <form method="POST" action="{{ url_for('export_blueprint.open_folder') }}">
-              <input type="hidden" name="folder" value="{{ packet.packet_path }}">
               <button type="submit" class="btn btn-primary btn-round">Open Packet Folder</button>
             </form>
           </div>
@@ -109,7 +108,6 @@
         <div class="packet-success-actions">
           <button type="button" class="btn btn-primary btn-round js-copy-text" data-copy-target="cpa_summary_copy">Copy CPA Summary</button>
           <form method="POST" action="{{ url_for('export_blueprint.open_path') }}">
-            <input type="hidden" name="path" value="{{ packet.readme_first_path }}">
             <button type="submit" class="btn btn-outline-primary btn-round">Open README_FIRST</button>
           </form>
           <a class="btn btn-outline-primary btn-round" href="{{ url_for('export_blueprint.review_queue') }}">Open Guided Review Queue</a>

@@ -115,7 +115,8 @@ def test_generated_wiki_pages_use_public_docs(tmp_path):
     combined_text = "\n".join(
         path.read_text(encoding="utf-8") for path in sorted(output_dir.glob("*.md"))
     )
-    assert "https://cryptogainz.store" in combined_text
+    assert "[Download Gainz](https://cryptogainz.store/download/)" in combined_text
+    assert "https://cryptogainz.store/user-walkthrough/" in combined_text
     assert (
         "https://raw.githubusercontent.com/salexandert/Gainz/main/docs/assets/screenshots/gainz-manual-batch-entry.png"
         in combined_text

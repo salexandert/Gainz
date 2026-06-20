@@ -33,7 +33,10 @@ def main():
     action = "created" if result.created else "reset"
     print(f"Gainz local admin password {action}.")
     print(f"Username: {result.username}")
-    print(f"Temporary password: {args.password}")
+    if args.password == DOCUMENTED_RESET_PHRASE:
+        print("Temporary password set to the documented local reset password.")
+    else:
+        print("Temporary password set to the value provided on the command line.")
     print("")
     print("Sign in locally, then use the gear menu > Change Password.")
     print(

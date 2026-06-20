@@ -208,9 +208,15 @@
         <div class="row">
           <div class="col-md-6">
             <form method="POST" action="{{ url_for('tax_filing_review_blueprint.scan_tax_evidence_folder') }}">
-              <label for="evidence_folder">Scan Local Evidence Folder</label>
+              <label for="scan_location">Scan Local Evidence Folder</label>
               <div class="input-group">
-                <input id="evidence_folder" name="evidence_folder" type="text" class="form-control" placeholder="Example: local Taxes folder path">
+                <select id="scan_location" name="scan_location" class="form-control">
+                  {% for location in scan_locations %}
+                  <option value="{{ location.value }}" {% if location.selected %}selected{% endif %}>
+                    {{ location.label }} - {{ location.path }}
+                  </option>
+                  {% endfor %}
+                </select>
                 <div class="input-group-append">
                   <button type="submit" class="btn btn-info">Scan Folder</button>
                 </div>

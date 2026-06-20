@@ -59,6 +59,29 @@ EVIDENCE_SCAN_PRESETS = {
 }
 
 
+def _detected_tax_folder():
+    candidate = Path.home() / "OneDrive" / "Taxes"
+    return str(candidate) if candidate.exists() and candidate.is_dir() else ""
+
+
+def _scan_location_choices():
+    choices = {
+        "uploaded_evidence": str(_tax_evidence_upload_dir()),
+    }
+    detected_tax_folder = _detected_tax_folder()
+    if detected_tax_folder:
+        choices["detected_taxes"] = detected_tax_folder
+    return choices
+
+
+def _scan_folder_for_location():
+    scan_location = (request.form.get("scan_location") or "").strip()
+    folder = _scan_location_choices().get(scan_location) or _detected_tax_folder()
+    if not folder:
+        folder = str(_tax_evidence_upload_dir())
+    return Path(folder).resolve()
+
+
 def _available_years(alignment):
     years = {row["year"] for row in alignment["rows"]}
     return sorted(years, reverse=True)
@@ -171,11 +194,19 @@ def _save_uploaded_evidence(file_storage):
     return str(destination)
 
 
-def _add_tax_evidence_record(transactions, year, reference, evidence_type, notes, copy_to_packet=False):
+def _add_tax_evidence_record(
+    transactions,
+    year,
+    reference,
+    evidence_type,
+    notes,
+    copy_to_packet=False,
+    trusted_path=False,
+):
     evidence_type = classify_tax_evidence(reference, notes, evidence_type)
     record_year = _optional_year(year, reference, notes)
     label = os.path.basename(str(reference)) if reference else tax_evidence_type_label(evidence_type)
-    evidence_path = reference if os.path.exists(str(reference)) else ""
+    evidence_path = reference if trusted_path else ""
 
     return transactions.set_tax_evidence_record(
         year=record_year,
@@ -220,6 +251,18 @@ def index():
         evidence_scan_presets=[
             {"value": value, "label": preset["label"]}
             for value, preset in EVIDENCE_SCAN_PRESETS.items()
+        ],
+        scan_locations=[
+            {
+                "value": value,
+                "label": {
+                    "detected_taxes": "Detected Taxes folder",
+                    "uploaded_evidence": "Gainz uploaded evidence folder",
+                }.get(value, value),
+                "path": path,
+                "selected": value == "detected_taxes",
+            }
+            for value, path in _scan_location_choices().items()
         ],
         available_years=_available_years(alignment),
         saved_year=request.args.get("saved_year"),
@@ -329,6 +372,7 @@ def save_tax_evidence_record():
         evidence_type=request.form.get("evidence_type") or "auto",
         copy_to_packet=copy_to_packet,
         notes=notes,
+        trusted_path=bool(uploaded_path),
     )
     transactions.save(description="Added tax evidence inventory item")
 
@@ -339,11 +383,7 @@ def save_tax_evidence_record():
 @login_required
 def scan_tax_evidence_folder():
     transactions = current_app.config['transactions']
-    folder_value = request.form.get("evidence_folder") or ""
-    if not folder_value.strip():
-        return redirect(url_for('tax_filing_review_blueprint.index', saved_evidence=0))
-
-    folder = Path(folder_value)
+    folder = _scan_folder_for_location()
     recursive = request.form.get("recursive") == "1"
     scan_preset = request.form.get("scan_preset") or ""
     scan_preset_label = EVIDENCE_SCAN_PRESETS.get(scan_preset, {}).get("label", "")

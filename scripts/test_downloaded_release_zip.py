@@ -208,11 +208,11 @@ def run_packaged_workflow_smoke(temp_path, expected_version):
         },
     )
 
-    output_dir = temp_path / "qa-output"
+    output_dir = temp_path / "audit_packets"
     preview_response = post_json(
         opener,
         f"{base_url}/export/packet_preview.json",
-        {"output_dir": str(output_dir)},
+        {"output_location": "audit_packets"},
     )
     preview_payload = read_json_response(preview_response)
     preview = preview_payload["packet_preview"]
@@ -227,19 +227,19 @@ def run_packaged_workflow_smoke(temp_path, expected_version):
     assert_post_json_status(
         opener,
         f"{base_url}/export/save",
-        {"output_dir": str(output_dir)},
+        {"output_location": "audit_packets"},
         400,
     )
     assert_post_json_status(
         opener,
         f"{base_url}/export/audit_packet",
-        {"output_dir": str(output_dir)},
+        {"output_location": "audit_packets"},
         400,
     )
     packet_payload = assert_post_json_status(
         opener,
         f"{base_url}/export/audit_packet",
-        {"output_dir": str(output_dir), "draft_acknowledged": True},
+        {"output_location": "audit_packets", "draft_acknowledged": True},
         200,
     )
     success_url = packet_payload.get("success_url")

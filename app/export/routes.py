@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from . import blueprint
-from flask import render_template, request, jsonify, current_app, redirect, url_for
+from flask import render_template, request, jsonify, current_app, redirect, session, url_for
 from flask_login import login_required
 from utils import *
 from app.services.export_service import ExportService
@@ -33,36 +33,41 @@ def _default_packet_output_folder():
     return _detected_tax_folder() or current_app.config['AUDIT_PACKET_FOLDER']
 
 
-def _requested_output_dir(default_folder):
+def _output_location_choices():
+    choices = {
+        "audit_packets": current_app.config['AUDIT_PACKET_FOLDER'],
+        "exports": current_app.config['EXPORT_FOLDER'],
+    }
+    detected_tax_folder = _detected_tax_folder()
+    if detected_tax_folder:
+        choices["detected_taxes"] = detected_tax_folder
+    return choices
+
+
+def _output_location_key():
     payload = request.get_json(silent=True) or {}
-    requested = str(payload.get("output_dir") or "").strip()
-    output_dir = Path(requested).expanduser() if requested else Path(default_folder)
-
-    if not output_dir.is_absolute():
-        output_dir = Path.cwd() / output_dir
-
-    if output_dir.exists() and not output_dir.is_dir():
-        raise ValueError("Output location must be a folder, not a file.")
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    return output_dir.resolve()
-
-
-def _preview_output_dir(default_folder):
-    payload = request.get_json(silent=True) or {}
-    requested = str(
-        payload.get("output_dir")
-        or request.args.get("output_dir")
-        or request.form.get("output_dir")
+    return str(
+        payload.get("output_location")
+        or request.args.get("output_location")
+        or request.form.get("output_location")
         or ""
     ).strip()
-    output_dir = Path(requested).expanduser() if requested else Path(default_folder)
+
+
+def _output_dir_for_location(default_folder, create=False):
+    choices = _output_location_choices()
+    location_key = _output_location_key()
+    folder = choices.get(location_key) or default_folder
+    output_dir = Path(folder).expanduser()
 
     if not output_dir.is_absolute():
         output_dir = Path.cwd() / output_dir
 
     if output_dir.exists() and not output_dir.is_dir():
         raise ValueError("Output location must be a folder, not a file.")
+
+    if create:
+        output_dir.mkdir(parents=True, exist_ok=True)
 
     return output_dir.resolve()
 
@@ -110,22 +115,8 @@ def _draft_workbook_path(path):
         index += 1
 
 
-def _open_folder(path):
-    path = Path(path).expanduser().resolve()
-    if path.is_file():
-        path = path.parent
-    path.mkdir(parents=True, exist_ok=True)
-
-    if os.name == "nt":
-        os.startfile(str(path))  # type: ignore[attr-defined]
-        return
-
-    opener = "open" if sys.platform == "darwin" else "xdg-open"
-    subprocess.Popen([opener, str(path)])
-
-
-def _open_path(path):
-    path = Path(path).expanduser().resolve()
+def _open_existing_local_path(path):
+    path = Path(path).resolve()
     if not path.exists():
         return False
 
@@ -136,6 +127,18 @@ def _open_path(path):
     opener = "open" if sys.platform == "darwin" else "xdg-open"
     subprocess.Popen([opener, str(path)])
     return True
+
+
+def _last_packet_path():
+    value = session.get("last_packet_path") or ""
+    if not value:
+        return None
+
+    packet_path = Path(value).resolve()
+    if packet_path.exists() and packet_path.is_dir():
+        return packet_path
+
+    return None
 
 
 def _work_order_rows(transactions):
@@ -262,12 +265,7 @@ def _format_bytes(size):
     return f"{value:.1f} GB"
 
 
-def _packet_success_context(packet_path_value):
-    packet_path = Path(packet_path_value or "").expanduser()
-    if not packet_path.is_absolute():
-        packet_path = Path.cwd() / packet_path
-    packet_path = packet_path.resolve()
-
+def _packet_success_context(packet_path):
     summary = {}
     summary_path = packet_path / "03_manifests" / "audit_packet_summary.json"
     if summary_path.exists():
@@ -333,6 +331,23 @@ def index():
         export_folder=_path_for_display(current_app.config['EXPORT_FOLDER']),
         audit_packet_folder=_path_for_display(current_app.config['AUDIT_PACKET_FOLDER']),
         detected_tax_folder=_detected_tax_folder(),
+        output_location_choices=[
+            {
+                "value": value,
+                "label": {
+                    "detected_taxes": "Detected Taxes folder",
+                    "audit_packets": "Gainz audit packet folder",
+                    "exports": "Gainz workbook export folder",
+                }.get(value, value),
+                "path": _path_for_display(path),
+                "selected": (
+                    value == "detected_taxes"
+                    if _detected_tax_folder()
+                    else value == "audit_packets"
+                ),
+            }
+            for value, path in _output_location_choices().items()
+        ],
         packet_preview=get_packet_preview(transactions, audit_readiness, default_output_folder),
         work_order_rows=work_order_rows,
         work_order_review_choices=work_order_review_choices(),
@@ -401,9 +416,9 @@ def review_queue_save():
 def packet_preview_json():
     transactions = current_app.config['transactions']
     try:
-        output_dir = _preview_output_dir(_default_packet_output_folder())
-    except ValueError as exc:
-        return jsonify({"message": str(exc)}), 400
+        output_dir = _output_dir_for_location(_default_packet_output_folder())
+    except ValueError:
+        return jsonify({"message": "Choose an available local Gainz output folder."}), 400
 
     readiness = get_audit_readiness_summary(transactions)
     return jsonify({
@@ -429,9 +444,9 @@ def save():
         return draft_error
 
     try:
-        output_dir = _requested_output_dir(current_app.config['EXPORT_FOLDER'])
-    except ValueError as exc:
-        return jsonify({"message": str(exc)}), 400
+        output_dir = _output_dir_for_location(_default_packet_output_folder(), create=True)
+    except ValueError:
+        return jsonify({"message": "Choose an available local Gainz output folder."}), 400
 
     readiness = get_audit_readiness_summary(transactions)
     save_as_filename = ExportService(str(output_dir)).export_to_excel(
@@ -458,26 +473,27 @@ def audit_packet():
         return draft_error
 
     try:
-        output_dir = _requested_output_dir(current_app.config['AUDIT_PACKET_FOLDER'])
-    except ValueError as exc:
-        return jsonify({"message": str(exc)}), 400
+        output_dir = _output_dir_for_location(_default_packet_output_folder(), create=True)
+    except ValueError:
+        return jsonify({"message": "Choose an available local Gainz output folder."}), 400
 
     packet_path = AuditPacketService(
         str(output_dir),
         str(output_dir),
     ).create_packet(transactions)
+    session["last_packet_path"] = str(Path(packet_path).resolve())
 
     return jsonify({
         "path": packet_path,
         "output_dir": str(output_dir),
-        "success_url": url_for("export_blueprint.packet_success", packet_path=packet_path),
+        "success_url": url_for("export_blueprint.packet_success"),
     })
 
 
 @blueprint.route('/packet_success', methods=['GET'])
 @login_required
 def packet_success():
-    packet_path = request.args.get("packet_path", "")
+    packet_path = _last_packet_path()
     if not packet_path:
         return redirect(url_for("export_blueprint.index"))
 
@@ -490,17 +506,17 @@ def packet_success():
 @blueprint.route('/open_folder', methods=['POST'])
 @login_required
 def open_folder():
-    folder = request.form.get("folder") or request.form.get("path") or ""
-    if folder:
-        _open_folder(folder)
-    return redirect(request.referrer or url_for("export_blueprint.index"))
+    packet_path = _last_packet_path()
+    if packet_path:
+        _open_existing_local_path(packet_path)
+    return redirect(url_for("export_blueprint.packet_success"))
 
 
 @blueprint.route('/open_path', methods=['POST'])
 @login_required
 def open_path():
-    path = request.form.get("path") or ""
-    if path:
-        _open_path(path)
-    return redirect(request.referrer or url_for("export_blueprint.index"))
+    packet_path = _last_packet_path()
+    if packet_path:
+        _open_existing_local_path(packet_path / "README_FIRST.md")
+    return redirect(url_for("export_blueprint.packet_success"))
 

@@ -14,6 +14,20 @@ from .forms import LoginForm, CreateAccountForm
 from .models import User
 
 LOCAL_ADMIN_EMAIL = "admin@local.gainz"
+SAFE_LOGIN_REDIRECTS = (
+    ("/home", "home_blueprint.index"),
+    ("/import_transactions", "import_transactions_blueprint.import_wizard"),
+    ("/holdings_accounting", "holdings_accounting_blueprint.holdings_accounting"),
+    ("/auto_link", "auto_link_blueprint.auto_link"),
+    ("/stats", "stats_blueprint.index"),
+    ("/tax_filing_review", "tax_filing_review_blueprint.index"),
+    ("/model", "model_blueprint.index"),
+    ("/export", "export_blueprint.index"),
+    ("/history", "history_blueprint.index"),
+    ("/add_links", "add_links_blueprint.add_links"),
+    ("/privacy", "privacy_blueprint.index"),
+    ("/setting/change_password", "setting_blueprint.change_password"),
+)
 
 
 @blueprint.route('/')
@@ -48,20 +62,25 @@ def _is_local_request():
     return request.remote_addr in ("127.0.0.1", "::1", "localhost")
 
 
-def _is_safe_next_url(target):
+def _safe_next_endpoint(target):
     if not target:
-        return False
+        return None
 
     parsed = urlparse(target)
-    return not parsed.scheme and not parsed.netloc and target.startswith("/")
+    if parsed.scheme or parsed.netloc:
+        return None
+
+    path = parsed.path or ""
+    for prefix, endpoint in SAFE_LOGIN_REDIRECTS:
+        if path == prefix or path.startswith(f"{prefix}/"):
+            return endpoint
+
+    return None
 
 
-def _safe_login_redirect(default_endpoint='home_blueprint.index'):
-    next_url = request.args.get('next')
-    if _is_safe_next_url(next_url):
-        return next_url
-
-    return url_for(default_endpoint)
+def _redirect_to_safe_login_next(default_endpoint='home_blueprint.index'):
+    endpoint = _safe_next_endpoint(request.args.get('next')) or default_endpoint
+    return redirect(url_for(endpoint))
 
 
 @blueprint.route('/login', methods=['GET', 'POST'])
@@ -90,7 +109,7 @@ def login():
                 user = User(username=username, email=LOCAL_ADMIN_EMAIL, password=password)
                 user.add_to_db()
                 login_user(user)
-                return redirect(_safe_login_redirect())
+                return _redirect_to_safe_login_next()
 
         return render_template(
             'login/login.html',
@@ -105,7 +124,7 @@ def login():
         if user:
             if user.checkpw(request.form['password']):
                 login_user(user)
-                return redirect(_safe_login_redirect())
+                return _redirect_to_safe_login_next()
             else:
                 status = 'Password Error !'
         else:
@@ -113,7 +132,7 @@ def login():
         return render_template('login/login.html', login_form=login_form, create_form=create_form, status=status)
 
     if current_user.is_authenticated:
-        return redirect(_safe_login_redirect())
+        return _redirect_to_safe_login_next()
     return render_template('login/login.html', login_form=login_form, create_form=create_form, status='')
    
 @blueprint.route('/logout')
@@ -136,7 +155,13 @@ def shutdown():
 
 @login_manager.unauthorized_handler
 def unauthorized_handler():
-    next_url = request.full_path.rstrip('?') if request.query_string else request.path
+    endpoint = request.endpoint or ""
+    next_url = ""
+    if endpoint and endpoint != "base_blueprint.login":
+        try:
+            next_url = url_for(endpoint)
+        except Exception:
+            next_url = ""
     return redirect(url_for('base_blueprint.login', next=next_url))
 
 

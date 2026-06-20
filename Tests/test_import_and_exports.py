@@ -1128,11 +1128,14 @@ class ImportAndExportTests(unittest.TestCase):
             app = create_app(RouteTestConfig, selenium=True)
             app.config["transactions"] = transactions
 
-            with app.test_client() as client:
+            with app.test_client() as client, patch(
+                "app.tax_filing_review.routes._scan_location_choices",
+                return_value={"detected_taxes": str(evidence_dir)},
+            ):
                 response = client.post(
                     "/tax_filing_review/scan_evidence_folder",
                     data={
-                        "evidence_folder": str(evidence_dir),
+                        "scan_location": "detected_taxes",
                         "scan_preset": "transaction_csvs",
                         "recursive": "1",
                     },
@@ -1217,8 +1220,8 @@ class ImportAndExportTests(unittest.TestCase):
                 WTF_CSRF_ENABLED = False
                 INSTANCE_PATH = temp_dir
                 SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
-                EXPORT_FOLDER = str(Path(temp_dir) / "default-exports")
-                AUDIT_PACKET_FOLDER = str(Path(temp_dir) / "default-packets")
+                EXPORT_FOLDER = str(output_dir)
+                AUDIT_PACKET_FOLDER = str(output_dir)
 
             app = create_app(ExportRouteTestConfig, selenium=True)
             app.config["transactions"] = transactions
@@ -1226,12 +1229,13 @@ class ImportAndExportTests(unittest.TestCase):
             with app.test_client() as client:
                 export_response = client.post(
                     "/export/save",
-                    json={"output_dir": str(output_dir), "draft_acknowledged": True},
+                    json={"output_location": "audit_packets", "draft_acknowledged": True},
                 )
                 packet_response = client.post(
                     "/export/audit_packet",
-                    json={"output_dir": str(output_dir), "draft_acknowledged": True},
+                    json={"output_location": "audit_packets", "draft_acknowledged": True},
                 )
+                success_response = client.get(packet_response.get_json()["success_url"])
 
             export_payload = export_response.get_json()
             packet_payload = packet_response.get_json()
@@ -1257,8 +1261,6 @@ class ImportAndExportTests(unittest.TestCase):
             )
             workbook.close()
 
-            with app.test_client() as client:
-                success_response = client.get(packet_payload["success_url"])
             self.assertEqual(200, success_response.status_code)
             self.assertIn(b"Audit Packet Generated", success_response.data)
             self.assertIn(b"FOR_CPAS.md", success_response.data)
@@ -1378,8 +1380,8 @@ class ImportAndExportTests(unittest.TestCase):
                 WTF_CSRF_ENABLED = False
                 INSTANCE_PATH = temp_dir
                 SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
-                EXPORT_FOLDER = str(Path(temp_dir) / "default-exports")
-                AUDIT_PACKET_FOLDER = str(Path(temp_dir) / "default-packets")
+                EXPORT_FOLDER = str(output_dir)
+                AUDIT_PACKET_FOLDER = str(output_dir)
 
             app = create_app(ExportRouteTestConfig, selenium=True)
             app.config["transactions"] = transactions
@@ -1387,11 +1389,11 @@ class ImportAndExportTests(unittest.TestCase):
             with app.test_client() as client:
                 export_response = client.post(
                     "/export/save",
-                    json={"output_dir": str(output_dir)},
+                    json={"output_location": "audit_packets"},
                 )
                 packet_response = client.post(
                     "/export/audit_packet",
-                    json={"output_dir": str(output_dir)},
+                    json={"output_location": "audit_packets"},
                 )
 
             self.assertEqual(400, export_response.status_code)
@@ -1429,7 +1431,7 @@ class ImportAndExportTests(unittest.TestCase):
                 INSTANCE_PATH = temp_dir
                 SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
                 EXPORT_FOLDER = str(Path(temp_dir) / "default-exports")
-                AUDIT_PACKET_FOLDER = str(Path(temp_dir) / "default-packets")
+                AUDIT_PACKET_FOLDER = str(output_dir)
 
             app = create_app(PreviewRouteTestConfig, selenium=True)
             app.config["transactions"] = transactions
@@ -1437,7 +1439,7 @@ class ImportAndExportTests(unittest.TestCase):
             with app.test_client() as client:
                 response = client.post(
                     "/export/packet_preview.json",
-                    json={"output_dir": str(output_dir)},
+                    json={"output_location": "audit_packets"},
                 )
 
             self.assertEqual(200, response.status_code)
