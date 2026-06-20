@@ -12,7 +12,7 @@ When a product improvement changes the user flow, update the relevant Markdown p
 - `docs/guides/*.md` for focused import, reconciliation, audit packet, CPA, and troubleshooting guides.
 - `docs/assets/screenshots/` for synthetic screenshots that are safe to publish.
 
-The website is built from `docs/`. Netlify can deploy the site from this repo using `netlify.toml`; `.github/workflows/pages.yml` validates that the docs site builds. The GitHub Wiki pages are generated from `docs/` by `scripts/generate_wiki_home.py` and synced by `.github/workflows/sync-wiki.yml`.
+The GitHub Wiki pages are generated from `docs/` by `scripts/generate_wiki_home.py` and synced by `.github/workflows/sync-wiki.yml`. The public website is maintained in the separate `salexandert/Gainz-Website` repository and should sync selected screenshots, links, and guide references from this app repo.
 
 Do not hand-maintain a second long-form copy of the same walkthrough in the wiki or website. The generated wiki includes inline screenshots, a walkthrough, guide index, and docs publishing flow. Wiki edits for product docs should happen in `docs/` first because the next sync replaces stale wiki-only pages.
 
@@ -27,3 +27,14 @@ git diff --check
 ```
 
 Never commit private saves, exports, source tax files, audit packets, logs, uploaded CSVs, local plans, or instance data.
+
+## Parser Requests
+
+Parser fixes should include tests and synthetic demo data only. Do not commit real exchange exports, tax folders, audit packets, or screenshots with private financial details.
+
+When adding parser support, update:
+
+- import code and tests
+- `demo_data/` only if a small synthetic sample is useful
+- `docs/` when the user flow or supported-source description changes
+- website guide links in `salexandert/Gainz-Website` when public guidance changes

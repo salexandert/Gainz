@@ -1,0 +1,50 @@
+name: Parser or CSV Support Request
+description: Request support for a new exchange CSV or changed export columns.
+title: "Parser request: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Gainz imports.
+
+        Please do not upload real tax records, full CSV exports, wallet addresses, account numbers, legal names, or private transaction history. Share only sanitized headers and a few synthetic/example rows that preserve the column shape.
+  - type: input
+    id: source
+    attributes:
+      label: Source or exchange
+      description: Example: Cash App, Coinbase, Coinbase Pro/GDAX, Kraken, broker 1099-DA, wallet export.
+      placeholder: Cash App
+    validations:
+      required: true
+  - type: textarea
+    id: headers
+    attributes:
+      label: CSV headers
+      description: Paste the header row exactly as exported. Remove private account fields if present.
+      render: text
+      placeholder: Date,Type,Asset,Quantity,USD Value,Notes
+    validations:
+      required: true
+  - type: textarea
+    id: sample_rows
+    attributes:
+      label: Sanitized sample rows
+      description: Provide 2-5 fake or redacted rows that preserve the format. Do not paste real transaction history.
+      render: text
+      placeholder: 2024-01-05,Buy,BTC,0.01000000,450.00,Synthetic example
+    validations:
+      required: true
+  - type: textarea
+    id: issue
+    attributes:
+      label: What Gainz did
+      description: Include the warning/error text and what you expected Gainz to import.
+      placeholder: Gainz skipped the row as an unsupported type, but it should be treated as a buy.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Extra context
+      description: Mention whether the file includes buys, sells, sends, receives, converts, rewards, fees, or tax forms.
+      placeholder: This export includes buys and sends. Sends may be owner transfers or disposals and need review.

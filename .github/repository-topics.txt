@@ -1,0 +1,16 @@
+Suggested GitHub repository topics:
+
+crypto-tax
+cost-basis
+tax-reconciliation
+offline-first
+privacy-tools
+audit-packet
+form-8949
+1099-da
+coinbase
+cash-app
+gdax
+python
+flask
+desktop-app

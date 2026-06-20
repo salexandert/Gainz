@@ -7,8 +7,10 @@ a token with push access to the repository, exposed as GITHUB_TOKEN.
 """
 
 import argparse
+from datetime import datetime, timezone
 import json
 import os
+from pathlib import Path
 import sys
 import urllib.error
 import urllib.request
@@ -16,6 +18,7 @@ import urllib.request
 
 DEFAULT_REPO = "salexandert/Gainz"
 API_ROOT = "https://api.github.com"
+DEFAULT_SNAPSHOT_DIR = "metrics/github-release-downloads"
 
 
 def github_get(path, token=None):
@@ -53,6 +56,43 @@ def release_downloads(repo, token=None):
     return rows
 
 
+def write_release_download_snapshot(rows, snapshot_dir=DEFAULT_SNAPSHOT_DIR, captured_at=None):
+    """Write an idempotent daily JSON snapshot of release asset downloads."""
+    if captured_at is None:
+        captured_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+    snapshot_date = captured_at[:10]
+    sorted_rows = sorted(
+        rows,
+        key=lambda row: (
+            str(row.get("release") or ""),
+            str(row.get("asset") or ""),
+        ),
+    )
+    payload = {
+        "snapshot_date": snapshot_date,
+        "captured_at": captured_at,
+        "total_downloads": sum(int(row.get("downloads") or 0) for row in sorted_rows),
+        "release_assets": sorted_rows,
+    }
+
+    snapshot_path = Path(snapshot_dir)
+    snapshot_path.mkdir(parents=True, exist_ok=True)
+    daily_path = snapshot_path / f"release-downloads-{snapshot_date}.json"
+    latest_path = snapshot_path / "release-downloads-latest.json"
+
+    text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    daily_path.write_text(text, encoding="utf-8")
+    latest_path.write_text(text, encoding="utf-8")
+
+    return {
+        "daily": str(daily_path),
+        "latest": str(latest_path),
+        "snapshot_date": snapshot_date,
+        "total_downloads": payload["total_downloads"],
+    }
+
+
 def repo_traffic(repo, token):
     if not token:
         return {
@@ -72,11 +112,14 @@ def repo_traffic(repo, token):
     return traffic
 
 
-def build_report(repo, token=None):
+def build_report(repo, token=None, include_traffic=True):
     return {
         "repo": repo,
         "release_assets": release_downloads(repo, token=token),
-        "traffic": repo_traffic(repo, token),
+        "traffic": repo_traffic(repo, token) if include_traffic else {
+            "available": False,
+            "reason": "Repository traffic skipped for download-only run.",
+        },
     }
 
 
@@ -89,6 +132,16 @@ def print_text_report(report):
         print("No release assets found.")
     for row in report["release_assets"]:
         print(f"{row['release']:10} {row['downloads']:6}  {row['asset']}")
+
+    snapshot = report.get("download_snapshot")
+    if snapshot:
+        print()
+        print("Snapshot")
+        print("--------")
+        print(f"Date:  {snapshot['snapshot_date']}")
+        print(f"Total: {snapshot['total_downloads']} downloads")
+        print(f"Daily: {snapshot['daily']}")
+        print(f"Latest: {snapshot['latest']}")
 
     print()
     traffic = report["traffic"]
@@ -122,10 +175,24 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Report Gainz GitHub downloads and repository traffic.")
     parser.add_argument("--repo", default=DEFAULT_REPO, help="Repository in owner/name format.")
     parser.add_argument("--json", action="store_true", help="Print raw JSON instead of a text report.")
+    parser.add_argument(
+        "--downloads-only",
+        action="store_true",
+        help="Skip repository traffic endpoints and report public release asset downloads only.",
+    )
+    parser.add_argument(
+        "--snapshot-dir",
+        help=f"Write a daily release download snapshot under this directory. Default target is {DEFAULT_SNAPSHOT_DIR}.",
+    )
     args = parser.parse_args(argv)
 
     token = os.environ.get("GITHUB_TOKEN")
-    report = build_report(args.repo, token=token)
+    report = build_report(args.repo, token=token, include_traffic=not args.downloads_only)
+    if args.snapshot_dir:
+        report["download_snapshot"] = write_release_download_snapshot(
+            report["release_assets"],
+            snapshot_dir=args.snapshot_dir,
+        )
 
     if args.json:
         print(json.dumps(report, indent=2))

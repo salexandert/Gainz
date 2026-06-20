@@ -28,6 +28,7 @@ Always review outputs with a qualified tax professional before filing.
 - Repo docs and guides: [docs/](docs/)
 - Click-by-click app walkthrough: [docs/user-walkthrough.md](docs/user-walkthrough.md)
 - Crypto cost basis learning guide: [docs/guides/crypto-cost-basis-learning.md](docs/guides/crypto-cost-basis-learning.md)
+- Support and parser requests: [SUPPORT.md](SUPPORT.md)
 
 The `docs/` folder is the public documentation source of truth for the app repository. The GitHub Wiki is generated from these docs. The public website lives in the separate `salexandert/Gainz-Website` repository and syncs selected screenshots, links, and guide references from this repo so website hosting stays separate from the offline app code.
 
@@ -46,6 +47,8 @@ The Cash App, Coinbase, and generic CSV import path recognizes common header ali
 If automatic detection cannot identify the needed columns, Gainz can pause for column review so the user can choose the header row and map the required fields.
 
 See `demo_data/` for small sample files that are safe to use for testing.
+
+If an exchange changes its CSV columns or adds a new transaction type, open a parser request with sanitized headers and synthetic sample rows. Do not upload full exports or private transaction history. See [Support and parser requests](SUPPORT.md).
 
 ## Quick Start With Packaged Builds
 
@@ -166,6 +169,16 @@ Gainz is free to run locally. If it saves you time, helps you organize a tax rev
 - BTC: `bc1q5ptf8aylwauthxr80x60k554c3xdv2lpe046t4`
 - Website: <https://cryptogainz.store>
 
+## Support And Parser Requests
+
+Use GitHub issues for sanitized bug reports and parser requests:
+
+- Parser requests should include the source name, exact header row, synthetic sample rows, and the warning Gainz showed.
+- Bug reports should include the Gainz version, operating system, packaged-vs-source run mode, and redacted steps to reproduce.
+- Do not post real tax files, full exchange exports, wallet addresses, account IDs, legal names, or screenshots with private financial details.
+
+See [SUPPORT.md](SUPPORT.md) for the support checklist.
+
 ## Packaging
 
 Gainz is distributed as a local desktop-style build, not a hosted SaaS product. A hosted version would require a separate security and compliance model because it would handle sensitive tax data.
@@ -179,6 +192,8 @@ Gainz is distributed as a local desktop-style build, not a hosted SaaS product. 
 ```
 
 Public releases are created from Git tags. After merging a version bump to `main`, the `Auto Tag Release Version` workflow creates the matching tag such as `v0.2.0` and dispatches the release workflow for that tag. The release workflow validates that the tag and version files match, builds Windows and macOS packages, verifies the release zips and checksums, publishes them to GitHub Releases, then downloads the published Windows ZIP by tag to verify the public package. The website download buttons point at GitHub's latest release assets, so they update when the release publishes.
+
+Daily GitHub Release download snapshots are captured by `.github/workflows/release-download-snapshots.yml` and written under `metrics/github-release-downloads/`. These snapshots use public aggregate GitHub Release asset counts only. They do not collect app usage, transaction data, tax data, IP addresses, user accounts, or local Gainz activity.
 
 For a clickable Windows build, install PyInstaller in the build environment and run:
 

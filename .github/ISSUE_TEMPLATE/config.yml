@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Gainz support and parser request guide
+    url: https://github.com/salexandert/Gainz/blob/main/SUPPORT.md
+    about: Read this before posting sanitized import examples or support details.
+  - name: Gainz website and download page
+    url: https://cryptogainz.store/download/
+    about: Download the latest packaged app and compare release checksums.
