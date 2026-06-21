@@ -542,6 +542,107 @@
     min-width: 205px;
 }
 
+.gainz-import-hero,
+.gainz-import-continue-panel,
+.gainz-import-status-split {
+    align-items: flex-start;
+    display: flex;
+    gap: 16px;
+    justify-content: space-between;
+}
+
+.gainz-import-hero p {
+    color: #4f5962;
+}
+
+.gainz-import-hero-actions {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.gainz-import-primary-card {
+    border-left: 4px solid #2b6cb0;
+}
+
+.gainz-import-secondary-details {
+    margin-bottom: 16px;
+}
+
+.gainz-import-secondary-details > summary {
+    cursor: pointer;
+    font-weight: 800;
+    list-style-position: inside;
+    padding: 16px 18px;
+}
+
+.gainz-import-secondary-details[open] > summary {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.gainz-import-detail-body {
+    padding: 16px 18px 18px;
+}
+
+.gainz-import-continue-panel {
+    color: #174b32;
+}
+
+.gainz-import-continue-panel p {
+    color: #174b32;
+}
+
+.gainz-import-status-grid {
+    margin-top: 0;
+}
+
+.gainz-import-status-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.7fr);
+}
+
+.gainz-import-status-split section {
+    background: #f8f9fa;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    padding: 14px;
+}
+
+.gainz-import-status-split h3 {
+    font-size: 16px;
+    font-weight: 800;
+    margin: 0 0 10px;
+}
+
+.gainz-import-mix-grid {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.gainz-import-mix-grid div {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 6px;
+    padding: 8px 10px;
+}
+
+.gainz-import-mix-grid span {
+    color: #6c757d;
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.gainz-import-mix-grid strong {
+    color: #252422;
+    display: block;
+    font-size: 18px;
+    margin-top: 2px;
+}
+
 #upload_csv_form.dropzone {
     align-items: flex-start;
     background: #fff;
@@ -1081,6 +1182,20 @@
     }
 
     .gainz-stage-rail {
+        grid-template-columns: 1fr;
+    }
+
+    .gainz-import-hero,
+    .gainz-import-continue-panel {
+        flex-direction: column;
+    }
+
+    .gainz-import-hero-actions {
+        justify-content: flex-start;
+    }
+
+    .gainz-import-status-split,
+    .gainz-import-mix-grid {
         grid-template-columns: 1fr;
     }
 

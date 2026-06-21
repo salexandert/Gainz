@@ -48,6 +48,20 @@ function gainzShowImportResult(result, fileName, alertClass) {
     if (result.data_summary) {
         gainzSetSourceOverlapWorkflow(result.data_summary.source_overlaps || []);
         gainzRenderDataSources(result.data_summary);
+        gainzUpdateImportContinuePanel(result.data_summary);
+    }
+}
+
+function gainzUpdateImportContinuePanel(summary) {
+    var panel = $("#import_continue_panel");
+    if (panel.length === 0 || !summary) {
+        return;
+    }
+
+    if ((summary.transaction_count || 0) > 0) {
+        panel.show();
+    } else {
+        panel.hide();
     }
 }
 
@@ -568,6 +582,27 @@ if (window.Dropzone) {
 }
 
 $(document).ready(function () {
+    function openLinkedDetails(hash) {
+        if (!hash || hash.length < 2) {
+            return;
+        }
+        var target = $(hash);
+        if (target.length === 0) {
+            return;
+        }
+        if (target.is("details")) {
+            target.prop("open", true);
+            return;
+        }
+        target.closest("details").prop("open", true);
+    }
+
+    openLinkedDetails(window.location.hash);
+
+    $(document).on("click", 'a[href^="#"]', function () {
+        openLinkedDetails($(this).attr("href"));
+    });
+
     $("#import_demo_data_button").on("click", function () {
         var button = $(this);
         var demoUrl = button.data("demo-url");

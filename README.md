@@ -55,10 +55,10 @@ If an exchange changes its CSV columns or adds a new transaction type, open a pa
 Public desktop packages are linked from the website download page with version, checksum, and SmartScreen notes:
 
 - Download page: <https://cryptogainz.store/download/>
-- Windows download: <https://github.com/salexandert/Gainz/releases/download/v0.2.16/Gainz-Windows.zip>
-- Windows checksum: <https://github.com/salexandert/Gainz/releases/download/v0.2.16/Gainz-Windows.zip.sha256>
-- macOS download: <https://github.com/salexandert/Gainz/releases/download/v0.2.16/Gainz-macOS.zip>
-- macOS checksum: <https://github.com/salexandert/Gainz/releases/download/v0.2.16/Gainz-macOS.zip.sha256>
+- Windows download: <https://github.com/salexandert/Gainz/releases/latest/download/Gainz-Windows.zip>
+- Windows checksum: <https://github.com/salexandert/Gainz/releases/latest/download/Gainz-Windows.zip.sha256>
+- macOS download: <https://github.com/salexandert/Gainz/releases/latest/download/Gainz-macOS.zip>
+- macOS checksum: <https://github.com/salexandert/Gainz/releases/latest/download/Gainz-macOS.zip.sha256>
 
 Unzip the package and open `Gainz.exe` on Windows or `Gainz.app` on macOS. The launcher starts the local server, shows the web interface link, and keeps your transaction data on your machine.
 
@@ -93,9 +93,9 @@ From a source checkout, you can reset the local password with `python .\scripts\
 
 1. Learn the cost-basis question and collect source files.
 2. Start on **Dashboard** and use **Guided Reconciliation** as the control center.
-3. Import transaction CSVs in **Import**.
-4. Add source-backed manual rows in the batch table when a CSV is missing known buys or sells.
-5. Return to **Dashboard** and follow the highlighted current stage.
+3. Open **Import** from Guided Reconciliation, then use **Try Demo Data** or upload one CSV at a time.
+4. Add source-backed manual rows from the collapsed **Add manual rows** section when a CSV is missing known buys or sells.
+5. Continue to **Reconcile** after the source files for the review pass are loaded.
 6. Declare current holdings in **Reconcile** before deeper basis work unless Guided Reconciliation points somewhere else.
 7. Review import warnings, source overlaps, and transfer questions that affect the reconciliation.
 8. Run FIFO or another basis-linking review in **Auto Link** when Dashboard or Reports & Export says sales still need basis.
@@ -116,9 +116,9 @@ The `demo_data/` folder contains synthetic CSVs that are safe to use for testing
 A good demo run is:
 
 1. Start Gainz from the packaged app by unzipping `Gainz-Windows.zip` and opening `Gainz.exe` on Windows, or unzipping `Gainz-macOS.zip` and opening `Gainz.app` on macOS.
-2. Open **Import**.
+2. Open **Import** from Guided Reconciliation.
 3. Click **Try Demo Data**, or upload each demo CSV one file at a time.
-4. Return to **Dashboard** and follow the highlighted current stage.
+4. Click **Continue to Declare Holdings** after data loads.
 5. Enter current holdings in **Reconcile**.
 6. Review warnings or tax evidence when Guided Reconciliation highlights them.
 7. Run **FIFO** in **Auto Link** only when Dashboard or Reports & Export says basis links are blocking readiness.

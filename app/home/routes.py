@@ -51,7 +51,7 @@ def _home_progress(transactions):
             "number": 1,
             "title": "Import",
             "description": "Load exchange CSVs or demo data.",
-            "url": url_for("import_transactions_blueprint.import_wizard"),
+            "url": url_for("import_transactions_blueprint.import_wizard", guided=1),
             "state": "current",
             "status": "Current",
             "detail": "Start by importing source files.",
@@ -257,13 +257,18 @@ def _stage_context(progress, audit_readiness, selected_stage_number=None):
             "detail": current_step["detail"],
         }
     else:
+        action_url = (
+            selected_step["url"]
+            if selected_step["number"] == 1 and selected_step["number"] == current_step["number"]
+            else audit_readiness["primary_action"]["url"]
+            if selected_step["number"] == current_step["number"]
+            else selected_step["url"]
+        )
         primary_action = {
             "label": audit_readiness["primary_action"]["label"]
             if selected_step["number"] == current_step["number"]
             else f"Open {selected_step['title']}",
-            "url": audit_readiness["primary_action"]["url"]
-            if selected_step["number"] == current_step["number"]
-            else selected_step["url"],
+            "url": action_url,
             "detail": selected_step["detail"],
         }
 

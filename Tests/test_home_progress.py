@@ -162,6 +162,7 @@ class HomeProgressTests(unittest.TestCase):
         self.assertEqual("Import", context["selected_step"]["title"])
         self.assertFalse(context["is_future_step"])
         self.assertEqual("Open import", context["primary_action"]["label"])
+        self.assertEqual("/import_transactions/?guided=1", context["primary_action"]["url"])
         self.assertIsNone(context["next_stage"])
         self.assertTrue(context["next_stage_locked"])
 
@@ -188,6 +189,8 @@ class HomeProgressTests(unittest.TestCase):
         self.assertIn("This step is locked for now.", rendered)
         self.assertIn("is-waiting is-previewed", rendered)
         self.assertIn("gainz-stage-step is-current is-selected", rendered)
+        self.assertIn("Go to Step 1", rendered)
+        self.assertNotIn("Back to current step", rendered)
         self.assertNotIn("Previous step", rendered)
         self.assertNotIn("Next step", rendered)
 

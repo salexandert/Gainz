@@ -84,7 +84,7 @@
               <a class="btn btn-primary btn-round" href="{{ stage_context.primary_action.url }}">
                 {{ stage_context.primary_action.label }}
               </a>
-              {% if stage_context.selected_step.number != stage_context.current_step.number %}
+              {% if stage_context.selected_step.number != stage_context.current_step.number and not stage_context.is_future_step %}
               <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index', stage=stage_context.current_step.number) }}">
                 Back to current step
               </a>
@@ -108,13 +108,7 @@
           </aside>
         </section>
 
-        {% if stage_context.is_future_step %}
-        <div class="gainz-stage-nav" aria-label="Stage navigation">
-          <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index', stage=stage_context.current_step.number) }}">
-            Back to current step
-          </a>
-        </div>
-        {% else %}
+        {% if not stage_context.is_future_step %}
         <div class="gainz-stage-nav" aria-label="Stage navigation">
           {% if stage_context.previous_stage %}
           <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index', stage=stage_context.previous_stage) }}">

@@ -71,6 +71,42 @@ class FileUpload:
         Path(destination).write_bytes(self.source.read_bytes())
 
 
+def import_template_context(**overrides):
+    context = {
+        "manual_trans": import_routes.ManualTransaction(),
+        "current_holdings": import_routes.CurrentHoldings(),
+        "save_summary": {
+            "revision": 0,
+            "save_count": 0,
+            "current_file": "Unsaved session",
+            "current_name": "Unsaved session",
+            "current_description": "",
+            "current_modified": "N/A",
+            "recent_saves": [],
+        },
+        "data_summary": {
+            "transaction_count": 0,
+            "asset_count": 0,
+            "source_count": 0,
+            "link_count": 0,
+            "source_overlap_count": 0,
+            "source_overlaps": [],
+            "sources": [],
+            "import_warnings": [],
+            "import_warning_rows": [],
+            "type_counts": {
+                "buy": 0,
+                "sell": 0,
+                "send": 0,
+                "receive": 0,
+            },
+        },
+        "guided_import": False,
+    }
+    context.update(overrides)
+    return context
+
+
 class ImportAndExportTests(unittest.TestCase):
     def test_import_service_imports_cash_app_sample(self):
         transactions = empty_transactions()
@@ -112,6 +148,7 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertNotIn("stats_table_data", context)
         self.assertNotIn("transactions", context)
         self.assertEqual(7, context["save_summary"]["revision"])
+        self.assertFalse(context["guided_import"])
 
     def test_import_page_renders_manual_batch_table(self):
         app = create_app(config_dict["Debug"], selenium=True)
@@ -120,30 +157,51 @@ class ImportAndExportTests(unittest.TestCase):
         with app.test_request_context("/import_transactions/#manual-transactions"):
             rendered_page = app.jinja_env.get_template(
                 "import_transactions.html"
-            ).render(
-                manual_trans=import_routes.ManualTransaction(),
-                current_holdings=import_routes.CurrentHoldings(),
-                save_summary={
-                    "revision": 0,
-                    "save_count": 0,
-                    "recent_saves": [],
-                },
-                data_summary={
-                    "transaction_count": 0,
-                    "asset_count": 0,
-                    "source_count": 0,
-                    "link_count": 0,
-                    "sources": [],
-                    "import_warnings": [],
-                    "import_warning_rows": [],
-                    "type_counts": {},
-                },
-            )
+            ).render(**import_template_context())
 
         self.assertIn('id="manual_transactions_table"', rendered_page)
         self.assertIn('name="manual_type[]"', rendered_page)
         self.assertIn('name="manual_batch_submit"', rendered_page)
         self.assertIn("Blank rows are ignored", rendered_page)
+        self.assertIn("<summary>Add manual rows</summary>", rendered_page)
+
+    def test_guided_import_page_prioritizes_upload_and_collapses_operational_details(self):
+        app = create_app(config_dict["Debug"], selenium=True)
+        app.config.update(WTF_CSRF_ENABLED=False)
+
+        with app.test_request_context("/import_transactions/?guided=1"):
+            rendered_page = app.jinja_env.get_template(
+                "import_transactions.html"
+            ).render(**import_template_context(guided_import=True))
+
+        self.assertIn("Step 1: Import Data", rendered_page)
+        self.assertIn("Start With Source Data", rendered_page)
+        self.assertIn('action="/import_transactions/?guided=1"', rendered_page)
+        self.assertIn("<summary>Column review options</summary>", rendered_page)
+        self.assertIn("<summary>Show current import status</summary>", rendered_page)
+        self.assertIn("<summary>Add manual rows</summary>", rendered_page)
+        self.assertIn("<summary>Review data sources and revisions</summary>", rendered_page)
+        self.assertLess(
+            rendered_page.index("Start With Source Data"),
+            rendered_page.index("Show current import status"),
+        )
+
+    def test_guided_import_page_hides_advanced_sidebar_tools(self):
+        app = create_app(config_dict["Debug"], selenium=True)
+
+        with app.test_request_context("/import_transactions/?guided=1"):
+            guided_sidebar = app.jinja_env.get_template(
+                "site_template/sidebar.html"
+            ).render()
+
+        with app.test_request_context("/import_transactions/"):
+            direct_sidebar = app.jinja_env.get_template(
+                "site_template/sidebar.html"
+            ).render()
+
+        self.assertNotIn("Advanced tools", guided_sidebar)
+        self.assertNotIn("Auto Link", guided_sidebar)
+        self.assertIn("Advanced tools", direct_sidebar)
 
     def test_import_page_renders_import_warning_workflow(self):
         app = create_app(config_dict["Debug"], selenium=True)
@@ -156,23 +214,13 @@ class ImportAndExportTests(unittest.TestCase):
             rendered_page = app.jinja_env.get_template(
                 "import_transactions.html"
             ).render(
-                manual_trans=import_routes.ManualTransaction(),
-                current_holdings=import_routes.CurrentHoldings(),
-                save_summary={
-                    "revision": 0,
-                    "save_count": 0,
-                    "recent_saves": [],
-                },
-                data_summary={
-                    "transaction_count": 0,
-                    "asset_count": 0,
-                    "source_count": 0,
-                    "link_count": 0,
-                    "sources": [],
-                    "import_warnings": warnings,
-                    "import_warning_rows": import_warning_review_rows(warnings),
-                    "type_counts": {},
-                },
+                **import_template_context(
+                    data_summary={
+                        **import_template_context()["data_summary"],
+                        "import_warnings": warnings,
+                        "import_warning_rows": import_warning_review_rows(warnings),
+                    }
+                )
             )
 
         self.assertIn('id="import_warning_workflow"', rendered_page)
@@ -187,25 +235,7 @@ class ImportAndExportTests(unittest.TestCase):
         with app.test_request_context("/import_transactions/"):
             rendered_page = app.jinja_env.get_template(
                 "import_transactions.html"
-            ).render(
-                manual_trans=import_routes.ManualTransaction(),
-                current_holdings=import_routes.CurrentHoldings(),
-                save_summary={
-                    "revision": 0,
-                    "save_count": 0,
-                    "recent_saves": [],
-                },
-                data_summary={
-                    "transaction_count": 0,
-                    "asset_count": 0,
-                    "source_count": 0,
-                    "link_count": 0,
-                    "sources": [],
-                    "import_warnings": [],
-                    "import_warning_rows": [],
-                    "type_counts": {},
-                },
-            )
+            ).render(**import_template_context())
 
         self.assertIn('id="import_column_mapper"', rendered_page)
         self.assertIn("Column review needed", rendered_page)

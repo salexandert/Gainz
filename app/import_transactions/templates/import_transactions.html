@@ -8,135 +8,74 @@
 
 {% block content %}
 
+{% set import_form_url = url_for('import_transactions_blueprint.import_wizard', guided=1) if guided_import else url_for('import_transactions_blueprint.import_wizard') %}
+{% set imported_count = data_summary.transaction_count|default(0) %}
 
 <!-- Page Description and Instructions -->
 <div class="row">
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
-        <div id="accordion" role="tablist" aria-multiselectable="true" class="card-collapse">
-          <h1 class="gainz-page-title">Import Data</h1>
-          <div class="card card-plain">
-            <div class="card-header" role="tab" id="headingOne">
-              <a data-toggle="collapse" data-parent="#accordion" href="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
-                How to use this page
-                <i class="nc-icon nc-minimal-down"></i>
-              </a>
-            </div>
-            <div id="collapseOne" class="collapse show" role="tabpanel" aria-labelledby="headingOne">
-              <div class="card-body">
-                Drag and drop or click the upload area below to import an exchange CSV.
-                <br> Supported sample workflows include Cash App, Coinbase, Coinbase Convert rows, Coinbase Pro/GDAX fills, Kraken, and the template import.
-                <br> Coinbase Convert rows import as a source-asset sell and destination-asset buy using the Coinbase conversion total.
-                <br> Gainz recognizes common column-name changes. If the columns are unclear, it will ask you to choose the header row and map the required fields.
-                <br><br>
-                Upload one file at a time. After each upload, Gainz shows imported, skipped, and warning counts.
-              </div>
-            </div>
+        <div class="gainz-import-hero">
+          <div>
+            <p class="gainz-stage-kicker">{% if guided_import %}Step 1 of 4{% else %}Import{% endif %}</p>
+            <h1 class="gainz-page-title">{% if guided_import %}Step 1: Import Data{% else %}Import Data{% endif %}</h1>
+            <p class="mb-2">
+              Start with exchange CSVs, demo data, or known source-backed manual rows. Gainz will ask for column review only when it cannot confidently map a file.
+            </p>
+            <p class="mb-0 text-muted">Upload one CSV at a time. After each import, Gainz shows imported, skipped, and warning counts.</p>
           </div>
+          {% if guided_import %}
+          <div class="gainz-import-hero-actions">
+            <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index', stage=1) }}">Back to Guided Reconciliation</a>
+            {% if imported_count %}
+            <a class="btn btn-primary btn-round" href="{{ url_for('holdings_accounting_blueprint.holdings_accounting') }}">Continue to Declare Holdings</a>
+            {% endif %}
+          </div>
+          {% endif %}
         </div>
+        <details class="gainz-import-secondary-details mt-3">
+          <summary>Supported import notes</summary>
+          <div class="gainz-import-detail-body">
+            <p>
+              Supported sample workflows include Cash App, Coinbase, Coinbase Convert rows, Coinbase Pro/GDAX fills, Kraken, and the template import.
+            </p>
+            <p class="mb-0">
+              Coinbase Convert rows import as a source-asset sell and destination-asset buy using the Coinbase conversion total.
+            </p>
+          </div>
+        </details>
       </div>
     </div>
   </div>
 </div>
 <!-- /Page Description and Instructions -->
 
-<!-- Data Summary -->
-<div class="row">
-  <div class="col-md-3">
-    <div class="card">
-      <div class="card-body">
-        <p class="card-category">Current Revision</p>
-        <h4 class="card-title">{{ save_summary.revision }}</h4>
-        <p class="text-muted mb-0">{{ save_summary.save_count }} saved revision{% if save_summary.save_count != 1 %}s{% endif %}</p>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-3">
-    <div class="card">
-      <div class="card-body">
-        <p class="card-category">Transactions</p>
-        <h4 class="card-title">{{ data_summary.transaction_count }}</h4>
-        <p class="text-muted mb-0">{{ data_summary.asset_count }} asset{% if data_summary.asset_count != 1 %}s{% endif %}</p>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-3">
-    <div class="card">
-      <div class="card-body">
-        <p class="card-category">Data Sources</p>
-        <h4 class="card-title">{{ data_summary.source_count }}</h4>
-        <p class="text-muted mb-0">
-          {{ data_summary.link_count }} basis link{% if data_summary.link_count != 1 %}s{% endif %}
-          {% if data_summary.source_overlap_count %} &middot; {{ data_summary.source_overlap_count }} overlap review{% if data_summary.source_overlap_count != 1 %}s{% endif %}{% endif %}
-        </p>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-3">
-    <div class="card">
-      <div class="card-body">
-        <p class="card-category">Import Warnings</p>
-        <h4 class="card-title">{{ data_summary.import_warnings|length }}</h4>
-        <p class="text-muted mb-0">Review before audit packet</p>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="row">
-  <div class="col-md-6">
-    <div class="card">
-      <div class="card-body">
-        <h5 class="card-title">Current Save</h5>
-        <p class="mb-1" title="{{ save_summary.current_file }}"><strong>File:</strong> {{ save_summary.current_name }}</p>
-        <p class="mb-1"><strong>Description:</strong> {{ save_summary.current_description or "No description" }}</p>
-        <p class="mb-0"><strong>Modified:</strong> {{ save_summary.current_modified }}</p>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-6">
-    <div class="card">
-      <div class="card-body">
-        <h5 class="card-title">Transaction Mix</h5>
-        <div class="row text-center">
-          <div class="col-3">
-            <p class="card-category">Buys</p>
-            <strong>{{ data_summary.type_counts.buy }}</strong>
-          </div>
-          <div class="col-3">
-            <p class="card-category">Sells</p>
-            <strong>{{ data_summary.type_counts.sell }}</strong>
-          </div>
-          <div class="col-3">
-            <p class="card-category">Sends</p>
-            <strong>{{ data_summary.type_counts.send }}</strong>
-          </div>
-          <div class="col-3">
-            <p class="card-category">Receives</p>
-            <strong>{{ data_summary.type_counts.receive }}</strong>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-<!-- /Data Summary -->
-      
-
 <!-- Upload -->
 <div class="row">
   <div class="col-md-12">
-    <div class="card">
+    <div class="card gainz-import-primary-card">
       <div class="card-body">
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
           <div>
-            <h5 class="mb-1">Import Data</h5>
-            <p class="text-muted mb-0">Use demo data first, or upload your own CSV.</p>
+            <h2 class="gainz-section-title mb-1">Start With Source Data</h2>
+            <p class="text-muted mb-0">Try the synthetic demo data or upload one exchange CSV.</p>
           </div>
-          <button type="button" id="import_demo_data_button" class="btn btn-outline-primary btn-sm" data-demo-url="{{ url_for('import_transactions_blueprint.import_demo_data') }}">Try Demo Data</button>
+          <button type="button" id="import_demo_data_button" class="btn btn-primary btn-round btn-sm" data-demo-url="{{ url_for('import_transactions_blueprint.import_demo_data') }}">Try Demo Data</button>
         </div>
         <div id="import_upload_result" class="alert alert-info" role="alert" style="display: none;"></div>
+        <div
+          id="import_continue_panel"
+          class="alert alert-success gainz-import-continue-panel"
+          role="status"
+          {% if not imported_count %}style="display: none;"{% endif %}
+        >
+          <div>
+            <strong>Import data is loaded.</strong>
+            <p class="mb-0">Continue when you have loaded the source files you want included in this review pass.</p>
+          </div>
+          <a class="btn btn-primary btn-round btn-sm" href="{{ url_for('holdings_accounting_blueprint.holdings_accounting') }}">Continue to Declare Holdings</a>
+        </div>
         <div
           id="import_warning_workflow"
           class="import-warning-workflow alert alert-warning"
@@ -152,7 +91,7 @@
             </div>
             <div class="import-warning-actions">
               <a class="btn btn-sm btn-outline-primary" href="#manual-transactions">Add manual rows</a>
-              <a class="btn btn-sm btn-outline-primary" href="#import_data_sources_table">Review sources</a>
+              <a class="btn btn-sm btn-outline-primary" href="#source-review">Review sources</a>
             </div>
           </div>
           <div class="table-responsive">
@@ -209,14 +148,22 @@
             </table>
           </div>
         </div>
-        <div class="form-check mb-3">
-          <label class="form-check-label" for="import_review_columns_before_import">
-            <input id="import_review_columns_before_import" class="form-check-input" type="checkbox">
-            Review header row and columns before importing
-            <span class="form-check-sign"></span>
-          </label>
-        </div>
-        <form id="upload_csv_form" action="{{ url_for('import_transactions_blueprint.import_wizard')}}" class="dropzone"></form>
+        <form id="upload_csv_form" action="{{ import_form_url }}" class="dropzone"></form>
+        <details class="gainz-import-secondary-details mt-3">
+          <summary>Column review options</summary>
+          <div class="gainz-import-detail-body">
+            <p class="text-muted">
+              Use this only when Gainz asks you to choose the header row and map columns, or when you already know the file has unusual headers.
+            </p>
+            <div class="form-check mb-0">
+              <label class="form-check-label" for="import_review_columns_before_import">
+                <input id="import_review_columns_before_import" class="form-check-input" type="checkbox">
+                Review header row and columns before importing
+                <span class="form-check-sign"></span>
+              </label>
+            </div>
+          </div>
+        </details>
         <div
           id="import_column_mapper"
           class="mt-4"
@@ -256,14 +203,73 @@
 </div>
 <!-- /Upload  -->
 
-<!-- Manual Transactions -->
-<div class="row" id="manual-transactions">
+<!-- Import Status Details -->
+<div class="row">
   <div class="col-md-12">
-    <div class="card">
-      <div class="card-body">
+    <details class="card gainz-import-secondary-details">
+      <summary>Show current import status</summary>
+      <div class="gainz-import-detail-body">
+        <div class="audit-readiness-grid gainz-import-status-grid" aria-label="Current import status">
+          <div class="audit-readiness-item">
+            <span>Current Revision</span>
+            <strong>{{ save_summary.revision }}</strong>
+            <p class="text-muted mb-0">{{ save_summary.save_count }} saved revision{% if save_summary.save_count != 1 %}s{% endif %}</p>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Transactions</span>
+            <strong>{{ data_summary.transaction_count }}</strong>
+            <p class="text-muted mb-0">{{ data_summary.asset_count }} asset{% if data_summary.asset_count != 1 %}s{% endif %}</p>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Data Sources</span>
+            <strong>{{ data_summary.source_count }}</strong>
+            <p class="text-muted mb-0">
+              {{ data_summary.link_count }} basis link{% if data_summary.link_count != 1 %}s{% endif %}
+              {% if data_summary.source_overlap_count %} &middot; {{ data_summary.source_overlap_count }} overlap review{% if data_summary.source_overlap_count != 1 %}s{% endif %}{% endif %}
+            </p>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Import Warnings</span>
+            <strong>{{ data_summary.import_warnings|length }}</strong>
+            <p class="text-muted mb-0">Review before audit packet</p>
+          </div>
+        </div>
+        <div class="gainz-import-status-split">
+          <section>
+            <h3>Current Save</h3>
+            <p class="mb-1" title="{{ save_summary.current_file }}"><strong>File:</strong> {{ save_summary.current_name }}</p>
+            <p class="mb-1"><strong>Description:</strong> {{ save_summary.current_description or "No description" }}</p>
+            <p class="mb-0"><strong>Modified:</strong> {{ save_summary.current_modified }}</p>
+          </section>
+          <section>
+            <h3>Transaction Mix</h3>
+            <div class="gainz-import-mix-grid">
+              <div><span>Buys</span><strong>{{ data_summary.type_counts.buy }}</strong></div>
+              <div><span>Sells</span><strong>{{ data_summary.type_counts.sell }}</strong></div>
+              <div><span>Sends</span><strong>{{ data_summary.type_counts.send }}</strong></div>
+              <div><span>Receives</span><strong>{{ data_summary.type_counts.receive }}</strong></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </details>
+  </div>
+</div>
+<!-- /Import Status Details -->
+
+<!-- Manual Transactions -->
+<div class="row">
+  <div class="col-md-12">
+    <details
+      id="manual-transactions"
+      class="card gainz-import-secondary-details"
+      {% if request.args.get('manual_added') or request.args.get('manual_error') %}open{% endif %}
+    >
+      <summary>Add manual rows</summary>
+      <div class="gainz-import-detail-body">
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
           <div>
-            <h5 class="mb-1">Add Manual Transactions</h5>
+            <h2 class="gainz-section-title mb-1">Add Manual Transactions</h2>
             <p class="text-muted mb-0">Add known buys or sells that were not imported from a CSV.</p>
           </div>
         </div>
@@ -277,7 +283,7 @@
           {{ request.args.get('manual_error') }}
         </div>
         {% endif %}
-        <form method="POST" action="{{ url_for('import_transactions_blueprint.import_wizard') }}#manual-transactions">
+        <form method="POST" action="{{ import_form_url }}#manual-transactions">
           {{ manual_trans.hidden_tag() }}
           <div class="table-responsive">
             <table id="manual_transactions_table" class="table table-striped manual-batch-table">
@@ -324,17 +330,20 @@
           Manual entries are saved with source <strong>Gainz App Manual Add</strong> and appear in data sources, revisions, holdings reconciliation, and exports.
         </p>
       </div>
-    </div>
+    </details>
   </div>
 </div>
 <!-- /Manual Transactions -->
 
 <!-- Data Sources -->
 <div class="row">
-  <div class="col-md-7">
-    <div class="card">
-      <div class="card-body">
-        <h5 class="card-title">Current Data Sources</h5>
+  <div class="col-md-12">
+    <details id="source-review" class="card gainz-import-secondary-details">
+      <summary>Review data sources and revisions</summary>
+      <div class="gainz-import-detail-body">
+        <div class="row">
+          <div class="col-md-7">
+        <h2 class="gainz-section-title">Current Data Sources</h2>
         <div id="data_source_action_result" class="alert alert-info" role="alert" style="display: none;"></div>
         <div
           id="source_overlap_workflow"
@@ -426,13 +435,9 @@
           </table>
         </div>
         <p class="text-muted mb-0">Source files are copied into audit packets when they still exist on disk. Refresh this page after imports or source removal to update the summary.</p>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-5">
-    <div class="card" id="revision-history">
-      <div class="card-body">
-        <h5 class="card-title">Recent Revisions</h5>
+          </div>
+          <div class="col-md-5" id="revision-history">
+        <h2 class="gainz-section-title">Recent Revisions</h2>
         <p class="text-muted">Every import, source removal, holdings edit, and FIFO link run will create a revision so you can return to an earlier state.</p>
         <div class="table-responsive">
           <table class="table table-striped">
@@ -459,8 +464,10 @@
           </table>
         </div>
         <a class="btn btn-sm btn-outline-primary" href="{{ url_for('history_blueprint.index') }}">Review Revisions</a>
+          </div>
+        </div>
       </div>
-    </div>
+    </details>
   </div>
 </div>
 <!-- /Data Sources -->

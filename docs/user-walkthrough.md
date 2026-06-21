@@ -44,11 +44,19 @@ Each stage includes **Done when** criteria so you know what has to be true befor
 
 ## 3. Import Transaction Files
 
-Open **Import**.
+From **Guided Reconciliation**, click **Open import**. Gainz opens **Step 1: Import Data**.
 
-If you are learning Gainz, click **Try Demo Data**. This loads the bundled synthetic Cash App, Coinbase, and Coinbase Convert files so you can reach Dashboard, Reconcile, and Reports & Export without using private records.
+The Import page is intentionally staged:
+
+- Primary actions: **Try Demo Data** and the CSV upload area.
+- Secondary actions: **Column review options**, which stay collapsed unless Gainz cannot confidently map the file or you choose to review headers first.
+- Tertiary review: **Add manual rows**, **Show current import status**, and **Review data sources and revisions** stay collapsed until needed.
+
+If you are learning Gainz, click **Try Demo Data**. This loads the bundled synthetic Cash App, Coinbase, and Coinbase Convert files so you can reach Reconcile and Reports & Export without using private records.
 
 Upload one file at a time. Gainz shows how many rows were imported, skipped, or warned after each upload.
+
+After data is loaded, click **Continue to Declare Holdings** when you have imported the source files you want included in this review pass.
 
 Supported workflows currently include:
 
@@ -63,14 +71,14 @@ File names help Gainz detect the parser. Use names that include terms such as `c
 
 Gainz also recognizes common column-name variations. For example, headers like `Transaction Date`, `Activity Type`, `Crypto Quantity`, `Token Symbol`, `Spot Price USD`, and `Transaction Value` can be mapped into the import fields even when an exchange changes its export wording. If the columns are too unusual, Gainz asks for the header row and lets you choose the Date/time, Transaction type, Asset symbol, Asset quantity, and USD price/value columns.
 
-Also review **Possible overlapping source files** on Import. Gainz flags pairs that look like a full-history export plus a year-specific export, or files with overlapping transaction signatures. If one source duplicates another, remove only the duplicate or overlapping source from current data and keep the original CSV for evidence.
+If Gainz reports import warnings, review the warning table before relying on generated reports. If Gainz flags **Possible overlapping source files**, open **Review data sources and revisions**. Gainz flags pairs that look like a full-history export plus a year-specific export, or files with overlapping transaction signatures. If one source duplicates another, remove only the duplicate or overlapping source from current data and keep the original CSV for evidence.
 
 ![Gainz Import page]({{ '/assets/screenshots/gainz-import-manage-data.png' | relative_url }})
 {: .screenshot-frame }
 
 ## 4. Add Source-Backed Manual Rows When Needed
 
-If a CSV is missing known buys or sells, use **Add Manual Transactions** on the Import page.
+If a CSV is missing known buys or sells, open **Add manual rows** on the Import page.
 
 Enter as many rows as needed, leave unused rows blank, and submit the batch. Gainz saves the batch as one revision with source `Gainz App Manual Add`.
 

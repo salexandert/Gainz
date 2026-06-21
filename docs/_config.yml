@@ -2,12 +2,12 @@ title: Gainz
 description: Private offline crypto tax audit packet and cost-basis reconciliation software.
 url: https://cryptogainz.store
 baseurl: ""
-version: 0.2.16
+version: 0.2.17
 github_url: "https://github.com/salexandert/Gainz?utm_source=cryptogainz.store&utm_medium=website&utm_campaign=site_nav"
-download_url: https://github.com/salexandert/Gainz/releases/download/v0.2.16/Gainz-Windows.zip
-checksum_url: https://github.com/salexandert/Gainz/releases/download/v0.2.16/Gainz-Windows.zip.sha256
-macos_download_url: https://github.com/salexandert/Gainz/releases/download/v0.2.16/Gainz-macOS.zip
-macos_checksum_url: https://github.com/salexandert/Gainz/releases/download/v0.2.16/Gainz-macOS.zip.sha256
+download_url: https://github.com/salexandert/Gainz/releases/latest/download/Gainz-Windows.zip
+checksum_url: https://github.com/salexandert/Gainz/releases/latest/download/Gainz-Windows.zip.sha256
+macos_download_url: https://github.com/salexandert/Gainz/releases/latest/download/Gainz-macOS.zip
+macos_checksum_url: https://github.com/salexandert/Gainz/releases/latest/download/Gainz-macOS.zip.sha256
 markdown: kramdown
 permalink: pretty
 

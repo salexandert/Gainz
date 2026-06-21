@@ -364,6 +364,7 @@ def import_wizard():
     transactions = current_app.config['transactions']
     manual_trans = ManualTransaction()
     current_holdings = CurrentHoldings()
+    guided_import = str(request.args.get("guided") or "").lower() in ("1", "true", "yes")
 
     if 'current_holdings' not in session:
         session['current_holdings'] = []
@@ -455,6 +456,7 @@ def import_wizard():
         current_holdings=current_holdings,
         save_summary=_current_save_summary(transactions),
         data_summary=_data_source_summary(transactions),
+        guided_import=guided_import,
     )
 
 
