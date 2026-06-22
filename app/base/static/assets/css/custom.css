@@ -1441,10 +1441,153 @@
     display: none;
 }
 
+.holdings-data-source-only {
+    display: none;
+}
+
+.holdings-guided-queue {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.holdings-guided-queue-header {
+    align-items: flex-start;
+    display: flex;
+    gap: 16px;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.holdings-guided-queue-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.holdings-guided-card-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.holdings-asset-card {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    border-radius: 8px;
+    color: #252422;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 184px;
+    padding: 16px;
+    text-align: left;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.holdings-asset-card:hover,
+.holdings-asset-card:focus {
+    border-color: #51cbce;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+    outline: none;
+    transform: translateY(-1px);
+}
+
+.holdings-asset-card.active {
+    border-color: #2b6cb0;
+    box-shadow: 0 0 0 3px rgba(43, 108, 176, 0.14);
+}
+
+.holdings-asset-card-symbol {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.holdings-asset-card-action {
+    color: #4f5962;
+    min-height: 44px;
+}
+
+.holdings-asset-card-metrics {
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    display: grid;
+    gap: 8px;
+    padding-top: 12px;
+}
+
+.holdings-asset-card-metrics span {
+    align-items: center;
+    color: #6c757d;
+    display: flex;
+    font-size: 13px;
+    justify-content: space-between;
+}
+
+.holdings-asset-card-metrics strong {
+    color: #252422;
+    font-size: 14px;
+}
+
+.holdings-inline-confirm {
+    margin: 12px 0;
+}
+
+.gainz-confirm-dialog {
+    align-items: center;
+    background: rgba(37, 36, 34, 0.42);
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    left: 0;
+    padding: 24px;
+    position: fixed;
+    right: 0;
+    top: 0;
+    z-index: 2000;
+}
+
+.gainz-confirm-dialog-card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
+    max-width: 560px;
+    padding: 24px;
+    width: 100%;
+}
+
+.gainz-confirm-dialog-card h2 {
+    font-size: 24px;
+    margin-bottom: 12px;
+}
+
+.gainz-confirm-dialog-message p {
+    color: #4f5962;
+    margin-bottom: 8px;
+}
+
+.gainz-confirm-dialog-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 18px;
+}
+
+.holdings-calculation-details > summary {
+    color: #4f5962;
+}
+
 .gainz-advanced-details {
     border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 8px;
     margin: 16px 0;
+}
+
+.gainz-advanced-details:not([open]) > *:not(summary) {
+    display: none;
 }
 
 .gainz-advanced-details > summary {

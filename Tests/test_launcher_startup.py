@@ -61,10 +61,10 @@ class LauncherStartupTests(unittest.TestCase):
                 },
                 guided_mode=False,
                 holdings_mode="full",
-            )
+        )
 
         self.assertIn('id="holdings_workbench_title"', rendered_page)
-        self.assertIn("Step 3 Asset Workbench", rendered_page)
+        self.assertIn("Asset Workbench", rendered_page)
         self.assertIn("Step 4: Review Readiness", rendered_page)
         self.assertIn('id="holdings_readiness_badge"', rendered_page)
         self.assertIn('id="holdings_run_fifo_button"', rendered_page)

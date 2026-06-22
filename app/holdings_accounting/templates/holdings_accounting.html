@@ -10,6 +10,9 @@
 
 {% set is_declare_mode = holdings_mode == 'declare' %}
 {% set is_reconcile_mode = holdings_mode == 'reconcile' %}
+<div id="holdings_page_context"
+     data-guided-mode="{% if guided_mode %}1{% else %}0{% endif %}"
+     data-holdings-mode="{{ holdings_mode }}"></div>
 
 <div class="row">
   <div class="col-md-12">
@@ -133,6 +136,12 @@
         <h4 class="card-title">Bulk Current Holdings</h4>
         <p class="card-category">Use this when your current records show one primary holding and every other tracked asset is zero.</p>
         <div id="bulk_holdings_message" class="alert alert-info" role="status" style="display: none;"></div>
+        <div id="bulk_holdings_confirm_panel" class="holdings-inline-confirm alert alert-warning" role="dialog" aria-modal="false" style="display: none;">
+          <strong>Confirm bulk holdings update</strong>
+          <p id="bulk_holdings_confirm_text" class="mb-2"></p>
+          <button type="button" id="bulk_holdings_confirm_yes" class="btn btn-warning btn-sm">Save Bulk Holdings</button>
+          <button type="button" id="bulk_holdings_confirm_no" class="btn btn-outline-secondary btn-sm">Cancel</button>
+        </div>
         <div class="form-group row align-items-end">
           <div class="col-md-3 col-sm-4">
             <label for="bulk_primary_asset">Primary asset</label>
@@ -164,43 +173,76 @@
         </h4>
         <p class="card-category">
           {% if is_declare_mode %}
-          Start with assets that need holdings. Selecting a row loads it into the workbench below.
+          Start with assets that need holdings. Selecting a card loads it into the current task below.
           {% elif is_reconcile_mode %}
-          Start with assets marked Needs Review or assets with unlinked sales. Selecting a row loads the gap details below.
+          Work one gap at a time. Use Previous and Next to move through assets that need review.
           {% else %}
           Choose an asset, then use the workbench below to declare holdings and interpret the difference.
           {% endif %}
         </p>
-        <table id="eh_stats_datatable" class="table table-striped table-bordered {% if guided_mode %}holdings-guided-asset-table{% endif %}" style="width:100%">
-          <thead>
-            <tr>
-              <th>Asset</th>
-              <th>Quantity Purchased</th>
-              <th>Quantity Sold</th>
-              <th>Quantity Sold Unlinked</th>
-              <th>Quantity Purchased Unlinked</th>
-              <th>Purchased in USD</th>
-              <th>Sold in USD</th>
-              <th>Realized Profit</th>
-              <th>Declared Holdings</th>
-            </tr>
-          </thead>
-          <tbody>
+        {% if guided_mode %}
+        <div id="holdings_guided_queue" class="holdings-guided-queue" data-mode="{{ holdings_mode }}">
+          <div class="holdings-guided-queue-header">
+            <div>
+              <strong id="holdings_guided_queue_title">{% if is_reconcile_mode %}Current gap{% else %}Asset cards{% endif %}</strong>
+              <p id="holdings_guided_queue_status" class="card-category mb-0">Select a card to continue.</p>
+            </div>
+            <div class="holdings-guided-queue-actions">
+              <button type="button" id="holdings_guided_prev_asset" class="btn btn-outline-secondary btn-sm">Previous</button>
+              <button type="button" id="holdings_guided_next_asset" class="btn btn-outline-primary btn-sm">Next</button>
+            </div>
+          </div>
+          <div id="holdings_guided_asset_cards" class="holdings-guided-card-grid" aria-live="polite">
             {% for row in stats_table_data %}
-            <tr>
-              <td>{{ row['symbol'] }}</td>
-              <td>{{ row['total_purchased_quantity'] }}</td>
-              <td>{{ row['total_sold_quantity'] }}</td>
-              <td>{{ row['total_sold_unlinked_quantity'] }}</td>
-              <td>{{ row['total_purchased_unlinked_quantity'] }}</td>
-              <td>{{ row['total_purchased_usd'] }}</td>
-              <td>{{ row['total_sold_usd'] }}</td>
-              <td>{{ row.get('total_profit_loss', row.get('profit_loss_total')) }}</td>
-              <td>{{ row['holdings'] }}</td>
-            </tr>
+            <button type="button" class="holdings-asset-card" data-asset="{{ row['symbol'] }}">
+              <span class="gainz-status-badge status-needs-review" data-card-status>Review</span>
+              <span class="holdings-asset-card-symbol">{{ row['symbol'] }}</span>
+              <span class="holdings-asset-card-action" data-card-action>Select this asset to continue.</span>
+              <span class="holdings-asset-card-metrics">
+                <span>Declared <strong data-card-holdings>{{ row['holdings'] }}</strong></span>
+                <span>Unlinked <strong data-card-unlinked>{{ row['total_sold_unlinked_quantity'] }}</strong></span>
+                <span>Difference <strong data-card-difference>--</strong></span>
+              </span>
+            </button>
             {% endfor %}
-          </tbody>
-        </table>
+          </div>
+          <p id="holdings_guided_queue_empty" class="alert alert-success mb-0" role="status" style="display: none;">
+            No assets are waiting in this step. Return to Guided Reconciliation for the next stage.
+          </p>
+        </div>
+        {% endif %}
+        <div class="{% if guided_mode %}holdings-data-source-only{% endif %}" {% if guided_mode %}aria-hidden="true"{% endif %}>
+          <table id="eh_stats_datatable" class="table table-striped table-bordered {% if guided_mode %}holdings-guided-asset-table{% endif %}" style="width:100%">
+            <thead>
+              <tr>
+                <th>Asset</th>
+                <th>Quantity Purchased</th>
+                <th>Quantity Sold</th>
+                <th>Quantity Sold Unlinked</th>
+                <th>Quantity Purchased Unlinked</th>
+                <th>Purchased in USD</th>
+                <th>Sold in USD</th>
+                <th>Realized Profit</th>
+                <th>Declared Holdings</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in stats_table_data %}
+              <tr>
+                <td>{{ row['symbol'] }}</td>
+                <td>{{ row['total_purchased_quantity'] }}</td>
+                <td>{{ row['total_sold_quantity'] }}</td>
+                <td>{{ row['total_sold_unlinked_quantity'] }}</td>
+                <td>{{ row['total_purchased_unlinked_quantity'] }}</td>
+                <td>{{ row['total_purchased_usd'] }}</td>
+                <td>{{ row['total_sold_usd'] }}</td>
+                <td>{{ row.get('total_profit_loss', row.get('profit_loss_total')) }}</td>
+                <td>{{ row['holdings'] }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -212,7 +254,7 @@
       <div class="card-body">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start">
           <div>
-            <h4 id="holdings_workbench_title" class="card-title">Step 3 Asset Workbench</h4>
+            <h4 id="holdings_workbench_title" class="card-title">{% if guided_mode %}{% if is_reconcile_mode %}Current Gap{% else %}Current Asset{% endif %}{% else %}Asset Workbench{% endif %}</h4>
             <p id="holdings_selected_asset" class="card-category">Select an asset above to begin.</p>
           </div>
           <div id="holdings_status_badge" class="gainz-status-badge status-needs-declared-holdings">Needs asset</div>
@@ -242,6 +284,8 @@
           Pick an asset to see review guidance.
         </div>
 
+        <details id="holdings_calculation_details" class="gainz-advanced-details holdings-calculation-details" {% if not guided_mode %}open{% endif %}>
+          <summary>Show calculation details</summary>
         <div id="holdings_difference_breakdown" class="holdings-difference-panel" style="display: none;">
           <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start">
             <div>
@@ -343,6 +387,7 @@
             </div>
           </details>
         </div>
+        </details>
 
         <div class="form-group row">
           <label class="control-label col-md-2 col-sm-3" for="holdings_quantity">Current Holdings</label>
@@ -353,6 +398,18 @@
             <button type="button" id="submit_holdings_button" class="btn btn-success">Save Declared Holdings</button>
             <button type="button" id="zero_holdings_button" class="btn btn-outline-secondary">Save 0 Holdings</button>
           </div>
+        </div>
+        <div id="zero_holdings_confirm_panel" class="holdings-inline-confirm alert alert-warning" role="dialog" aria-modal="false" style="display: none;">
+          <strong id="zero_holdings_confirm_title">Confirm zero holdings</strong>
+          <p id="zero_holdings_confirm_text" class="mb-2"></p>
+          <button type="button" id="zero_holdings_confirm_yes" class="btn btn-warning btn-sm">Save 0 Holdings</button>
+          <button type="button" id="zero_holdings_confirm_no" class="btn btn-outline-secondary btn-sm">Cancel</button>
+        </div>
+        <div id="holdings_action_confirm_panel" class="holdings-inline-confirm alert alert-warning" role="dialog" aria-modal="false" style="display: none;">
+          <strong id="holdings_action_confirm_title">Confirm action</strong>
+          <p id="holdings_action_confirm_text" class="mb-2"></p>
+          <button type="button" id="holdings_action_confirm_yes" class="btn btn-warning btn-sm">Continue</button>
+          <button type="button" id="holdings_action_confirm_no" class="btn btn-outline-secondary btn-sm">Cancel</button>
         </div>
 
         {% if not guided_mode or is_reconcile_mode %}
@@ -403,8 +460,8 @@
       <div class="card-body">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start">
           <div>
-            <h4 class="card-title">Step 4: Review Readiness</h4>
-            <p class="card-category">Use the selected asset status to decide whether to add holdings, create basis links, review source records, or move to Reports & Export.</p>
+            <h4 class="card-title">{% if guided_mode %}Current Gap Actions{% else %}Step 4: Review Readiness{% endif %}</h4>
+            <p class="card-category">{% if guided_mode %}Choose the next supported action for this one gap. If you do not know what happened yet, leave it as needs research.{% else %}Use the selected asset status to decide whether to add holdings, create basis links, review source records, or move to Reports & Export.{% endif %}</p>
           </div>
           <span id="holdings_readiness_badge" class="gainz-status-badge status-needs-declared-holdings">Select asset</span>
         </div>
@@ -435,8 +492,10 @@
         <div class="holdings-readiness-actions">
           <button type="button" id="holdings_run_fifo_button" class="btn btn-primary" disabled>Run FIFO Auto Link for Selected Asset</button>
           <button type="button" id="holdings_leave_basis_unresolved_button" class="btn btn-outline-warning" disabled>Leave Missing Basis As Needs Research</button>
-          <a class="btn btn-outline-primary" href="/export">Open Reports & Export</a>
+          <a class="btn btn-outline-primary" href="{{ url_for('export_blueprint.index', guided=1) if guided_mode else '/export' }}">Open Reports & Export</a>
+          {% if not guided_mode %}
           <a class="btn btn-outline-secondary" href="/stats">Open Stats & Charts</a>
+          {% endif %}
         </div>
 
         <div class="holdings-readiness-details">
