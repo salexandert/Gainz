@@ -362,6 +362,7 @@ def work_order_review():
     item_id = str(payload.get("item_id") or request.form.get("item_id") or "").strip()
     decision = str(payload.get("decision") or request.form.get("decision") or "").strip()
     note = str(payload.get("note") or request.form.get("note") or "").strip()
+    cpa_question = str(payload.get("cpa_question") or request.form.get("cpa_question") or "").strip()
 
     if not item_id:
         if request.is_json:
@@ -373,7 +374,12 @@ def work_order_review():
             return jsonify({"message": "Choose a valid work order review state."}), 400
         return redirect(url_for('export_blueprint.index', work_order_reviewed=0))
 
-    transactions.set_work_order_review(item_id, decision=decision, note=note)
+    transactions.set_work_order_review(
+        item_id,
+        decision=decision,
+        note=note,
+        cpa_question=cpa_question,
+    )
     transactions.save(description=f"Updated work order item: {WORK_ORDER_REVIEW_DECISIONS[decision]}")
 
     if request.is_json:
@@ -401,11 +407,17 @@ def review_queue_save():
     item_id = str(request.form.get("item_id") or "").strip()
     decision = str(request.form.get("decision") or "").strip()
     note = str(request.form.get("note") or "").strip()
+    cpa_question = str(request.form.get("cpa_question") or "").strip()
 
     if not item_id or decision not in WORK_ORDER_REVIEW_DECISIONS:
         return redirect(url_for('export_blueprint.review_queue', item_id=item_id, saved=0))
 
-    transactions.set_work_order_review(item_id, decision=decision, note=note)
+    transactions.set_work_order_review(
+        item_id,
+        decision=decision,
+        note=note,
+        cpa_question=cpa_question,
+    )
     transactions.save(description=f"Updated review queue item: {WORK_ORDER_REVIEW_DECISIONS[decision]}")
 
     return redirect(url_for('export_blueprint.review_queue', saved=1))

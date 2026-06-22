@@ -53,6 +53,7 @@ WORK_ORDER_REVIEW_COLUMNS = [
     "item_id",
     "decision",
     "note",
+    "cpa_question",
     "updated_at",
 ]
 
@@ -681,12 +682,13 @@ class Transactions:
 
         return None
 
-    def set_work_order_review(self, item_id, decision="", note=""):
+    def set_work_order_review(self, item_id, decision="", note="", cpa_question=""):
         item_id = str(item_id or "")
         record = {
             "item_id": item_id,
             "decision": str(decision or "").strip(),
             "note": str(note or "").strip(),
+            "cpa_question": str(cpa_question or "").strip(),
             "updated_at": strftime("%Y-%m-%d %H:%M:%S"),
         }
 

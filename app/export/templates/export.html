@@ -147,6 +147,7 @@
                   <th>Next Action</th>
                   <th>Review State</th>
                   <th>Note</th>
+                  <th>CPA Question</th>
                   <th>Save</th>
                 </tr>
               </thead>
@@ -185,6 +186,17 @@
                       value="{{ row.review_note }}"
                       placeholder="Optional note"
                       aria-label="Work order review note"
+                    >
+                  </td>
+                  <td>
+                    <input
+                      form="{{ work_order_form_id }}"
+                      name="cpa_question"
+                      type="text"
+                      class="form-control"
+                      value="{{ row.cpa_question }}"
+                      placeholder="{{ row.suggested_cpa_question }}"
+                      aria-label="CPA question for this work order item"
                     >
                   </td>
                   <td>

@@ -1325,6 +1325,7 @@ class ImportAndExportTests(unittest.TestCase):
                         "item_id": "work-item-1",
                         "decision": "sent_to_cpa",
                         "note": "Asked CPA to review this item.",
+                        "cpa_question": "Should this remain unresolved for CPA review?",
                     },
                 )
 
@@ -1333,6 +1334,10 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertIsNotNone(record)
             self.assertEqual("sent_to_cpa", record["decision"])
             self.assertEqual("Asked CPA to review this item.", record["note"])
+            self.assertEqual(
+                "Should this remain unresolved for CPA review?",
+                record["cpa_question"],
+            )
             self.assertIn(
                 "Updated work order item: Sent to CPA",
                 transactions.saved_descriptions,
@@ -1365,7 +1370,11 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual(200, response.status_code)
             self.assertIn(b"Guided Review Queue", response.data)
             self.assertIn(b"Current holdings missing", response.data)
-            self.assertIn(b"This decision and note will appear in the audit packet", response.data)
+            self.assertIn(b"Gap Investigator", response.data)
+            self.assertIn(b"What Gainz Knows", response.data)
+            self.assertIn(b"What Gainz Does Not Know", response.data)
+            self.assertIn(b"Safe Outcomes", response.data)
+            self.assertIn(b"It is valid to choose", response.data)
             self.assertIn(b"Return to full work order", response.data)
 
             readiness = get_audit_readiness_summary(transactions)
@@ -1383,6 +1392,7 @@ class ImportAndExportTests(unittest.TestCase):
                         "item_id": item_id,
                         "decision": "needs_research",
                         "note": "User will research source records.",
+                        "cpa_question": "What source records should be checked next?",
                     },
                     follow_redirects=True,
                 )
@@ -1393,6 +1403,10 @@ class ImportAndExportTests(unittest.TestCase):
             record = transactions.get_work_order_review(item_id)
             self.assertEqual("needs_research", record["decision"])
             self.assertEqual("User will research source records.", record["note"])
+            self.assertEqual(
+                "What source records should be checked next?",
+                record["cpa_question"],
+            )
 
             with app.app_context():
                 db.drop_all()
@@ -1610,6 +1624,8 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertTrue((packet_path / "01_reports" / "suggested_filed_totals.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "reconciliation_work_order.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "reconciliation_work_order.md").exists())
+            self.assertTrue((packet_path / "01_reports" / "unknown_gap_memos.csv").exists())
+            self.assertTrue((packet_path / "01_reports" / "unknown_gap_memos.md").exists())
             self.assertTrue((packet_path / "03_manifests" / "tax_evidence_inventory.json").exists())
             self.assertTrue((packet_path / "03_manifests" / "suggested_filed_totals.json").exists())
             self.assertEqual(1, len(list((packet_path / "01_reports").glob("*.xlsx"))))
@@ -1662,6 +1678,7 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertNotEqual(readme_first, packet_status)
             self.assertIn("Read This First", readme_first)
             self.assertIn("Folder Map", readme_first)
+            self.assertIn("unknown_gap_memos.md", readme_first)
             self.assertIn("Gainz Packet Status", packet_status)
             self.assertIn("Open Blockers", packet_status)
             self.assertIn("DRAFT - NOT FILING READY", packet_status)
@@ -1675,6 +1692,7 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertIn("For CPAs", for_cpas)
             self.assertIn("Suggested Review Order", for_cpas)
             self.assertIn("Reference-only tax evidence records: 1", for_cpas)
+            self.assertIn("unknown_gap_memos.md", for_cpas)
             self.assertIn("Questions For The Taxpayer", for_cpas)
             self.assertIn("Can you provide source records", for_cpas)
             privacy_handling = (packet_path / "PRIVACY_AND_EVIDENCE_HANDLING.md").read_text(encoding="utf-8")
@@ -1693,6 +1711,15 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertTrue(any(row["blocker_type"] == "Import warning decision" for row in work_order_rows))
             self.assertIn("item_id", work_order_rows[0])
             self.assertIn("review_decision", work_order_rows[0])
+            self.assertIn("cpa_question", work_order_rows[0])
+            self.assertIn("what_gainz_knows", work_order_rows[0])
+
+            with open(packet_path / "01_reports" / "unknown_gap_memos.csv", newline="", encoding="utf-8") as file:
+                memo_rows = list(csv.DictReader(file))
+            self.assertTrue(any(row["blocker_type"] == "Import warning decision" for row in memo_rows))
+            memo_text = (packet_path / "01_reports" / "unknown_gap_memos.md").read_text(encoding="utf-8")
+            self.assertIn("Unknown Gap Memos", memo_text)
+            self.assertIn("preserve uncertainty", memo_text)
             self.assertEqual([], list(export_root.glob("*.xlsx")))
 
     def test_audit_packet_manifest_uses_reference_only_for_label_only_tax_evidence(self):

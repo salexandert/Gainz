@@ -193,15 +193,22 @@ The guided queue shows one unresolved item at a time:
 - Recommended action.
 - Asset, year, date, and source file when available.
 - A link to the related page.
+- Gap Investigator details: what Gainz knows, what Gainz does not know, likely explanations, evidence to look for, and plain-language questions.
 
 Choose the review decision that matches what you found:
 
 - `Resolved`
+- `Import missing records`
+- `Classify documented send as disposal`
+- `Keep as owner transfer`
+- `Document unknown basis`
 - `Needs research`
-- `Ignored for draft`
+- `Ignore for draft only`
 - `Sent to CPA`
 
-Add a short note when helpful. After saving, Gainz moves to the next open item. These decisions are saved into the reconciliation work order, dashboard readiness state, and generated audit packet files.
+It is valid to choose an unresolved state when you do not know yet. Gainz keeps the item as a draft blocker and documents the uncertainty instead of forcing a guess.
+
+Add user memory notes, files checked, and a CPA or future-research question when helpful. After saving, Gainz moves to the next open item. These decisions are saved into the reconciliation work order, dashboard readiness state, generated audit packet files, and the unknown gap memo outputs.
 
 Use **Skip for now** when you need to keep moving without recording a decision yet. When every current work order item has a decision, Gainz shows an all-reviewed completion state and points you back to packet preview.
 
@@ -214,6 +221,7 @@ Expand **Review Details** when you need row-level evidence for:
 - Missing acquisition basis.
 - Import warning decisions.
 - Holdings explanations.
+- Unknown gap memos.
 - Source overlaps.
 - Tax evidence inventory.
 - Form 8949 totals.
@@ -265,6 +273,7 @@ The audit packet includes:
 - Tax evidence inventory CSV and JSON.
 - Suggested filed totals CSV and JSON.
 - Reconciliation work order CSV and Markdown.
+- Unknown gap memo CSV and Markdown for unresolved items documented as research or CPA questions.
 - Holdings reconciliation CSV.
 - Current holdings lots CSV.
 - Import warnings CSV with active warnings and preserved review decisions for warnings that were later cleared by source updates.

@@ -22,6 +22,7 @@ A Gainz audit packet can include:
 - Tax evidence inventory CSV and JSON.
 - Suggested filed totals CSV and JSON.
 - Reconciliation work order CSV and Markdown.
+- Unknown gap memo CSV and Markdown for unresolved items documented for research or CPA review.
 - Holdings reconciliation CSV.
 - Current holdings lots CSV.
 - Import warnings CSV with active warnings and preserved review decisions for warnings that were later cleared by source updates.

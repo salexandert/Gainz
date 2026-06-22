@@ -27,6 +27,7 @@ The sample ZIP contains:
 - `PRIVACY_AND_EVIDENCE_HANDLING.md`: reference-only vs copied evidence and local storage notes.
 - `00_memos/METHODOLOGY.md`: a short explanation of how the synthetic records were prepared.
 - `01_reports/reconciliation_work_order.csv`: a review queue of blockers, suspected issues, and next actions.
+- `01_reports/unknown_gap_memos.md`: documented unknowns, user notes, candidate explanations, and CPA questions.
 - `01_reports/form_8949_totals.csv`: short-term, long-term, and total proceeds, basis, and gain/loss totals.
 - `01_reports/holdings_reconciliation.csv`: declared holdings compared with calculated holdings.
 - `01_reports/import_warnings.csv`: a visible place for unsupported or skipped rows.

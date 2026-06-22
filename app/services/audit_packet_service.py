@@ -19,6 +19,8 @@ from app.services.packet_plan_service import (
     reconciliation_work_order_rows,
     tax_evidence_packet_counts,
     transaction_source_paths,
+    unknown_gap_memos_markdown,
+    unresolved_gap_memo_rows,
 )
 from utils import (
     FORM_8949_COLUMNS,
@@ -119,6 +121,7 @@ class AuditPacketService:
         self._write_import_warnings(packet_dir, transactions)
         self._write_source_overlap_review(packet_dir, transactions)
         self._write_reconciliation_work_order(packet_dir, readiness, transactions)
+        self._write_unknown_gap_memos(packet_dir, readiness, transactions)
         self._write_packet_status_files(packet_dir, readiness, manifest_rows)
         self._write_cpa_handoff(packet_dir, readiness, manifest_rows, transactions)
         self._write_for_cpas(packet_dir, readiness, manifest_rows, transactions)
@@ -232,8 +235,12 @@ class AuditPacketService:
             f"- Reviewed items: {work_order_summary.get('reviewed_count', 0)}",
             f"- Unreviewed items: {work_order_summary.get('unreviewed_count', 0)}",
             f"- Resolved: {work_order_summary.get('resolved_count', 0)}",
+            f"- Import missing records: {work_order_summary.get('import_missing_records_count', 0)}",
+            f"- Classify documented send as disposal: {work_order_summary.get('classify_documented_disposal_count', 0)}",
+            f"- Keep as owner transfer: {work_order_summary.get('keep_owner_transfer_count', 0)}",
+            f"- Document unknown basis: {work_order_summary.get('document_unknown_basis_count', 0)}",
             f"- Needs research: {work_order_summary.get('needs_research_count', 0)}",
-            f"- Ignored for draft: {work_order_summary.get('ignored_for_draft_count', 0)}",
+            f"- Ignore for draft only: {work_order_summary.get('ignored_for_draft_count', 0)}",
             f"- Sent to CPA: {work_order_summary.get('sent_to_cpa_count', 0)}",
         ])
         status_lines.extend([
@@ -259,6 +266,7 @@ class AuditPacketService:
             "3. Open `CPA_HANDOFF.md` for the generation notes.",
             "4. Open `PRIVACY_AND_EVIDENCE_HANDLING.md` before sharing the packet.",
             "5. Review `01_reports/reconciliation_work_order.csv` for the itemized work queue.",
+            "6. Review `01_reports/unknown_gap_memos.md` for unresolved items that are documented for research or CPA review.",
             "",
             "## Folder Map",
             "",
@@ -347,10 +355,11 @@ class AuditPacketService:
             "",
             "1. `PACKET_STATUS.md` for readiness, blockers, warnings, and evidence counts.",
             "2. `01_reports/reconciliation_work_order.csv` for the itemized unresolved work queue.",
-            "3. `01_reports/tax_filing_alignment.csv` for calculated totals compared with user-entered filed totals.",
-            "4. `01_reports/form_8949_totals.csv` and the Form 8949 detail CSVs for proceeds, basis, and gain/loss.",
-            "5. `01_reports/holdings_reconciliation.csv` and `01_reports/current_holdings_lots.csv` for holdings explanation.",
-            "6. `03_manifests/evidence_manifest.csv` for copied files, reference-only evidence, missing paths, and hashes.",
+            "3. `01_reports/unknown_gap_memos.md` for documented unknowns, user notes, candidate explanations, and CPA questions.",
+            "4. `01_reports/tax_filing_alignment.csv` for calculated totals compared with user-entered filed totals.",
+            "5. `01_reports/form_8949_totals.csv` and the Form 8949 detail CSVs for proceeds, basis, and gain/loss.",
+            "6. `01_reports/holdings_reconciliation.csv` and `01_reports/current_holdings_lots.csv` for holdings explanation.",
+            "7. `03_manifests/evidence_manifest.csv` for copied files, reference-only evidence, missing paths, and hashes.",
             "",
             "## Evidence Handling",
             "",
@@ -883,15 +892,64 @@ class AuditPacketService:
             "review_decision",
             "review_decision_label",
             "review_note",
+            "cpa_question",
             "review_updated_at",
+            "what_gainz_knows",
+            "what_gainz_does_not_know",
+            "likely_explanations",
+            "evidence_to_look_for",
+            "plain_language_questions",
+            "suggested_cpa_question",
         ]
         with open(packet_dir / "01_reports" / "reconciliation_work_order.csv", "w", newline="", encoding="utf-8") as file:
             writer = csv.DictWriter(file, fieldnames=fieldnames)
             writer.writeheader()
-            writer.writerows(rows)
+            for row in rows:
+                csv_row = dict(row)
+                for field in (
+                    "what_gainz_knows",
+                    "what_gainz_does_not_know",
+                    "likely_explanations",
+                    "evidence_to_look_for",
+                    "plain_language_questions",
+                ):
+                    csv_row[field] = " | ".join(csv_row.get(field) or [])
+                writer.writerow({field: csv_row.get(field, "") for field in fieldnames})
 
         (packet_dir / "01_reports" / "reconciliation_work_order.md").write_text(
             reconciliation_work_order_markdown(rows),
+            encoding="utf-8",
+        )
+
+    def _write_unknown_gap_memos(self, packet_dir, readiness, transactions):
+        rows = reconciliation_work_order_rows(readiness, transactions)
+        memo_rows = unresolved_gap_memo_rows(rows)
+        fieldnames = [
+            "item_id",
+            "blocker_type",
+            "asset",
+            "year",
+            "date",
+            "source_file",
+            "amount_or_quantity_affected",
+            "current_decision",
+            "user_memory_notes",
+            "cpa_question",
+            "what_is_missing",
+            "why_it_matters",
+            "files_checked",
+            "candidate_explanations",
+            "evidence_to_look_for",
+            "plain_language_questions",
+            "next_action",
+        ]
+        with open(packet_dir / "01_reports" / "unknown_gap_memos.csv", "w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(memo_rows)
+
+        (packet_dir / "01_reports" / "unknown_gap_memos.md").write_text(
+            unknown_gap_memos_markdown(rows),
             encoding="utf-8",
         )
 

@@ -91,6 +91,7 @@ Audit packets include root-level status and handoff files:
 - `FOR_CPAS.md`: CPA-facing review order and evidence-handling orientation.
 - `CPA_HANDOFF.md`: how the packet was generated and suggested review order.
 - `PRIVACY_AND_EVIDENCE_HANDLING.md`: local storage and evidence-copy explanation.
+- `01_reports/unknown_gap_memos.md`: unresolved gaps documented with what is missing, evidence checked, user notes, and CPA questions.
 
 Review these files before sharing a packet with a CPA or anyone else.
 

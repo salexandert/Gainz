@@ -13,7 +13,11 @@ from app.services.tax_evidence_service import (
     get_tax_evidence_inventory_summary,
 )
 from app.services.tax_total_extraction_service import get_suggested_filed_totals
-from app.services.packet_plan_service import reconciliation_work_order_rows
+from app.services.packet_plan_service import (
+    reconciliation_work_order_rows,
+    unknown_gap_memos_markdown,
+    unresolved_gap_memo_rows,
+)
 from app.stats.routes import _auto_fix_safe_issues
 from openpyxl import Workbook
 from transaction import Buy, Receive, Sell, Send
@@ -607,6 +611,13 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual(20, rows[1]["priority"])
         self.assertTrue(rows[0]["priority_label"].startswith("P1"))
         self.assertTrue(rows[-1]["priority_label"].startswith("P5"))
+        self.assertIn("Blocker type", rows[0]["what_gainz_knows"][0])
+        self.assertTrue(rows[0]["what_gainz_does_not_know"])
+        self.assertIn("Missing acquisition before sale.", rows[0]["likely_explanations"])
+        self.assertTrue(rows[0]["evidence_to_look_for"])
+        self.assertTrue(rows[0]["plain_language_questions"])
+        self.assertIn("Document unknown basis", rows[0]["allowed_outcomes"])
+        self.assertIn("basis", rows[0]["suggested_cpa_question"].lower())
 
     def test_reconciliation_work_order_applies_saved_review_state(self):
         transactions = empty_transactions()
@@ -633,19 +644,75 @@ class TransactionsEngineTests(unittest.TestCase):
         initial_rows = reconciliation_work_order_rows(readiness, transactions)
         transactions.set_work_order_review(
             initial_rows[0]["item_id"],
-            decision="needs_research",
+            decision="sent_to_cpa",
             note="User will investigate source records later.",
+            cpa_question="Ask whether unknown basis needs documented treatment.",
         )
 
         reviewed_rows = reconciliation_work_order_rows(readiness, transactions)
 
-        self.assertEqual("needs_research", reviewed_rows[0]["review_decision"])
-        self.assertEqual("Needs research", reviewed_rows[0]["review_decision_label"])
-        self.assertEqual("Needs research", reviewed_rows[0]["status"])
+        self.assertEqual("sent_to_cpa", reviewed_rows[0]["review_decision"])
+        self.assertEqual("Sent to CPA", reviewed_rows[0]["review_decision_label"])
+        self.assertEqual("Sent to CPA", reviewed_rows[0]["status"])
         self.assertEqual(
             "User will investigate source records later.",
             reviewed_rows[0]["review_note"],
         )
+        self.assertEqual(
+            "Ask whether unknown basis needs documented treatment.",
+            reviewed_rows[0]["cpa_question"],
+        )
+
+    def test_unresolved_gap_memos_preserve_unknown_review_items(self):
+        transactions = empty_transactions()
+        readiness = {
+            "is_ready": False,
+            "missing_records": {
+                "current_holdings": [],
+                "holdings_explanations": [],
+                "basis": [
+                    {
+                        "asset": "BCH",
+                        "date": "2019-01-07",
+                        "source": "coinbase.csv",
+                        "message": "This sale needs earlier acquisition basis.",
+                        "status": "Missing acquisition basis",
+                    },
+                ],
+                "source_overlaps": [],
+                "filed_totals": [],
+            },
+            "unresolved_import_warning_rows": [],
+        }
+
+        rows = reconciliation_work_order_rows(readiness, transactions)
+        memo_rows = unresolved_gap_memo_rows(rows)
+
+        self.assertEqual(1, len(memo_rows))
+        self.assertEqual("Missing acquisition basis", memo_rows[0]["blocker_type"])
+        self.assertEqual("Not reviewed", memo_rows[0]["current_decision"])
+        self.assertIn("Missing acquisition before sale", memo_rows[0]["candidate_explanations"])
+
+        transactions.set_work_order_review(
+            rows[0]["item_id"],
+            decision="document_unknown_basis",
+            note="User does not know yet; older records still need review.",
+            cpa_question="Can this be documented as unknown basis for review?",
+        )
+        reviewed_rows = reconciliation_work_order_rows(readiness, transactions)
+        reviewed_memos = unresolved_gap_memo_rows(reviewed_rows)
+        memo_text = unknown_gap_memos_markdown(reviewed_rows)
+
+        self.assertEqual("Document unknown basis", reviewed_memos[0]["current_decision"])
+        self.assertEqual(
+            "User does not know yet; older records still need review.",
+            reviewed_memos[0]["user_memory_notes"],
+        )
+        self.assertIn("Can this be documented as unknown basis", memo_text)
+
+        transactions.set_work_order_review(rows[0]["item_id"], decision="resolved")
+        resolved_rows = reconciliation_work_order_rows(readiness, transactions)
+        self.assertEqual([], unresolved_gap_memo_rows(resolved_rows))
 
     def test_partial_tax_year_research_record_stays_needs_research(self):
         transactions = empty_transactions()
@@ -742,6 +809,7 @@ class TransactionsEngineTests(unittest.TestCase):
                 "abc123",
                 decision="sent_to_cpa",
                 note="Asked CPA to review missing basis.",
+                cpa_question="Can this be supported by older exchange records?",
             )
 
             try:
@@ -755,6 +823,10 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertIsNotNone(record)
         self.assertEqual("sent_to_cpa", record["decision"])
         self.assertEqual("Asked CPA to review missing basis.", record["note"])
+        self.assertEqual(
+            "Can this be supported by older exchange records?",
+            record["cpa_question"],
+        )
 
     def test_review_decisions_round_trip_through_save_file(self):
         original_basedir = transactions_module.basedir

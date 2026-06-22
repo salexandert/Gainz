@@ -1392,6 +1392,40 @@
     margin-top: 10px;
 }
 
+.gap-investigator-panel {
+    margin-top: 18px;
+}
+
+.gap-investigator-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.gap-investigator-grid div {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+
+.gap-investigator-grid h4 {
+    color: #252422;
+    font-size: 14px;
+    font-weight: 800;
+    margin: 0 0 8px;
+}
+
+.gap-investigator-grid ul {
+    color: #4f5962;
+    margin: 0;
+    padding-left: 18px;
+}
+
+.gap-investigator-grid li + li {
+    margin-top: 6px;
+}
+
 .packet-success-list {
     color: #4f5962;
     padding-left: 20px;
