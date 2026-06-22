@@ -59,6 +59,8 @@ class LauncherStartupTests(unittest.TestCase):
                     "assets_matched": 0,
                     "assets_with_mismatch": 0,
                 },
+                guided_mode=False,
+                holdings_mode="full",
             )
 
         self.assertIn('id="holdings_workbench_title"', rendered_page)

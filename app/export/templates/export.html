@@ -128,16 +128,21 @@
           <div class="d-flex flex-wrap justify-content-between align-items-start">
             <div>
               <h3 class="gainz-section-title">Reconciliation Work Order</h3>
-              <p class="card-category">Mark each open item as resolved, needs research, ignored for draft, or sent to a CPA.</p>
+              <p class="card-category">Use the guided review queue to work one unresolved item at a time. The full table is available when you need bulk review.</p>
             </div>
             <div class="d-flex flex-wrap align-items-center">
               <span class="gainz-status-badge {% if audit_readiness.work_order_review_summary.unreviewed_count == 0 %}status-verified{% else %}status-needs-review{% endif %}">
                 {{ audit_readiness.work_order_review_summary.unreviewed_count }} unreviewed
               </span>
-              <a class="btn btn-sm btn-primary ml-2" href="{{ url_for('export_blueprint.review_queue') }}">Start guided review</a>
+              <a class="btn btn-sm btn-primary ml-2" href="{{ url_for('export_blueprint.review_queue', guided=1) }}">Start guided review</a>
             </div>
           </div>
-          <div class="table-responsive">
+          <div class="alert alert-info mt-3" role="status">
+            <strong>Recommended:</strong> Start with the guided queue. It shows what Gainz knows, what remains unknown, safe decisions, notes, and CPA questions one item at a time.
+          </div>
+          <details class="gainz-advanced-details">
+            <summary>Show full work order table</summary>
+            <div class="table-responsive gainz-import-detail-body">
             <table class="table table-sm table-striped">
               <thead>
                 <tr>
@@ -207,7 +212,8 @@
                 {% endfor %}
               </tbody>
             </table>
-          </div>
+            </div>
+          </details>
         </div>
         {% endif %}
 

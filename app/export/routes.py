@@ -180,9 +180,13 @@ def _work_order_why_it_matters(row):
 def _work_order_related_url(row):
     blocker_type = row.get("blocker_type")
     if blocker_type in {"Current holdings missing", "Holdings explanation needed", "Missing acquisition basis"}:
-        return url_for("holdings_accounting_blueprint.holdings_accounting")
+        return url_for(
+            "holdings_accounting_blueprint.holdings_accounting",
+            guided=1,
+            mode="declare" if blocker_type == "Current holdings missing" else "reconcile",
+        )
     if blocker_type in {"Import warning decision", "Reviewed import warning blocker", "Possible overlapping source files"}:
-        return url_for("import_transactions_blueprint.import_wizard")
+        return url_for("import_transactions_blueprint.import_wizard", guided=1) + "#import_warning_workflow"
     if blocker_type == "Tax evidence review":
         return url_for("tax_filing_review_blueprint.index")
     return url_for("export_blueprint.index")

@@ -330,9 +330,10 @@ function gainzSetImportWarningWorkflow(panelSelector, tableSelector, warnings, w
 
 $(document).on("click", ".import-warning-decision-button", function() {
     var button = $(this);
-    var table = button.closest("table");
-    var reviewUrl = table.data("review-url");
-    var note = button.closest("td").find(".import-warning-note-input").val() || "";
+    var reviewContext = button.closest("[data-review-url]");
+    var noteContext = button.closest("td, .guided-review-panel");
+    var reviewUrl = reviewContext.data("review-url");
+    var note = noteContext.find(".import-warning-note-input").val() || "";
 
     if (!reviewUrl) {
         return;

@@ -114,6 +114,10 @@ def _holdings_bulk_payload(transactions, primary_asset, primary_quantity, zeroed
 @login_required
 def holdings_accounting():
     transactions = current_app.config['transactions']
+    guided_mode = str(request.args.get("guided") or "").lower() in ("1", "true", "yes")
+    holdings_mode = str(request.args.get("mode") or "").lower()
+    if holdings_mode not in ("declare", "reconcile"):
+        holdings_mode = "declare" if guided_mode else "full"
 
     stats_table_data = get_stats_table_data(transactions)
 
@@ -134,6 +138,8 @@ def holdings_accounting():
         'holdings_accounting.html',
         stats_table_data=stats_table_data,
         holdings_summary=_holdings_summary(transactions),
+        guided_mode=guided_mode,
+        holdings_mode=holdings_mode,
     )
 
 

@@ -1,6 +1,6 @@
 <!-- sidebar menu -->
 {% set current_path = request.path %}
-{% set guided_import = current_path.startswith('/import_transactions') and request.args.get('guided') in ['1', 'true', 'yes'] %}
+{% set guided_mode = current_path.startswith('/home') or request.args.get('guided') in ['1', 'true', 'yes'] or current_path.startswith('/export/review_queue') %}
 <div class="logo">
   <a href="{{ url_for('home_blueprint.index') }}" class="simple-text logo-mini" aria-label="Gainz dashboard">
     <div class="logo-image-small">
@@ -50,7 +50,7 @@
       </a>
     </li>
 
-    {% if not current_path.startswith('/home') and not guided_import %}
+    {% if not guided_mode %}
     <li class="sidebar-nav-label" aria-hidden="true">Advanced tools</li>
     <li class="{% if current_path.startswith('/auto_link') %}active{% endif %}">
       <a href="{{ url_for('auto_link_blueprint.auto_link') }}" {% if current_path.startswith('/auto_link') %}aria-current="page"{% endif %}>

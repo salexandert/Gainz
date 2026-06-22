@@ -29,7 +29,7 @@
           <div class="gainz-import-hero-actions">
             <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index', stage=1) }}">Back to Guided Reconciliation</a>
             {% if imported_count %}
-            <a class="btn btn-primary btn-round" href="{{ url_for('holdings_accounting_blueprint.holdings_accounting') }}">Continue to Declare Holdings</a>
+            <a class="btn btn-primary btn-round" href="{{ url_for('holdings_accounting_blueprint.holdings_accounting', guided=1, mode='declare') }}">Continue to Declare Holdings</a>
             {% endif %}
           </div>
           {% endif %}
@@ -74,19 +74,20 @@
             <strong>Import data is loaded.</strong>
             <p class="mb-0">Continue when you have loaded the source files you want included in this review pass.</p>
           </div>
-          <a class="btn btn-primary btn-round btn-sm" href="{{ url_for('holdings_accounting_blueprint.holdings_accounting') }}">Continue to Declare Holdings</a>
+          <a class="btn btn-primary btn-round btn-sm" href="{{ url_for('holdings_accounting_blueprint.holdings_accounting', guided=1, mode='declare') }}">Continue to Declare Holdings</a>
         </div>
         <div
           id="import_warning_workflow"
           class="import-warning-workflow alert alert-warning"
           role="alert"
+          data-review-url="{{ url_for('import_transactions_blueprint.import_warning_review') }}"
           {% if not data_summary.import_warnings %}style="display: none;"{% endif %}
         >
           <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-start">
             <div>
               <strong>Import warnings need review.</strong>
               <p class="mb-2">
-                Some rows were skipped or imported with assumptions. Review these before using generated reports or audit packets.
+                Some rows were skipped or imported with assumptions. Review one warning at a time before using generated reports or audit packets.
               </p>
             </div>
             <div class="import-warning-actions">
@@ -94,7 +95,41 @@
               <a class="btn btn-sm btn-outline-primary" href="#source-review">Review sources</a>
             </div>
           </div>
-          <div class="table-responsive">
+          {% if data_summary.import_warning_rows %}
+          {% set first_warning = data_summary.import_warning_rows[0] %}
+          <div class="guided-review-panel mt-3">
+            <h3>First warning to review</h3>
+            <dl class="guided-review-details">
+              <div>
+                <dt>Source</dt>
+                <dd>{{ first_warning.source }}</dd>
+              </div>
+              <div>
+                <dt>Row</dt>
+                <dd>{{ first_warning.row }}</dd>
+              </div>
+              <div>
+                <dt>Asset</dt>
+                <dd>{{ first_warning.asset or "N/A" }}</dd>
+              </div>
+              <div>
+                <dt>Issue</dt>
+                <dd>{{ first_warning.issue }}</dd>
+              </div>
+            </dl>
+            <p class="mb-2"><strong>Suggested next action:</strong> {{ first_warning.next_action }}</p>
+            <input type="text" class="form-control form-control-sm import-warning-note-input" value="{{ first_warning.review_note }}" placeholder="Add note">
+            <div class="guided-review-actions mt-2" role="group" aria-label="Import warning decisions">
+              <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="true_zero_value_transfer" data-warning="{{ first_warning.raw }}">True zero-value transfer</button>
+              <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="needs_manual_usd_value" data-warning="{{ first_warning.raw }}">Needs manual USD value</button>
+              <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="ignore_for_now" data-warning="{{ first_warning.raw }}">Ignore for now</button>
+              <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="note" data-warning="{{ first_warning.raw }}">Add note</button>
+            </div>
+          </div>
+          {% endif %}
+          <details class="gainz-advanced-details mt-3">
+            <summary>Show all import warning rows</summary>
+            <div class="table-responsive gainz-import-detail-body">
             <table
               id="import_warning_workflow_table"
               class="table table-sm table-striped import-warning-table"
@@ -146,7 +181,8 @@
                 {% endfor %}
               </tbody>
             </table>
-          </div>
+            </div>
+          </details>
         </div>
         <form id="upload_csv_form" action="{{ import_form_url }}" class="dropzone"></form>
         <details class="gainz-import-secondary-details mt-3">

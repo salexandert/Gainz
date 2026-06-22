@@ -203,6 +203,75 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertNotIn("Auto Link", guided_sidebar)
         self.assertIn("Advanced tools", direct_sidebar)
 
+        with app.test_request_context("/holdings_accounting/?guided=1&mode=declare"):
+            guided_holdings_sidebar = app.jinja_env.get_template(
+                "site_template/sidebar.html"
+            ).render()
+
+        with app.test_request_context("/export/?guided=1"):
+            guided_export_sidebar = app.jinja_env.get_template(
+                "site_template/sidebar.html"
+            ).render()
+
+        self.assertNotIn("Advanced tools", guided_holdings_sidebar)
+        self.assertNotIn("Advanced tools", guided_export_sidebar)
+
+    def test_holdings_page_has_separate_guided_declare_and_reconcile_modes(self):
+        app = create_app(config_dict["Debug"], selenium=True)
+        app.config.update(WTF_CSRF_ENABLED=False)
+        stats_rows = [
+            {
+                "symbol": "BTC",
+                "total_purchased_quantity": "1",
+                "total_sold_quantity": "0",
+                "total_sold_unlinked_quantity": "0",
+                "total_purchased_unlinked_quantity": "0",
+                "total_purchased_usd": "$100.00",
+                "total_sold_usd": "$0.00",
+                "total_profit_loss": "$0.00",
+                "holdings": "N/A",
+            }
+        ]
+        holdings_summary = {
+            "asset_count": 1,
+            "assets_needing_holdings": 1,
+            "assets_matched": 0,
+            "assets_with_mismatch": 0,
+        }
+
+        with app.test_request_context("/holdings_accounting/?guided=1&mode=declare"):
+            declare_page = app.jinja_env.get_template(
+                "holdings_accounting.html"
+            ).render(
+                stats_table_data=stats_rows,
+                holdings_summary=holdings_summary,
+                guided_mode=True,
+                holdings_mode="declare",
+            )
+
+        with app.test_request_context("/holdings_accounting/?guided=1&mode=reconcile"):
+            reconcile_page = app.jinja_env.get_template(
+                "holdings_accounting.html"
+            ).render(
+                stats_table_data=stats_rows,
+                holdings_summary=holdings_summary,
+                guided_mode=True,
+                holdings_mode="reconcile",
+            )
+
+        self.assertIn("Step 2 of 4", declare_page)
+        self.assertIn("Declare Holdings", declare_page)
+        self.assertIn("Continue to Reconcile Gaps", declare_page)
+        self.assertIn("holdings-guided-asset-table", declare_page)
+        self.assertNotIn("Documented Activity Classification", declare_page)
+        self.assertNotIn("Step 4: Review Readiness", declare_page)
+
+        self.assertIn("Step 3 of 4", reconcile_page)
+        self.assertIn("Reconcile Gaps", reconcile_page)
+        self.assertIn("Open Guided Review Queue", reconcile_page)
+        self.assertIn("Documented Activity Classification", reconcile_page)
+        self.assertIn("Advanced gap details", reconcile_page)
+
     def test_import_page_renders_import_warning_workflow(self):
         app = create_app(config_dict["Debug"], selenium=True)
         app.config.update(WTF_CSRF_ENABLED=False)
@@ -225,6 +294,8 @@ class ImportAndExportTests(unittest.TestCase):
 
         self.assertIn('id="import_warning_workflow"', rendered_page)
         self.assertIn("Import warnings need review", rendered_page)
+        self.assertIn("First warning to review", rendered_page)
+        self.assertIn("Show all import warning rows", rendered_page)
         self.assertIn("coinbase.csv", rendered_page)
         self.assertIn("Suggested next action", rendered_page)
 

@@ -52,6 +52,7 @@ def _home_progress(transactions):
             "title": "Import",
             "description": "Load exchange CSVs or demo data.",
             "url": url_for("import_transactions_blueprint.import_wizard", guided=1),
+            "action_label": "Open Import",
             "state": "current",
             "status": "Current",
             "detail": "Start by importing source files.",
@@ -60,16 +61,18 @@ def _home_progress(transactions):
             "number": 2,
             "title": "Declare Holdings",
             "description": "Enter what you actually hold today.",
-            "url": url_for("holdings_accounting_blueprint.holdings_accounting"),
+            "url": url_for("holdings_accounting_blueprint.holdings_accounting", guided=1, mode="declare"),
+            "action_label": "Declare Holdings",
             "state": "waiting",
             "status": "Waiting",
             "detail": "Import transactions first.",
         },
         {
             "number": 3,
-            "title": "Reconcile",
+            "title": "Reconcile Gaps",
             "description": "Review missing activity before using reports.",
-            "url": url_for("holdings_accounting_blueprint.holdings_accounting"),
+            "url": url_for("holdings_accounting_blueprint.holdings_accounting", guided=1, mode="reconcile"),
+            "action_label": "Reconcile Gaps",
             "state": "waiting",
             "status": "Waiting",
             "detail": "Declare holdings before reconciling.",
@@ -78,7 +81,8 @@ def _home_progress(transactions):
             "number": 4,
             "title": "Review & Export",
             "description": "Review readiness, model sales, and generate outputs.",
-            "url": url_for("export_blueprint.index"),
+            "url": url_for("export_blueprint.index", guided=1),
+            "action_label": "Open Reports & Export",
             "state": "waiting",
             "status": "Waiting",
             "detail": "Resolve earlier stages first.",
@@ -92,6 +96,11 @@ def _home_progress(transactions):
         steps[0].update({
             "state": "review",
             "status": "Needs Review",
+            "url": url_for("import_transactions_blueprint.import_wizard", guided=1) + "#import_warning_workflow",
+            "action_label": (
+                f"Review {import_warning_count} import "
+                f"{_plural(import_warning_count, 'warning')}"
+            ),
             "detail": (
                 f"{import_warning_count} import "
                 f"{_plural(import_warning_count, 'warning')} need review."
@@ -115,6 +124,8 @@ def _home_progress(transactions):
         steps[1].update({
             "state": "current",
             "status": "Current",
+            "url": url_for("holdings_accounting_blueprint.holdings_accounting", guided=1, mode="declare"),
+            "action_label": "Enter holdings",
             "detail": (
                 f"{count} {_plural(count, 'asset')} still "
                 "need declared holdings."
@@ -133,6 +144,8 @@ def _home_progress(transactions):
         steps[2].update({
             "state": "review",
             "status": "Needs Review",
+            "url": url_for("holdings_accounting_blueprint.holdings_accounting", guided=1, mode="reconcile"),
+            "action_label": "Review reconciliation gaps",
             "detail": (
                 f"{review_count} {_plural(review_count, 'asset')} "
                 "need reconciliation review."
@@ -149,6 +162,8 @@ def _home_progress(transactions):
     steps[3].update({
         "state": "ready",
         "status": "Ready",
+        "url": url_for("export_blueprint.index", guided=1),
+        "action_label": "Review & Export",
         "detail": "Review reports and generate exports.",
     })
 
@@ -257,15 +272,9 @@ def _stage_context(progress, audit_readiness, selected_stage_number=None):
             "detail": current_step["detail"],
         }
     else:
-        action_url = (
-            selected_step["url"]
-            if selected_step["number"] == 1 and selected_step["number"] == current_step["number"]
-            else audit_readiness["primary_action"]["url"]
-            if selected_step["number"] == current_step["number"]
-            else selected_step["url"]
-        )
+        action_url = selected_step["url"]
         primary_action = {
-            "label": audit_readiness["primary_action"]["label"]
+            "label": selected_step.get("action_label")
             if selected_step["number"] == current_step["number"]
             else f"Open {selected_step['title']}",
             "url": action_url,

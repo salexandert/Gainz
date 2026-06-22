@@ -59,7 +59,7 @@ class HomeProgressTests(unittest.TestCase):
 
         self.assertEqual("current", step_named(progress, "Import")["state"])
         self.assertEqual("waiting", step_named(progress, "Declare Holdings")["state"])
-        self.assertEqual("waiting", step_named(progress, "Reconcile")["state"])
+        self.assertEqual("waiting", step_named(progress, "Reconcile Gaps")["state"])
         self.assertEqual("waiting", step_named(progress, "Review & Export")["state"])
 
     def test_home_progress_moves_to_holdings_after_clean_import(self):
@@ -103,7 +103,7 @@ class HomeProgressTests(unittest.TestCase):
         progress = progress_for(transactions)
 
         self.assertEqual("complete", step_named(progress, "Declare Holdings")["state"])
-        self.assertEqual("review", step_named(progress, "Reconcile")["state"])
+        self.assertEqual("review", step_named(progress, "Reconcile Gaps")["state"])
         self.assertEqual("waiting", step_named(progress, "Review & Export")["state"])
 
     def test_home_progress_marks_export_ready_after_reconciliation(self):
@@ -123,7 +123,7 @@ class HomeProgressTests(unittest.TestCase):
 
         self.assertEqual("complete", step_named(progress, "Import")["state"])
         self.assertEqual("complete", step_named(progress, "Declare Holdings")["state"])
-        self.assertEqual("complete", step_named(progress, "Reconcile")["state"])
+        self.assertEqual("complete", step_named(progress, "Reconcile Gaps")["state"])
         self.assertEqual("ready", step_named(progress, "Review & Export")["state"])
 
     def test_home_page_keeps_simple_cards_and_only_marks_completed_steps(self):
@@ -161,10 +161,59 @@ class HomeProgressTests(unittest.TestCase):
 
         self.assertEqual("Import", context["selected_step"]["title"])
         self.assertFalse(context["is_future_step"])
-        self.assertEqual("Open import", context["primary_action"]["label"])
+        self.assertEqual("Open Import", context["primary_action"]["label"])
         self.assertEqual("/import_transactions/?guided=1", context["primary_action"]["url"])
         self.assertIsNone(context["next_stage"])
         self.assertTrue(context["next_stage_locked"])
+
+    def test_home_stage_context_routes_import_warnings_to_import_review(self):
+        transactions = empty_transactions()
+        transactions.transactions.append(
+            Buy(
+                symbol="BTC",
+                quantity=1,
+                time_stamp=datetime.datetime(2024, 1, 1),
+                usd_spot=100,
+                source="test.csv",
+            )
+        )
+        transactions.import_warnings = ["Skipped row 2 from test.csv: review needed."]
+        progress = progress_for(transactions)
+        audit_readiness = get_audit_readiness_summary(transactions)
+
+        with create_app(config_dict["Debug"], selenium=True).test_request_context("/home/"):
+            context = _stage_context(progress, audit_readiness)
+
+        self.assertEqual("Import", context["selected_step"]["title"])
+        self.assertEqual("Review 1 import warning", context["primary_action"]["label"])
+        self.assertEqual(
+            "/import_transactions/?guided=1#import_warning_workflow",
+            context["primary_action"]["url"],
+        )
+
+    def test_home_stage_context_routes_holdings_to_declare_mode(self):
+        transactions = empty_transactions()
+        transactions.transactions.append(
+            Buy(
+                symbol="BTC",
+                quantity=1,
+                time_stamp=datetime.datetime(2024, 1, 1),
+                usd_spot=100,
+                source="test.csv",
+            )
+        )
+        progress = progress_for(transactions)
+        audit_readiness = get_audit_readiness_summary(transactions)
+
+        with create_app(config_dict["Debug"], selenium=True).test_request_context("/home/"):
+            context = _stage_context(progress, audit_readiness)
+
+        self.assertEqual("Declare Holdings", context["selected_step"]["title"])
+        self.assertEqual("Enter holdings", context["primary_action"]["label"])
+        self.assertEqual(
+            "/holdings_accounting/?guided=1&mode=declare",
+            context["primary_action"]["url"],
+        )
 
     def test_home_stage_context_treats_future_stage_as_preview(self):
         transactions = empty_transactions()

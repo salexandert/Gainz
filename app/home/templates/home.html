@@ -177,8 +177,8 @@
               <p class="text-muted mb-2">Work these items from top to bottom to move toward export readiness.</p>
             </div>
             <div>
-              <a class="btn btn-sm btn-primary" href="{{ url_for('export_blueprint.review_queue') }}">Start guided review</a>
-              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('export_blueprint.index') }}">Open Reports & Export</a>
+              <a class="btn btn-sm btn-primary" href="{{ url_for('export_blueprint.review_queue', guided=1) }}">Start guided review</a>
+              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('export_blueprint.index', guided=1) }}">Open Reports & Export</a>
             </div>
           </div>
           <div class="audit-blocker-grid">
