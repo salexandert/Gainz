@@ -341,6 +341,18 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual("transactions.csv", result["warning_rows"][0]["source"])
         self.assertEqual("12", result["warning_rows"][0]["row"])
 
+    def test_usd_spot_import_warning_points_to_source_row_and_advanced_import(self):
+        warning_rows = import_warning_review_rows([
+            "Imported row 261 from cash_app_report_btc2019.csv with $0 USD spot price."
+        ])
+
+        self.assertEqual(1, len(warning_rows))
+        self.assertEqual("cash_app_report_btc2019.csv", warning_rows[0]["source"])
+        self.assertEqual("261", warning_rows[0]["row"])
+        self.assertIn("Open the source file and check row 261", warning_rows[0]["next_action"])
+        self.assertIn("USD spot/total USD value column", warning_rows[0]["next_action"])
+        self.assertIn("re-import using Advanced Import", warning_rows[0]["next_action"])
+
     def test_public_mapping_prompt_does_not_create_warning_rows(self):
         result = _public_import_result({
             "file_path": r"C:\private\uploads\cash_app_report.csv",

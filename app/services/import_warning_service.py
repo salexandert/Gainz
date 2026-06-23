@@ -176,17 +176,21 @@ def classify_import_warning(message, transactions=None):
     issue = detail or raw_message
     status = "Needs review"
     next_action = (
-        "Review the source row. If it should affect holdings or generated reports, "
-        "fix the CSV mapping, re-import the source, or add a source-backed manual transaction."
+        f"Open the source file and check row {row_number} plus the relevant mapped columns. "
+        "If the row or column mapping is wrong, remove this source and re-import using "
+        "Advanced Import. If it belongs in Gainz but the source cannot be fixed, add a "
+        "source-backed manual transaction."
     )
 
     if "$0 usd spot price" in lower_message or "usd spot price" in lower_message:
         issue = "$0 USD spot price"
         status = "Price review"
         next_action = (
-            "If the row has a USD value, remove this source and re-import with a mapped USD spot "
-            "price or total USD value column. If the row was truly zero-value, keep documentation "
-            "with the source file."
+            f"Open the source file and check row {row_number} and the USD spot/total USD value "
+            "column. If the row has a USD value or the wrong column was mapped, remove this "
+            "source and re-import using Advanced Import with the correct USD spot price or total "
+            "USD value column. If the row was truly zero-value, keep documentation with the "
+            "source file."
         )
     elif "unrecognized transaction type" in lower_message:
         type_match = UNRECOGNIZED_TYPE_RE.search(raw_message)
@@ -201,15 +205,16 @@ def classify_import_warning(message, transactions=None):
             )
         else:
             next_action = (
-                "Decide whether this row is a buy, sell, send, or receive. If it belongs in Gainz, "
-                "use column review or add a manual transaction with the source row as support."
+                f"Open the source file and check row {row_number} plus the type, asset, quantity, "
+                "and USD columns. If the row should be imported, remove this source and re-import "
+                "using Advanced Import, or add a source-backed manual transaction."
             )
     elif "could not identify required columns" in lower_message:
         issue = "Required columns were not identified"
         status = "Mapping needed"
         next_action = (
-            "Upload the file again with column review enabled, choose the header row, and map date, "
-            "type, asset, quantity, and USD value columns."
+            "Open the source file, confirm the header row and the date, type, asset, quantity, "
+            "and USD value columns, then re-import using Advanced Import."
         )
     elif "missing or non-crypto asset" in lower_message:
         issue = "Missing or non-crypto asset"

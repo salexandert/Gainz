@@ -246,7 +246,7 @@ function gainzParseImportWarning(warning) {
     var detail = raw;
     var issue = raw;
     var status = "Needs review";
-    var nextAction = "Review the source row. If it should affect holdings or generated reports, fix the CSV mapping, re-import the source, or add a source-backed manual transaction.";
+    var nextAction = "Open the source file and check row " + row + " plus the relevant mapped columns. If the row or column mapping is wrong, remove this source and re-import using Advanced Import. If it belongs in Gainz but the source cannot be fixed, add a source-backed manual transaction.";
 
     if (match) {
         source = match[3];
@@ -259,16 +259,16 @@ function gainzParseImportWarning(warning) {
     if (lower.indexOf("$0 usd spot price") !== -1 || lower.indexOf("usd spot price") !== -1) {
         issue = "$0 USD spot price";
         status = "Price review";
-        nextAction = "If the row has a USD value, remove this source and re-import with a mapped USD spot price or total USD value column. If it was truly zero-value, keep documentation with the source file.";
+        nextAction = "Open the source file and check row " + row + " and the USD spot/total USD value column. If the row has a USD value or the wrong column was mapped, remove this source and re-import using Advanced Import with the correct USD spot price or total USD value column. If the row was truly zero-value, keep documentation with the source file.";
     } else if (lower.indexOf("unrecognized transaction type") !== -1) {
         var typeMatch = raw.match(/unrecognized transaction type '([^']+)'/i);
         issue = "Unrecognized transaction type: " + (typeMatch ? typeMatch[1] : "unknown");
         status = "Classification review";
-        nextAction = "Decide whether this row is a buy, sell, send, or receive. If it belongs in Gainz, use column review or add a manual transaction with the source row as support.";
+        nextAction = "Open the source file and check row " + row + " plus the type, asset, quantity, and USD columns. If the row should be imported, remove this source and re-import using Advanced Import, or add a source-backed manual transaction.";
     } else if (lower.indexOf("could not identify required columns") !== -1) {
         issue = "Required columns were not identified";
         status = "Mapping needed";
-        nextAction = "Upload the file again with column review enabled, choose the header row, and map date, type, asset, quantity, and USD value columns.";
+        nextAction = "Open the source file, confirm the header row and the date, type, asset, quantity, and USD value columns, then re-import using Advanced Import.";
     } else if (lower.indexOf("could not parse this row") !== -1) {
         issue = "Could not parse row";
         status = "Row review";
