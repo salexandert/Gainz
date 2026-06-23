@@ -1587,16 +1587,114 @@ $(document).ready(function() {
         : (holdingsIsGuided && holdingsMode == 'reconcile' ? 'review' : 'all');
     holdingsApplySummaryFilter(initialHoldingsFilter, { skipScroll: true });
 
-    function holdingsRefreshBulkButtonText() {
-        var asset = String($('#bulk_primary_asset').val() || 'BTC').trim().toUpperCase() || 'BTC';
-        $('#bulk_primary_asset').val(asset);
-        $('#bulk_set_non_primary_zero_button').text('Set All Non-' + asset + ' Assets To 0');
+    function holdingsRefreshBulkRows() {
+        var rows = $('.bulk-holdings-row');
+        rows.find('.bulk-remove-holding-row').prop('disabled', rows.length <= 1);
+        $('#bulk_set_non_primary_zero_button').text('Save These Holdings And Set The Rest To 0');
     }
 
-    $('#bulk_primary_asset').on('input blur', holdingsRefreshBulkButtonText);
-    holdingsRefreshBulkButtonText();
+    function holdingsNewBulkRow(index) {
+        return $(
+            '<div class="bulk-holdings-row">' +
+                '<div>' +
+                    '<label for="bulk_holding_asset_' + index + '">Asset</label>' +
+                    '<input id="bulk_holding_asset_' + index + '" class="form-control text-uppercase bulk-holdings-asset" placeholder="ETH">' +
+                '</div>' +
+                '<div>' +
+                    '<label for="bulk_holding_quantity_' + index + '">Current holdings</label>' +
+                    '<input id="bulk_holding_quantity_' + index + '" type="number" step="any" min="0" class="form-control bulk-holdings-quantity" placeholder="0.00000000">' +
+                '</div>' +
+                '<div class="bulk-holdings-row-actions">' +
+                    '<button type="button" class="btn btn-outline-secondary bulk-remove-holding-row">Remove</button>' +
+                '</div>' +
+            '</div>'
+        );
+    }
 
-    function holdingsSaveBulkHoldings(primaryAsset, primaryQuantity) {
+    function holdingsCollectBulkRows() {
+        var rows = [];
+        var seenAssets = {};
+        var error = '';
+
+        $('.bulk-holdings-row').each(function(index) {
+            var rowNumber = index + 1;
+            var assetInput = $(this).find('.bulk-holdings-asset');
+            var quantityInput = $(this).find('.bulk-holdings-quantity');
+            var asset = String(assetInput.val() || '').trim().toUpperCase();
+            var quantity = quantityInput.val();
+
+            assetInput.val(asset);
+
+            if (!asset && !quantity) {
+                return;
+            }
+
+            if (!asset) {
+                error = 'Enter an asset symbol for row ' + rowNumber + '.';
+                return false;
+            }
+
+            if (!quantity && quantity !== '0') {
+                error = 'Enter the current holdings quantity for ' + asset + '.';
+                return false;
+            }
+
+            if (seenAssets[asset]) {
+                error = asset + ' appears more than once. Combine duplicate rows before saving.';
+                return false;
+            }
+
+            var parsedQuantity = Number(quantity);
+            if (!Number.isFinite(parsedQuantity) || parsedQuantity < 0) {
+                error = 'Enter a valid non-negative current holdings quantity for ' + asset + '.';
+                return false;
+            }
+
+            seenAssets[asset] = true;
+            rows.push({
+                asset: asset,
+                quantity: quantity
+            });
+        });
+
+        if (!error && rows.length == 0) {
+            error = 'Enter at least one current holding before saving.';
+        }
+
+        return {
+            rows: rows,
+            error: error
+        };
+    }
+
+    function holdingsDescribeBulkRows(rows) {
+        return rows.map(function(row) {
+            return row.asset + ' ' + row.quantity;
+        }).join(', ');
+    }
+
+    $('#bulk_add_holding_row_button').click(function() {
+        var index = $('.bulk-holdings-row').length + 1;
+        $('#bulk_holdings_rows').append(holdingsNewBulkRow(index));
+        holdingsRefreshBulkRows();
+        $('#bulk_holdings_rows .bulk-holdings-row:last .bulk-holdings-asset').focus();
+    });
+
+    $('#bulk_holdings_rows').on('click', '.bulk-remove-holding-row', function() {
+        if ($('.bulk-holdings-row').length <= 1) {
+            return;
+        }
+        $(this).closest('.bulk-holdings-row').remove();
+        holdingsRefreshBulkRows();
+    });
+
+    $('#bulk_holdings_rows').on('blur', '.bulk-holdings-asset', function() {
+        $(this).val(String($(this).val() || '').trim().toUpperCase());
+    });
+
+    holdingsRefreshBulkRows();
+
+    function holdingsSaveBulkHoldings(holdingsRows) {
         var button = $('#bulk_set_non_primary_zero_button');
         var startedAt = Date.now();
         button.prop('disabled', true).text('Saving revision...');
@@ -1611,20 +1709,19 @@ $(document).ready(function() {
             type: "POST",
             url: "/holdings_accounting/bulk_holdings",
             data: JSON.stringify({
-                'primary_asset': primaryAsset,
-                'primary_quantity': primaryQuantity
+                'holdings': holdingsRows
             }),
             dataType: "json",
             contentType: 'application/json',
             success: function(data) {
                 holdingsRowsSet(data['stats_table_rows']);
                 holdingsSetSummary(data['holdings_summary']);
-                var updatedRow = holdingsSelectAsset(primaryAsset);
+                var updatedRow = holdingsSelectAsset(data['primary_asset']);
                 holdingsLoadRow(updatedRow);
                 $('#bulk_holdings_message')
                     .removeClass('alert-info alert-warning')
                     .addClass('alert-success')
-                    .text(data['message'] + ' Confirmation: ' + primaryAsset + ' ' + data['primary_quantity'] + ', all others 0. Completed in ' + Math.max(1, Math.round((Date.now() - startedAt) / 1000)) + ' second(s).')
+                    .text(data['message'] + ' Completed in ' + Math.max(1, Math.round((Date.now() - startedAt) / 1000)) + ' second(s).')
                     .show();
                 holdingsScrollTo('#bulk_holdings_message');
             },
@@ -1640,25 +1737,27 @@ $(document).ready(function() {
                     .show();
             },
             complete: function() {
-                holdingsRefreshBulkButtonText();
+                holdingsRefreshBulkRows();
                 button.prop('disabled', false);
             },
         });
     }
 
     $('#bulk_set_non_primary_zero_button').click(function() {
-        var primaryAsset = String($('#bulk_primary_asset').val() || 'BTC').trim().toUpperCase() || 'BTC';
-        var primaryQuantity = $('#bulk_primary_quantity').val();
+        var collected = holdingsCollectBulkRows();
 
-        if (!primaryQuantity && primaryQuantity !== '0') {
-            alert('Enter the current holdings quantity for ' + primaryAsset + '.');
+        if (collected.error) {
+            $('#bulk_holdings_message')
+                .removeClass('alert-info alert-success')
+                .addClass('alert-warning')
+                .text(collected.error)
+                .show();
             return;
         }
 
-        $('#bulk_holdings_confirm_text').text('Save current holdings as ' + primaryAsset + ' ' + primaryQuantity + ' and set every other tracked asset to 0?');
+        $('#bulk_holdings_confirm_text').text('Save current holdings as ' + holdingsDescribeBulkRows(collected.rows) + ' and set every other tracked asset to 0?');
         $('#bulk_holdings_confirm_panel')
-            .data('primary-asset', primaryAsset)
-            .data('primary-quantity', primaryQuantity)
+            .data('holdings-rows', collected.rows)
             .show();
         holdingsScrollTo('#bulk_holdings_confirm_panel');
     });
@@ -1668,10 +1767,7 @@ $(document).ready(function() {
     });
 
     $('#bulk_holdings_confirm_yes').click(function() {
-        holdingsSaveBulkHoldings(
-            $('#bulk_holdings_confirm_panel').data('primary-asset'),
-            $('#bulk_holdings_confirm_panel').data('primary-quantity')
-        );
+        holdingsSaveBulkHoldings($('#bulk_holdings_confirm_panel').data('holdings-rows') || []);
     });
 
     $("#auto_action_button").click(function(){

@@ -114,7 +114,7 @@ Gainz compares:
 
 If the status is `Needs Review`, look for missing buys, missing disposals, sends, receives, gifts, income, losses, conversions, or overlapping source files.
 
-If your records show one primary asset and every other tracked asset is currently zero, use **Bulk Current Holdings**. Enter the primary asset and amount, then let Gainz set all other tracked assets to zero in one revision. Review the confirmation before continuing.
+If your records show you currently hold only a few assets, use **Bulk Current Holdings**. Enter one row for each asset you still hold, add another row when needed, then let Gainz set every other tracked asset to zero in one revision. Review the confirmation before continuing.
 
 ![Gainz Reconcile holdings walkthrough]({{ '/assets/screenshots/gainz-holdings-accounting.png' | relative_url }})
 {: .screenshot-frame }

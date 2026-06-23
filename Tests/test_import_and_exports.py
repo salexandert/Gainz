@@ -265,6 +265,8 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("holdings-guided-card-grid", declare_page)
         self.assertIn("holdings-data-source-only", declare_page)
         self.assertIn("Confirm zero holdings", declare_page)
+        self.assertIn("Add Another Holding", declare_page)
+        self.assertIn("Save These Holdings And Set The Rest To 0", declare_page)
         self.assertNotIn("Documented Activity Classification", declare_page)
         self.assertNotIn("Step 4: Review Readiness", declare_page)
         self.assertNotIn("Step 3 Asset Workbench", declare_page)
@@ -1048,6 +1050,91 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual(0, transactions.get_holdings("ETH"))
             self.assertEqual(0, transactions.get_holdings("BCH"))
             self.assertEqual(["BCH", "ETH"], payload["zeroed_assets"])
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_bulk_holdings_accepts_multiple_current_holdings_and_zeroes_rest(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "demo"),
+            Buy("ETH", 2, datetime.datetime(2024, 1, 2), 50, "demo"),
+            Buy("BCH", 3, datetime.datetime(2024, 1, 3), 25, "demo"),
+            Buy("LTC", 4, datetime.datetime(2024, 1, 4), 10, "demo"),
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class RouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(RouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/holdings_accounting/bulk_holdings",
+                    json={
+                        "holdings": [
+                            {"asset": "BTC", "quantity": "0.5"},
+                            {"asset": "eth", "quantity": "1.25"},
+                        ],
+                    },
+                )
+
+            self.assertEqual(200, response.status_code)
+            payload = response.get_json()
+            self.assertEqual(
+                [
+                    {"asset": "BTC", "quantity": "0.5"},
+                    {"asset": "ETH", "quantity": "1.25"},
+                ],
+                payload["declared_holdings"],
+            )
+            self.assertEqual(0.5, transactions.get_holdings("BTC"))
+            self.assertEqual(1.25, transactions.get_holdings("ETH"))
+            self.assertEqual(0, transactions.get_holdings("BCH"))
+            self.assertEqual(0, transactions.get_holdings("LTC"))
+            self.assertEqual(["BCH", "LTC"], payload["zeroed_assets"])
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_bulk_holdings_rejects_duplicate_rows(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "demo"),
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class RouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(RouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/holdings_accounting/bulk_holdings",
+                    json={
+                        "holdings": [
+                            {"asset": "BTC", "quantity": "0.5"},
+                            {"asset": "btc", "quantity": "0.25"},
+                        ],
+                    },
+                )
+
+            self.assertEqual(400, response.status_code)
+            self.assertIn("BTC appears more than once", response.get_json()["message"])
 
             with app.app_context():
                 db.drop_all()

@@ -95,19 +95,75 @@ def _holdings_update_payload(transactions, asset, message, links_created=0, fail
     }
 
 
-def _holdings_bulk_payload(transactions, primary_asset, primary_quantity, zeroed_assets):
+def _holdings_bulk_payload(transactions, declared_holdings, zeroed_assets):
     stats_table_data = get_stats_table_data(transactions)
+    holdings_text = ", ".join(
+        f"{row['asset']} {format_quantity(row['quantity'])}" for row in declared_holdings
+    )
+    primary = declared_holdings[0]
     return {
         "message": (
-            f"Saved current holdings: {primary_asset} {format_quantity(primary_quantity)}, "
+            f"Saved current holdings: {holdings_text}; "
             f"all other tracked assets 0."
         ),
-        "primary_asset": primary_asset,
-        "primary_quantity": format_quantity(primary_quantity),
+        "primary_asset": primary["asset"],
+        "primary_quantity": format_quantity(primary["quantity"]),
+        "declared_holdings": [
+            {
+                "asset": row["asset"],
+                "quantity": format_quantity(row["quantity"]),
+            }
+            for row in declared_holdings
+        ],
         "zeroed_assets": zeroed_assets,
         "stats_table_rows": _holdings_stats_rows(stats_table_data),
         "holdings_summary": _holdings_summary(transactions),
     }
+
+
+def _bulk_holdings_from_payload(payload):
+    rows = payload.get("holdings")
+    if not isinstance(rows, list):
+        rows = [
+            {
+                "asset": payload.get("primary_asset") or "BTC",
+                "quantity": payload.get("primary_quantity") or 0,
+            }
+        ]
+
+    holdings = []
+    seen_assets = set()
+    for index, row in enumerate(rows, start=1):
+        if not isinstance(row, dict):
+            return None, f"Holdings row {index} is not valid."
+
+        asset = str(row.get("asset") or "").strip().upper()
+        quantity_value = row.get("quantity")
+
+        if not asset and (quantity_value is None or str(quantity_value).strip() == ""):
+            continue
+
+        if not asset:
+            return None, f"Enter an asset symbol for holdings row {index}."
+
+        try:
+            quantity = float(quantity_value)
+        except (TypeError, ValueError):
+            return None, f"Enter a valid current holdings quantity for {asset}."
+
+        if quantity < 0:
+            return None, f"Current holdings for {asset} cannot be negative."
+
+        if asset in seen_assets:
+            return None, f"{asset} appears more than once. Combine duplicate rows before saving."
+
+        seen_assets.add(asset)
+        holdings.append({"asset": asset, "quantity": quantity})
+
+    if not holdings:
+        return None, "Enter at least one current holding before saving."
+
+    return holdings, None
 
 
 @blueprint.route('/', methods=['POST', 'GET'])
@@ -222,37 +278,33 @@ def holdings_info():
 @login_required
 def bulk_holdings():
     payload = request.get_json(silent=True) or {}
-    primary_asset = str(payload.get("primary_asset") or "BTC").strip().upper()
-
-    try:
-        primary_quantity = float(payload.get("primary_quantity") or 0)
-    except (TypeError, ValueError):
-        return jsonify({"message": "Enter a valid current holdings quantity."}), 400
-
-    if primary_quantity < 0:
-        return jsonify({"message": "Current holdings cannot be negative."}), 400
+    declared_holdings, error = _bulk_holdings_from_payload(payload)
+    if error:
+        return jsonify({"message": error}), 400
 
     transactions = current_app.config['transactions']
     assets = _all_crypto_assets(transactions)
-    if primary_asset not in assets:
-        assets.append(primary_asset)
+    declared_by_asset = {row["asset"]: row["quantity"] for row in declared_holdings}
+    for asset in declared_by_asset:
+        if asset not in assets:
+            assets.append(asset)
         assets.sort()
 
     zeroed_assets = []
     for asset in assets:
-        if asset == primary_asset:
-            continue
-        transactions.set_holdings(asset, 0)
-        zeroed_assets.append(asset)
+        if asset in declared_by_asset:
+            transactions.set_holdings(asset, declared_by_asset[asset])
+        else:
+            transactions.set_holdings(asset, 0)
+            zeroed_assets.append(asset)
 
-    transactions.set_holdings(primary_asset, primary_quantity)
-    transactions.save(description=f"Bulk holdings update: {primary_asset} plus zero balances")
+    declared_names = ", ".join(row["asset"] for row in declared_holdings)
+    transactions.save(description=f"Bulk holdings update: {declared_names} plus zero balances")
 
     return jsonify(
         _holdings_bulk_payload(
             transactions,
-            primary_asset,
-            primary_quantity,
+            declared_holdings,
             zeroed_assets,
         )
     )

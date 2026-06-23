@@ -1535,6 +1535,38 @@
     margin: 12px 0;
 }
 
+.bulk-holdings-rows {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.bulk-holdings-row {
+    align-items: end;
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(160px, 240px) minmax(220px, 360px) auto;
+}
+
+.bulk-holdings-row label {
+    color: #8b929a;
+    display: block;
+    margin-bottom: 6px;
+}
+
+.bulk-holdings-row-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.bulk-holdings-actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
 .gainz-confirm-dialog {
     align-items: center;
     background: rgba(37, 36, 34, 0.42);
@@ -1633,6 +1665,14 @@
 }
 
 @media (max-width: 768px) {
+    .bulk-holdings-row {
+        grid-template-columns: 1fr;
+    }
+
+    .bulk-holdings-row-actions {
+        align-items: flex-start;
+    }
+
     .guided-review-grid {
         grid-template-columns: 1fr;
     }

@@ -134,7 +134,7 @@
     <div class="card">
       <div class="card-body">
         <h4 class="card-title">Bulk Current Holdings</h4>
-        <p class="card-category">Use this when your current records show one primary holding and every other tracked asset is zero.</p>
+        <p class="card-category">Enter the assets you currently hold. Gainz will set every other tracked asset to zero in one revision.</p>
         <div id="bulk_holdings_message" class="alert alert-info" role="status" style="display: none;"></div>
         <div id="bulk_holdings_confirm_panel" class="holdings-inline-confirm alert alert-warning" role="dialog" aria-modal="false" style="display: none;">
           <strong>Confirm bulk holdings update</strong>
@@ -142,22 +142,28 @@
           <button type="button" id="bulk_holdings_confirm_yes" class="btn btn-warning btn-sm">Save Bulk Holdings</button>
           <button type="button" id="bulk_holdings_confirm_no" class="btn btn-outline-secondary btn-sm">Cancel</button>
         </div>
-        <div class="form-group row align-items-end">
-          <div class="col-md-3 col-sm-4">
-            <label for="bulk_primary_asset">Primary asset</label>
-            <input id="bulk_primary_asset" class="form-control text-uppercase" value="BTC">
-          </div>
-          <div class="col-md-4 col-sm-5">
-            <label for="bulk_primary_quantity">Current holdings</label>
-            <input id="bulk_primary_quantity" type="number" step="any" min="0" class="form-control" placeholder="0.00000000">
-          </div>
-          <div class="col-md-5 col-sm-12">
-            <button type="button" id="bulk_set_non_primary_zero_button" class="btn btn-primary">
-              Set All Non-BTC Assets To 0
-            </button>
+        <div id="bulk_holdings_rows" class="bulk-holdings-rows">
+          <div class="bulk-holdings-row">
+            <div>
+              <label for="bulk_holding_asset_1">Asset</label>
+              <input id="bulk_holding_asset_1" class="form-control text-uppercase bulk-holdings-asset" value="BTC" placeholder="BTC">
+            </div>
+            <div>
+              <label for="bulk_holding_quantity_1">Current holdings</label>
+              <input id="bulk_holding_quantity_1" type="number" step="any" min="0" class="form-control bulk-holdings-quantity" placeholder="0.00000000">
+            </div>
+            <div class="bulk-holdings-row-actions">
+              <button type="button" class="btn btn-outline-secondary bulk-remove-holding-row">Remove</button>
+            </div>
           </div>
         </div>
-        <p class="text-muted mb-0">Gainz will save one revision showing the primary asset amount and zero declared holdings for every other imported asset.</p>
+        <div class="bulk-holdings-actions">
+          <button type="button" id="bulk_add_holding_row_button" class="btn btn-outline-primary">Add Another Holding</button>
+          <button type="button" id="bulk_set_non_primary_zero_button" class="btn btn-primary">
+            Save These Holdings And Set The Rest To 0
+          </button>
+        </div>
+        <p class="text-muted mb-0">Example: enter BTC and ETH if those are the only assets you still hold. Gainz saves those amounts and records zero holdings for every other imported asset.</p>
       </div>
     </div>
   </div>
