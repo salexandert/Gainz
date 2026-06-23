@@ -199,8 +199,8 @@
           </div>
           <div class="alert alert-info" role="alert">
             <strong>Need to edit declared holdings?</strong>
-            Use the guided Holdings & Accounting walkthrough to enter or change current holdings.
-            <a class="btn btn-sm btn-outline-primary ml-2" href="/holdings_accounting">Open Holdings & Accounting</a>
+            Use the guided Declare Holdings step to enter or change current holdings.
+            <a class="btn btn-sm btn-outline-primary ml-2" href="{{ url_for('holdings_accounting_blueprint.holdings_accounting', guided=1, mode='declare') }}">Open Declare Holdings</a>
           </div>
           <div class="card card-plain">
             <div class="card-header" role="tab" id="headingSelectedHoldings">

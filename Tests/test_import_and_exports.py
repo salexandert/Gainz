@@ -1234,7 +1234,7 @@ class ImportAndExportTests(unittest.TestCase):
             )
             basis_group = next(group for group in readiness["blocker_groups"] if group["key"] == "missing_basis")
             self.assertEqual("Needs research", basis_group["status"])
-            self.assertEqual("/holdings_accounting/", basis_group["action_url"])
+            self.assertEqual("/holdings_accounting/?guided=1&mode=reconcile", basis_group["action_url"])
 
             with app.app_context():
                 db.drop_all()
@@ -1528,7 +1528,7 @@ class ImportAndExportTests(unittest.TestCase):
             app.config["transactions"] = transactions
 
             with app.test_client() as client:
-                response = client.get("/export/review_queue")
+                response = client.get("/export/review_queue?guided=1")
 
             self.assertEqual(200, response.status_code)
             self.assertIn(b"Guided Review Queue", response.data)
@@ -1538,7 +1538,8 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertIn(b"What Gainz Does Not Know", response.data)
             self.assertIn(b"Safe Outcomes", response.data)
             self.assertIn(b"It is valid to choose", response.data)
-            self.assertIn(b"Return to full work order", response.data)
+            self.assertIn(b"Return to Reports & Export", response.data)
+            self.assertIn(b"/export/?guided=1", response.data)
 
             readiness = get_audit_readiness_summary(transactions)
             rows = [
@@ -1562,6 +1563,7 @@ class ImportAndExportTests(unittest.TestCase):
 
             self.assertEqual(200, save_response.status_code)
             self.assertIn(b"All Queue Items Reviewed", save_response.data)
+            self.assertIn(b"/export/?guided=1#packet_preview", save_response.data)
             self.assertIn(b"Generate or refresh the packet", save_response.data)
             record = transactions.get_work_order_review(item_id)
             self.assertEqual("needs_research", record["decision"])

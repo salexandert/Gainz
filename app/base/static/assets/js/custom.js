@@ -17,7 +17,7 @@ function gainzFormatImportResult(result, fileName) {
     if (warnings.length > 0) {
         message += " Review " + warnings.length + " warning(s) below before relying on generated reports.";
     } else {
-        message += " Next: import more files, then run Auto Link or open Holdings & Accounting.";
+        message += " Next: import more files, then continue to Declare Holdings.";
     }
 
     return message;
@@ -810,7 +810,7 @@ $(document).ready(function () {
     });
 });
 
-// Holdings & Accounting
+// Holdings reconciliation
 $(document).ready(function() {
     if ($('#eh_stats_datatable').length == 0) {
         return;
@@ -1238,11 +1238,76 @@ $(document).ready(function() {
             .text(message);
     }
 
+    function holdingsSetContextualActions(rowData, context) {
+        context = context || {};
+        var selected = !!rowData;
+        var soldUnlinked = context.soldUnlinked || 0;
+        var difference = context.difference;
+        var declaredHoldings = context.declaredHoldings;
+        var tolerance = 0.00000001;
+        var actionButtons = $('#holdings_run_fifo_button, #holdings_leave_basis_unresolved_button, #sends_to_sells_button, #classify_sends_fifo_button, #buys_to_lost_button');
+
+        actionButtons
+            .prop('disabled', true)
+            .hide();
+        $('#convert_quantity').prop('disabled', !selected);
+        $('#basis_review_note').prop('disabled', !selected);
+
+        if (!selected) {
+            $('#holdings_contextual_action_hint')
+                .removeClass('alert-success alert-warning alert-info')
+                .addClass('alert-light')
+                .text('Pick a gap to see the supported actions for that exact issue.');
+            return;
+        }
+
+        if (declaredHoldings === null) {
+            $('#holdings_contextual_action_hint')
+                .removeClass('alert-success alert-warning alert-light')
+                .addClass('alert-info')
+                .text('Declare current holdings first. Gainz needs that before it can decide whether this asset has a real gap.');
+            return;
+        }
+
+        if (soldUnlinked > tolerance) {
+            $('#holdings_run_fifo_button, #holdings_leave_basis_unresolved_button').prop('disabled', false).show();
+            $('#holdings_contextual_action_hint')
+                .removeClass('alert-success alert-light alert-info')
+                .addClass('alert-warning')
+                .text('This asset has sales without complete basis. Start with FIFO Auto Link, or leave missing basis as needs research if records are not available yet.');
+            return;
+        }
+
+        if (difference !== null && Math.abs(difference) > tolerance) {
+            $('#holdings_leave_basis_unresolved_button').prop('disabled', false).show();
+            if (difference > 0) {
+                $('#sends_to_sells_button, #classify_sends_fifo_button').prop('disabled', false).show();
+                $('#holdings_contextual_action_hint')
+                    .removeClass('alert-success alert-light alert-info')
+                    .addClass('alert-warning')
+                    .text('Imported buys/sells imply more than you declared. Review sends or missing disposals; only classify documented sends when records support it.');
+            } else {
+                $('#buys_to_lost_button').prop('disabled', false).show();
+                $('#holdings_contextual_action_hint')
+                    .removeClass('alert-success alert-light alert-info')
+                    .addClass('alert-warning')
+                    .text('Declared holdings are higher than imported activity explains. Look for missing acquisitions, income, gifts, or transfer records; document uncertainty if needed.');
+            }
+            return;
+        }
+
+        $('#holdings_contextual_action_hint')
+            .removeClass('alert-warning alert-light alert-info')
+            .addClass('alert-success')
+            .text('This asset is currently verified in Gainz. Move to the next gap or open Reports & Export.');
+    }
+
     function holdingsRenderReadiness(rowData, precheckData) {
         if (!rowData) {
             $('#holdings_readiness_asset, #holdings_readiness_holdings, #holdings_readiness_unlinked, #holdings_readiness_difference').text('--');
             $('#holdings_run_fifo_button').prop('disabled', true).text('Run FIFO Auto Link for Selected Asset');
             $('#holdings_leave_basis_unresolved_button').prop('disabled', true);
+            holdingsSetContextualActions(null);
             holdingsSetReadinessBadge('Select asset');
             holdingsSetReadinessMessage('Select an asset to see the next review step.', 'info');
             return;
@@ -1263,6 +1328,11 @@ $(document).ready(function() {
         $('#holdings_readiness_difference').text(difference === null ? '--' : holdingsFormatQuantity(difference));
         $('#holdings_run_fifo_button').prop('disabled', soldUnlinked <= tolerance).text('Run FIFO Auto Link for Selected Asset');
         $('#holdings_leave_basis_unresolved_button').prop('disabled', soldUnlinked <= tolerance);
+        holdingsSetContextualActions(rowData, {
+            soldUnlinked: soldUnlinked,
+            difference: difference,
+            declaredHoldings: declaredHoldings
+        });
 
         if (declaredHoldings === null) {
             holdingsSetReadinessBadge('Needs declared holdings');
@@ -1587,6 +1657,46 @@ $(document).ready(function() {
         : (holdingsIsGuided && holdingsMode == 'reconcile' ? 'review' : 'all');
     holdingsApplySummaryFilter(initialHoldingsFilter, { skipScroll: true });
 
+    function holdingsAutoAdvanceAfterDeclare(savedAsset) {
+        if (!holdingsIsGuided || holdingsMode != 'declare') {
+            return false;
+        }
+
+        activeHoldingsFilter = 'needs';
+        table.search('').draw();
+        var remainingRows = [];
+        table.rows().every(function() {
+            var rowData = this.data();
+            if (rowData && rowData[0] != savedAsset && holdingsRowStatus(rowData) == 'needs') {
+                remainingRows.push(rowData);
+            }
+        });
+
+        if (remainingRows.length > 0) {
+            var nextRow = remainingRows[0];
+            holdingsSelectAsset(nextRow[0]);
+            holdingsLoadRow(nextRow);
+            $('#holdings_save_message')
+                .removeClass('alert-warning')
+                .addClass('alert-success')
+                .text('Declared holdings for ' + savedAsset + ' saved. Next: ' + nextRow[0] + ' is ready for holdings entry.')
+                .show();
+            holdingsScrollTo('#holdings_selected_asset');
+            return true;
+        }
+
+        table.rows().deselect();
+        holdingsLoadRow(null);
+        holdingsUpdateGuidedCards();
+        $('#holdings_guided_queue_empty')
+            .removeClass('alert-success')
+            .addClass('alert-info')
+            .html('All listed assets now have declared holdings. <a href="/holdings_accounting/?guided=1&amp;mode=reconcile">Continue to Reconcile Gaps</a>.')
+            .show();
+        holdingsScrollTo('#holdings_guided_queue');
+        return true;
+    }
+
     function holdingsRefreshBulkRows() {
         var rows = $('.bulk-holdings-row');
         rows.find('.bulk-remove-holding-row').prop('disabled', rows.length <= 1);
@@ -1850,6 +1960,7 @@ $(document).ready(function() {
                     .addClass('alert-success')
                     .text(data['message'] || 'Declared holdings saved.')
                     .show();
+                holdingsAutoAdvanceAfterDeclare(rowData[0]);
             },
             error: function () {
                 alert("Declared holdings could not be saved. Please try again.");

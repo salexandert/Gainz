@@ -927,7 +927,7 @@ def _audit_readiness_groups(
             "status-needs-declared-holdings",
             "No source transactions are loaded yet. Import exchange CSVs, try demo data, or add known manual rows.",
             "Open import",
-            "/import_transactions/",
+            "/import_transactions/?guided=1",
         ))
 
     holdings_assets = sorted(set(assets_needing_holdings + assets_with_mismatches))
@@ -953,7 +953,7 @@ def _audit_readiness_groups(
             "status-needs-review",
             detail,
             "Enter holdings" if assets_needing_holdings else "Open reconcile",
-            "/holdings_accounting/",
+            "/holdings_accounting/?guided=1&mode=declare" if assets_needing_holdings else "/holdings_accounting/?guided=1&mode=reconcile",
         ))
 
     if unresolved_warning_rows:
@@ -966,7 +966,7 @@ def _audit_readiness_groups(
             "status-unlinked-sales",
             warning_state["detail"],
             "Review warnings",
-            "/import_transactions/#import_warning_workflow",
+            "/import_transactions/?guided=1#import_warning_workflow",
             severity="warning",
         ))
 
@@ -1006,7 +1006,7 @@ def _audit_readiness_groups(
             status_class,
             detail,
             "Review basis",
-            "/holdings_accounting/",
+            "/holdings_accounting/?guided=1&mode=reconcile",
         ))
 
     if source_overlap_rows:
@@ -1018,7 +1018,7 @@ def _audit_readiness_groups(
             "status-unlinked-sales",
             "Some source files look like they may cover the same activity. Review before relying on totals.",
             "Review sources",
-            "/import_transactions/#source_overlap_workflow",
+            "/import_transactions/?guided=1#source_overlap_workflow",
             severity="warning",
         ))
 
@@ -1034,7 +1034,7 @@ def _audit_readiness_groups(
             "status-needs-review",
             "Sells exist, but linked Form 8949-style rows cannot be generated yet. Run FIFO or review missing basis.",
             "Run FIFO",
-            "/auto_link/",
+            "/holdings_accounting/?guided=1&mode=reconcile",
         ))
 
     if filed_total_records:

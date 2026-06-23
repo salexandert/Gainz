@@ -189,7 +189,7 @@ def _work_order_related_url(row):
         return url_for("import_transactions_blueprint.import_wizard", guided=1) + "#import_warning_workflow"
     if blocker_type == "Tax evidence review":
         return url_for("tax_filing_review_blueprint.index")
-    return url_for("export_blueprint.index")
+    return url_for("export_blueprint.index", guided=1)
 
 
 def _review_queue_context(transactions, item_id=""):
@@ -414,7 +414,7 @@ def review_queue_save():
     cpa_question = str(request.form.get("cpa_question") or "").strip()
 
     if not item_id or decision not in WORK_ORDER_REVIEW_DECISIONS:
-        return redirect(url_for('export_blueprint.review_queue', item_id=item_id, saved=0))
+        return redirect(url_for('export_blueprint.review_queue', guided=1, item_id=item_id, saved=0))
 
     transactions.set_work_order_review(
         item_id,
@@ -424,7 +424,7 @@ def review_queue_save():
     )
     transactions.save(description=f"Updated review queue item: {WORK_ORDER_REVIEW_DECISIONS[decision]}")
 
-    return redirect(url_for('export_blueprint.review_queue', saved=1))
+    return redirect(url_for('export_blueprint.review_queue', guided=1, saved=1))
 
 
 @blueprint.route('/packet_preview.json', methods=['GET', 'POST'])

@@ -21,7 +21,7 @@
               dashboard readiness state, and generated audit packet files.
             </p>
           </div>
-          <a class="btn btn-outline-primary btn-round" href="{{ url_for('export_blueprint.index') }}">Back to Reports & Export</a>
+          <a class="btn btn-outline-primary btn-round" href="{{ url_for('export_blueprint.index', guided=1) }}">Back to Reports & Export</a>
         </div>
         {% if request.args.get("saved") == "1" %}
         <div class="alert alert-success mt-3" role="status">
@@ -183,9 +183,9 @@
           </div>
           <div class="guided-review-secondary-actions">
             {% if next_item_id %}
-            <a class="btn btn-link" href="{{ url_for('export_blueprint.review_queue', item_id=next_item_id) }}">Skip for now</a>
+            <a class="btn btn-link" href="{{ url_for('export_blueprint.review_queue', guided=1, item_id=next_item_id) }}">Skip for now</a>
             {% endif %}
-            <a class="btn btn-link" href="{{ url_for('export_blueprint.index') }}">Return to full work order</a>
+            <a class="btn btn-link" href="{{ url_for('export_blueprint.index', guided=1) }}">Return to Reports & Export</a>
           </div>
         </form>
       </div>
@@ -225,7 +225,7 @@
         </p>
         {% endif %}
         <div class="packet-success-actions">
-          <a class="btn btn-primary btn-round" href="{{ url_for('export_blueprint.index') }}#packet_preview">Review packet preview</a>
+          <a class="btn btn-primary btn-round" href="{{ url_for('export_blueprint.index', guided=1) }}#packet_preview">Review packet preview</a>
           <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index') }}">Back to Dashboard</a>
         </div>
       </div>

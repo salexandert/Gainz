@@ -21,7 +21,7 @@
               Draft output preserves unresolved review items for discussion and documentation.
             </p>
           </div>
-          <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index') }}">Back to Dashboard</a>
+          <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index', stage=4) if request.args.get('guided') else url_for('home_blueprint.index') }}">Back to Dashboard</a>
         </div>
       </div>
     </div>

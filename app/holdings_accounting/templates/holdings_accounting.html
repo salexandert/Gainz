@@ -88,8 +88,8 @@
             <div>
               <h5>Import what you know</h5>
               <p>Start with exchange CSVs and any manual transactions you already know about. Transfers do not need perfect wallet mapping; Gainz uses one universal wallet for basis.</p>
-              <a class="btn btn-sm btn-outline-primary" href="/import_transactions/">Import CSVs</a>
-              <a class="btn btn-sm btn-outline-secondary" href="/import_transactions/#manual-transactions">Add manual transactions</a>
+              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('import_transactions_blueprint.import_wizard') }}">Import CSVs</a>
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('import_transactions_blueprint.import_wizard') }}#manual-transactions">Add manual transactions</a>
             </div>
           </div>
           <div class="holdings-step">
@@ -493,6 +493,9 @@
 
         <div id="holdings_readiness_message" class="alert alert-info" role="status">
           Select an asset to see the next review step.
+        </div>
+        <div id="holdings_contextual_action_hint" class="alert alert-light" role="status">
+          Pick a gap to see the supported actions for that exact issue.
         </div>
 
         <div class="holdings-readiness-actions">

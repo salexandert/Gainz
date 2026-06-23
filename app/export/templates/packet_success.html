@@ -110,8 +110,8 @@
           <form method="POST" action="{{ url_for('export_blueprint.open_path') }}">
             <button type="submit" class="btn btn-outline-primary btn-round">Open README_FIRST</button>
           </form>
-          <a class="btn btn-outline-primary btn-round" href="{{ url_for('export_blueprint.review_queue') }}">Open Guided Review Queue</a>
-          <a class="btn btn-outline-primary btn-round" href="{{ url_for('export_blueprint.index') }}">Back to Reports & Export</a>
+          <a class="btn btn-outline-primary btn-round" href="{{ url_for('export_blueprint.review_queue', guided=1) }}">Open Guided Review Queue</a>
+          <a class="btn btn-outline-primary btn-round" href="{{ url_for('export_blueprint.index', guided=1) }}">Back to Reports & Export</a>
           <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index') }}">Back to Dashboard</a>
         </div>
         <textarea id="cpa_summary_copy" class="gainz-copy-source" readonly>{{ packet.cpa_summary }}</textarea>
