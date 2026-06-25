@@ -267,6 +267,7 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("Confirm zero holdings", declare_page)
         self.assertIn("Add Another Holding", declare_page)
         self.assertIn("Save These Holdings And Set The Rest To 0", declare_page)
+        self.assertIn("Save Declared Holdings", declare_page)
         self.assertNotIn("Documented Activity Classification", declare_page)
         self.assertNotIn("Step 4: Review Readiness", declare_page)
         self.assertNotIn("Step 3 Asset Workbench", declare_page)
@@ -278,6 +279,9 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("Current Gap Actions", reconcile_page)
         self.assertIn("Documented Activity Classification", reconcile_page)
         self.assertIn("Advanced gap details", reconcile_page)
+        self.assertIn("Open Declare Holdings", reconcile_page)
+        self.assertNotIn("Save Declared Holdings", reconcile_page)
+        self.assertNotIn("Save 0 Holdings", reconcile_page)
 
     def test_import_page_renders_import_warning_workflow(self):
         app = create_app(config_dict["Debug"], selenium=True)
@@ -305,6 +309,10 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("Show all import warning rows", rendered_page)
         self.assertIn("coinbase.csv", rendered_page)
         self.assertIn("Suggested next action", rendered_page)
+        self.assertIn("Show source path", rendered_page)
+        self.assertIn("Open Advanced Import / Column Mapping", rendered_page)
+        self.assertIn("Remove this source and re-import", rendered_page)
+        self.assertIn("I do not know yet", rendered_page)
 
     def test_import_page_renders_column_review_workflow(self):
         app = create_app(config_dict["Debug"], selenium=True)

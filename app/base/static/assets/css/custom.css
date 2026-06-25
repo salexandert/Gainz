@@ -767,6 +767,16 @@
     min-width: 260px;
 }
 
+.import-warning-repair-actions {
+    margin: 8px 0;
+}
+
+.import-warning-source-path-display {
+    color: #252422;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
 .column-review-panel {
     color: #252422;
 }

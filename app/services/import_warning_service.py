@@ -29,6 +29,11 @@ IMPORT_WARNING_DECISIONS = {
         "status": "Needs review",
         "resolved": False,
     },
+    "unknown_needs_research": {
+        "label": "I do not know yet",
+        "status": "Needs research",
+        "resolved": False,
+    },
     "cleared_by_source_update": {
         "label": "Cleared by source update",
         "status": "Cleared",
@@ -251,6 +256,7 @@ def classify_import_warning(message, transactions=None):
         "asset": row_details.get("asset", ""),
         "quantity": row_details.get("quantity", ""),
         "notes": row_details.get("notes", ""),
+        "source_path": row_details.get("source_path", ""),
         "likely_category": _likely_category(issue, row_details),
         "issue": issue,
         "status": status,

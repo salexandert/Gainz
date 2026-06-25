@@ -219,6 +219,132 @@ function gainzRenderDataSources(summary) {
     });
 }
 
+function gainzOpenAdvancedImport() {
+    var advancedDetails = $("#advanced-import");
+    if (advancedDetails.length) {
+        advancedDetails.prop("open", true);
+    }
+
+    $("#import_review_columns_before_import").prop("checked", true);
+    $("#import_upload_result")
+        .removeClass("alert-danger alert-info alert-warning")
+        .addClass("alert-info")
+        .text("Advanced Import is ready. Upload the corrected CSV again, then choose the header row and map the columns before importing.")
+        .show();
+
+    var target = advancedDetails.length ? advancedDetails : $("#upload_csv_form");
+    if (target.length) {
+        $("html, body").animate({ scrollTop: target.offset().top - 90 }, 250);
+    }
+}
+
+function gainzImportWarningDecisionLabel(decision) {
+    return {
+        true_zero_value_transfer: "True zero-value transfer",
+        needs_manual_usd_value: "Needs manual USD value",
+        unknown_needs_research: "I do not know yet",
+        ignore_for_now: "Ignore for now",
+        note: "Add note"
+    }[decision] || "Save";
+}
+
+function gainzBuildImportWarningRepairActions(row) {
+    var wrapper = $('<div class="guided-review-secondary-actions import-warning-repair-actions" role="group" aria-label="Import warning repair actions"></div>');
+    var sourcePath = row.source_path || "";
+    var sourceName = row.source || "this source";
+
+    wrapper.append(
+        $('<button type="button" class="btn btn-sm btn-outline-secondary import-warning-source-path-button">Show source path</button>')
+            .data("source-path", sourcePath)
+            .data("source-name", sourceName)
+    );
+    wrapper.append(
+        $('<button type="button" class="btn btn-sm btn-outline-primary import-warning-open-advanced-button">Open Advanced Import / Column Mapping</button>')
+    );
+    wrapper.append(
+        $('<button type="button" class="btn btn-sm btn-outline-danger import-warning-remove-source-button">Remove this source and re-import</button>')
+            .data("source", sourcePath)
+            .data("source-name", sourceName)
+            .prop("disabled", !sourcePath)
+    );
+
+    return wrapper;
+}
+
+function gainzRemoveImportSourceForReimport(button) {
+    var table = $("#import_data_sources_table");
+    var removeUrl = table.data("remove-url");
+    var source = button.data("source");
+    var sourceName = button.data("source-name") || "this source";
+    var resultBox = $("#data_source_action_result");
+
+    if (!removeUrl || !source) {
+        $("#import_upload_result")
+            .removeClass("alert-info alert-warning")
+            .addClass("alert-danger")
+            .text("Gainz could not locate the exact source path for this warning. Open Review sources and remove the source there.")
+            .show();
+        return;
+    }
+
+    gainzConfirmDialog({
+        title: "Remove source before re-import?",
+        message: [
+            "Remove " + sourceName + " from the current data set so you can re-import it with Advanced Import?",
+            "",
+            "Gainz will save a new revision. Prior revisions stay available in History.",
+            "The original CSV file will not be deleted from disk."
+        ].join("\n"),
+        confirmText: "Remove Source",
+        onConfirm: function() {
+            button.prop("disabled", true).text("Removing...");
+            resultBox
+                .removeClass("alert-danger alert-info alert-success")
+                .addClass("alert-info")
+                .text("Removing the source, saving a revision, and preparing Advanced Import...")
+                .show();
+
+            $.ajax({
+                url: removeUrl,
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({ source: source })
+            }).done(function(result) {
+                resultBox
+                    .removeClass("alert-info alert-danger")
+                    .addClass("alert-success")
+                    .text(result.message || "Data source removed. Re-import it with Advanced Import.");
+
+                if (result.data_summary) {
+                    gainzSetSourceOverlapWorkflow(result.data_summary.source_overlaps || []);
+                    gainzRenderDataSources(result.data_summary);
+                    gainzSetImportWarningWorkflow(
+                        "#import_warning_workflow",
+                        "#import_warning_workflow_table",
+                        result.data_summary.import_warnings || [],
+                        result.data_summary.import_warning_rows || []
+                    );
+                    gainzUpdateImportContinuePanel(result.data_summary);
+                }
+
+                gainzOpenAdvancedImport();
+            }).fail(function(xhr) {
+                var message = "Could not remove that data source.";
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    message += " " + xhr.responseJSON.error;
+                }
+                resultBox
+                    .removeClass("alert-info alert-success")
+                    .addClass("alert-danger")
+                    .text(message)
+                    .show();
+            }).always(function() {
+                button.prop("disabled", false).text("Remove this source and re-import");
+            });
+        }
+    });
+}
+
 function gainzShowColumnReviewResult(result) {
     var warnings = result.warnings || [];
     var message = warnings.join(" ") || "Column review needed. Choose the header row and map the columns below.";
@@ -281,6 +407,7 @@ function gainzParseImportWarning(warning) {
         row: row,
         issue: issue,
         status: status,
+        source_path: "",
         next_action: nextAction
     };
 }
@@ -331,6 +458,8 @@ function gainzRenderImportWarningTable(tableSelector, rows) {
 
         var actionCell = $('<td class="import-warning-action"></td>');
         actionCell.append($("<p></p>").text(row.next_action || row.raw || "Review this source row."));
+        actionCell.append(gainzBuildImportWarningRepairActions(row));
+        actionCell.append($('<div class="import-warning-source-path-display alert alert-light mt-2" role="status" style="display: none;"></div>'));
 
         if (reviewUrl) {
             var noteInput = $('<input type="text" class="form-control form-control-sm import-warning-note-input" placeholder="Add note">')
@@ -339,6 +468,7 @@ function gainzRenderImportWarningTable(tableSelector, rows) {
             [
                 ["true_zero_value_transfer", "True zero-value transfer"],
                 ["needs_manual_usd_value", "Needs manual USD value"],
+                ["unknown_needs_research", "I do not know yet"],
                 ["ignore_for_now", "Ignore for now"],
                 ["note", "Add note"]
             ].forEach(function(action) {
@@ -355,6 +485,69 @@ function gainzRenderImportWarningTable(tableSelector, rows) {
     });
 }
 
+function gainzRenderFirstImportWarning(panelSelector, rows) {
+    var panel = $(panelSelector);
+
+    if (panel.length === 0) {
+        return;
+    }
+
+    panel.empty();
+    if (!rows || rows.length === 0) {
+        panel.hide();
+        return;
+    }
+
+    var row = rows[0];
+    var details = $('<dl class="guided-review-details"></dl>');
+    [
+        ["Source", row.source || "Current import"],
+        ["Row", row.row || "N/A"],
+        ["Asset", row.asset || "N/A"],
+        ["Issue", row.issue || row.raw || "Review import row"]
+    ].forEach(function(item) {
+        details.append(
+            $("<div></div>")
+                .append($("<dt></dt>").text(item[0]))
+                .append($("<dd></dd>").text(item[1]))
+        );
+    });
+
+    var decisionActions = $('<div class="guided-review-actions mt-2" role="group" aria-label="Import warning decisions"></div>');
+    [
+        ["true_zero_value_transfer", "True zero-value transfer"],
+        ["needs_manual_usd_value", "Needs manual USD value"],
+        ["unknown_needs_research", "I do not know yet"],
+        ["ignore_for_now", "Ignore for now"],
+        ["note", "Add note"]
+    ].forEach(function(action) {
+        decisionActions.append(
+            $('<button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button"></button>')
+                .text(action[1])
+                .data("decision", action[0])
+                .data("warning", row.raw || "")
+        );
+    });
+
+    panel
+        .append($("<h3></h3>").text("First warning to review"))
+        .append(details)
+        .append(
+            $("<p></p>")
+                .addClass("mb-2")
+                .append($("<strong></strong>").text("Suggested next action: "))
+                .append(document.createTextNode(row.next_action || "Review this source row."))
+        )
+        .append(gainzBuildImportWarningRepairActions(row))
+        .append($('<div class="import-warning-source-path-display alert alert-light mt-2" role="status" style="display: none;"></div>'))
+        .append(
+            $('<input type="text" class="form-control form-control-sm import-warning-note-input" placeholder="Add note">')
+                .val(row.review_note || "")
+        )
+        .append(decisionActions)
+        .show();
+}
+
 function gainzSetImportWarningWorkflow(panelSelector, tableSelector, warnings, warningRows) {
     var rows = gainzNormalizeImportWarningRows(warnings, warningRows);
     var panel = $(panelSelector);
@@ -364,9 +557,11 @@ function gainzSetImportWarningWorkflow(panelSelector, tableSelector, warnings, w
     }
 
     if (rows.length > 0) {
+        gainzRenderFirstImportWarning("#import_warning_first_panel", rows);
         gainzRenderImportWarningTable(tableSelector, rows);
         panel.show();
     } else {
+        gainzRenderFirstImportWarning("#import_warning_first_panel", []);
         panel.hide();
     }
 }
@@ -416,16 +611,35 @@ $(document).on("click", ".import-warning-decision-button", function() {
             alert(message);
         },
         complete: function() {
-            button.prop("disabled", false).text(
-                {
-                    true_zero_value_transfer: "True zero-value transfer",
-                    needs_manual_usd_value: "Needs manual USD value",
-                    ignore_for_now: "Ignore for now",
-                    note: "Add note"
-                }[button.data("decision")] || "Save"
-            );
+            button.prop("disabled", false).text(gainzImportWarningDecisionLabel(button.data("decision")));
         }
     });
+});
+
+$(document).on("click", ".import-warning-source-path-button", function() {
+    var button = $(this);
+    var display = button.closest("td, .guided-review-panel").find(".import-warning-source-path-display").first();
+    var sourcePath = button.data("source-path");
+    var sourceName = button.data("source-name") || "this source";
+
+    if (!display.length) {
+        return;
+    }
+
+    if (sourcePath) {
+        display.text("Source path for " + sourceName + ": " + sourcePath);
+    } else {
+        display.text("Gainz only has the source filename for this warning. Open Review sources to find the exact source path, or re-import the CSV with Advanced Import.");
+    }
+    display.show();
+});
+
+$(document).on("click", ".import-warning-open-advanced-button", function() {
+    gainzOpenAdvancedImport();
+});
+
+$(document).on("click", ".import-warning-remove-source-button", function() {
+    gainzRemoveImportSourceForReimport($(this));
 });
 
 function gainzParseDisplayNumber(value) {

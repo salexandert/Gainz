@@ -91,13 +91,14 @@
               </p>
             </div>
             <div class="import-warning-actions">
+              <button type="button" class="btn btn-sm btn-outline-primary import-warning-open-advanced-button">Open Advanced Import / Column Mapping</button>
               <a class="btn btn-sm btn-outline-primary" href="#manual-transactions">Add manual rows</a>
               <a class="btn btn-sm btn-outline-primary" href="#source-review">Review sources</a>
             </div>
           </div>
-          {% if data_summary.import_warning_rows %}
-          {% set first_warning = data_summary.import_warning_rows[0] %}
-          <div class="guided-review-panel mt-3">
+          {% set first_warning = data_summary.import_warning_rows[0] if data_summary.import_warning_rows else none %}
+          <div id="import_warning_first_panel" class="guided-review-panel mt-3" {% if not data_summary.import_warning_rows %}style="display: none;"{% endif %}>
+            {% if data_summary.import_warning_rows %}
             <h3>First warning to review</h3>
             <dl class="guided-review-details">
               <div>
@@ -118,15 +119,30 @@
               </div>
             </dl>
             <p class="mb-2"><strong>Suggested next action:</strong> {{ first_warning.next_action }}</p>
+            <div class="guided-review-secondary-actions import-warning-repair-actions" role="group" aria-label="Import warning repair actions">
+              <button type="button" class="btn btn-sm btn-outline-secondary import-warning-source-path-button" data-source-path="{{ first_warning.source_path or '' }}" data-source-name="{{ first_warning.source }}">Show source path</button>
+              <button type="button" class="btn btn-sm btn-outline-primary import-warning-open-advanced-button">Open Advanced Import / Column Mapping</button>
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-danger import-warning-remove-source-button"
+                data-source="{{ first_warning.source_path or '' }}"
+                data-source-name="{{ first_warning.source }}"
+                {% if not first_warning.source_path %}disabled{% endif %}
+              >
+                Remove this source and re-import
+              </button>
+            </div>
+            <div class="import-warning-source-path-display alert alert-light mt-2" role="status" style="display: none;"></div>
             <input type="text" class="form-control form-control-sm import-warning-note-input" value="{{ first_warning.review_note }}" placeholder="Add note">
             <div class="guided-review-actions mt-2" role="group" aria-label="Import warning decisions">
               <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="true_zero_value_transfer" data-warning="{{ first_warning.raw }}">True zero-value transfer</button>
               <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="needs_manual_usd_value" data-warning="{{ first_warning.raw }}">Needs manual USD value</button>
+              <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="unknown_needs_research" data-warning="{{ first_warning.raw }}">I do not know yet</button>
               <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="ignore_for_now" data-warning="{{ first_warning.raw }}">Ignore for now</button>
               <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="note" data-warning="{{ first_warning.raw }}">Add note</button>
             </div>
+            {% endif %}
           </div>
-          {% endif %}
           <details class="gainz-advanced-details mt-3">
             <summary>Show all import warning rows</summary>
             <div class="table-responsive gainz-import-detail-body">
@@ -171,9 +187,24 @@
                   <td>{{ warning.notes }}</td>
                   <td class="import-warning-action">
                     <p>{{ warning.next_action }}</p>
+                    <div class="guided-review-secondary-actions import-warning-repair-actions" role="group" aria-label="Import warning repair actions">
+                      <button type="button" class="btn btn-sm btn-outline-secondary import-warning-source-path-button" data-source-path="{{ warning.source_path or '' }}" data-source-name="{{ warning.source }}">Show source path</button>
+                      <button type="button" class="btn btn-sm btn-outline-primary import-warning-open-advanced-button">Open Advanced Import / Column Mapping</button>
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-danger import-warning-remove-source-button"
+                        data-source="{{ warning.source_path or '' }}"
+                        data-source-name="{{ warning.source }}"
+                        {% if not warning.source_path %}disabled{% endif %}
+                      >
+                        Remove this source and re-import
+                      </button>
+                    </div>
+                    <div class="import-warning-source-path-display alert alert-light mt-2" role="status" style="display: none;"></div>
                     <input type="text" class="form-control form-control-sm import-warning-note-input" value="{{ warning.review_note }}" placeholder="Add note">
                     <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="true_zero_value_transfer" data-warning="{{ warning.raw }}">True zero-value transfer</button>
                     <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="needs_manual_usd_value" data-warning="{{ warning.raw }}">Needs manual USD value</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="unknown_needs_research" data-warning="{{ warning.raw }}">I do not know yet</button>
                     <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="ignore_for_now" data-warning="{{ warning.raw }}">Ignore for now</button>
                     <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="note" data-warning="{{ warning.raw }}">Add note</button>
                   </td>
@@ -185,7 +216,7 @@
           </details>
         </div>
         <form id="upload_csv_form" action="{{ import_form_url }}" class="dropzone"></form>
-        <details class="gainz-import-secondary-details mt-3">
+        <details id="advanced-import" class="gainz-import-secondary-details mt-3">
           <summary>Column review options</summary>
           <div class="gainz-import-detail-body">
             <p class="text-muted">

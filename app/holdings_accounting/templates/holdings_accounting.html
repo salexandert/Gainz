@@ -395,22 +395,29 @@
         </div>
         </details>
 
-        <div class="form-group row">
-          <label class="control-label col-md-2 col-sm-3" for="holdings_quantity">Current Holdings</label>
-          <div class="col-md-4 col-sm-5">
-            <input type="number" step="any" id="holdings_quantity" class="form-control" placeholder="Select an asset first">
+        {% if not guided_mode or is_declare_mode %}
+          <div class="form-group row">
+            <label class="control-label col-md-2 col-sm-3" for="holdings_quantity">Current Holdings</label>
+            <div class="col-md-4 col-sm-5">
+              <input type="number" step="any" id="holdings_quantity" class="form-control" placeholder="Select an asset first">
+            </div>
+            <div class="col-md-3 col-sm-4">
+              <button type="button" id="submit_holdings_button" class="btn btn-success">Save Declared Holdings</button>
+              <button type="button" id="zero_holdings_button" class="btn btn-outline-secondary">Save 0 Holdings</button>
+            </div>
           </div>
-          <div class="col-md-3 col-sm-4">
-            <button type="button" id="submit_holdings_button" class="btn btn-success">Save Declared Holdings</button>
-            <button type="button" id="zero_holdings_button" class="btn btn-outline-secondary">Save 0 Holdings</button>
+          <div id="zero_holdings_confirm_panel" class="holdings-inline-confirm alert alert-warning" role="dialog" aria-modal="false" style="display: none;">
+            <strong id="zero_holdings_confirm_title">Confirm zero holdings</strong>
+            <p id="zero_holdings_confirm_text" class="mb-2"></p>
+            <button type="button" id="zero_holdings_confirm_yes" class="btn btn-warning btn-sm">Save 0 Holdings</button>
+            <button type="button" id="zero_holdings_confirm_no" class="btn btn-outline-secondary btn-sm">Cancel</button>
           </div>
-        </div>
-        <div id="zero_holdings_confirm_panel" class="holdings-inline-confirm alert alert-warning" role="dialog" aria-modal="false" style="display: none;">
-          <strong id="zero_holdings_confirm_title">Confirm zero holdings</strong>
-          <p id="zero_holdings_confirm_text" class="mb-2"></p>
-          <button type="button" id="zero_holdings_confirm_yes" class="btn btn-warning btn-sm">Save 0 Holdings</button>
-          <button type="button" id="zero_holdings_confirm_no" class="btn btn-outline-secondary btn-sm">Cancel</button>
-        </div>
+        {% elif is_reconcile_mode %}
+          <div class="alert alert-light holdings-edit-handoff" role="status">
+            Need to change current holdings for this asset?
+            <a class="btn btn-sm btn-outline-primary ml-2" href="{{ url_for('holdings_accounting_blueprint.holdings_accounting', guided=1, mode='declare') }}">Open Declare Holdings</a>
+          </div>
+        {% endif %}
         <div id="holdings_action_confirm_panel" class="holdings-inline-confirm alert alert-warning" role="dialog" aria-modal="false" style="display: none;">
           <strong id="holdings_action_confirm_title">Confirm action</strong>
           <p id="holdings_action_confirm_text" class="mb-2"></p>
