@@ -191,6 +191,31 @@ class HomeProgressTests(unittest.TestCase):
             context["primary_action"]["url"],
         )
 
+    def test_home_import_warning_count_uses_unresolved_warnings(self):
+        transactions = empty_transactions()
+        transactions.transactions.append(
+            Buy(
+                symbol="BTC",
+                quantity=1,
+                time_stamp=datetime.datetime(2024, 1, 1),
+                usd_spot=100,
+                source="test.csv",
+            )
+        )
+        resolved_warning = "Imported row 2 from test.csv with $0 USD spot price."
+        unresolved_warning = "Imported row 3 from test.csv with $0 USD spot price."
+        transactions.import_warnings = [resolved_warning, unresolved_warning]
+        transactions.set_import_warning_review(
+            resolved_warning,
+            decision="true_zero_value_transfer",
+            note="Documented owner transfer.",
+        )
+
+        progress = progress_for(transactions)
+
+        self.assertEqual("Review 1 import warning", step_named(progress, "Import")["action_label"])
+        self.assertIn("1 import warning needs review", step_named(progress, "Import")["detail"])
+
     def test_home_stage_context_routes_holdings_to_declare_mode(self):
         transactions = empty_transactions()
         transactions.transactions.append(

@@ -732,6 +732,31 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual("Needs research", alignment["rows"][0]["status"])
         self.assertIn("enter filed proceeds", alignment["rows"][0]["next_action"])
 
+    def test_tax_year_research_record_with_values_is_not_confirmed(self):
+        transactions = empty_transactions()
+        buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "exchange")
+        sell = Sell("BTC", 1, datetime.datetime(2024, 6, 1), 300, "exchange")
+        sell.link_transaction(buy, 1)
+        transactions.transactions = [buy, sell]
+        transactions.set_tax_year_record(
+            2024,
+            reported_proceeds=300,
+            reported_cost_basis=100,
+            reported_gain_loss=200,
+            tax_paid=25,
+            filing_status="Needs research",
+            evidence_reference="ambiguous suggested filed totals",
+            notes="Do not treat this as confirmed yet.",
+        )
+
+        alignment = get_tax_filing_alignment_summary(transactions)
+        evidence_inventory = get_tax_evidence_inventory_summary(transactions, alignment)
+
+        self.assertEqual("Needs research", alignment["rows"][0]["status"])
+        self.assertEqual(0, alignment["metrics"]["declared_years"])
+        self.assertEqual("Needs research", evidence_inventory["rows"][0]["status"])
+        self.assertIn("needs research", evidence_inventory["rows"][0]["what_gainz_found"])
+
     def test_tax_year_records_round_trip_through_save_file(self):
         original_basedir = transactions_module.basedir
         with tempfile.TemporaryDirectory() as temp_dir:

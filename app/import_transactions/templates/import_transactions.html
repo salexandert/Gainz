@@ -10,6 +10,8 @@
 
 {% set import_form_url = url_for('import_transactions_blueprint.import_wizard', guided=1) if guided_import else url_for('import_transactions_blueprint.import_wizard') %}
 {% set imported_count = data_summary.transaction_count|default(0) %}
+{% set unresolved_warning_count = data_summary.unresolved_import_warning_count|default(0) %}
+{% set can_continue_import = imported_count and unresolved_warning_count == 0 %}
 
 <!-- Page Description and Instructions -->
 <div class="row">
@@ -28,7 +30,7 @@
           {% if guided_import %}
           <div class="gainz-import-hero-actions">
             <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index', stage=1) }}">Back to Guided Reconciliation</a>
-            {% if imported_count %}
+            {% if can_continue_import %}
             <a class="btn btn-primary btn-round" href="{{ url_for('holdings_accounting_blueprint.holdings_accounting', guided=1, mode='declare') }}">Continue to Declare Holdings</a>
             {% endif %}
           </div>
@@ -66,22 +68,34 @@
         <div id="import_upload_result" class="alert alert-info" role="alert" style="display: none;"></div>
         <div
           id="import_continue_panel"
-          class="alert alert-success gainz-import-continue-panel"
+          class="alert {% if can_continue_import %}alert-success{% else %}alert-warning{% endif %} gainz-import-continue-panel"
           role="status"
           {% if not imported_count %}style="display: none;"{% endif %}
         >
           <div>
-            <strong>Import data is loaded.</strong>
-            <p class="mb-0">Continue when you have loaded the source files you want included in this review pass.</p>
+            <strong>{% if can_continue_import %}Import data is ready for the next step.{% else %}Import data is loaded, but review is still needed.{% endif %}</strong>
+            <p class="mb-0 import-continue-message">
+              {% if can_continue_import %}
+              Continue when you have loaded the source files you want included in this review pass.
+              {% else %}
+              Review {{ unresolved_warning_count }} unresolved import warning{% if unresolved_warning_count != 1 %}s{% endif %} before moving to Declare Holdings.
+              {% endif %}
+            </p>
           </div>
-          <a class="btn btn-primary btn-round btn-sm" href="{{ url_for('holdings_accounting_blueprint.holdings_accounting', guided=1, mode='declare') }}">Continue to Declare Holdings</a>
+          <a
+            class="btn btn-primary btn-round btn-sm import-continue-action"
+            href="{{ url_for('holdings_accounting_blueprint.holdings_accounting', guided=1, mode='declare') }}"
+            {% if not can_continue_import %}style="display: none;"{% endif %}
+          >
+            Continue to Declare Holdings
+          </a>
         </div>
         <div
           id="import_warning_workflow"
           class="import-warning-workflow alert alert-warning"
           role="alert"
           data-review-url="{{ url_for('import_transactions_blueprint.import_warning_review') }}"
-          {% if not data_summary.import_warnings %}style="display: none;"{% endif %}
+          {% if not data_summary.unresolved_import_warning_count %}style="display: none;"{% endif %}
         >
           <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-start">
             <div>
@@ -96,9 +110,9 @@
               <a class="btn btn-sm btn-outline-primary" href="#source-review">Review sources</a>
             </div>
           </div>
-          {% set first_warning = data_summary.import_warning_rows[0] if data_summary.import_warning_rows else none %}
-          <div id="import_warning_first_panel" class="guided-review-panel mt-3" {% if not data_summary.import_warning_rows %}style="display: none;"{% endif %}>
-            {% if data_summary.import_warning_rows %}
+          {% set first_warning = data_summary.unresolved_import_warning_rows[0] if data_summary.unresolved_import_warning_rows else none %}
+          <div id="import_warning_first_panel" class="guided-review-panel mt-3" {% if not data_summary.unresolved_import_warning_rows %}style="display: none;"{% endif %}>
+            {% if data_summary.unresolved_import_warning_rows %}
             <h3>First warning to review</h3>
             <dl class="guided-review-details">
               <div>
@@ -116,6 +130,14 @@
               <div>
                 <dt>Issue</dt>
                 <dd>{{ first_warning.issue }}</dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd>{{ first_warning.review_status }}</dd>
+              </div>
+              <div>
+                <dt>Decision</dt>
+                <dd>{{ first_warning.decision_label }}{% if first_warning.review_note %}: {{ first_warning.review_note }}{% endif %}</dd>
               </div>
             </dl>
             <p class="mb-2"><strong>Suggested next action:</strong> {{ first_warning.next_action }}</p>
@@ -422,6 +444,36 @@
           <p class="mb-2">
             Gainz found source files that look like they may cover the same activity. This often happens when a full-history export and a year-specific export are both imported.
           </p>
+          {% if data_summary.source_overlaps %}
+          {% set first_overlap = data_summary.source_overlaps[0] %}
+          <div id="source_overlap_first_panel" class="guided-review-panel mt-3">
+            <h3>First source overlap to review</h3>
+            <dl class="guided-review-details">
+              <div>
+                <dt>Source A</dt>
+                <dd>{{ first_overlap.name_a }} {{ first_overlap.date_range_a }}</dd>
+              </div>
+              <div>
+                <dt>Source B</dt>
+                <dd>{{ first_overlap.name_b }} {{ first_overlap.date_range_b }}</dd>
+              </div>
+              <div>
+                <dt>Matching rows</dt>
+                <dd>{{ first_overlap.matching_rows }} ({{ first_overlap.overlap_percent }})</dd>
+              </div>
+              <div>
+                <dt>Next action</dt>
+                <dd>{{ first_overlap.next_action }}</dd>
+              </div>
+            </dl>
+            <div class="guided-review-actions">
+              <a class="btn btn-sm btn-outline-primary" href="#source-review">Review data sources</a>
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('export_blueprint.review_queue', guided=1) }}">Open Guided Review Queue</a>
+            </div>
+          </div>
+          {% else %}
+          <div id="source_overlap_first_panel" class="guided-review-panel mt-3" style="display: none;"></div>
+          {% endif %}
           <div class="table-responsive">
             <table id="source_overlap_table" class="table table-sm table-striped">
               <thead>

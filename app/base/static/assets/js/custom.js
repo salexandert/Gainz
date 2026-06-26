@@ -25,7 +25,8 @@ function gainzFormatImportResult(result, fileName) {
 
 function gainzShowImportResult(result, fileName, alertClass) {
     var warnings = result.warnings || [];
-    var warningRows = result.warning_rows || [];
+    var warningRows = result.data_summary ? (result.data_summary.import_warning_rows || []) : (result.warning_rows || []);
+    var unresolvedWarningRows = result.data_summary ? (result.data_summary.unresolved_import_warning_rows || []) : [];
     var resultClass = alertClass || (warnings.length > 0 ? "alert-warning" : "alert-info");
 
     $("#import_upload_result")
@@ -39,7 +40,8 @@ function gainzShowImportResult(result, fileName, alertClass) {
             "#import_warning_workflow",
             "#import_warning_workflow_table",
             warnings,
-            warningRows
+            warningRows,
+            unresolvedWarningRows
         );
     } else {
         $("#import_warning_workflow").hide();
@@ -101,7 +103,25 @@ function gainzUpdateImportContinuePanel(summary) {
         return;
     }
 
-    if ((summary.transaction_count || 0) > 0) {
+    var transactionCount = summary.transaction_count || 0;
+    var unresolvedWarnings = summary.unresolved_import_warning_count || 0;
+    var canContinue = transactionCount > 0 && unresolvedWarnings === 0;
+    var action = panel.find(".import-continue-action");
+    var message = panel.find(".import-continue-message");
+    var heading = panel.find("strong").first();
+
+    panel
+        .removeClass("alert-success alert-warning")
+        .addClass(canContinue ? "alert-success" : "alert-warning");
+
+    if (transactionCount > 0) {
+        heading.text(canContinue ? "Import data is ready for the next step." : "Import data is loaded, but review is still needed.");
+        message.text(
+            canContinue
+                ? "Continue when you have loaded the source files you want included in this review pass."
+                : "Review " + unresolvedWarnings + " unresolved import warning" + (unresolvedWarnings == 1 ? "" : "s") + " before moving to Declare Holdings."
+        );
+        action.toggle(canContinue);
         panel.show();
     } else {
         panel.hide();
@@ -111,12 +131,44 @@ function gainzUpdateImportContinuePanel(summary) {
 function gainzRenderSourceOverlapTable(rows) {
     var table = $("#source_overlap_table");
     var tbody = table.find("tbody");
+    var firstPanel = $("#source_overlap_first_panel");
 
     if (table.length === 0 || tbody.length === 0) {
         return;
     }
 
     tbody.empty();
+    if (firstPanel.length) {
+        firstPanel.empty();
+        if (rows && rows.length > 0) {
+            var first = rows[0];
+            var details = $('<dl class="guided-review-details"></dl>');
+            [
+                ["Source A", (first.name_a || "Source A") + " " + (first.date_range_a || "")],
+                ["Source B", (first.name_b || "Source B") + " " + (first.date_range_b || "")],
+                ["Matching rows", (first.matching_rows || 0) + " (" + (first.overlap_percent || "0%") + ")"],
+                ["Next action", first.next_action || "Review sources and remove the duplicate only after confirming the overlap."]
+            ].forEach(function(item) {
+                details.append(
+                    $("<div></div>")
+                        .append($("<dt></dt>").text(item[0]))
+                        .append($("<dd></dd>").text(item[1]))
+                );
+            });
+            firstPanel
+                .append($("<h3></h3>").text("First source overlap to review"))
+                .append(details)
+                .append(
+                    $('<div class="guided-review-actions"></div>')
+                        .append($('<a class="btn btn-sm btn-outline-primary" href="#source-review">Review data sources</a>'))
+                        .append($('<a class="btn btn-sm btn-outline-secondary" href="/export/review_queue?guided=1">Open Guided Review Queue</a>'))
+                )
+                .show();
+        } else {
+            firstPanel.hide();
+        }
+    }
+
     (rows || []).forEach(function(row) {
         var tableRow = $("<tr></tr>");
         tableRow.append(
@@ -322,7 +374,8 @@ function gainzRemoveImportSourceForReimport(button) {
                         "#import_warning_workflow",
                         "#import_warning_workflow_table",
                         result.data_summary.import_warnings || [],
-                        result.data_summary.import_warning_rows || []
+                        result.data_summary.import_warning_rows || [],
+                        result.data_summary.unresolved_import_warning_rows || []
                     );
                     gainzUpdateImportContinuePanel(result.data_summary);
                 }
@@ -504,7 +557,9 @@ function gainzRenderFirstImportWarning(panelSelector, rows) {
         ["Source", row.source || "Current import"],
         ["Row", row.row || "N/A"],
         ["Asset", row.asset || "N/A"],
-        ["Issue", row.issue || row.raw || "Review import row"]
+        ["Issue", row.issue || row.raw || "Review import row"],
+        ["Status", row.review_status || row.status || "Needs review"],
+        ["Decision", (row.decision_label || "Not reviewed") + (row.review_note ? ": " + row.review_note : "")]
     ].forEach(function(item) {
         details.append(
             $("<div></div>")
@@ -548,16 +603,21 @@ function gainzRenderFirstImportWarning(panelSelector, rows) {
         .show();
 }
 
-function gainzSetImportWarningWorkflow(panelSelector, tableSelector, warnings, warningRows) {
+function gainzSetImportWarningWorkflow(panelSelector, tableSelector, warnings, warningRows, unresolvedWarningRows) {
     var rows = gainzNormalizeImportWarningRows(warnings, warningRows);
+    var queueRows = (
+        unresolvedWarningRows && unresolvedWarningRows.length > 0
+            ? unresolvedWarningRows
+            : rows.filter(function(row) { return !row.is_resolved; })
+    );
     var panel = $(panelSelector);
 
     if (panel.length === 0) {
         return;
     }
 
-    if (rows.length > 0) {
-        gainzRenderFirstImportWarning("#import_warning_first_panel", rows);
+    if (queueRows.length > 0) {
+        gainzRenderFirstImportWarning("#import_warning_first_panel", queueRows);
         gainzRenderImportWarningTable(tableSelector, rows);
         panel.show();
     } else {
@@ -594,12 +654,18 @@ $(document).on("click", ".import-warning-decision-button", function() {
                     "#import_warning_workflow",
                     "#import_warning_workflow_table",
                     data.data_summary.import_warnings || [],
-                    data.data_summary.import_warning_rows || []
+                    data.data_summary.import_warning_rows || [],
+                    data.data_summary.unresolved_import_warning_rows || []
                 );
+                gainzUpdateImportContinuePanel(data.data_summary);
+                var unresolvedCount = data.data_summary.unresolved_import_warning_count || 0;
+                var savedMessage = unresolvedCount > 0
+                    ? (data.message || "Import warning review decision saved.") + " " + unresolvedCount + " unresolved warning" + (unresolvedCount == 1 ? " remains." : "s remain.")
+                    : "All import warnings are reviewed. Continue to Declare Holdings when your source data is loaded.";
                 $("#import_upload_result")
-                    .removeClass("alert-info alert-danger")
-                    .addClass("alert-warning")
-                    .text(data.message || "Import warning review decision saved.")
+                    .removeClass("alert-info alert-danger alert-warning")
+                    .addClass(unresolvedCount > 0 ? "alert-warning" : "alert-success")
+                    .text(savedMessage)
                     .show();
             }
         },
@@ -2045,7 +2111,11 @@ $(document).ready(function() {
                 $('#bulk_holdings_message')
                     .removeClass('alert-info alert-warning')
                     .addClass('alert-success')
-                    .text(data['message'] + ' Completed in ' + Math.max(1, Math.round((Date.now() - startedAt) / 1000)) + ' second(s).')
+                    .html(
+                        '<strong>Bulk holdings saved.</strong> ' +
+                        $('<span></span>').text(data['message'] + ' Completed in ' + Math.max(1, Math.round((Date.now() - startedAt) / 1000)) + ' second(s).').html() +
+                        ' <a class="btn btn-sm btn-primary ml-2" href="/holdings_accounting/?guided=1&amp;mode=reconcile">Continue to Reconcile Gaps</a>'
+                    )
                     .show();
                 holdingsScrollTo('#bulk_holdings_message');
             },

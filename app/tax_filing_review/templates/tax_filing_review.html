@@ -58,6 +58,36 @@
         <p class="text-muted mb-0">
           Gainz separates calculated transaction totals, filed totals you record, local evidence references, payment evidence, and user confirmations. This is documentation support only, not tax, legal, or financial advice.
         </p>
+
+        {% if evidence_inventory.review_rows %}
+        {% set next_tax_review = evidence_inventory.review_rows[0] %}
+        <div class="guided-review-panel mt-3">
+          <h2 class="gainz-section-title">Next Tax Evidence Review</h2>
+          <dl class="guided-review-details">
+            <div>
+              <dt>Year</dt>
+              <dd>{{ next_tax_review.year }}</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd>{{ next_tax_review.status }}</dd>
+            </div>
+            <div>
+              <dt>What Gainz found</dt>
+              <dd>{{ next_tax_review.what_gainz_found }}</dd>
+            </div>
+            <div>
+              <dt>What Gainz needs</dt>
+              <dd>{{ next_tax_review.what_gainz_needs }}</dd>
+            </div>
+          </dl>
+          <div class="guided-review-actions">
+            <a class="btn btn-sm btn-primary" href="#record-filed-totals">Record filed totals</a>
+            <a class="btn btn-sm btn-outline-primary" href="#tax-evidence-inventory">Scan or add evidence</a>
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('export_blueprint.review_queue', guided=1) }}">Open Guided Review Queue</a>
+          </div>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -118,9 +148,9 @@
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
-        <h5 class="card-title">Confirm Suggested Filed Totals</h5>
+        <h5 id="suggested-filed-totals" class="card-title">Confirm Suggested Filed Totals</h5>
         <p class="text-muted">
-          Gainz can scan local CSV, XLSX, and readable PDF evidence for possible filed totals. These are suggestions only. Confirm, edit, or mark a year as needs research before using the comparison.
+          Gainz can scan local CSV, XLSX, and readable PDF evidence for possible filed totals. These are suggestions only. Confirm only when the values match official filed records; use Needs Research for ambiguous values.
         </p>
         <div class="table-responsive">
           <table class="table table-striped table-bordered" style="width:100%">
@@ -200,7 +230,7 @@
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
-        <h5 class="card-title">Tax Evidence Inventory</h5>
+        <h5 id="tax-evidence-inventory" class="card-title">Tax Evidence Inventory</h5>
         <p class="text-muted">
           Add filed returns, Form 8949, Schedule D, payment receipts, crypto workbooks, broker forms, transaction CSVs, estimates, or zero/not-applicable confirmations. Gainz classifies evidence first, then surfaces reviewable suggested totals when it can read clear source values.
         </p>
@@ -410,7 +440,7 @@
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
-        <h5 class="card-title">Record Filed Totals</h5>
+        <h5 id="record-filed-totals" class="card-title">Record Filed Totals</h5>
         <p class="text-muted">Enter the totals from your filed return or tax software, plus a reference to the filing/payment evidence you keep outside Gainz.</p>
         <form method="POST" action="{{ url_for('tax_filing_review_blueprint.save_tax_year_record') }}">
           <div class="row">

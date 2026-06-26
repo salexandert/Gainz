@@ -243,6 +243,7 @@ def _data_source_summary(transactions):
 
     import_warnings = getattr(transactions, "import_warnings", []) or []
     warning_rows = import_warning_review_rows(import_warnings, transactions=transactions)
+    unresolved_warning_rows = unresolved_import_warning_rows(transactions)
 
     return {
         "transaction_count": len(getattr(transactions, "transactions", [])),
@@ -260,7 +261,8 @@ def _data_source_summary(transactions):
         },
         "import_warnings": import_warnings,
         "import_warning_rows": warning_rows,
-        "unresolved_import_warning_count": len(unresolved_import_warning_rows(transactions)),
+        "unresolved_import_warning_rows": unresolved_warning_rows,
+        "unresolved_import_warning_count": len(unresolved_warning_rows),
     }
 
 

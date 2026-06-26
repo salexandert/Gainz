@@ -296,6 +296,14 @@ def _record_has_reported_totals(record):
     )
 
 
+def _tax_record_needs_research(record):
+    return bool(record and "research" in str(record.get("filing_status") or "").lower())
+
+
+def _record_has_confirmed_filed_totals(record):
+    return _record_has_reported_totals(record) and not _tax_record_needs_research(record)
+
+
 def _tax_alignment_status(record, differences, sell_counts, tolerance):
     if record is None:
         return {
@@ -304,15 +312,14 @@ def _tax_alignment_status(record, differences, sell_counts, tolerance):
             "next_action": "Enter the totals reported for this year and record the payment reference or filing note.",
         }
 
-    if not _record_has_reported_totals(record):
-        filing_status = str(record.get("filing_status") or "").lower()
-        if "research" in filing_status:
-            return {
-                "status": "Needs research",
-                "status_class": "status-needs-review",
-                "next_action": "Review the evidence note for this year, then enter filed proceeds, cost basis, and gain/loss when confirmed.",
-            }
+    if _tax_record_needs_research(record):
+        return {
+            "status": "Needs research",
+            "status_class": "status-needs-review",
+            "next_action": "Review the evidence note for this year, then enter filed proceeds, cost basis, and gain/loss only when confirmed from official filing records.",
+        }
 
+    if not _record_has_reported_totals(record):
         return {
             "status": "Needs filed totals",
             "status_class": "status-needs-declared-holdings",
@@ -445,7 +452,11 @@ def get_tax_filing_alignment_summary(transactions, tolerance=1.0):
             "years": len(rows),
             "aligned_years": status_counts.get("Aligned", 0),
             "years_needing_review": len([row for row in rows if row["status"] != "Aligned"]),
-            "declared_years": len([row for row in rows if row["has_record"]]),
+            "declared_years": len([
+                row
+                for row in rows
+                if _record_has_confirmed_filed_totals(records_by_year.get(int(row["year"])))
+            ]),
             "payment_records": len([row for row in rows if row["payment_recorded"]]),
         },
     }

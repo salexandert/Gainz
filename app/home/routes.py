@@ -5,6 +5,7 @@ from utils import (
     get_audit_readiness_summary,
     get_multi_asset_holdings_reconciliation_table_data,
 )
+from app.services.import_warning_service import unresolved_import_warning_rows
 
 
 def _plural(count, singular, plural=None):
@@ -27,7 +28,7 @@ def _unlinked_sale_assets(transactions):
 def _home_progress(transactions):
     transaction_count = len(getattr(transactions, "transactions", []) or [])
     asset_count = len(getattr(transactions, "assets", set()) or set())
-    import_warning_count = len(getattr(transactions, "import_warnings", []) or [])
+    import_warning_count = len(unresolved_import_warning_rows(transactions))
     holdings_rows = (
         get_multi_asset_holdings_reconciliation_table_data(transactions)
         if transaction_count
@@ -103,7 +104,8 @@ def _home_progress(transactions):
             ),
             "detail": (
                 f"{import_warning_count} import "
-                f"{_plural(import_warning_count, 'warning')} need review."
+                f"{_plural(import_warning_count, 'warning')} "
+                f"{'needs' if import_warning_count == 1 else 'need'} review."
             ),
         })
         steps[1]["detail"] = "Resolve import warnings before relying on holdings."

@@ -141,12 +141,22 @@ def _record_has_all_totals(record):
     )
 
 
+def _tax_record_needs_research(record):
+    return bool(record and "research" in str(record.get("filing_status") or "").lower())
+
+
+def _record_has_confirmed_totals(record):
+    return _record_has_all_totals(record) and not _tax_record_needs_research(record)
+
+
 def _found_summary(records, tax_record, calculated_rows):
     found = []
     if calculated_rows > 0:
         found.append("Gainz calculated Form 8949-style totals")
-    if _record_has_all_totals(tax_record):
+    if _record_has_confirmed_totals(tax_record):
         found.append("filed totals entered")
+    elif _tax_record_needs_research(tax_record):
+        found.append("filed totals marked needs research")
     if records:
         evidence_counts = defaultdict(int)
         for record in records:
@@ -161,6 +171,8 @@ def _found_summary(records, tax_record, calculated_rows):
 def _needs_for_status(year, status, records, tax_record):
     if status == "Ready":
         return "Review and keep evidence with the audit packet."
+    if status == "Needs research":
+        return f"{year}: review the source evidence and enter filed totals only after they are confirmed from official filing records."
     if status == "Not applicable / zero confirmed":
         return "Keep the zero/not-applicable confirmation with the year record."
     if status == "Return found, crypto totals not found":
@@ -221,9 +233,11 @@ def _year_inventory_status(year, calculated, tax_record, records, alignment_row)
     has_estimate = _has_evidence(records, "estimate")
     has_zero_confirmation = _has_evidence(records, "zero_confirmation")
     has_filing_detail = _has_evidence(records, "form_8949", "schedule_d", "broker_form")
-    has_totals = _record_has_all_totals(tax_record)
+    has_totals = _record_has_confirmed_totals(tax_record)
     has_payment_record = bool(tax_record and tax_record.get("tax_paid") is not None)
 
+    if _tax_record_needs_research(tax_record):
+        return "Needs research", "status-needs-review"
     if has_zero_confirmation and calculated["rows"] == 0 and not has_totals:
         return "Not applicable / zero confirmed", "status-verified"
     if has_estimate and not has_filed_return and not has_totals:

@@ -94,6 +94,8 @@ def import_template_context(**overrides):
             "sources": [],
             "import_warnings": [],
             "import_warning_rows": [],
+            "unresolved_import_warning_rows": [],
+            "unresolved_import_warning_count": 0,
             "type_counts": {
                 "buy": 0,
                 "sell": 0,
@@ -248,6 +250,18 @@ class ImportAndExportTests(unittest.TestCase):
                 guided_mode=True,
                 holdings_mode="declare",
             )
+        with app.test_request_context("/holdings_accounting/?guided=1&mode=declare"):
+            ready_declare_page = app.jinja_env.get_template(
+                "holdings_accounting.html"
+            ).render(
+                stats_table_data=stats_rows,
+                holdings_summary={
+                    **holdings_summary,
+                    "assets_needing_holdings": 0,
+                },
+                guided_mode=True,
+                holdings_mode="declare",
+            )
 
         with app.test_request_context("/holdings_accounting/?guided=1&mode=reconcile"):
             reconcile_page = app.jinja_env.get_template(
@@ -261,7 +275,8 @@ class ImportAndExportTests(unittest.TestCase):
 
         self.assertIn("Step 2 of 4", declare_page)
         self.assertIn("Declare Holdings", declare_page)
-        self.assertIn("Continue to Reconcile Gaps", declare_page)
+        self.assertNotIn("Continue to Reconcile Gaps", declare_page)
+        self.assertIn("Continue to Reconcile Gaps", ready_declare_page)
         self.assertIn("holdings-guided-card-grid", declare_page)
         self.assertIn("holdings-data-source-only", declare_page)
         self.assertIn("Confirm zero holdings", declare_page)
@@ -289,6 +304,7 @@ class ImportAndExportTests(unittest.TestCase):
         warnings = [
             "Skipped row 12 from coinbase.csv: unrecognized transaction type 'Mystery Reward'"
         ]
+        warning_rows = import_warning_review_rows(warnings)
 
         with app.test_request_context("/import_transactions/"):
             rendered_page = app.jinja_env.get_template(
@@ -297,8 +313,11 @@ class ImportAndExportTests(unittest.TestCase):
                 **import_template_context(
                     data_summary={
                         **import_template_context()["data_summary"],
+                        "transaction_count": 1,
                         "import_warnings": warnings,
-                        "import_warning_rows": import_warning_review_rows(warnings),
+                        "import_warning_rows": warning_rows,
+                        "unresolved_import_warning_rows": warning_rows,
+                        "unresolved_import_warning_count": 1,
                     }
                 )
             )
@@ -313,6 +332,50 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("Open Advanced Import / Column Mapping", rendered_page)
         self.assertIn("Remove this source and re-import", rendered_page)
         self.assertIn("I do not know yet", rendered_page)
+        self.assertIn("Import data is loaded, but review is still needed", rendered_page)
+        self.assertIn("Review 1 unresolved import warning", rendered_page)
+
+    def test_import_page_hides_continue_until_warnings_are_resolved(self):
+        app = create_app(config_dict["Debug"], selenium=True)
+        app.config.update(WTF_CSRF_ENABLED=False)
+        warnings = ["Imported row 261 from cash_app_report_btc2019.csv with $0 USD spot price."]
+        warning_rows = import_warning_review_rows(warnings)
+
+        with app.test_request_context("/import_transactions/?guided=1"):
+            blocked_page = app.jinja_env.get_template("import_transactions.html").render(
+                **import_template_context(
+                    guided_import=True,
+                    data_summary={
+                        **import_template_context()["data_summary"],
+                        "transaction_count": 2,
+                        "import_warnings": warnings,
+                        "import_warning_rows": warning_rows,
+                        "unresolved_import_warning_rows": warning_rows,
+                        "unresolved_import_warning_count": 1,
+                    },
+                )
+            )
+
+        with app.test_request_context("/import_transactions/?guided=1"):
+            ready_page = app.jinja_env.get_template("import_transactions.html").render(
+                **import_template_context(
+                    guided_import=True,
+                    data_summary={
+                        **import_template_context()["data_summary"],
+                        "transaction_count": 2,
+                        "import_warnings": warnings,
+                        "import_warning_rows": warning_rows,
+                        "unresolved_import_warning_rows": [],
+                        "unresolved_import_warning_count": 0,
+                    },
+                )
+            )
+
+        self.assertIn("Import data is loaded, but review is still needed", blocked_page)
+        self.assertIn('class="btn btn-primary btn-round btn-sm import-continue-action"', blocked_page)
+        self.assertIn('style="display: none;"', blocked_page)
+        self.assertIn("Import data is ready for the next step", ready_page)
+        self.assertIn("Continue to Declare Holdings", ready_page)
 
     def test_import_page_renders_column_review_workflow(self):
         app = create_app(config_dict["Debug"], selenium=True)

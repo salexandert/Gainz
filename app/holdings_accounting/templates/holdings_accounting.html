@@ -40,7 +40,9 @@
           <div>
             <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index', stage=2 if is_declare_mode else 3) }}">Back to Guided Reconciliation</a>
             {% if is_declare_mode %}
+            {% if holdings_summary.assets_needing_holdings == 0 %}
             <a class="btn btn-primary btn-round" href="{{ url_for('holdings_accounting_blueprint.holdings_accounting', guided=1, mode='reconcile') }}">Continue to Reconcile Gaps</a>
+            {% endif %}
             {% else %}
             <a class="btn btn-primary btn-round" href="{{ url_for('export_blueprint.review_queue', guided=1) }}">Open Guided Review Queue</a>
             {% endif %}
@@ -76,6 +78,9 @@
           <p class="mb-0">
             {% if is_declare_mode %}
             Select an asset, enter the amount you actually hold today, and save it. Use the bulk tool if one asset is your only current holding.
+            {% if holdings_summary.assets_needing_holdings == 0 %}
+            This step is complete; continue to Reconcile Gaps when you are ready.
+            {% endif %}
             {% else %}
             Select an asset marked Needs Review, read the workbench guidance, and record a supported decision or research note.
             {% endif %}
