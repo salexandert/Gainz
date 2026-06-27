@@ -11,6 +11,9 @@
 {% set import_form_url = url_for('import_transactions_blueprint.import_wizard', guided=1) if guided_import else url_for('import_transactions_blueprint.import_wizard') %}
 {% set imported_count = data_summary.transaction_count|default(0) %}
 {% set unresolved_warning_count = data_summary.unresolved_import_warning_count|default(0) %}
+{% set first_import_warning = data_summary.unresolved_import_warning_rows[0] if data_summary.unresolved_import_warning_rows else none %}
+{% set first_import_decision_option = first_import_warning.decision_options[0] if first_import_warning and first_import_warning.decision_options else none %}
+{% set source_overlap_count = data_summary.source_overlaps|default([])|length %}
 {% set can_continue_import = imported_count and unresolved_warning_count == 0 %}
 
 <!-- Page Description and Instructions -->
@@ -36,6 +39,52 @@
           </div>
           {% endif %}
         </div>
+        {% if guided_import %}
+        <div id="import_current_decision" class="gainz-current-decision" role="region" aria-label="Current decision">
+          <div>
+            <span>Current task</span>
+            <strong id="import_current_task">
+              {% if unresolved_warning_count and first_import_warning %}
+              Decide what row {{ first_import_warning.row }} represents
+              {% elif source_overlap_count %}
+              Review possible duplicate source files
+              {% elif imported_count %}
+              Confirm source data is ready
+              {% else %}
+              Upload source data
+              {% endif %}
+            </strong>
+          </div>
+          <div>
+            <span>Why</span>
+            <strong id="import_current_why">
+              {% if unresolved_warning_count and first_import_warning %}
+              {{ first_import_warning.card_title or first_import_warning.issue or "Gainz found an import warning." }}
+              {% elif source_overlap_count %}
+              Gainz found files that may cover the same activity.
+              {% elif imported_count %}
+              Source rows are loaded and no unresolved import warnings are blocking this step.
+              {% else %}
+              Gainz needs source transactions before holdings or reports can be reviewed.
+              {% endif %}
+            </strong>
+          </div>
+          <div>
+            <span>Best next action</span>
+            <strong id="import_current_best_action">
+              {% if unresolved_warning_count and first_import_warning %}
+              {{ first_import_decision_option.label if first_import_decision_option else "Answer the warning card below." }}
+              {% elif source_overlap_count %}
+              Open source review and confirm whether one file duplicates another.
+              {% elif imported_count %}
+              Continue to Declare Holdings when all intended CSVs are loaded.
+              {% else %}
+              Try demo data or upload one exchange CSV.
+              {% endif %}
+            </strong>
+          </div>
+        </div>
+        {% endif %}
         <details class="gainz-import-secondary-details mt-3">
           <summary>Supported import notes</summary>
           <div class="gainz-import-detail-body">
@@ -81,7 +130,7 @@
               </p>
             </div>
           </div>
-          {% set first_warning = data_summary.unresolved_import_warning_rows[0] if data_summary.unresolved_import_warning_rows else none %}
+          {% set first_warning = first_import_warning %}
           <div id="import_warning_first_panel" class="guided-review-panel mt-3" {% if not data_summary.unresolved_import_warning_rows %}style="display: none;"{% endif %}>
             {% if data_summary.unresolved_import_warning_rows %}
             <h3>{% if first_warning.decision %}Current warning: {{ first_warning.review_status }}{% else %}{{ first_warning.card_title or "Import warning to review" }}{% endif %}</h3>
@@ -480,14 +529,17 @@
           {% if data_summary.source_overlaps %}
           {% set first_overlap = data_summary.source_overlaps[0] %}
           <div id="source_overlap_first_panel" class="guided-review-panel mt-3">
-            <h3>First source overlap to review</h3>
+            <h3>Decide whether these files duplicate the same activity</h3>
+            <p>
+              These two source files share rows. If one file fully contains the other, keep the fuller source and remove the duplicate from this review pass. If both contain unique records, keep both and document why.
+            </p>
             <dl class="guided-review-details">
               <div>
-                <dt>Source A</dt>
+                <dt>Possible full-history source</dt>
                 <dd>{{ first_overlap.name_a }} {{ first_overlap.date_range_a }}</dd>
               </div>
               <div>
-                <dt>Source B</dt>
+                <dt>Possible year-specific source</dt>
                 <dd>{{ first_overlap.name_b }} {{ first_overlap.date_range_b }}</dd>
               </div>
               <div>
@@ -495,19 +547,21 @@
                 <dd>{{ first_overlap.matching_rows }} ({{ first_overlap.overlap_percent }})</dd>
               </div>
               <div>
-                <dt>Next action</dt>
+                <dt>Best next action</dt>
                 <dd>{{ first_overlap.next_action }}</dd>
               </div>
             </dl>
             <div class="guided-review-actions">
-              <a class="btn btn-sm btn-outline-primary" href="#source-review">Review data sources</a>
+              <a class="btn btn-sm btn-primary" href="#source-review">Review row coverage before removing anything</a>
               <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('export_blueprint.review_queue', guided=1) }}">Open Guided Review Queue</a>
             </div>
           </div>
           {% else %}
           <div id="source_overlap_first_panel" class="guided-review-panel mt-3" style="display: none;"></div>
           {% endif %}
-          <div class="table-responsive">
+          <details class="gainz-advanced-details mt-3">
+            <summary>Show source overlap evidence table</summary>
+            <div class="table-responsive gainz-import-detail-body">
             <table id="source_overlap_table" class="table table-sm table-striped">
               <thead>
                 <tr>
@@ -532,7 +586,8 @@
                 {% endfor %}
               </tbody>
             </table>
-          </div>
+            </div>
+          </details>
         </div>
         <p class="text-muted">
           Remove a source only removes its transactions from the current data set and saves a new revision.

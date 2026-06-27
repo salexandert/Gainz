@@ -32,6 +32,20 @@
           Choose a review decision before saving this item.
         </div>
         {% endif %}
+        <div class="gainz-current-decision mt-3" role="region" aria-label="Current decision">
+          <div>
+            <span>Current task</span>
+            <strong>{% if item %}Decide what to do with this work order item{% else %}Review packet preview{% endif %}</strong>
+          </div>
+          <div>
+            <span>Why</span>
+            <strong>{% if item %}{{ item.why_it_matters }}{% elif total > 0 %}Every current work order item has a saved review decision.{% else %}Gainz does not currently have open work order items.{% endif %}</strong>
+          </div>
+          <div>
+            <span>Best next action</span>
+            <strong>{% if item %}{{ item.next_action or "Review source records and document the decision." }}{% else %}Open packet preview and confirm draft or ready status.{% endif %}</strong>
+          </div>
+        </div>
       </div>
     </div>
   </div>

@@ -39,6 +39,8 @@ Gainz opens the stage that needs your attention now. You can click a lower stage
 
 Each stage includes **Done when** criteria so you know what has to be true before moving on. The old dashboard counts and review groups are still available under **Show status details**, but they are collapsed by default so the first thing you see is the current step.
 
+Guided pages also include a **Current task / Why / Best next action** band. Read this first when you land on a page; it tells you what Gainz is asking you to decide before showing source details or advanced tools.
+
 ![Gainz Guided Reconciliation]({{ '/assets/screenshots/gainz-home.png' | relative_url }})
 {: .screenshot-frame }
 

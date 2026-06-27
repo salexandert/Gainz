@@ -23,6 +23,22 @@
           </div>
           <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index', stage=4) if request.args.get('guided') else url_for('home_blueprint.index') }}">Back to Dashboard</a>
         </div>
+        {% if request.args.get('guided') %}
+        <div class="gainz-current-decision" role="region" aria-label="Current decision">
+          <div>
+            <span>Current task</span>
+            <strong>{% if audit_readiness.is_ready %}Review and generate the packet{% else %}Work the next open review item{% endif %}</strong>
+          </div>
+          <div>
+            <span>Why</span>
+            <strong>{{ audit_readiness.summary }}</strong>
+          </div>
+          <div>
+            <span>Best next action</span>
+            <strong>{{ audit_readiness.next_action }}</strong>
+          </div>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>

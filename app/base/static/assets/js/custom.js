@@ -51,6 +51,7 @@ function gainzShowImportResult(result, fileName, alertClass) {
         gainzSetSourceOverlapWorkflow(result.data_summary.source_overlaps || []);
         gainzRenderDataSources(result.data_summary);
         gainzUpdateImportContinuePanel(result.data_summary);
+        gainzUpdateImportCurrentDecision(result.data_summary);
     }
 }
 
@@ -128,6 +129,40 @@ function gainzUpdateImportContinuePanel(summary) {
     }
 }
 
+function gainzUpdateImportCurrentDecision(summary) {
+    var panel = $("#import_current_decision");
+    if (panel.length === 0 || !summary) {
+        return;
+    }
+
+    var warningRows = summary.unresolved_import_warning_rows || [];
+    var sourceOverlaps = summary.source_overlaps || [];
+    var transactionCount = summary.transaction_count || 0;
+    var task = "Upload source data";
+    var why = "Gainz needs source transactions before holdings or reports can be reviewed.";
+    var bestAction = "Try demo data or upload one exchange CSV.";
+
+    if (warningRows.length > 0) {
+        var firstWarning = warningRows[0] || {};
+        var firstOption = (firstWarning.decision_options || [])[0] || {};
+        task = "Decide what row " + (firstWarning.row || "this row") + " represents";
+        why = firstWarning.card_title || firstWarning.issue || "Gainz found an import warning.";
+        bestAction = firstOption.label || "Answer the warning card below.";
+    } else if (sourceOverlaps.length > 0) {
+        task = "Review possible duplicate source files";
+        why = "Gainz found files that may cover the same activity.";
+        bestAction = "Open source review and confirm whether one file duplicates another.";
+    } else if (transactionCount > 0) {
+        task = "Confirm source data is ready";
+        why = "Source rows are loaded and no unresolved import warnings are blocking this step.";
+        bestAction = "Continue to Declare Holdings when all intended CSVs are loaded.";
+    }
+
+    $("#import_current_task").text(task);
+    $("#import_current_why").text(why);
+    $("#import_current_best_action").text(bestAction);
+}
+
 function gainzRenderSourceOverlapTable(rows) {
     var table = $("#source_overlap_table");
     var tbody = table.find("tbody");
@@ -156,7 +191,10 @@ function gainzRenderSourceOverlapTable(rows) {
                 );
             });
             firstPanel
-                .append($("<h3></h3>").text("Source overlap to review"))
+                .append($("<h3></h3>").text("Decide whether these files duplicate the same activity"))
+                .append(
+                    $("<p></p>").text("These two source files share rows. If one file fully contains the other, keep the fuller source and remove the duplicate from this review pass. If both contain unique records, keep both and document why.")
+                )
                 .append(details)
                 .append(
                     $('<div class="alert alert-light" role="status"></div>')
@@ -164,9 +202,8 @@ function gainzRenderSourceOverlapTable(rows) {
                 )
                 .append(
                     $('<div class="guided-review-actions"></div>')
-                        .append($('<a class="btn btn-sm btn-primary" href="#source-review">Review sources before deciding</a>'))
-                        .append($('<a class="btn btn-sm btn-outline-danger" href="#source-review">Remove duplicate after confirming</a>'))
-                        .append($('<a class="btn btn-sm btn-outline-secondary" href="/export/review_queue?guided=1">I do not know yet / Send to CPA</a>'))
+                        .append($('<a class="btn btn-sm btn-primary" href="#source-review">Review row coverage before removing anything</a>'))
+                        .append($('<a class="btn btn-sm btn-outline-secondary" href="/export/review_queue?guided=1">Open Guided Review Queue</a>'))
                 )
                 .show();
         } else {
@@ -383,6 +420,7 @@ function gainzRemoveImportSourceForReimport(button) {
                         result.data_summary.unresolved_import_warning_rows || []
                     );
                     gainzUpdateImportContinuePanel(result.data_summary);
+                    gainzUpdateImportCurrentDecision(result.data_summary);
                 }
 
                 gainzOpenAdvancedImport();
@@ -754,6 +792,7 @@ $(document).on("click", ".import-warning-decision-button", function() {
                     { recordedDecisionLabel: decisionLabel }
                 );
                 gainzUpdateImportContinuePanel(data.data_summary);
+                gainzUpdateImportCurrentDecision(data.data_summary);
                 var unresolvedCount = data.data_summary.unresolved_import_warning_count || 0;
                 var savedMessage = unresolvedCount > 0
                     ? (data.message || "Import warning review decision saved.") + " " + unresolvedCount + " unresolved warning" + (unresolvedCount == 1 ? " remains." : "s remain.")

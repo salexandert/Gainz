@@ -50,6 +50,37 @@
           {% endif %}
         </div>
 
+        {% if guided_mode %}
+        <div class="gainz-current-decision" role="region" aria-label="Current decision">
+          <div>
+            <span>Current task</span>
+            <strong>
+              {% if is_declare_mode %}Declare what you currently hold{% else %}Review one holdings gap{% endif %}
+            </strong>
+          </div>
+          <div>
+            <span>Why</span>
+            <strong>
+              {% if is_declare_mode %}
+              Declared holdings give Gainz the real-world target for reconciliation.
+              {% else %}
+              A gap means imported activity does not yet explain declared holdings.
+              {% endif %}
+            </strong>
+          </div>
+          <div>
+            <span>Best next action</span>
+            <strong>
+              {% if is_declare_mode %}
+                {% if holdings_summary.assets_needing_holdings == 0 %}Continue to Reconcile Gaps.{% else %}Select an asset card or use Bulk Current Holdings.{% endif %}
+              {% else %}
+              Select a Needs Review asset and record a supported decision or research note.
+              {% endif %}
+            </strong>
+          </div>
+        </div>
+        {% endif %}
+
         <div class="holdings-progress-band">
           <button type="button" class="holdings-progress-item holdings-progress-action" data-holdings-filter="all" aria-describedby="holdings_summary_action">
             <span>Assets</span>

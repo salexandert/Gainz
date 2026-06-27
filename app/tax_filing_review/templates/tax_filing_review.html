@@ -8,6 +8,8 @@
 
 {% block content %}
 
+{% set next_tax_review = evidence_inventory.review_rows[0] if evidence_inventory.review_rows else none %}
+
 <div class="row">
   <div class="col-md-12">
     <div class="card">
@@ -18,6 +20,27 @@
             <p class="card-category">Compare Gainz's calculated Form 8949-style totals with the totals you recorded on prior-year filings.</p>
           </div>
           <span class="gainz-status-badge {{ alignment.overall_status_class }}">{{ alignment.overall_status }}</span>
+        </div>
+
+        <div class="gainz-current-decision" role="region" aria-label="Current decision">
+          <div>
+            <span>Current task</span>
+            <strong>
+              {% if next_tax_review %}Review {{ next_tax_review.year }} tax evidence{% else %}Add or scan tax evidence{% endif %}
+            </strong>
+          </div>
+          <div>
+            <span>Why</span>
+            <strong>
+              {% if next_tax_review %}{{ next_tax_review.status }}: {{ next_tax_review.what_gainz_found }}{% else %}Gainz keeps calculated totals separate from confirmed filed totals.{% endif %}
+            </strong>
+          </div>
+          <div>
+            <span>Best next action</span>
+            <strong>
+              {% if next_tax_review %}{{ next_tax_review.what_gainz_needs }}{% else %}Scan local evidence or confirm suggested filed totals only when they match filed records.{% endif %}
+            </strong>
+          </div>
         </div>
 
         <div class="audit-readiness-grid">
@@ -60,7 +83,6 @@
         </p>
 
         {% if evidence_inventory.review_rows %}
-        {% set next_tax_review = evidence_inventory.review_rows[0] %}
         <div class="guided-review-panel mt-3">
           <h2 class="gainz-section-title">Next Tax Evidence Review</h2>
           <dl class="guided-review-details">

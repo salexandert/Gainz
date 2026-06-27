@@ -177,6 +177,9 @@ class ImportAndExportTests(unittest.TestCase):
             ).render(**import_template_context(guided_import=True))
 
         self.assertIn("Step 1: Import Data", rendered_page)
+        self.assertIn("Current task", rendered_page)
+        self.assertIn("Upload source data", rendered_page)
+        self.assertIn("Try demo data or upload one exchange CSV.", rendered_page)
         self.assertIn("Start With Source Data", rendered_page)
         self.assertIn('action="/import_transactions/?guided=1"', rendered_page)
         self.assertIn("<summary>Column review options</summary>", rendered_page)
@@ -275,6 +278,8 @@ class ImportAndExportTests(unittest.TestCase):
 
         self.assertIn("Step 2 of 4", declare_page)
         self.assertIn("Declare Holdings", declare_page)
+        self.assertIn("Declare what you currently hold", declare_page)
+        self.assertIn("Declared holdings give Gainz the real-world target", declare_page)
         self.assertNotIn("Continue to Reconcile Gaps", declare_page)
         self.assertIn("Continue to Reconcile Gaps", ready_declare_page)
         self.assertIn("holdings-guided-card-grid", declare_page)
@@ -289,6 +294,8 @@ class ImportAndExportTests(unittest.TestCase):
 
         self.assertIn("Step 3 of 4", reconcile_page)
         self.assertIn("Reconcile Gaps", reconcile_page)
+        self.assertIn("Review one holdings gap", reconcile_page)
+        self.assertIn("A gap means imported activity does not yet explain declared holdings", reconcile_page)
         self.assertIn("Open Guided Review Queue", reconcile_page)
         self.assertIn("Current gap", reconcile_page)
         self.assertIn("Current Gap Actions", reconcile_page)
@@ -336,6 +343,72 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("Leave unresolved for draft only", rendered_page)
         self.assertIn("Import data is loaded, but review is still needed", rendered_page)
         self.assertIn("Review 1 unresolved import warning", rendered_page)
+
+    def test_guided_import_current_decision_prioritizes_warning(self):
+        app = create_app(config_dict["Debug"], selenium=True)
+        app.config.update(WTF_CSRF_ENABLED=False)
+        warnings = [
+            "Imported row 261 from cash_app_report_btc2019.csv with $0 USD spot price."
+        ]
+        warning_rows = import_warning_review_rows(warnings)
+
+        with app.test_request_context("/import_transactions/?guided=1"):
+            rendered_page = app.jinja_env.get_template(
+                "import_transactions.html"
+            ).render(
+                **import_template_context(
+                    guided_import=True,
+                    data_summary={
+                        **import_template_context()["data_summary"],
+                        "transaction_count": 2,
+                        "import_warnings": warnings,
+                        "import_warning_rows": warning_rows,
+                        "unresolved_import_warning_rows": warning_rows,
+                        "unresolved_import_warning_count": 1,
+                    }
+                )
+        )
+
+        self.assertIn("Decide what row 261 represents", rendered_page)
+        self.assertIn("This needs a corrected value", rendered_page)
+        self.assertNotIn("Try demo data or upload one exchange CSV.", rendered_page)
+
+    def test_source_overlap_review_starts_with_plain_language_decision(self):
+        app = create_app(config_dict["Debug"], selenium=True)
+        app.config.update(WTF_CSRF_ENABLED=False)
+        overlap = {
+            "source_a": "exchange_full_history.csv",
+            "source_b": "exchange_year_export.csv",
+            "name_a": "exchange_full_history.csv",
+            "name_b": "exchange_year_export.csv",
+            "date_range_a": "2017-2025",
+            "date_range_b": "2025",
+            "matching_rows": 42,
+            "overlap_percent": "95%",
+            "status": "Needs review",
+            "message": "These sources appear to overlap.",
+            "next_action": "Confirm whether one export duplicates the other before removing anything.",
+        }
+
+        with app.test_request_context("/import_transactions/?guided=1"):
+            rendered_page = app.jinja_env.get_template(
+                "import_transactions.html"
+            ).render(
+                **import_template_context(
+                    guided_import=True,
+                    data_summary={
+                        **import_template_context()["data_summary"],
+                        "transaction_count": 3,
+                        "source_overlap_count": 1,
+                        "source_overlaps": [overlap],
+                    }
+                )
+            )
+
+        self.assertIn("Review possible duplicate source files", rendered_page)
+        self.assertIn("Decide whether these files duplicate the same activity", rendered_page)
+        self.assertIn("Review row coverage before removing anything", rendered_page)
+        self.assertIn("Show source overlap evidence table", rendered_page)
 
     def test_import_page_hides_continue_until_warnings_are_resolved(self):
         app = create_app(config_dict["Debug"], selenium=True)

@@ -1257,6 +1257,40 @@
     padding: 12px 14px;
 }
 
+.gainz-current-decision {
+    background: #f5fbfb;
+    border: 1px solid rgba(81, 203, 206, 0.35);
+    border-left: 4px solid #51cbce;
+    border-radius: 8px;
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 18px;
+    padding: 14px 16px;
+}
+
+.gainz-current-decision span {
+    color: #5d6770;
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.gainz-current-decision strong {
+    color: #111820;
+    display: block;
+    font-size: 15px;
+    line-height: 1.45;
+    margin-top: 4px;
+}
+
+@media (max-width: 900px) {
+    .gainz-current-decision {
+        grid-template-columns: 1fr;
+    }
+}
+
 .audit-packet-list {
     margin-top: 18px;
 }
