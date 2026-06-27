@@ -50,13 +50,13 @@ From **Guided Reconciliation**, click **Open import**. Gainz opens **Step 1: Imp
 
 The Import page is intentionally staged:
 
-- Primary actions: **Try Demo Data** and the CSV upload area.
+- Primary actions: **Try Demo Data** and **Choose CSV file**. Drag/drop still works, but the visible file picker is the normal path.
 - Secondary actions: **Column review options**, which stay collapsed unless Gainz cannot confidently map the file or you choose to review headers first.
 - Tertiary review: **Add manual rows**, **Show current import status**, and **Review data sources and revisions** stay collapsed until needed.
 
 If you are learning Gainz, click **Try Demo Data**. This loads the bundled synthetic Cash App, Coinbase, and Coinbase Convert files so you can reach Reconcile and Reports & Export without using private records.
 
-Upload one file at a time. Gainz shows how many rows were imported, skipped, or warned after each upload.
+Upload one file at a time. After a file is selected, Gainz shows the filename, import progress, and how many rows were imported, skipped, or warned after each upload.
 
 After data is loaded, click **Continue to Declare Holdings** when you have imported the source files you want included in this review pass.
 
@@ -141,6 +141,8 @@ Use **Tax Evidence Inventory** to scan a local tax evidence folder or add one it
 
 For broad folder scans, use the year, file type, include-keyword, and exclude-keyword filters. Scanned files are recorded as local references by default; Gainz does not copy them into audit packets unless you explicitly choose packet copy for a curated folder or evidence item.
 
+Gainz skips likely app/output folders by default during tax evidence scans, including prior `gainz_audit_packet_*`, `audit_packets`, `exports`, `uploads`, `downloads`, `package`, and `90_Gainz_Product_Review_Archive` folders. This keeps generated packets, downloaded builds, and product-review archives from becoming duplicate evidence. When available, scan a curated year folder such as `01_Tax_Years`.
+
 Review **Confirm Suggested Filed Totals**. When Gainz can read clear values from local CSV, XLSX, or readable PDF evidence, it shows possible filed proceeds, cost basis, gain/loss, and tax-paid values with a confidence label and source file. Confirm, edit, or mark the year as needs research. Suggested totals are not treated as recorded filed totals until you save a review decision.
 
 Use **Import Filed Totals from CSV** when you already have a year-by-year filed-total CSV. Gainz reports the actual number of rows imported and skipped. If a CSV only contains three years, Gainz imports three years and leaves the other evidence years visible for review.
@@ -185,7 +187,7 @@ If the status is `Not ready`, review the listed blockers before using the packet
 
 If **Reports & Export** shows open work order items, click **Start guided review**.
 
-The guided queue shows one unresolved item at a time:
+The guided queue shows one unresolved item at a time. The decision fields and buttons appear before the deeper Gap Investigator details so you can record the outcome first, then expand your reasoning when needed:
 
 - Issue.
 - Why it matters.
@@ -246,7 +248,7 @@ Before generating an audit packet, review **Audit Packet Preview**. It shows:
 
 Reference only means the file path or label is listed, but the file is not copied. Copied means the file is included inside the audit packet and appears in the manifest with hashes.
 
-If blockers remain, Gainz can generate draft output only after you acknowledge that unresolved review items remain. Draft output is marked in the filename and inside the generated workbook or packet status files.
+If blockers remain, Gainz can generate draft output only after you check the visible draft acknowledgement box. If you click generate first, Gainz moves focus back to that acknowledgement and explains that draft output still has unresolved review items. Draft output is marked in the filename and inside the generated workbook or packet status files.
 
 After Gainz generates an audit packet, it opens a packet success screen with:
 

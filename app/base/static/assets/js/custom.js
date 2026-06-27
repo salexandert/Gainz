@@ -82,20 +82,46 @@ function gainzConfirmDialog(options) {
     });
     $("#gainz_confirm_dialog_confirm").text(options.confirmText || "Continue");
     $("#gainz_confirm_dialog_cancel").text(options.cancelText || "Cancel");
-    $("#gainz_confirm_dialog_confirm").off("click").on("click", function() {
-        dialog.hide();
-        if (options.onConfirm) {
-            options.onConfirm();
+    function closeDialog(callback) {
+        dialog.hide().off("keydown");
+        if (callback) {
+            callback();
         }
+    }
+    $("#gainz_confirm_dialog_confirm").off("click").on("click", function() {
+        closeDialog(options.onConfirm);
     });
     $("#gainz_confirm_dialog_cancel").off("click").on("click", function() {
-        dialog.hide();
-        if (options.onCancel) {
-            options.onCancel();
+        closeDialog(options.onCancel);
+    });
+    dialog.off("keydown").on("keydown", function(event) {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeDialog(options.onCancel);
+            return;
+        }
+
+        if (event.key !== "Tab") {
+            return;
+        }
+
+        var focusable = dialog.find('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])').filter(':visible');
+        if (focusable.length === 0) {
+            return;
+        }
+
+        var first = focusable.first()[0];
+        var last = focusable.last()[0];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
         }
     });
     dialog.css("display", "flex");
-    $("#gainz_confirm_dialog_confirm").focus();
+    $("#gainz_confirm_dialog_cancel").focus();
 }
 
 function gainzUpdateImportContinuePanel(summary) {
@@ -1007,6 +1033,7 @@ if (window.Dropzone) {
             this.on("sending", function (file, xhr, formData) {
                 var reviewColumns = $("#import_review_columns_before_import").is(":checked") ? "1" : "0";
                 formData.append("review_columns", reviewColumns);
+                $("#import_selected_file_status").text("Selected " + (file.name || "CSV") + ". Importing now...");
                 $("#import_upload_result")
                     .removeClass("alert-danger alert-warning")
                     .addClass("alert-info")
@@ -1031,6 +1058,7 @@ if (window.Dropzone) {
 
                 $("#import_column_mapper").hide();
                 gainzShowImportResult(result, file.name || "uploaded file");
+                $("#import_selected_file_status").text((file.name || "CSV") + " imported. Review the result and continue when ready.");
             });
 
             this.on("error", function (file, response) {
@@ -1044,6 +1072,7 @@ if (window.Dropzone) {
                     .addClass("alert-danger")
                     .text(message)
                     .show();
+                $("#import_selected_file_status").text("Import failed for " + (file.name || "CSV") + ".");
             });
         }
     };
@@ -1066,6 +1095,43 @@ $(document).ready(function () {
     }
 
     openLinkedDetails(window.location.hash);
+
+    $("#upload_exchange_csv").on("change", function () {
+        var input = this;
+        var file = input.files && input.files[0];
+        if (!file) {
+            $("#import_selected_file_status").text("No file selected yet. You can also click or drop files in the upload area below.");
+            return;
+        }
+
+        $("#import_selected_file_status").text("Selected " + file.name + ". Uploading and importing...");
+        if (window.Dropzone) {
+            var dropzone = null;
+            try {
+                dropzone = Dropzone.forElement("#upload_csv_form");
+            } catch (e) {
+                dropzone = null;
+            }
+            if (dropzone) {
+                dropzone.addFile(file);
+                input.value = "";
+                return;
+            }
+        }
+
+        $("#import_upload_result")
+            .removeClass("alert-info alert-warning")
+            .addClass("alert-danger")
+            .text("The upload control could not start. Try dropping the file onto the upload area or reload the page.")
+            .show();
+    });
+
+    $("#upload_exchange_csv_label").on("keydown", function(event) {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            $("#upload_exchange_csv").trigger("click");
+        }
+    });
 
     $(document).on("click", 'a[href^="#"]', function () {
         openLinkedDetails($(this).attr("href"));
@@ -1288,6 +1354,20 @@ $(document).ready(function() {
         $('#holdings_summary_need_holdings').text(summary.assets_needing_holdings);
         $('#holdings_summary_matched').text(summary.assets_matched);
         $('#holdings_summary_mismatch').text(summary.assets_with_mismatch);
+
+        if (holdingsIsGuided && holdingsMode == 'declare' && Number(summary.assets_needing_holdings || 0) === 0) {
+            holdingsSetCurrentDecision(
+                'Continue to Reconcile Gaps',
+                'Current holdings are recorded. Gainz can now compare them to imported activity.',
+                'Continue to Reconcile Gaps'
+            );
+        }
+    }
+
+    function holdingsSetCurrentDecision(task, why, bestAction) {
+        $('#holdings_current_task').text(task || '');
+        $('#holdings_current_why').text(why || '');
+        $('#holdings_current_best_action').text(bestAction || '');
     }
 
     function holdingsRowStatus(rowData) {
@@ -1359,6 +1439,85 @@ $(document).ready(function() {
             return 'Verified in Gainz. Review supporting records when exporting.';
         }
         return 'Select this asset to continue.';
+    }
+
+    function holdingsRefreshCurrentDecision(rowData) {
+        if (!holdingsIsGuided || $('#holdings_current_task').length === 0) {
+            return;
+        }
+
+        if (holdingsMode == 'declare') {
+            var remaining = Number($('#holdings_summary_need_holdings').text() || 0);
+            if (remaining === 0) {
+                holdingsSetCurrentDecision(
+                    'Continue to Reconcile Gaps',
+                    'Current holdings are recorded. Gainz can now compare them to imported activity.',
+                    'Continue to Reconcile Gaps'
+                );
+                return;
+            }
+
+            if (rowData) {
+                holdingsSetCurrentDecision(
+                    'Declare ' + rowData[0] + ' holdings',
+                    'Gainz needs your current ' + rowData[0] + ' amount before it can evaluate this asset.',
+                    'Enter the current amount and save declared holdings.'
+                );
+                return;
+            }
+
+            holdingsSetCurrentDecision(
+                'Declare what you currently hold',
+                'Declared holdings give Gainz the real-world target for reconciliation.',
+                'Select an asset card or use Bulk Current Holdings.'
+            );
+            return;
+        }
+
+        if (!rowData) {
+            holdingsSetCurrentDecision(
+                'Review one holdings gap',
+                'A gap means imported activity does not yet explain declared holdings.',
+                'Select a Needs Review asset and record a supported decision or research note.'
+            );
+            return;
+        }
+
+        var asset = rowData[0];
+        var status = holdingsRowStatus(rowData);
+        var difference = holdingsDifferenceForRow(rowData);
+        if (status == 'unlinked') {
+            holdingsSetCurrentDecision(
+                'Resolve ' + asset + ' missing basis',
+                asset + ' has sales without complete basis links.',
+                'Run FIFO Auto Link, or leave missing basis as needs research if records are not available yet.'
+            );
+            return;
+        }
+        if (status == 'mismatch') {
+            holdingsSetCurrentDecision(
+                'Resolve ' + asset + ' holdings mismatch',
+                'Imported activity differs from declared ' + asset + ' holdings by ' + holdingsFormatQuantity(difference) + '.',
+                difference > 0
+                    ? 'Review missing disposals, transfers, losses, or documented sends.'
+                    : 'Review missing acquisitions, income, gifts, transfers, or external records.'
+            );
+            return;
+        }
+        if (status == 'needs') {
+            holdingsSetCurrentDecision(
+                'Declare ' + asset + ' holdings',
+                'Gainz needs current holdings before reviewing this asset gap.',
+                'Open Declare Holdings and enter the current ' + asset + ' amount.'
+            );
+            return;
+        }
+
+        holdingsSetCurrentDecision(
+            asset + ' is verified in Gainz',
+            'Declared holdings and imported buy/sell activity currently match for this asset.',
+            'Move to the next gap or open Reports & Export.'
+        );
     }
 
     function holdingsFilterMatches(rowData, filterName) {
@@ -1818,6 +1977,7 @@ $(document).ready(function() {
         $('#holdings_save_message').hide().text('');
         $('#zero_holdings_confirm_panel').hide();
         holdingsRenderSelection(rowData);
+        holdingsRefreshCurrentDecision(rowData);
 
         if (!rowData) {
             $('#auto_actions_datatable').DataTable().clear().draw();
@@ -2068,6 +2228,27 @@ $(document).ready(function() {
         holdingsScrollTo('#holdings_guided_queue');
     }
 
+    function holdingsHasAnotherGuidedGap(asset) {
+        if (!holdingsIsGuided || holdingsMode != 'reconcile') {
+            return false;
+        }
+
+        var rows = holdingsGuidedEligibleRows();
+        return rows.some(function(rowData) {
+            return rowData && rowData[0] != asset;
+        });
+    }
+
+    function holdingsPostGapActionHtml(asset) {
+        if (holdingsHasAnotherGuidedGap(asset)) {
+            return ' <button type="button" id="holdings_next_gap_button" class="btn btn-sm btn-primary ml-2">Next gap</button>' +
+                ' <a class="btn btn-sm btn-outline-primary ml-2" href="/export/review_queue?guided=1">Open Guided Review Queue</a>';
+        }
+
+        return ' <a class="btn btn-sm btn-primary ml-2" href="/export/review_queue?guided=1">Open Guided Review Queue</a>' +
+            ' <a class="btn btn-sm btn-outline-primary ml-2" href="/export/?guided=1">Continue to Reports & Export</a>';
+    }
+
     $('#holdings_guided_prev_asset').on('click', function() {
         holdingsMoveGuidedQueue(-1);
     });
@@ -2090,6 +2271,11 @@ $(document).ready(function() {
         $('#holdings_completion_actions').html(
             '<a class="btn btn-sm btn-primary" href="/holdings_accounting/?guided=1&amp;mode=reconcile">Continue to Reconcile Gaps</a> ' +
             '<button type="button" id="holdings_edit_after_completion" class="btn btn-sm btn-outline-secondary">Edit declared holdings</button>'
+        );
+        holdingsSetCurrentDecision(
+            'Continue to Reconcile Gaps',
+            'Current holdings are recorded. Gainz can now compare them to imported activity.',
+            'Continue to Reconcile Gaps'
         );
         $('#holdings_completion_panel').show();
     }
@@ -2139,7 +2325,7 @@ $(document).ready(function() {
         $('#holdings_guided_queue_empty')
             .removeClass('alert-success')
             .addClass('alert-info')
-            .html('All listed assets now have declared holdings. <a href="/holdings_accounting/?guided=1&amp;mode=reconcile">Continue to Reconcile Gaps</a>.')
+            .text('All listed assets now have declared holdings. Use the completion panel to continue.')
             .show();
         holdingsShowDeclaredCompletion('Declared holdings for ' + savedAsset + ' saved. All listed assets now have declared holdings.');
         holdingsScrollTo('#holdings_guided_queue');
@@ -2280,11 +2466,7 @@ $(document).ready(function() {
                 $('#bulk_holdings_message')
                     .removeClass('alert-info alert-warning')
                     .addClass('alert-success')
-                    .html(
-                        '<strong>Bulk holdings saved.</strong> ' +
-                        $('<span></span>').text(data['message'] + ' Completed in ' + Math.max(1, Math.round((Date.now() - startedAt) / 1000)) + ' second(s).').html() +
-                        ' <a class="btn btn-sm btn-primary ml-2" href="/holdings_accounting/?guided=1&amp;mode=reconcile">Continue to Reconcile Gaps</a>'
-                    )
+                    .html('<strong>Bulk holdings saved.</strong> ' + $('<span></span>').text(data['message'] + ' Completed in ' + Math.max(1, Math.round((Date.now() - startedAt) / 1000)) + ' second(s). Continue below.').html())
                     .show();
                 holdingsShowDeclaredCompletion(data['message']);
                 holdingsScrollTo('#bulk_holdings_message');
@@ -2548,10 +2730,14 @@ $(document).ready(function() {
                     .html(
                         '<strong>Decision recorded.</strong> ' +
                         $('<span></span>').text((data['message'] || (asset + ' left unresolved as needs user research.')) + ' This remains a draft blocker.').html() +
-                        ' <button type="button" id="holdings_next_gap_button" class="btn btn-sm btn-primary ml-2">Next gap</button>' +
-                        ' <a class="btn btn-sm btn-outline-primary ml-2" href="/export/review_queue?guided=1">Open Guided Review Queue</a>'
+                        holdingsPostGapActionHtml(asset)
                     )
                     .show();
+                holdingsSetCurrentDecision(
+                    'Decision recorded for ' + asset,
+                    'This gap is documented and remains visible for draft or CPA review.',
+                    holdingsHasAnotherGuidedGap(asset) ? 'Review the next gap.' : 'Open Guided Review Queue or continue to Reports & Export.'
+                );
                 holdingsScrollTo('#holdings_save_message');
             },
             error: function(xhr) {
@@ -3627,10 +3813,18 @@ $(document).ready(function() {
     function exportReadyForOutput() {
         var isReady = String($('#draft_export_ack_panel').data('ready')) == '1';
         if (isReady || $('#draft_export_ack').is(':checked')) {
+            $('#draft_export_ack_message').hide();
             return true;
         }
 
+        $('#draft_export_ack_message').show();
         $('#export_button_text').text('Check the draft-output acknowledgement before generating files with unresolved review items.');
+        var panel = $('#draft_export_ack_panel');
+        if (panel.length) {
+            $('html, body').animate({ scrollTop: Math.max(panel.offset().top - 90, 0) }, 250, function() {
+                $('#draft_export_ack').trigger('focus');
+            });
+        }
         return false;
     }
 

@@ -54,14 +54,22 @@
         <div class="gainz-current-decision" role="region" aria-label="Current decision">
           <div>
             <span>Current task</span>
-            <strong>
-              {% if is_declare_mode %}Declare what you currently hold{% else %}Review one holdings gap{% endif %}
+            <strong id="holdings_current_task">
+              {% if is_declare_mode and holdings_summary.assets_needing_holdings == 0 %}
+              Continue to Reconcile Gaps
+              {% elif is_declare_mode %}
+              Declare what you currently hold
+              {% else %}
+              Review one holdings gap
+              {% endif %}
             </strong>
           </div>
           <div>
             <span>Why</span>
-            <strong>
-              {% if is_declare_mode %}
+            <strong id="holdings_current_why">
+              {% if is_declare_mode and holdings_summary.assets_needing_holdings == 0 %}
+              Current holdings are recorded. Gainz can now compare them to imported activity.
+              {% elif is_declare_mode %}
               Declared holdings give Gainz the real-world target for reconciliation.
               {% else %}
               A gap means imported activity does not yet explain declared holdings.
@@ -70,9 +78,11 @@
           </div>
           <div>
             <span>Best next action</span>
-            <strong>
-              {% if is_declare_mode %}
-                {% if holdings_summary.assets_needing_holdings == 0 %}Continue to Reconcile Gaps.{% else %}Select an asset card or use Bulk Current Holdings.{% endif %}
+            <strong id="holdings_current_best_action">
+              {% if is_declare_mode and holdings_summary.assets_needing_holdings == 0 %}
+              Continue to Reconcile Gaps
+              {% elif is_declare_mode %}
+              Select an asset card or use Bulk Current Holdings.
               {% else %}
               Select a Needs Review asset and record a supported decision or research note.
               {% endif %}

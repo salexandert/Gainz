@@ -293,14 +293,17 @@
 
         {% if not audit_readiness.is_ready %}
         <div id="draft_export_ack_panel" class="alert alert-warning mt-3" role="alert" data-ready="0">
-          <div class="form-check">
-            <label class="form-check-label">
-              <input id="draft_export_ack" class="form-check-input" type="checkbox">
-              Generate draft output with unresolved review items included.
+          <div class="gainz-native-checkbox-row">
+            <input id="draft_export_ack" class="gainz-native-checkbox" type="checkbox">
+            <label for="draft_export_ack" class="mb-0">
+              I understand this will generate draft output with unresolved review items included.
             </label>
           </div>
-          <p class="mb-0">
+          <p class="mb-0 mt-2">
             Draft output is useful for review, but should not be treated as filing-ready until blockers and warnings are resolved or documented.
+          </p>
+          <p id="draft_export_ack_message" class="mb-0 mt-2 text-danger" role="alert" style="display: none;">
+            Check this box to generate a draft packet with unresolved items.
           </p>
         </div>
         {% else %}
@@ -380,11 +383,17 @@
     <div class="card">
       <div class="card-body">
         <h2 class="gainz-section-title">Generate Files</h2>
+        {% if not audit_readiness.is_ready %}
+        <div class="alert alert-info" role="status">
+          <strong>Recommended next:</strong> Work the guided queue first. A draft packet is useful for CPA handoff or research, but it is not filing-ready.
+          <a class="btn btn-sm btn-primary btn-round ml-2" href="{{ url_for('export_blueprint.review_queue', guided=1) }}">Open Guided Review Queue</a>
+        </div>
+        {% endif %}
         <p class="text-muted">Create a workbook or audit packet in the output folder above.</p>
         <p id="export_button_text"></p>
-        <button type="button" id="export_button" class="btn btn-success">Generate Workbook</button>
-        <button type="button" id="audit_packet_button" class="btn btn-info">
-          {% if audit_readiness.is_ready %}Generate Audit Packet{% else %}Generate Draft Audit Packet{% endif %}
+        <button type="button" id="export_button" class="btn {% if audit_readiness.is_ready %}btn-success{% else %}btn-outline-secondary{% endif %}">Generate Workbook</button>
+        <button type="button" id="audit_packet_button" class="btn {% if audit_readiness.is_ready %}btn-info{% else %}btn-outline-info{% endif %}">
+          {% if audit_readiness.is_ready %}Generate Audit Packet{% else %}Generate Draft Packet For CPA Review{% endif %}
         </button>
       </div>
     </div>

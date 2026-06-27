@@ -130,6 +130,9 @@
   <div class="col-md-12">
     <div class="alert alert-success" role="alert">
       Tax evidence inventory updated. {{ saved_evidence }} item{% if saved_evidence != "1" %}s{% endif %} added or refreshed.
+      {% if skipped_evidence_folders and skipped_evidence_folders != "0" %}
+      Gainz skipped {{ skipped_evidence_folders }} likely app/output folder{% if skipped_evidence_folders != "1" %}s{% endif %} during the scan.
+      {% endif %}
     </div>
   </div>
 </div>
@@ -286,6 +289,20 @@
               <small class="form-text text-muted">
                 Reference only: Gainz lists the local file path, but does not copy the file. Copied: Gainz includes the file in the audit packet. Scans default to reference only.
               </small>
+              <details class="gainz-advanced-details mt-3">
+                <summary>Skipped likely app/output folders</summary>
+                <div class="gainz-import-detail-body">
+                  <p class="mb-2">
+                    Gainz skips common product-review, download, upload, export, and prior packet folders by default so evidence scans do not multiply generated artifacts.
+                  </p>
+                  <ul class="gainz-plain-list">
+                    {% for folder in default_evidence_scan_exclude_folders %}
+                    <li>{{ folder }}</li>
+                    {% endfor %}
+                  </ul>
+                  <p class="mb-0 text-muted">Recommended structure: scan a curated folder such as <strong>01_Tax_Years</strong> when available.</p>
+                </div>
+              </details>
               <div class="form-group mt-3">
                 <label for="scan_preset">Scan Preset</label>
                 <select id="scan_preset" name="scan_preset" class="form-control">
@@ -316,24 +333,21 @@
                 <span class="d-block text-muted small mb-1">File Types</span>
                 {% for extension in [".pdf", ".csv", ".xlsx", ".xls", ".txt", ".png", ".jpg", ".jpeg"] %}
                 <label class="form-check-label mr-3">
-                  <input class="form-check-input" type="checkbox" name="evidence_file_types" value="{{ extension }}" checked>
+                  <input class="gainz-native-checkbox" type="checkbox" name="evidence_file_types" value="{{ extension }}" checked>
                   {{ extension }}
-                  <span class="form-check-sign"></span>
                 </label>
                 {% endfor %}
               </div>
-              <div class="form-check mt-2">
-                <label class="form-check-label">
-                  <input class="form-check-input" type="checkbox" name="recursive" value="1" checked>
+              <div class="gainz-native-checkbox-row mt-2">
+                <input id="tax_evidence_recursive" class="gainz-native-checkbox" type="checkbox" name="recursive" value="1" checked>
+                <label for="tax_evidence_recursive" class="mb-0">
                   Include subfolders
-                  <span class="form-check-sign"></span>
                 </label>
               </div>
-              <div class="form-check mt-2">
-                <label class="form-check-label">
-                  <input class="form-check-input" type="checkbox" name="copy_scanned_evidence" value="1">
+              <div class="gainz-native-checkbox-row mt-2">
+                <input id="copy_scanned_evidence" class="gainz-native-checkbox" type="checkbox" name="copy_scanned_evidence" value="1">
+                <label for="copy_scanned_evidence" class="mb-0">
                   Copy scanned evidence files into audit packets
-                  <span class="form-check-sign"></span>
                 </label>
                 <small class="form-text text-muted">Leave this off for broad folder scans. Turn it on only for a curated evidence folder you intend to hand off.</small>
               </div>
@@ -372,11 +386,10 @@
                   <button type="submit" class="btn btn-success btn-block">Add Evidence</button>
                 </div>
               </div>
-              <div class="form-check mt-3">
-                <label class="form-check-label">
-                  <input class="form-check-input" type="checkbox" name="copy_to_packet" value="1">
+              <div class="gainz-native-checkbox-row mt-3">
+                <input id="copy_tax_evidence_to_packet" class="gainz-native-checkbox" type="checkbox" name="copy_to_packet" value="1">
+                <label for="copy_tax_evidence_to_packet" class="mb-0">
                   Copy this evidence file into audit packets
-                  <span class="form-check-sign"></span>
                 </label>
                 <small class="form-text text-muted">Unchecked means reference only: the path is listed, but the file is not copied.</small>
               </div>

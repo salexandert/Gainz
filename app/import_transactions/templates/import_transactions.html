@@ -319,7 +319,25 @@
             Continue to Declare Holdings
           </a>
         </div>
-        <form id="upload_csv_form" action="{{ import_form_url }}" class="dropzone"></form>
+        <div class="gainz-upload-picker" aria-labelledby="upload_exchange_csv_label">
+          <div>
+            <label id="upload_exchange_csv_label" for="upload_exchange_csv" class="btn btn-primary btn-round mb-0" role="button" tabindex="0">
+              Choose CSV file
+            </label>
+            <input
+              id="upload_exchange_csv"
+              class="gainz-accessible-upload-input"
+              type="file"
+              accept=".csv,text/csv"
+              aria-label="Upload exchange CSV"
+              aria-describedby="import_selected_file_status"
+            >
+          </div>
+          <p id="import_selected_file_status" class="mb-0 text-muted" role="status">
+            No file selected yet. You can also click or drop files in the upload area below.
+          </p>
+        </div>
+        <form id="upload_csv_form" action="{{ import_form_url }}" class="dropzone" aria-label="Upload exchange CSV drop zone"></form>
         <details id="advanced-import" class="gainz-import-secondary-details mt-3">
           <summary>Column review options</summary>
           <div class="gainz-import-detail-body">

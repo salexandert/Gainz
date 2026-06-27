@@ -181,6 +181,9 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("Upload source data", rendered_page)
         self.assertIn("Try demo data or upload one exchange CSV.", rendered_page)
         self.assertIn("Start With Source Data", rendered_page)
+        self.assertIn("Choose CSV file", rendered_page)
+        self.assertIn('id="upload_exchange_csv"', rendered_page)
+        self.assertIn('aria-label="Upload exchange CSV"', rendered_page)
         self.assertIn('action="/import_transactions/?guided=1"', rendered_page)
         self.assertIn("<summary>Column review options</summary>", rendered_page)
         self.assertIn("<summary>Show current import status</summary>", rendered_page)
@@ -282,6 +285,12 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("Declared holdings give Gainz the real-world target", declare_page)
         self.assertNotIn("Continue to Reconcile Gaps", declare_page)
         self.assertIn("Continue to Reconcile Gaps", ready_declare_page)
+        self.assertIn("Current holdings are recorded. Gainz can now compare them to imported activity.", ready_declare_page)
+        self.assertIn('id="holdings_current_task"', ready_declare_page)
+        self.assertLess(
+            ready_declare_page.index('id="holdings_current_task"'),
+            ready_declare_page.index("Current holdings are recorded"),
+        )
         self.assertIn("holdings-guided-card-grid", declare_page)
         self.assertIn("holdings-data-source-only", declare_page)
         self.assertIn("Confirm zero holdings", declare_page)
@@ -1549,6 +1558,53 @@ class ImportAndExportTests(unittest.TestCase):
                 db.session.remove()
                 db.engine.dispose()
 
+    def test_tax_evidence_scan_skips_gainz_artifact_folders_by_default(self):
+        transactions = empty_transactions()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            evidence_dir = Path(temp_dir) / "Taxes"
+            evidence_dir.mkdir()
+            (evidence_dir / "2023_filed_return.pdf").write_text("synthetic return", encoding="utf-8")
+            archive_dir = evidence_dir / "90_Gainz_Product_Review_Archive" / "Artifacts"
+            archive_dir.mkdir(parents=True)
+            (archive_dir / "2023_filed_return_duplicate.pdf").write_text("duplicate return", encoding="utf-8")
+            packet_dir = evidence_dir / "gainz_audit_packet_DRAFT_2026-06-27"
+            packet_dir.mkdir()
+            (packet_dir / "PACKET_STATUS.md").write_text("generated packet", encoding="utf-8")
+
+            class RouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(RouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client, patch(
+                "app.tax_filing_review.routes._scan_location_choices",
+                return_value={"detected_taxes": str(evidence_dir)},
+            ):
+                response = client.post(
+                    "/tax_filing_review/scan_evidence_folder",
+                    data={
+                        "scan_location": "detected_taxes",
+                        "recursive": "1",
+                        "evidence_file_types": [".pdf", ".md"],
+                    },
+                )
+
+            self.assertEqual(302, response.status_code)
+            self.assertIn("saved_evidence=1", response.location)
+            self.assertIn("skipped_evidence_folders=2", response.location)
+            self.assertEqual(["2023_filed_return.pdf"], [
+                record["evidence_label"] for record in transactions.tax_evidence_records
+            ])
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
     def test_tax_filing_review_imports_filed_totals_csv_with_unicode_hyphen_headers(self):
         transactions = empty_transactions()
         csv_text = (
@@ -1744,6 +1800,11 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertIn(b"It is valid to choose", response.data)
             self.assertIn(b"Return to Reports & Export", response.data)
             self.assertIn(b"/export/?guided=1", response.data)
+            response_text = response.data.decode("utf-8")
+            self.assertLess(
+                response_text.index("User memory notes / files checked"),
+                response_text.index("Gap Investigator"),
+            )
 
             readiness = get_audit_readiness_summary(transactions)
             rows = [

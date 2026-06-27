@@ -1,4 +1,5 @@
 import os
+from fnmatch import fnmatch
 from pathlib import Path
 
 from flask import current_app, redirect, render_template, request, url_for
@@ -20,6 +21,16 @@ from . import blueprint
 
 
 TAX_EVIDENCE_SCAN_EXTENSIONS = {".pdf", ".csv", ".xlsx", ".xls", ".txt", ".png", ".jpg", ".jpeg"}
+DEFAULT_EVIDENCE_SCAN_EXCLUDE_FOLDERS = [
+    "90_Gainz_Product_Review_Archive",
+    "Gainz_v*_validation_*",
+    "gainz_audit_packet_*",
+    "downloads",
+    "package",
+    "exports",
+    "audit_packets",
+    "uploads",
+]
 EVIDENCE_SCAN_PRESETS = {
     "crypto_tax_evidence": {
         "label": "Crypto tax evidence only",
@@ -173,6 +184,15 @@ def _path_matches_scan_filters(path, years, include_keywords, exclude_keywords):
     return True
 
 
+def _default_excluded_scan_folder(path):
+    for part in Path(path).parts:
+        normalized_part = str(part).strip().lower()
+        for pattern in DEFAULT_EVIDENCE_SCAN_EXCLUDE_FOLDERS:
+            if fnmatch(normalized_part, pattern.lower()):
+                return pattern
+    return ""
+
+
 def _save_uploaded_evidence(file_storage):
     if not file_storage or not file_storage.filename:
         return ""
@@ -272,6 +292,8 @@ def index():
         imported_tax_rows=request.args.get("imported_tax_rows"),
         skipped_tax_rows=request.args.get("skipped_tax_rows"),
         tax_import_error=request.args.get("tax_import_error"),
+        skipped_evidence_folders=request.args.get("skipped_evidence_folders"),
+        default_evidence_scan_exclude_folders=DEFAULT_EVIDENCE_SCAN_EXCLUDE_FOLDERS,
     )
 
 
@@ -407,9 +429,14 @@ def scan_tax_evidence_folder():
 
     paths = folder.rglob("*") if recursive else folder.iterdir()
     added = 0
+    skipped_default_folders = set()
     for path in sorted(paths):
         if added >= 500:
             break
+        excluded_folder = _default_excluded_scan_folder(path)
+        if excluded_folder:
+            skipped_default_folders.add(excluded_folder)
+            continue
         if not path.is_file() or path.suffix.lower() not in extension_filters:
             continue
         if not _path_matches_scan_filters(path, year_filters, include_keywords, exclude_keywords):
@@ -436,7 +463,11 @@ def scan_tax_evidence_folder():
     if added:
         transactions.save(description=f"Scanned {added} tax evidence item(s)")
 
-    return redirect(url_for('tax_filing_review_blueprint.index', saved_evidence=added))
+    return redirect(url_for(
+        'tax_filing_review_blueprint.index',
+        saved_evidence=added,
+        skipped_evidence_folders=len(skipped_default_folders),
+    ))
 
 
 @blueprint.route('/import_csv', methods=['POST'])

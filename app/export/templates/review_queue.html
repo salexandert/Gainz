@@ -102,9 +102,51 @@
           </section>
         </div>
 
-        <div class="alert alert-info" role="note">
-          It is valid to choose "I do not know yet." Gainz keeps that as a documented draft blocker instead of forcing certainty.
-        </div>
+        <form method="POST" action="{{ url_for('export_blueprint.review_queue_save') }}" class="guided-review-form">
+          <input type="hidden" name="item_id" value="{{ item.item_id }}">
+          <div class="alert alert-info" role="note">
+            It is valid to choose "I do not know yet." Gainz keeps that as a documented draft blocker instead of forcing certainty.
+          </div>
+          <div class="form-group">
+            <label for="guided_review_note">User memory notes / files checked</label>
+            <textarea
+              id="guided_review_note"
+              name="note"
+              class="form-control"
+              rows="3"
+              placeholder="Write what you remember, what you checked, or what still needs research."
+            >{{ item.review_note }}</textarea>
+          </div>
+          <div class="form-group">
+            <label for="guided_review_cpa_question">Question for CPA or future research</label>
+            <textarea
+              id="guided_review_cpa_question"
+              name="cpa_question"
+              class="form-control"
+              rows="3"
+              placeholder="{{ item.suggested_cpa_question }}"
+            >{{ item.cpa_question }}</textarea>
+            <small class="form-text text-muted">Suggested: {{ item.suggested_cpa_question }}</small>
+          </div>
+          <div class="guided-review-actions" role="group" aria-label="Review decisions">
+            {% for choice in choices %}
+            <button
+              type="submit"
+              name="decision"
+              value="{{ choice.value }}"
+              class="btn {% if item.review_decision == choice.value %}btn-primary{% else %}btn-outline-primary{% endif %}"
+            >
+              {{ choice.label }}
+            </button>
+            {% endfor %}
+          </div>
+          <div class="guided-review-secondary-actions">
+            {% if next_item_id %}
+            <a class="btn btn-link" href="{{ url_for('export_blueprint.review_queue', guided=1, item_id=next_item_id) }}">Skip for now</a>
+            {% endif %}
+            <a class="btn btn-link" href="{{ url_for('export_blueprint.index', guided=1) }}">Return to Reports & Export</a>
+          </div>
+        </form>
 
         <section class="guided-review-panel gap-investigator-panel" aria-labelledby="gap_investigator_heading">
           <h3 id="gap_investigator_heading">Gap Investigator</h3>
@@ -159,49 +201,6 @@
             </div>
           </div>
         </section>
-
-        <form method="POST" action="{{ url_for('export_blueprint.review_queue_save') }}" class="guided-review-form">
-          <input type="hidden" name="item_id" value="{{ item.item_id }}">
-          <div class="form-group">
-            <label for="guided_review_note">User memory notes / files checked</label>
-            <textarea
-              id="guided_review_note"
-              name="note"
-              class="form-control"
-              rows="3"
-              placeholder="Write what you remember, what you checked, or what still needs research."
-            >{{ item.review_note }}</textarea>
-          </div>
-          <div class="form-group">
-            <label for="guided_review_cpa_question">Question for CPA or future research</label>
-            <textarea
-              id="guided_review_cpa_question"
-              name="cpa_question"
-              class="form-control"
-              rows="3"
-              placeholder="{{ item.suggested_cpa_question }}"
-            >{{ item.cpa_question }}</textarea>
-            <small class="form-text text-muted">Suggested: {{ item.suggested_cpa_question }}</small>
-          </div>
-          <div class="guided-review-actions" role="group" aria-label="Review decisions">
-            {% for choice in choices %}
-            <button
-              type="submit"
-              name="decision"
-              value="{{ choice.value }}"
-              class="btn {% if item.review_decision == choice.value %}btn-primary{% else %}btn-outline-primary{% endif %}"
-            >
-              {{ choice.label }}
-            </button>
-            {% endfor %}
-          </div>
-          <div class="guided-review-secondary-actions">
-            {% if next_item_id %}
-            <a class="btn btn-link" href="{{ url_for('export_blueprint.review_queue', guided=1, item_id=next_item_id) }}">Skip for now</a>
-            {% endif %}
-            <a class="btn btn-link" href="{{ url_for('export_blueprint.index', guided=1) }}">Return to Reports & Export</a>
-          </div>
-        </form>
       </div>
     </div>
   </div>
