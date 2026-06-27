@@ -1357,6 +1357,12 @@
     color: #4f5962;
 }
 
+.guided-review-panel .import-warning-question {
+    color: #111820;
+    font-size: 18px;
+    margin: 16px 0 8px;
+}
+
 .guided-review-details {
     display: grid;
     gap: 8px;

@@ -536,7 +536,7 @@ class TransactionsEngineTests(unittest.TestCase):
         readiness = get_audit_readiness_summary(transactions)
 
         self.assertIn(
-            "1 import warning reviewed but still blocking: Needs manual USD value.",
+            "1 import warning reviewed but still blocking: Sold, spent, or paid to someone.",
             readiness["warnings"],
         )
         self.assertNotIn("Choose review decisions for 1 import warning.", readiness["warnings"])
@@ -550,7 +550,7 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertTrue(checklist["Import warning decisions recorded"]["complete"])
         self.assertFalse(checklist["Import warning blockers resolved"]["complete"])
         self.assertIn(
-            "Needs manual USD value",
+            "Sold, spent, or paid to someone",
             checklist["Import warning blockers resolved"]["detail"],
         )
 
@@ -596,7 +596,7 @@ class TransactionsEngineTests(unittest.TestCase):
                     "source": "cash_app_report.csv",
                     "issue": "$0 USD spot price",
                     "decision": "needs_manual_usd_value",
-                    "decision_label": "Needs manual USD value",
+                    "decision_label": "Sold, spent, or paid to someone",
                     "next_action": "Map USD value.",
                 },
             ],

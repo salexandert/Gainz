@@ -81,7 +81,7 @@ WORK_ORDER_REVIEW_DECISIONS = {
     "keep_owner_transfer": "Keep as owner transfer",
     "document_unknown_basis": "Document unknown basis",
     "needs_research": "Needs research",
-    "ignored_for_draft": "Ignore for draft only",
+    "ignored_for_draft": "Leave unresolved for draft only",
     "sent_to_cpa": "Sent to CPA",
 }
 

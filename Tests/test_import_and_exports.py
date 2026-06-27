@@ -324,15 +324,16 @@ class ImportAndExportTests(unittest.TestCase):
 
         self.assertIn('id="import_warning_workflow"', rendered_page)
         self.assertIn("Import warnings need review", rendered_page)
-        self.assertIn("First warning to review", rendered_page)
+        self.assertIn("Gainz found an import row that needs review", rendered_page)
         self.assertIn("Show all import warning rows", rendered_page)
         self.assertIn("coinbase.csv", rendered_page)
-        self.assertIn("Suggested next action", rendered_page)
+        self.assertIn("What should happen with this row?", rendered_page)
+        self.assertIn("Advanced import repair", rendered_page)
         self.assertIn("Show source path", rendered_page)
         self.assertIn("Open Advanced Import / Column Mapping", rendered_page)
         self.assertIn("Remove this source and re-import", rendered_page)
         self.assertIn("I do not know yet", rendered_page)
-        self.assertIn("Ignore for draft only", rendered_page)
+        self.assertIn("Leave unresolved for draft only", rendered_page)
         self.assertIn("Import data is loaded, but review is still needed", rendered_page)
         self.assertIn("Review 1 unresolved import warning", rendered_page)
 
@@ -424,6 +425,45 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("Open the source file and check row 261", warning_rows[0]["next_action"])
         self.assertIn("USD spot/total USD value column", warning_rows[0]["next_action"])
         self.assertIn("re-import using Advanced Import", warning_rows[0]["next_action"])
+
+    def test_usd_spot_withdrawal_warning_uses_owner_transfer_decision_card(self):
+        transactions = empty_transactions()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "cash_app_report_btc2019.csv"
+            source.write_text(
+                "\n".join([
+                    "Transaction ID,Date,Transaction Type,Currency,Amount,Fee,Net Amount,Asset Type,Asset Price,Asset Amount,Status,Notes,Name,Account",
+                    "m11cax,2020-02-16 21:59:29 EST,Bitcoin Withdrawal,USD,$0,$0,$0,BTC,,0.03760644,COMPLETED,Withdrawing BTC 0.03760644,,Your Cash",
+                    "h88o3a,2020-02-16 21:58:49 EST,Bitcoin Buy,USD,($370),($6.71),($376.71),BTC,$9838.74,0.03760644,COMPLETED,purchase of BTC 0.03760644,,Your Cash",
+                ]),
+                encoding="utf-8",
+            )
+            transactions.transactions = [
+                Send("BTC", 0.03760644, datetime.datetime(2020, 2, 16, 21, 59, 29), 0, str(source))
+            ]
+
+            warning_rows = import_warning_review_rows([
+                "Imported row 2 from cash_app_report_btc2019.csv with $0 USD spot price."
+            ], transactions=transactions)
+
+        warning = warning_rows[0]
+        self.assertEqual("zero_usd_transfer", warning["mode"])
+        self.assertEqual("Gainz found a $0 BTC withdrawal", warning["card_title"])
+        self.assertEqual("What happened to this BTC?", warning["question"])
+        self.assertEqual("Bitcoin Withdrawal", warning["raw_row_type"])
+        self.assertEqual("$0", warning["raw_usd_amount"])
+        self.assertIn("Withdrawing BTC 0.03760644", warning["notes"])
+        self.assertIn("row 3: Bitcoin Buy", warning["nearby_summary"])
+        self.assertIn("0.03760644 BTC", warning["nearby_summary"])
+        self.assertEqual(
+            {
+                "decision": "true_zero_value_transfer",
+                "label": "This went to my own wallet/account",
+                "style": "primary",
+            },
+            warning["decision_options"][0],
+        )
 
     def test_public_mapping_prompt_does_not_create_warning_rows(self):
         result = _public_import_result({
@@ -2098,7 +2138,7 @@ class ImportAndExportTests(unittest.TestCase):
 
             self.assertEqual(1, len(warning_rows))
             self.assertEqual("Cleared from active warnings", warning_rows[0]["active_status"])
-            self.assertEqual("True zero-value transfer", warning_rows[0]["decision"])
+            self.assertEqual("Own wallet/account transfer", warning_rows[0]["decision"])
             self.assertEqual("Reviewed before warning was cleared.", warning_rows[0]["note"])
 
             summary = json.loads((packet_path / "03_manifests" / "audit_packet_summary.json").read_text(encoding="utf-8"))

@@ -125,12 +125,9 @@ Use **Import** for source warnings and source-management decisions.
 
 If Gainz shows import warnings, review them before relying on generated reports. The warning table shows source file, row number, date, type, asset, quantity, issue, likely category, and review decision.
 
-For each warning, choose whether it is:
+For each warning, answer the plain-language question Gainz shows. A `$0` withdrawal usually asks whether the asset went to your own wallet/account, was sold/spent/paid to someone, is still unknown, or imported incorrectly.
 
-- A true zero-value transfer.
-- A row that needs a manual USD value.
-- Something to ignore for now.
-- Something that needs a note.
+Use **Advanced import repair** only when the source row or mapped columns look wrong. In that path, open the source file, check the row number and USD spot/total USD value column, then re-import with Advanced Import if needed.
 
 Unresolved warnings stay visible in Reports & Export and the audit packet.
 
@@ -203,7 +200,7 @@ Choose the review decision that matches what you found:
 - `Keep as owner transfer`
 - `Document unknown basis`
 - `Needs research`
-- `Ignore for draft only`
+- `Leave unresolved for draft only`
 - `Sent to CPA`
 
 It is valid to choose an unresolved state when you do not know yet. Gainz keeps the item as a draft blocker and documents the uncertainty instead of forcing a guess.

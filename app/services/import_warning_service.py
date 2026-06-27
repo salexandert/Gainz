@@ -10,17 +10,17 @@ ROW_WARNING_RE = re.compile(
 UNRECOGNIZED_TYPE_RE = re.compile(r"unrecognized transaction type '([^']+)'", re.IGNORECASE)
 IMPORT_WARNING_DECISIONS = {
     "true_zero_value_transfer": {
-        "label": "True zero-value transfer",
-        "status": "Reviewed",
+        "label": "Own wallet/account transfer",
+        "status": "Resolved",
         "resolved": True,
     },
     "needs_manual_usd_value": {
-        "label": "Needs manual USD value",
-        "status": "Needs manual USD value",
+        "label": "Sold, spent, or paid to someone",
+        "status": "Needs value or evidence",
         "resolved": False,
     },
     "ignore_for_now": {
-        "label": "Ignore for draft only",
+        "label": "Leave unresolved for draft only",
         "status": "Draft-only unresolved",
         "resolved": False,
     },
@@ -117,17 +117,99 @@ def _read_csv_row_details(source_name, row_number, transactions=None):
         lookup = build_column_lookup(headers)
         raw_type = get_row_value(row, lookup, "transaction_type", "")
         raw_quantity = get_row_value(row, lookup, "asset_amount", "")
+        raw_asset = get_row_value(row, lookup, "asset_type", "")
+        raw_usd_amount = (
+            get_row_value(row, lookup, "fiat_amount", "")
+            or get_row_value(row, lookup, "total", "")
+            or get_row_value(row, lookup, "net_amount", "")
+            or get_row_value(row, lookup, "subtotal", "")
+        )
+        asset = normalize_asset_symbol(raw_asset)
+        quantity = str(parse_quantity_value(raw_quantity)) if raw_quantity != "" else ""
+        nearby_row = _nearby_source_row(
+            rows,
+            headers,
+            lookup,
+            header_row,
+            row_number,
+            asset,
+            quantity,
+            normalize_asset_symbol,
+            parse_quantity_value,
+            standardize_transaction_type,
+            get_row_value,
+        )
 
         return {
             "source_path": source_path,
             "row_date": str(get_row_value(row, lookup, "date", "") or ""),
             "row_type": standardize_transaction_type(raw_type),
-            "asset": normalize_asset_symbol(get_row_value(row, lookup, "asset_type", "")),
-            "quantity": str(parse_quantity_value(raw_quantity)) if raw_quantity != "" else "",
+            "raw_row_type": str(raw_type or ""),
+            "asset": asset,
+            "quantity": quantity,
+            "raw_usd_amount": str(raw_usd_amount or ""),
             "notes": str(get_row_value(row, lookup, "notes", "") or ""),
+            "nearby_row": nearby_row,
         }
     except Exception:
         return {"source_path": source_path}
+
+
+def _nearby_source_row(
+    rows,
+    headers,
+    lookup,
+    header_row,
+    row_number,
+    asset,
+    quantity,
+    normalize_asset_symbol,
+    parse_quantity_value,
+    standardize_transaction_type,
+    get_row_value,
+):
+    if not rows or row_number <= 1:
+        return None
+
+    for candidate_number in (row_number + 1, row_number - 1):
+        if candidate_number <= header_row or candidate_number > len(rows):
+            continue
+
+        values = rows[candidate_number - 1]
+        row = {
+            headers[index]: values[index] if index < len(values) else ""
+            for index in range(len(headers))
+        }
+        raw_type = get_row_value(row, lookup, "transaction_type", "")
+        candidate_type = standardize_transaction_type(raw_type)
+        candidate_asset = normalize_asset_symbol(get_row_value(row, lookup, "asset_type", ""))
+        raw_quantity = get_row_value(row, lookup, "asset_amount", "")
+        candidate_quantity = str(parse_quantity_value(raw_quantity)) if raw_quantity != "" else ""
+
+        if asset and candidate_asset and candidate_asset != asset:
+            continue
+        if quantity and candidate_quantity and candidate_quantity != quantity:
+            continue
+        if candidate_type not in ("Buy", "Sell", "Receive", "Send"):
+            continue
+
+        raw_usd_amount = (
+            get_row_value(row, lookup, "fiat_amount", "")
+            or get_row_value(row, lookup, "total", "")
+            or get_row_value(row, lookup, "net_amount", "")
+            or get_row_value(row, lookup, "subtotal", "")
+        )
+        return {
+            "row": str(candidate_number),
+            "row_type": candidate_type,
+            "raw_row_type": str(raw_type or ""),
+            "asset": candidate_asset,
+            "quantity": candidate_quantity,
+            "raw_usd_amount": str(raw_usd_amount or ""),
+            "notes": str(get_row_value(row, lookup, "notes", "") or ""),
+        }
+
+    return None
 
 
 def _likely_category(issue, row_details):
@@ -148,6 +230,127 @@ def _likely_category(issue, row_details):
         return "Needs column mapping"
 
     return "Needs source-row review"
+
+
+def _warning_guidance(issue, row_details):
+    issue_lower = str(issue or "").lower()
+    row_type = str(row_details.get("row_type", "") or "")
+    raw_type = str(row_details.get("raw_row_type", "") or row_type or "source row")
+    asset = row_details.get("asset") or "asset"
+    quantity = row_details.get("quantity") or ""
+    is_zero_usd = "$0 usd spot" in issue_lower
+    is_transfer_like = row_type in ("Send", "Receive") or any(
+        term in raw_type.lower()
+        for term in ("withdraw", "deposit", "send", "receive", "transfer")
+    )
+
+    if is_zero_usd and is_transfer_like:
+        direction = "withdrawal" if row_type == "Send" or "withdraw" in raw_type.lower() else "transfer"
+        nearby = row_details.get("nearby_row") or {}
+        nearby_summary = ""
+        if nearby:
+            nearby_type = nearby.get("raw_row_type") or nearby.get("row_type") or "nearby row"
+            nearby_quantity = nearby.get("quantity") or quantity
+            nearby_asset = nearby.get("asset") or asset
+            nearby_usd = nearby.get("raw_usd_amount") or ""
+            nearby_summary = (
+                f"Nearby source row: row {nearby.get('row')}: {nearby_type}, "
+                f"{nearby_quantity} {nearby_asset}"
+            )
+            if nearby_usd:
+                nearby_summary = f"{nearby_summary}, {nearby_usd}"
+            nearby_summary = f"{nearby_summary}."
+
+        return {
+            "mode": "zero_usd_transfer",
+            "card_title": f"Gainz found a $0 {asset} {direction}",
+            "summary": (
+                f"This looks like a {asset} {direction}. If it went to your own wallet or account, "
+                "it can stay as a transfer. If it was sold, spent, or paid to someone, Gainz needs "
+                "a USD value or supporting note before reports are filing-ready."
+            ),
+            "question": f"What happened to this {asset}?",
+            "nearby_summary": nearby_summary,
+            "decision_options": [
+                {
+                    "decision": "true_zero_value_transfer",
+                    "label": "This went to my own wallet/account",
+                    "style": "primary",
+                },
+                {
+                    "decision": "needs_manual_usd_value",
+                    "label": "This was sold, spent, or paid to someone",
+                    "style": "secondary",
+                },
+                {
+                    "decision": "unknown_needs_research",
+                    "label": "I do not know yet",
+                    "style": "secondary",
+                },
+                {
+                    "decision": "ignore_for_now",
+                    "label": "Leave unresolved for draft only",
+                    "style": "quiet",
+                },
+            ],
+        }
+
+    if is_zero_usd and row_type in ("Buy", "Sell"):
+        return {
+            "mode": "missing_usd_value",
+            "card_title": f"Gainz found a $0 USD {row_type.lower()} row",
+            "summary": (
+                "This row looks like taxable activity or basis activity with a missing USD value. "
+                "Open the source row, check the USD columns, and enter or re-import the correct value."
+            ),
+            "question": "Can you find the missing USD value?",
+            "nearby_summary": "",
+            "decision_options": [
+                {
+                    "decision": "needs_manual_usd_value",
+                    "label": "This row needs a USD value",
+                    "style": "primary",
+                },
+                {
+                    "decision": "unknown_needs_research",
+                    "label": "I do not know yet",
+                    "style": "secondary",
+                },
+                {
+                    "decision": "ignore_for_now",
+                    "label": "Leave unresolved for draft only",
+                    "style": "quiet",
+                },
+            ],
+        }
+
+    return {
+        "mode": "import_repair",
+        "card_title": "Gainz found an import row that needs review",
+        "summary": (
+            "Review the source row and decide whether this is a missing value, a row that should "
+            "be imported differently, or a research item."
+        ),
+        "question": "What should happen with this row?",
+        "nearby_summary": "",
+        "decision_options": [
+            {
+                "decision": "needs_manual_usd_value",
+                "label": "This needs a corrected value",
+                "style": "primary",
+            },
+            {
+                "decision": "unknown_needs_research",
+                "label": "I do not know yet",
+                "style": "secondary",
+            },
+            {
+                "decision": "ignore_for_now",
+                "label": "Leave unresolved for draft only",
+                "style": "quiet",
+            },
+        ],
+    }
 
 
 def _review_for_warning(transactions, raw_message):
@@ -246,6 +449,7 @@ def classify_import_warning(message, transactions=None):
 
     row_details = _read_csv_row_details(source, row_number, transactions)
     decision = _decision_state(_review_for_warning(transactions, raw_message))
+    guidance = _warning_guidance(issue, row_details)
 
     return {
         "raw": raw_message,
@@ -253,14 +457,18 @@ def classify_import_warning(message, transactions=None):
         "row": row_number,
         "row_date": row_details.get("row_date", ""),
         "row_type": row_details.get("row_type", ""),
+        "raw_row_type": row_details.get("raw_row_type", ""),
         "asset": row_details.get("asset", ""),
         "quantity": row_details.get("quantity", ""),
+        "raw_usd_amount": row_details.get("raw_usd_amount", ""),
         "notes": row_details.get("notes", ""),
         "source_path": row_details.get("source_path", ""),
+        "nearby_row": row_details.get("nearby_row"),
         "likely_category": _likely_category(issue, row_details),
         "issue": issue,
         "status": status,
         "next_action": next_action,
+        **guidance,
         **decision,
     }
 

@@ -240,7 +240,7 @@ class AuditPacketService:
             f"- Keep as owner transfer: {work_order_summary.get('keep_owner_transfer_count', 0)}",
             f"- Document unknown basis: {work_order_summary.get('document_unknown_basis_count', 0)}",
             f"- Needs research: {work_order_summary.get('needs_research_count', 0)}",
-            f"- Ignore for draft only: {work_order_summary.get('ignored_for_draft_count', 0)}",
+            f"- Leave unresolved for draft only: {work_order_summary.get('ignored_for_draft_count', 0)}",
             f"- Sent to CPA: {work_order_summary.get('sent_to_cpa_count', 0)}",
         ])
         status_lines.extend([

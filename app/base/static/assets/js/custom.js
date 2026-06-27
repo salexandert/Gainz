@@ -297,10 +297,10 @@ function gainzOpenAdvancedImport() {
 
 function gainzImportWarningDecisionLabel(decision) {
     return {
-        true_zero_value_transfer: "True zero-value transfer",
-        needs_manual_usd_value: "Needs manual USD value",
+        true_zero_value_transfer: "Own wallet/account transfer",
+        needs_manual_usd_value: "Sold, spent, or paid to someone",
         unknown_needs_research: "I do not know yet",
-        ignore_for_now: "Ignore for draft only",
+        ignore_for_now: "Leave unresolved for draft only",
         note: "Add note"
     }[decision] || "Save";
 }
@@ -466,6 +466,14 @@ function gainzParseImportWarning(warning) {
         issue: issue,
         status: status,
         source_path: "",
+        card_title: "Gainz found an import row that needs review",
+        summary: "Review the source row and decide whether this is a missing value, a row that should be imported differently, or a research item.",
+        question: "What should happen with this row?",
+        decision_options: [
+            { decision: "needs_manual_usd_value", label: "This needs a corrected value", style: "primary" },
+            { decision: "unknown_needs_research", label: "I do not know yet", style: "secondary" },
+            { decision: "ignore_for_now", label: "Leave unresolved for draft only", style: "quiet" }
+        ],
         next_action: nextAction
     };
 }
@@ -523,24 +531,89 @@ function gainzRenderImportWarningTable(tableSelector, rows) {
             var noteInput = $('<input type="text" class="form-control form-control-sm import-warning-note-input" placeholder="Add note">')
                 .val(row.review_note || "");
             actionCell.append(noteInput);
-            [
-                ["true_zero_value_transfer", "True zero-value transfer"],
-                ["needs_manual_usd_value", "Needs manual USD value"],
-                ["unknown_needs_research", "I do not know yet"],
-                ["ignore_for_now", "Ignore for draft only"],
-                ["note", "Add note"]
-            ].forEach(function(action) {
+            (row.decision_options || [
+                { decision: "true_zero_value_transfer", label: "This went to my own wallet/account", style: "primary" },
+                { decision: "needs_manual_usd_value", label: "This was sold, spent, or paid to someone", style: "secondary" },
+                { decision: "unknown_needs_research", label: "I do not know yet", style: "secondary" },
+                { decision: "ignore_for_now", label: "Leave unresolved for draft only", style: "quiet" }
+            ]).forEach(function(action) {
                 var button = $('<button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button"></button>')
-                    .text(action[1])
-                    .data("decision", action[0])
+                    .text(action.label)
+                    .data("decision", action.decision)
                     .data("warning", row.raw || "");
                 actionCell.append(button);
             });
+            actionCell.append(
+                $('<button type="button" class="btn btn-sm btn-outline-secondary import-warning-decision-button">Add note</button>')
+                    .data("decision", "note")
+                    .data("warning", row.raw || "")
+            );
         }
 
         tableRow.append(actionCell);
         tbody.append(tableRow);
     });
+}
+
+function gainzImportWarningOptionClass(option) {
+    if (option.style == "primary") {
+        return "btn-primary";
+    }
+    if (option.style == "quiet") {
+        return "btn-outline-secondary";
+    }
+    return "btn-outline-primary";
+}
+
+function gainzBuildImportWarningDecisionActions(row) {
+    var decisionActions = $('<div class="guided-review-actions mt-2" role="group" aria-label="Import warning decisions"></div>');
+    var options = row.decision_options || [
+        { decision: "true_zero_value_transfer", label: "This went to my own wallet/account", style: "primary" },
+        { decision: "needs_manual_usd_value", label: "This was sold, spent, or paid to someone", style: "secondary" },
+        { decision: "unknown_needs_research", label: "I do not know yet", style: "secondary" },
+        { decision: "ignore_for_now", label: "Leave unresolved for draft only", style: "quiet" }
+    ];
+
+    options.forEach(function(option) {
+        decisionActions.append(
+            $('<button type="button" class="btn btn-sm import-warning-decision-button"></button>')
+                .addClass(gainzImportWarningOptionClass(option))
+                .text(option.label)
+                .data("decision", option.decision)
+                .data("warning", row.raw || "")
+        );
+    });
+    decisionActions.append(
+        $('<button type="button" class="btn btn-sm btn-outline-secondary import-warning-show-repair-button">The CSV imported incorrectly</button>')
+    );
+
+    return decisionActions;
+}
+
+function gainzBuildImportWarningDisclosure(row) {
+    var sourceDetails = $('<details class="gainz-advanced-details mt-3 import-warning-source-details"></details>');
+    sourceDetails.append($('<summary>Show source path</summary>'));
+    sourceDetails.append(
+        $('<div class="gainz-import-detail-body"></div>')
+            .append(
+                $('<button type="button" class="btn btn-sm btn-outline-secondary import-warning-source-path-button">Show source path</button>')
+                    .data("source-path", row.source_path || "")
+                    .data("source-name", row.source || "this source")
+            )
+            .append($('<div class="import-warning-source-path-display alert alert-light mt-2" role="status" style="display: none;"></div>'))
+    );
+
+    var repairDetails = $('<details class="gainz-advanced-details mt-3 import-warning-repair-details"></details>');
+    repairDetails.append($('<summary>Advanced import repair</summary>'));
+    repairDetails.append(
+        $('<div class="gainz-import-detail-body"></div>')
+            .append($('<p class="mb-2"></p>').text("Use this only if the CSV row or column mapping appears wrong."))
+            .append(gainzBuildImportWarningRepairActions(row))
+            .append($('<a class="btn btn-sm btn-outline-primary ml-2" href="#manual-transactions">Add manual rows</a>'))
+            .append($('<a class="btn btn-sm btn-outline-primary ml-2" href="#source-review">Review sources</a>'))
+    );
+
+    return $('<div></div>').append(sourceDetails).append(repairDetails);
 }
 
 function gainzRenderFirstImportWarning(panelSelector, rows, options) {
@@ -557,7 +630,7 @@ function gainzRenderFirstImportWarning(panelSelector, rows, options) {
             panel
                 .append(
                     $('<div class="alert alert-success mb-0" role="status"></div>')
-                        .text("Recorded as " + options.recordedDecisionLabel + ". All import warnings are reviewed.")
+                        .text("Decision recorded: " + options.recordedDecisionLabel + ". All import warnings are reviewed.")
                 )
                 .show();
             return;
@@ -570,14 +643,15 @@ function gainzRenderFirstImportWarning(panelSelector, rows, options) {
     var hasDecision = !!row.decision;
     var title = hasDecision
         ? "Current warning: " + (row.review_status || row.status || "Needs review")
-        : "First warning to review";
+        : (row.card_title || "First warning to review");
     var details = $('<dl class="guided-review-details"></dl>');
     [
         ["Source", row.source || "Current import"],
         ["Row", row.row || "N/A"],
-        ["Asset", row.asset || "N/A"],
-        ["Issue", row.issue || row.raw || "Review import row"],
-        ["Status", row.review_status || row.status || "Needs review"],
+        ["Transaction", row.raw_row_type || row.row_type || "N/A"],
+        ["Amount", (row.quantity || "N/A") + (row.asset ? " " + row.asset : "")],
+        ["USD amount", row.raw_usd_amount || "$0"],
+        ["Note", row.notes || "N/A"],
         ["Decision", (row.decision_label || "Not reviewed") + (row.review_note ? ": " + row.review_note : "")]
     ].forEach(function(item) {
         details.append(
@@ -587,26 +661,10 @@ function gainzRenderFirstImportWarning(panelSelector, rows, options) {
         );
     });
 
-    var decisionActions = $('<div class="guided-review-actions mt-2" role="group" aria-label="Import warning decisions"></div>');
-    [
-        ["true_zero_value_transfer", "True zero-value transfer"],
-        ["needs_manual_usd_value", "Needs manual USD value"],
-        ["unknown_needs_research", "I do not know yet"],
-        ["ignore_for_now", "Ignore for draft only"],
-        ["note", "Add note"]
-    ].forEach(function(action) {
-        decisionActions.append(
-            $('<button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button"></button>')
-                .text(action[1])
-                .data("decision", action[0])
-                .data("warning", row.raw || "")
-        );
-    });
-
     if (options.recordedDecisionLabel) {
         panel.append(
             $('<div class="alert alert-success" role="status"></div>')
-                .text("Recorded as " + options.recordedDecisionLabel + ". " + (hasDecision ? "This warning still needs follow-up before reports are ready." : "Showing the next unresolved warning."))
+                .text("Decision recorded: " + options.recordedDecisionLabel + ". " + (hasDecision ? "This warning still needs follow-up before reports are ready." : "Showing the next unresolved warning."))
         );
     }
 
@@ -619,20 +677,16 @@ function gainzRenderFirstImportWarning(panelSelector, rows, options) {
 
     panel
         .append($("<h3></h3>").text(title))
+        .append($("<p></p>").text(row.summary || "Review this row before using generated reports."))
         .append(details)
+        .append(row.nearby_summary ? $('<div class="alert alert-light" role="status"></div>').text(row.nearby_summary) : $())
+        .append($('<p class="import-warning-question"></p>').append($("<strong></strong>").text(row.question || "What happened?")))
+        .append(gainzBuildImportWarningDecisionActions(row))
         .append(
-            $("<p></p>")
-                .addClass("mb-2")
-                .append($("<strong></strong>").text("Suggested next action: "))
-                .append(document.createTextNode(row.next_action || "Review this source row."))
-        )
-        .append(gainzBuildImportWarningRepairActions(row))
-        .append($('<div class="import-warning-source-path-display alert alert-light mt-2" role="status" style="display: none;"></div>'))
-        .append(
-            $('<input type="text" class="form-control form-control-sm import-warning-note-input" placeholder="Add note">')
+            $('<input type="text" class="form-control form-control-sm import-warning-note-input mt-3" placeholder="Optional note">')
                 .val(row.review_note || "")
         )
-        .append(decisionActions)
+        .append(gainzBuildImportWarningDisclosure(row))
         .show();
 }
 
@@ -744,6 +798,15 @@ $(document).on("click", ".import-warning-source-path-button", function() {
 
 $(document).on("click", ".import-warning-open-advanced-button", function() {
     gainzOpenAdvancedImport();
+});
+
+$(document).on("click", ".import-warning-show-repair-button", function() {
+    var panel = $(this).closest(".guided-review-panel");
+    var repairDetails = panel.find(".import-warning-repair-details").first();
+    if (repairDetails.length) {
+        repairDetails.prop("open", true);
+        $("html, body").animate({ scrollTop: repairDetails.offset().top - 90 }, 250);
+    }
 });
 
 $(document).on("click", ".import-warning-remove-source-button", function() {
