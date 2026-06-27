@@ -20,8 +20,8 @@ IMPORT_WARNING_DECISIONS = {
         "resolved": False,
     },
     "ignore_for_now": {
-        "label": "Ignore for now",
-        "status": "Unresolved",
+        "label": "Ignore for draft only",
+        "status": "Draft-only unresolved",
         "resolved": False,
     },
     "note": {

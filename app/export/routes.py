@@ -516,6 +516,7 @@ def packet_success():
     return render_template(
         "packet_success.html",
         packet=_packet_success_context(packet_path),
+        open_request=request.args.get("opened"),
     )
 
 
@@ -525,7 +526,7 @@ def open_folder():
     packet_path = _last_packet_path()
     if packet_path:
         _open_existing_local_path(packet_path)
-    return redirect(url_for("export_blueprint.packet_success"))
+    return redirect(url_for("export_blueprint.packet_success", opened="folder"))
 
 
 @blueprint.route('/open_path', methods=['POST'])
@@ -534,5 +535,5 @@ def open_path():
     packet_path = _last_packet_path()
     if packet_path:
         _open_existing_local_path(packet_path / "README_FIRST.md")
-    return redirect(url_for("export_blueprint.packet_success"))
+    return redirect(url_for("export_blueprint.packet_success", opened="readme"))
 

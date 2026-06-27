@@ -332,6 +332,7 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("Open Advanced Import / Column Mapping", rendered_page)
         self.assertIn("Remove this source and re-import", rendered_page)
         self.assertIn("I do not know yet", rendered_page)
+        self.assertIn("Ignore for draft only", rendered_page)
         self.assertIn("Import data is loaded, but review is still needed", rendered_page)
         self.assertIn("Review 1 unresolved import warning", rendered_page)
 
@@ -1378,8 +1379,15 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual(25.0, confirmed["tax_paid"])
             self.assertIn("Confirmed from Gainz", confirmed["notes"])
             needs_research = transactions.get_tax_year_record(2023)
-            self.assertEqual("Needs research", needs_research["filing_status"])
-            self.assertEqual("Needs source review.", needs_research["notes"])
+            self.assertIsNone(needs_research)
+            research_items = [
+                record
+                for record in transactions.tax_evidence_records
+                if record["year"] == 2023 and "filed totals need research" in record["evidence_label"]
+            ]
+            self.assertEqual(1, len(research_items))
+            self.assertIn("No filed totals were recorded", research_items[0]["notes"])
+            self.assertIn("Needs source review.", research_items[0]["notes"])
 
             with app.app_context():
                 db.drop_all()

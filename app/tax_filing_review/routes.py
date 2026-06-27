@@ -268,6 +268,7 @@ def index():
         saved_year=request.args.get("saved_year"),
         saved_evidence=request.args.get("saved_evidence"),
         saved_suggestion=request.args.get("saved_suggestion"),
+        research_year=request.args.get("research_year"),
         imported_tax_rows=request.args.get("imported_tax_rows"),
         skipped_tax_rows=request.args.get("skipped_tax_rows"),
         tax_import_error=request.args.get("tax_import_error"),
@@ -337,20 +338,28 @@ def mark_suggested_filed_totals_needs_research():
     existing_record = transactions.get_tax_year_record(year)
     source_reference = request.form.get("source_reference") or _existing_text_or_form("evidence_reference", "evidence_reference", existing_record)
     user_note = request.form.get("notes") or "Review source evidence before recording filed totals."
-
-    transactions.set_tax_year_record(
-        year=year,
-        reported_proceeds=existing_record.get("reported_proceeds") if existing_record else None,
-        reported_cost_basis=existing_record.get("reported_cost_basis") if existing_record else None,
-        reported_gain_loss=existing_record.get("reported_gain_loss") if existing_record else None,
-        tax_paid=existing_record.get("tax_paid") if existing_record else None,
-        filing_status="Needs research",
-        evidence_reference=source_reference,
-        notes=user_note,
+    source_label = os.path.basename(str(source_reference)) if source_reference else f"{year} suggested filed totals"
+    evidence_label = f"{source_label} - filed totals need research"
+    notes = "; ".join(
+        note
+        for note in (
+            "Suggested filed totals marked Needs Research. No filed totals were recorded from this suggestion.",
+            user_note,
+        )
+        if note
     )
-    transactions.save(description=f"Marked filed totals for {year} as needs research")
 
-    return redirect(url_for('tax_filing_review_blueprint.index', saved_year=year, saved_suggestion=1))
+    transactions.set_tax_evidence_record(
+        year=year,
+        evidence_type=classify_tax_evidence(source_reference, notes),
+        evidence_label=evidence_label,
+        evidence_path=source_reference if source_reference and os.path.exists(source_reference) else "",
+        copy_to_packet=False,
+        notes=notes,
+    )
+    transactions.save(description=f"Marked suggested filed totals for {year} as needs research")
+
+    return redirect(url_for('tax_filing_review_blueprint.index', research_year=year, saved_suggestion=1))
 
 
 @blueprint.route('/evidence', methods=['POST'])

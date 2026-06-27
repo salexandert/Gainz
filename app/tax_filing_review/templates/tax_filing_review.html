@@ -116,8 +116,12 @@
 {% if saved_suggestion %}
 <div class="row">
   <div class="col-md-12">
-    <div class="alert alert-success" role="alert">
+    <div class="alert {% if research_year %}alert-warning{% else %}alert-success{% endif %}" role="alert">
+      {% if research_year %}
+      Suggested filed totals for {{ research_year }} were marked Needs Research. Gainz saved a research evidence note and did not record filed totals from that suggestion.
+      {% else %}
       Suggested filed totals review saved.
+      {% endif %}
     </div>
   </div>
 </div>
@@ -184,10 +188,11 @@
                   <span class="text-muted">{{ candidate.evidence_type_label }}</span>
                 </td>
                 <td><span class="gainz-status-badge {{ candidate.confidence_class }}">{{ candidate.confidence }}</span></td>
-                <td><input form="{{ suggested_form_id }}" name="reported_proceeds" type="number" step="0.01" class="form-control" value="{{ candidate.reported_proceeds if candidate.reported_proceeds is not none else '' }}"></td>
-                <td><input form="{{ suggested_form_id }}" name="reported_cost_basis" type="number" step="0.01" class="form-control" value="{{ candidate.reported_cost_basis if candidate.reported_cost_basis is not none else '' }}"></td>
-                <td><input form="{{ suggested_form_id }}" name="reported_gain_loss" type="number" step="0.01" class="form-control" value="{{ candidate.reported_gain_loss if candidate.reported_gain_loss is not none else '' }}"></td>
-                <td><input form="{{ suggested_form_id }}" name="tax_paid" type="number" step="0.01" class="form-control" value="{{ candidate.tax_paid if candidate.tax_paid is not none else '' }}"></td>
+                {% set candidate_is_ambiguous = candidate.confidence != 'High' or (candidate.combined_suggestions_count or 1) > 1 %}
+                <td><input form="{{ suggested_form_id }}" name="reported_proceeds" type="number" step="0.01" class="form-control" value="{{ candidate.reported_proceeds if candidate.reported_proceeds is not none and not candidate_is_ambiguous else '' }}" placeholder="{% if candidate_is_ambiguous and candidate.reported_proceeds is not none %}Suggested {{ candidate.reported_proceeds }}{% endif %}"></td>
+                <td><input form="{{ suggested_form_id }}" name="reported_cost_basis" type="number" step="0.01" class="form-control" value="{{ candidate.reported_cost_basis if candidate.reported_cost_basis is not none and not candidate_is_ambiguous else '' }}" placeholder="{% if candidate_is_ambiguous and candidate.reported_cost_basis is not none %}Suggested {{ candidate.reported_cost_basis }}{% endif %}"></td>
+                <td><input form="{{ suggested_form_id }}" name="reported_gain_loss" type="number" step="0.01" class="form-control" value="{{ candidate.reported_gain_loss if candidate.reported_gain_loss is not none and not candidate_is_ambiguous else '' }}" placeholder="{% if candidate_is_ambiguous and candidate.reported_gain_loss is not none %}Suggested {{ candidate.reported_gain_loss }}{% endif %}"></td>
+                <td><input form="{{ suggested_form_id }}" name="tax_paid" type="number" step="0.01" class="form-control" value="{{ candidate.tax_paid if candidate.tax_paid is not none and not candidate_is_ambiguous else '' }}" placeholder="{% if candidate_is_ambiguous and candidate.tax_paid is not none %}Suggested {{ candidate.tax_paid }}{% endif %}"></td>
                 <td>{{ candidate.combined_suggestions_count or 1 }}</td>
                 <td>
                   <input form="{{ suggested_form_id }}" name="notes" type="text" class="form-control" placeholder="Optional review note">
@@ -195,8 +200,13 @@
                 </td>
                 <td>
                   <form id="{{ suggested_form_id }}" method="POST" action="{{ url_for('tax_filing_review_blueprint.confirm_suggested_filed_totals') }}"></form>
-                  <button form="{{ suggested_form_id }}" type="submit" class="btn btn-sm btn-success btn-block">Confirm / Edit</button>
+                  {% if candidate_is_ambiguous %}
                   <button form="{{ suggested_form_id }}" type="submit" class="btn btn-sm btn-warning btn-block" formaction="{{ url_for('tax_filing_review_blueprint.mark_suggested_filed_totals_needs_research') }}" formnovalidate>Needs Research</button>
+                  <button form="{{ suggested_form_id }}" type="submit" class="btn btn-sm btn-outline-primary btn-block">Confirm / Edit</button>
+                  {% else %}
+                  <button form="{{ suggested_form_id }}" type="submit" class="btn btn-sm btn-success btn-block">Confirm / Edit</button>
+                  <button form="{{ suggested_form_id }}" type="submit" class="btn btn-sm btn-outline-warning btn-block" formaction="{{ url_for('tax_filing_review_blueprint.mark_suggested_filed_totals_needs_research') }}" formnovalidate>Needs Research</button>
+                  {% endif %}
                 </td>
               </tr>
               {% else %}

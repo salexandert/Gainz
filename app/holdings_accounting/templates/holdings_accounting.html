@@ -73,7 +73,7 @@
         </div>
 
         {% if guided_mode %}
-        <div class="gainz-stage-callout">
+        <div id="holdings_stage_callout" class="gainz-stage-callout">
           <strong>Do this now.</strong>
           <p class="mb-0">
             {% if is_declare_mode %}
@@ -85,6 +85,11 @@
             Select an asset marked Needs Review, read the workbench guidance, and record a supported decision or research note.
             {% endif %}
           </p>
+        </div>
+        <div id="holdings_completion_panel" class="alert alert-success holdings-completion-panel" role="status" style="display: none;">
+          <strong>Holdings declared</strong>
+          <p id="holdings_completion_summary" class="mb-2"></p>
+          <div id="holdings_completion_actions"></div>
         </div>
         {% else %}
         <div class="holdings-walkthrough">

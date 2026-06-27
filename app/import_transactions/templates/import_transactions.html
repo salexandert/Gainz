@@ -67,30 +67,6 @@
         </div>
         <div id="import_upload_result" class="alert alert-info" role="alert" style="display: none;"></div>
         <div
-          id="import_continue_panel"
-          class="alert {% if can_continue_import %}alert-success{% else %}alert-warning{% endif %} gainz-import-continue-panel"
-          role="status"
-          {% if not imported_count %}style="display: none;"{% endif %}
-        >
-          <div>
-            <strong>{% if can_continue_import %}Import data is ready for the next step.{% else %}Import data is loaded, but review is still needed.{% endif %}</strong>
-            <p class="mb-0 import-continue-message">
-              {% if can_continue_import %}
-              Continue when you have loaded the source files you want included in this review pass.
-              {% else %}
-              Review {{ unresolved_warning_count }} unresolved import warning{% if unresolved_warning_count != 1 %}s{% endif %} before moving to Declare Holdings.
-              {% endif %}
-            </p>
-          </div>
-          <a
-            class="btn btn-primary btn-round btn-sm import-continue-action"
-            href="{{ url_for('holdings_accounting_blueprint.holdings_accounting', guided=1, mode='declare') }}"
-            {% if not can_continue_import %}style="display: none;"{% endif %}
-          >
-            Continue to Declare Holdings
-          </a>
-        </div>
-        <div
           id="import_warning_workflow"
           class="import-warning-workflow alert alert-warning"
           role="alert"
@@ -113,7 +89,12 @@
           {% set first_warning = data_summary.unresolved_import_warning_rows[0] if data_summary.unresolved_import_warning_rows else none %}
           <div id="import_warning_first_panel" class="guided-review-panel mt-3" {% if not data_summary.unresolved_import_warning_rows %}style="display: none;"{% endif %}>
             {% if data_summary.unresolved_import_warning_rows %}
-            <h3>First warning to review</h3>
+            <h3>{% if first_warning.decision %}Current warning: {{ first_warning.review_status }}{% else %}First warning to review{% endif %}</h3>
+            {% if first_warning.decision %}
+            <div class="alert alert-warning" role="status">
+              A review decision is recorded, but this warning still blocks filing-ready output until the source row is fixed, documented, or sent for research.
+            </div>
+            {% endif %}
             <dl class="guided-review-details">
               <div>
                 <dt>Source</dt>
@@ -160,7 +141,7 @@
               <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="true_zero_value_transfer" data-warning="{{ first_warning.raw }}">True zero-value transfer</button>
               <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="needs_manual_usd_value" data-warning="{{ first_warning.raw }}">Needs manual USD value</button>
               <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="unknown_needs_research" data-warning="{{ first_warning.raw }}">I do not know yet</button>
-              <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="ignore_for_now" data-warning="{{ first_warning.raw }}">Ignore for now</button>
+              <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="ignore_for_now" data-warning="{{ first_warning.raw }}">Ignore for draft only</button>
               <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="note" data-warning="{{ first_warning.raw }}">Add note</button>
             </div>
             {% endif %}
@@ -227,7 +208,7 @@
                     <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="true_zero_value_transfer" data-warning="{{ warning.raw }}">True zero-value transfer</button>
                     <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="needs_manual_usd_value" data-warning="{{ warning.raw }}">Needs manual USD value</button>
                     <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="unknown_needs_research" data-warning="{{ warning.raw }}">I do not know yet</button>
-                    <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="ignore_for_now" data-warning="{{ warning.raw }}">Ignore for now</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="ignore_for_now" data-warning="{{ warning.raw }}">Ignore for draft only</button>
                     <button type="button" class="btn btn-sm btn-outline-primary import-warning-decision-button" data-decision="note" data-warning="{{ warning.raw }}">Add note</button>
                   </td>
                 </tr>
@@ -236,6 +217,30 @@
             </table>
             </div>
           </details>
+        </div>
+        <div
+          id="import_continue_panel"
+          class="alert {% if can_continue_import %}alert-success{% else %}alert-warning{% endif %} gainz-import-continue-panel"
+          role="status"
+          {% if not imported_count %}style="display: none;"{% endif %}
+        >
+          <div>
+            <strong>{% if can_continue_import %}Import data is ready for the next step.{% else %}Import data is loaded, but review is still needed.{% endif %}</strong>
+            <p class="mb-0 import-continue-message">
+              {% if can_continue_import %}
+              Continue when you have loaded the source files you want included in this review pass.
+              {% else %}
+              Review {{ unresolved_warning_count }} unresolved import warning{% if unresolved_warning_count != 1 %}s{% endif %} before moving to Declare Holdings.
+              {% endif %}
+            </p>
+          </div>
+          <a
+            class="btn btn-primary btn-round btn-sm import-continue-action"
+            href="{{ url_for('holdings_accounting_blueprint.holdings_accounting', guided=1, mode='declare') }}"
+            {% if not can_continue_import %}style="display: none;"{% endif %}
+          >
+            Continue to Declare Holdings
+          </a>
         </div>
         <form id="upload_csv_form" action="{{ import_form_url }}" class="dropzone"></form>
         <details id="advanced-import" class="gainz-import-secondary-details mt-3">

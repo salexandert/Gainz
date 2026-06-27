@@ -33,6 +33,15 @@
           Gainz could not confirm this packet folder still exists. Check the output folder and generate again if needed.
         </div>
         {% endif %}
+        {% if open_request == 'folder' %}
+        <div class="alert alert-info mt-3" role="status">
+          Packet folder open request sent to the operating system.
+        </div>
+        {% elif open_request == 'readme' %}
+        <div class="alert alert-info mt-3" role="status">
+          README_FIRST open request sent to the operating system.
+        </div>
+        {% endif %}
         <textarea id="packet_path_copy" class="gainz-copy-source" readonly>{{ packet.packet_path }}</textarea>
       </div>
     </div>
