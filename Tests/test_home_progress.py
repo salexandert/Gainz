@@ -59,7 +59,7 @@ class HomeProgressTests(unittest.TestCase):
 
         self.assertEqual("current", step_named(progress, "Import")["state"])
         self.assertEqual("waiting", step_named(progress, "Declare Holdings")["state"])
-        self.assertEqual("waiting", step_named(progress, "Reconcile Gaps")["state"])
+        self.assertEqual("waiting", step_named(progress, "Reconcile")["state"])
         self.assertEqual("waiting", step_named(progress, "Review & Export")["state"])
 
     def test_home_progress_moves_to_holdings_after_clean_import(self):
@@ -103,7 +103,7 @@ class HomeProgressTests(unittest.TestCase):
         progress = progress_for(transactions)
 
         self.assertEqual("complete", step_named(progress, "Declare Holdings")["state"])
-        self.assertEqual("review", step_named(progress, "Reconcile Gaps")["state"])
+        self.assertEqual("review", step_named(progress, "Reconcile")["state"])
         self.assertEqual("waiting", step_named(progress, "Review & Export")["state"])
 
     def test_home_progress_marks_export_ready_after_reconciliation(self):
@@ -123,7 +123,7 @@ class HomeProgressTests(unittest.TestCase):
 
         self.assertEqual("complete", step_named(progress, "Import")["state"])
         self.assertEqual("complete", step_named(progress, "Declare Holdings")["state"])
-        self.assertEqual("complete", step_named(progress, "Reconcile Gaps")["state"])
+        self.assertEqual("complete", step_named(progress, "Reconcile")["state"])
         self.assertEqual("ready", step_named(progress, "Review & Export")["state"])
 
     def test_home_page_keeps_simple_cards_and_only_marks_completed_steps(self):
@@ -144,6 +144,8 @@ class HomeProgressTests(unittest.TestCase):
         self.assertIn("Guided Reconciliation", rendered)
         self.assertIn("Reconciliation stages", rendered)
         self.assertIn("Show status details", rendered)
+        self.assertIn("Examples", rendered)
+        self.assertIn("Reference-only evidence lists file paths", rendered)
         self.assertIn("Done when", rendered)
         self.assertIn("Open Review Groups", rendered)
         self.assertNotIn("gainz-home-flow-heading", rendered)

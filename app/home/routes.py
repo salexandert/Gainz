@@ -70,10 +70,10 @@ def _home_progress(transactions):
         },
         {
             "number": 3,
-            "title": "Reconcile Gaps",
+            "title": "Reconcile",
             "description": "Review missing activity before using reports.",
             "url": url_for("holdings_accounting_blueprint.holdings_accounting", guided=1, mode="reconcile"),
-            "action_label": "Reconcile Gaps",
+            "action_label": "Reconcile",
             "state": "waiting",
             "status": "Waiting",
             "detail": "Declare holdings before reconciling.",
@@ -147,7 +147,7 @@ def _home_progress(transactions):
             "state": "review",
             "status": "Needs Review",
             "url": url_for("holdings_accounting_blueprint.holdings_accounting", guided=1, mode="reconcile"),
-            "action_label": "Review reconciliation gaps",
+            "action_label": "Review reconciliation",
             "detail": (
                 f"{review_count} {_plural(review_count, 'asset')} "
                 "need reconciliation review."
@@ -205,7 +205,7 @@ def _stage_tasks(step_number):
         3: [
             "Review holdings differences, owner-transfer questions, and missing basis.",
             "Document research notes for unresolved assets.",
-            "Run FIFO basis linking when sales still need linked acquisition lots.",
+            "Run FIFO basis linking when sales have missing cost basis.",
         ],
         4: [
             "Review packet readiness and the guided review queue.",
@@ -214,6 +214,29 @@ def _stage_tasks(step_number):
         ],
     }
     return tasks.get(step_number, [])
+
+
+def _stage_examples(step_number):
+    examples = {
+        1: [
+            "A Cash App or Coinbase CSV gives Gainz source rows to review.",
+            "If a header is unusual, Advanced Import lets you choose the right columns.",
+        ],
+        2: [
+            "If you now only hold BTC, save BTC and set the rest to zero.",
+            "If an old asset is gone, zero holdings helps Gainz look for the missing explanation.",
+        ],
+        3: [
+            "A BTC withdrawal may be your own wallet transfer or a disposal that needs evidence.",
+            "A sale has missing cost basis when Gainz cannot find enough earlier buy or receive lots.",
+            "A holdings difference may point to missing source files, duplicate imports, or transfers that need notes.",
+        ],
+        4: [
+            "A draft packet can document unresolved research items for CPA review.",
+            "Reference-only evidence lists file paths without copying private tax files into the packet.",
+        ],
+    }
+    return examples.get(step_number, [])
 
 
 def _stage_done_criteria(step_number):
@@ -230,7 +253,7 @@ def _stage_done_criteria(step_number):
         ],
         3: [
             "Holdings differences, transfer questions, and missing-basis items have decisions or notes.",
-            "FIFO or another basis-linking review has been run when sales need linked lots.",
+            "FIFO or another basis-linking review has been run when sales have missing cost basis.",
             "Anything still unresolved is marked for research, draft, or CPA review.",
         ],
         4: [
@@ -309,6 +332,7 @@ def _stage_context(progress, audit_readiness, selected_stage_number=None):
         ),
         "primary_action": primary_action,
         "tasks": _stage_tasks(selected_step["number"]),
+        "examples": _stage_examples(selected_step["number"]),
         "done_criteria": _stage_done_criteria(selected_step["number"]),
         "previous_stage": previous_stage,
         "next_stage": next_stage,

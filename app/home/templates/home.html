@@ -99,6 +99,14 @@
               <li>{{ task }}</li>
               {% endfor %}
             </ul>
+            {% if stage_context.examples %}
+            <h3 class="gainz-stage-done-heading">Examples</h3>
+            <ul>
+              {% for example in stage_context.examples %}
+              <li>{{ example }}</li>
+              {% endfor %}
+            </ul>
+            {% endif %}
             <h3 class="gainz-stage-done-heading">Done when</h3>
             <ul>
               {% for item in stage_context.done_criteria %}
