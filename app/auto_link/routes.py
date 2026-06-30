@@ -102,7 +102,13 @@ def auto_link_asset():
 
     algo_type = payload.get('algo', 'fifo')
 
-    message = service.auto_link(transactions, asset=asset, algo=algo_type, year=year)
+    message = service.auto_link(
+        transactions,
+        asset=asset,
+        algo=algo_type,
+        year=year,
+        rebuild=True,
+    )
 
     return jsonify(message)
 

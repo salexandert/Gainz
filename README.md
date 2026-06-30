@@ -98,7 +98,7 @@ From a source checkout, you can reset the local password with `python .\scripts\
 5. Continue to **Reconcile** after the source files for the review pass are loaded.
 6. Declare current holdings in **Reconcile** before deeper basis work unless Guided Reconciliation points somewhere else.
 7. Review import warnings, source overlaps, and transfer questions that affect the reconciliation.
-8. Run FIFO or another basis-linking review in **Auto Link** when Dashboard or Reports & Export says sales still need basis.
+8. Let Gainz apply default FIFO basis links automatically; use **Auto Link** only when you intentionally want to recalculate or compare another supported method.
 9. Open **Tax Evidence**, build the year-by-year tax evidence inventory, and confirm or mark suggested filed totals for research.
 10. Open **Reports & Export**, then use **Start guided review** to work unresolved items one at a time.
 11. Review packet preview, generate the workbook or audit packet, then use the packet success screen to copy the packet path, open the output folder, and review the first files.

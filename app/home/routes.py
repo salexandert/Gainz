@@ -205,7 +205,7 @@ def _stage_tasks(step_number):
         3: [
             "Review holdings differences, owner-transfer questions, and missing basis.",
             "Document research notes for unresolved assets.",
-            "Run FIFO basis linking when sales have missing cost basis.",
+            "Gainz runs FIFO automatically when sales have missing cost basis.",
         ],
         4: [
             "Review packet readiness and the guided review queue.",
@@ -229,6 +229,7 @@ def _stage_examples(step_number):
         3: [
             "A BTC withdrawal may be your own wallet transfer or a disposal that needs evidence.",
             "A sale has missing cost basis when Gainz cannot find enough earlier buy or receive lots.",
+            "If you add records or choose a different method, Gainz can recalculate the basis links.",
             "A holdings difference may point to missing source files, duplicate imports, or transfers that need notes.",
         ],
         4: [
@@ -253,7 +254,7 @@ def _stage_done_criteria(step_number):
         ],
         3: [
             "Holdings differences, transfer questions, and missing-basis items have decisions or notes.",
-            "FIFO or another basis-linking review has been run when sales have missing cost basis.",
+            "Automatic FIFO or a chosen basis method has been applied when sales have missing cost basis.",
             "Anything still unresolved is marked for research, draft, or CPA review.",
         ],
         4: [

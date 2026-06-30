@@ -147,11 +147,11 @@ Review **Confirm Suggested Filed Totals**. When Gainz can read clear values from
 
 Use **Import Filed Totals from CSV** when you already have a year-by-year filed-total CSV. Gainz reports the actual number of rows imported and skipped. If a CSV only contains three years, Gainz imports three years and leaves the other evidence years visible for review.
 
-## 8. Run FIFO And Basis Review When Dashboard Asks
+## 8. Review Basis Links When Dashboard Asks
 
-Use **Auto Link** when Dashboard or Reports & Export says sales need basis links.
+Gainz applies default FIFO basis links automatically when matching earlier acquisitions are available. Use **Auto Link** only when records changed, you need to recalculate, or you intentionally want to compare another supported basis method.
 
-For a simple first review pass, use **FIFO**. FIFO links sales to the oldest available acquisition lots first, then creates Form 8949-style rows from those links.
+For a simple first review pass, use the automatic FIFO result. FIFO links sales to the oldest available acquisition lots first, then creates Form 8949-style rows from those links.
 
 Repeat for assets with unlinked sales. If a sale still needs earlier basis and you do not have the source records yet, return to **Reconcile**, choose **Leave Missing Basis As Needs Research**, and add a note. Gainz keeps exports draft/not filing-ready while showing that the missing basis is a known research item.
 

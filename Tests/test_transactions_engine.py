@@ -1026,6 +1026,58 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual(1, eth_sell.unlinked_quantity)
         self.assertEqual(["test guided link"], transactions.saved_descriptions)
 
+    def test_default_fifo_service_adds_missing_links_without_manual_action(self):
+        transactions = empty_transactions()
+        buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "test")
+        sell = Sell("BTC", 1, datetime.datetime(2024, 2, 1), 300, "test")
+        transactions.transactions = [buy, sell]
+
+        result = AutoLinkService().ensure_default_fifo_links(
+            transactions,
+            reason="test import",
+        )
+
+        self.assertEqual(1, result["links_created"])
+        self.assertEqual(0, result["links_removed"])
+        self.assertEqual([], result["failures"])
+        self.assertEqual(0, sell.unlinked_quantity)
+        self.assertEqual(
+            ["Automatically added FIFO basis links after test import"],
+            transactions.saved_descriptions,
+        )
+
+    def test_auto_link_service_rebuilds_links_when_algorithm_changes(self):
+        transactions = empty_transactions()
+        old_buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "old")
+        newer_buy = Buy("BTC", 1, datetime.datetime(2024, 2, 1), 200, "newer")
+        sell = Sell("BTC", 1, datetime.datetime(2024, 3, 1), 300, "test")
+        transactions.transactions = [old_buy, newer_buy, sell]
+
+        AutoLinkService().ensure_default_fifo_links(
+            transactions,
+            reason="test import",
+        )
+        self.assertEqual(old_buy.uid, sell.links[0].buy.uid)
+
+        message = AutoLinkService().auto_link(
+            transactions,
+            asset="BTC",
+            algo="filo",
+            rebuild=True,
+        )
+
+        self.assertIn("Rebuilt basis links using filo", message)
+        self.assertEqual(1, len(sell.links))
+        self.assertEqual(newer_buy.uid, sell.links[0].buy.uid)
+        self.assertEqual(0, sell.unlinked_quantity)
+        self.assertEqual(
+            [
+                "Automatically added FIFO basis links after test import",
+                "Added FILO basis links for review",
+            ],
+            transactions.saved_descriptions,
+        )
+
     def test_auto_link_service_normalizes_year_values(self):
         service = AutoLinkService()
 

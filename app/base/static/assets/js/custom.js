@@ -14,6 +14,10 @@ function gainzFormatImportResult(result, fileName) {
         message += " Used header row " + result.header_row_used + ".";
     }
 
+    if (result.auto_link && Number(result.auto_link.links_created || 0) > 0) {
+        message += " Gainz automatically added " + result.auto_link.links_created + " FIFO basis link(s) for missing cost basis.";
+    }
+
     if (warnings.length > 0) {
         message += " Review " + warnings.length + " warning(s) below before relying on generated reports.";
     } else {
@@ -1490,7 +1494,7 @@ $(document).ready(function() {
             holdingsSetCurrentDecision(
                 'Resolve ' + asset + ' missing basis',
                 asset + ' has sales without complete basis links.',
-                'Run FIFO Auto Link, or leave missing basis as needs research if records are not available yet.'
+                'Gainz uses FIFO automatically; recalculate FIFO basis if records changed, or leave missing basis as needs research.'
             );
             return;
         }
@@ -1857,7 +1861,7 @@ $(document).ready(function() {
             $('#holdings_contextual_action_hint')
                 .removeClass('alert-success alert-light alert-info')
                 .addClass('alert-warning')
-                .text('This asset has sales without complete basis. Start with FIFO Auto Link, or leave missing basis as needs research if records are not available yet.');
+                .text('This asset has sales without complete basis. Gainz uses FIFO automatically; recalculate FIFO if records changed, or leave missing basis as needs research.');
             return;
         }
 
@@ -1888,7 +1892,7 @@ $(document).ready(function() {
     function holdingsRenderReadiness(rowData, precheckData) {
         if (!rowData) {
             $('#holdings_readiness_asset, #holdings_readiness_holdings, #holdings_readiness_unlinked, #holdings_readiness_difference').text('--');
-            $('#holdings_run_fifo_button').prop('disabled', true).text('Run FIFO Auto Link for Selected Asset');
+            $('#holdings_run_fifo_button').prop('disabled', true).text('Recalculate FIFO Basis for Selected Asset');
             $('#holdings_leave_basis_unresolved_button').prop('disabled', true);
             holdingsSetContextualActions(null);
             holdingsSetReadinessBadge('Select asset');
@@ -1909,7 +1913,7 @@ $(document).ready(function() {
         $('#holdings_readiness_holdings').text(declaredHoldings === null ? 'Not declared' : holdingsFormatQuantity(declaredHoldings));
         $('#holdings_readiness_unlinked').text(holdingsFormatQuantity(soldUnlinked));
         $('#holdings_readiness_difference').text(difference === null ? '--' : holdingsFormatQuantity(difference));
-        $('#holdings_run_fifo_button').prop('disabled', soldUnlinked <= tolerance).text('Run FIFO Auto Link for Selected Asset');
+        $('#holdings_run_fifo_button').prop('disabled', soldUnlinked <= tolerance).text('Recalculate FIFO Basis for Selected Asset');
         $('#holdings_leave_basis_unresolved_button').prop('disabled', soldUnlinked <= tolerance);
         holdingsSetContextualActions(rowData, {
             soldUnlinked: soldUnlinked,
@@ -1925,7 +1929,7 @@ $(document).ready(function() {
 
         if (soldUnlinked > tolerance) {
             holdingsSetReadinessBadge('Unlinked sales');
-            holdingsSetReadinessMessage(asset + ' has sales without complete basis links. Run FIFO Auto Link for this asset or review links manually before using generated reports.', 'warning');
+            holdingsSetReadinessMessage(asset + ' has sales without complete basis links. Gainz runs FIFO automatically when it can; recalculate FIFO for this asset if records changed, or review links manually before using generated reports.', 'warning');
             return;
         }
 
@@ -2662,7 +2666,7 @@ $(document).ready(function() {
 
         var startedAt = Date.now();
         button.prop('disabled', true).text('Linking and saving...');
-        holdingsSetReadinessMessage('Running FIFO Auto Link for ' + asset + ', recalculating basis links, and saving a revision. This can take 10-30 seconds on large data sets; keep this tab open.', 'info');
+        holdingsSetReadinessMessage('Recalculating FIFO basis for ' + asset + ' and saving a revision. This can take 10-30 seconds on large data sets; keep this tab open.', 'info');
 
         $.ajax({
             type: "POST",
@@ -2675,14 +2679,14 @@ $(document).ready(function() {
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
-                holdingsSetReadinessMessage((data || 'FIFO Auto Link complete.') + ' Completed in ' + Math.max(1, Math.round((Date.now() - startedAt) / 1000)) + ' second(s). Refreshing review data...', 'success');
+                holdingsSetReadinessMessage((data || 'FIFO basis recalculation complete.') + ' Completed in ' + Math.max(1, Math.round((Date.now() - startedAt) / 1000)) + ' second(s). Refreshing review data...', 'success');
                 window.setTimeout(function () {
                     location.reload();
                 }, 900);
             },
             error: function () {
-                holdingsSetReadinessMessage('FIFO Auto Link could not run. Review source records or use Auto Link manually.', 'warning');
-                button.prop('disabled', false).text('Run FIFO Auto Link for Selected Asset');
+                holdingsSetReadinessMessage('FIFO basis recalculation could not run. Review source records or use Auto Link manually.', 'warning');
+                button.prop('disabled', false).text('Recalculate FIFO Basis for Selected Asset');
             },
         });
     }
@@ -2692,14 +2696,14 @@ $(document).ready(function() {
         var asset = rowData ? rowData[0] : null;
 
         if (!rowData) {
-            holdingsSetReadinessMessage('Select an asset before running FIFO Auto Link.', 'warning');
+            holdingsSetReadinessMessage('Select an asset before recalculating FIFO basis.', 'warning');
             return;
         }
 
         holdingsShowActionConfirm(
-            'Run FIFO Auto Link?',
-            'Run FIFO Auto Link for ' + asset + '? Gainz will create basis links for review and save a new revision if links are added.',
-            'Run FIFO Auto Link',
+            'Recalculate FIFO basis?',
+            'Recalculate FIFO basis for ' + asset + '? Gainz will create basis links for review and save a new revision if links are added.',
+            'Recalculate FIFO',
             function() {
                 holdingsRunFifoForRow(rowData);
             }
@@ -2827,7 +2831,7 @@ $(document).ready(function() {
             },
             complete: function () {
                 $('#sends_to_sells_button').prop('disabled', false).text('Classify Documented Sends as Disposals');
-                $('#classify_sends_fifo_button').prop('disabled', false).text('Classify Documented Sends And Run FIFO');
+                $('#classify_sends_fifo_button').prop('disabled', false).text('Classify Documented Sends And Recalculate FIFO');
             },
         });
     }
@@ -2849,7 +2853,7 @@ $(document).ready(function() {
 
         holdingsShowActionConfirm(
             'Classify documented sends?',
-            'Classify ' + quantity + ' ' + asset + ' of documented sends as disposals and run FIFO Auto Link? Owner transfers should remain transfers.',
+            'Classify ' + quantity + ' ' + asset + ' of documented sends as disposals and recalculate FIFO basis? Owner transfers should remain transfers.',
             'Classify And Link',
             function() {
                 holdingsSaveDocumentedSendClassification(rowData, asset, quantity);
@@ -2959,8 +2963,8 @@ $(document).ready(function() {
         var endpoint = button.data('url') || "/auto_link/auto_link_all_fifo";
         var startedAt = Date.now();
 
-        autoLinkShowResult('Running FIFO Auto Link across assets with unlinked sales, recalculating basis links, and saving a revision. Large data sets may take 10-30 seconds; keep this tab open.', false);
-        button.prop('disabled', true).text('Linking and saving...');
+        autoLinkShowResult('Recalculating FIFO basis across assets with unlinked sales and saving a revision. Large data sets may take 10-30 seconds; keep this tab open.', false);
+        button.prop('disabled', true).text('Recalculating and saving...');
 
         $.ajax({
             type: "POST",
@@ -2971,7 +2975,7 @@ $(document).ready(function() {
             dataType: "json",
             contentType: 'application/json',
             success: function (data) {
-                var message = data && data.message ? data.message : 'FIFO Auto Link complete. Review generated links before using reports.';
+                var message = data && data.message ? data.message : 'FIFO basis recalculation complete. Review generated links before using reports.';
                 message += ' Completed in ' + Math.max(1, Math.round((Date.now() - startedAt) / 1000)) + ' second(s).';
                 autoLinkShowResult(message, false);
                 window.setTimeout(function () {
@@ -2979,7 +2983,7 @@ $(document).ready(function() {
                 }, 1000);
             },
             error: function () {
-                autoLinkShowResult('FIFO Auto Link could not run. Review imports and basis lots, then try again.', true);
+                autoLinkShowResult('FIFO basis recalculation could not run. Review imports and basis lots, then try again.', true);
             },
             complete: function () {
                 button.prop('disabled', false).text(originalText);
@@ -3421,7 +3425,7 @@ $(document).ready(function() {
         }
 
         if (visibleRows > 0) {
-            statsShowSummaryMessage('Showing assets with unlinked sales. ' + visibleRows + ' asset' + (visibleRows == 1 ? '' : 's') + ' shown; run FIFO Auto Link or inspect the selected asset.');
+            statsShowSummaryMessage('Showing assets with unlinked sales. ' + visibleRows + ' asset' + (visibleRows == 1 ? '' : 's') + ' shown; recalculate FIFO basis or inspect the selected asset.');
         } else {
             statsShowSummaryMessage('No assets currently have unlinked sales.');
         }
@@ -3636,7 +3640,7 @@ $(document).ready(function() {
         var selectedAsset = selectedStatsRowData ? selectedStatsRowData[0] : null;
 
         $('#stats_auto_fix_result').removeClass('text-danger').text('');
-        button.prop('disabled', true).text('Linking...');
+        button.prop('disabled', true).text('Recalculating...');
 
         $.ajax({
             type: "POST",
@@ -3653,7 +3657,7 @@ $(document).ready(function() {
                 setStatsImportWarnings(data['import_warnings'], data['import_warning_rows']);
                 setStatsSummary(data['stats_summary']);
                 setAllHoldingsReconciliation(data['holdings_reconciliation_table_data']);
-                $('#stats_auto_fix_result').text(data['message'] || 'FIFO auto-link complete. Review the generated links.');
+                $('#stats_auto_fix_result').text(data['message'] || 'FIFO basis recalculation complete. Review the generated links.');
                 $('#stats_auto_fix_panel').show();
 
                 if (selectedAsset) {
@@ -3666,10 +3670,10 @@ $(document).ready(function() {
             error: function () {
                 $('#stats_auto_fix_result')
                     .addClass('text-danger')
-                    .text('FIFO auto-link could not run. Please try Auto Link or review the data manually.');
+                    .text('FIFO basis recalculation could not run. Please try Auto Link or review the data manually.');
             },
             complete: function () {
-                button.prop('disabled', false).text('Run FIFO Auto Link');
+                button.prop('disabled', false).text('Recalculate FIFO Basis');
             },
         });
     });

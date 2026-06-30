@@ -16,6 +16,7 @@ from app.services.tax_evidence_service import (
 )
 from app.services.tax_filing_import_service import import_tax_total_records
 from app.services.tax_total_extraction_service import get_suggested_filed_totals
+from app.services.auto_link_service import AutoLinkService
 
 from . import blueprint
 
@@ -314,6 +315,10 @@ def save_tax_year_record():
         notes=request.form.get("notes") or "",
     )
     transactions.save(description=f"Recorded filed tax totals for {year}")
+    AutoLinkService().ensure_default_fifo_links(
+        transactions,
+        reason="filed tax totals update",
+    )
 
     return redirect(url_for('tax_filing_review_blueprint.index', saved_year=year))
 
@@ -348,6 +353,10 @@ def confirm_suggested_filed_totals():
         notes=notes,
     )
     transactions.save(description=f"Confirmed suggested filed totals for {year}")
+    AutoLinkService().ensure_default_fifo_links(
+        transactions,
+        reason="filed tax totals update",
+    )
 
     return redirect(url_for('tax_filing_review_blueprint.index', saved_year=year, saved_suggestion=1))
 
@@ -482,6 +491,10 @@ def import_filed_totals_csv():
         summary = import_tax_total_records(file_storage, transactions, file_storage.filename)
         if summary["imported_count"]:
             transactions.save(description=f"Imported {summary['imported_count']} filed tax total record(s) from CSV")
+            AutoLinkService().ensure_default_fifo_links(
+                transactions,
+                reason="filed tax totals import",
+            )
 
         return redirect(url_for(
             'tax_filing_review_blueprint.index',

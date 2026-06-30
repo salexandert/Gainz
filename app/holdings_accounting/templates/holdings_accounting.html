@@ -484,7 +484,7 @@
             <strong>Possible documented send-disposal workflow.</strong>
             <p id="holdings_send_disposal_text" class="mb-2"></p>
             <button type="button" id="classify_sends_fifo_button" class="btn btn-warning">
-              Classify Documented Sends And Run FIFO
+              Classify Documented Sends And Recalculate FIFO
             </button>
           </div>
           <div class="form-group row">
@@ -557,7 +557,7 @@
         </div>
 
         <div class="holdings-readiness-actions">
-          <button type="button" id="holdings_run_fifo_button" class="btn btn-primary" disabled>Run FIFO Auto Link for Selected Asset</button>
+          <button type="button" id="holdings_run_fifo_button" class="btn btn-primary" disabled>Recalculate FIFO Basis for Selected Asset</button>
           <button type="button" id="holdings_leave_basis_unresolved_button" class="btn btn-outline-warning" disabled>Leave Missing Basis As Needs Research</button>
           <a class="btn btn-outline-primary" href="{{ url_for('export_blueprint.index', guided=1) if guided_mode else '/export' }}">Open Reports & Export</a>
           {% if not guided_mode %}

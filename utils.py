@@ -740,9 +740,9 @@ def _reconciliation_checklist(
         "No unlinked sales remain."
         if fifo_run
         else (
-            "Import transactions first, then run FIFO."
+            "Import transactions first; Gainz will apply automatic FIFO when matching basis is available."
             if not has_transactions
-            else "Run FIFO or leave specific missing basis as needs user research."
+            else "Gainz applies FIFO automatically when it can. Recalculate basis or leave specific missing basis as needs user research."
         )
     )
     source_overlap_detail = (
@@ -776,7 +776,7 @@ def _reconciliation_checklist(
             "detail": holdings_detail,
         },
         {
-            "label": "FIFO run",
+            "label": "Basis links reviewed",
             "complete": fifo_run,
             "detail": fifo_detail,
         },
@@ -1043,8 +1043,8 @@ def _audit_readiness_groups(
             len(assets_with_unlinked_sales),
             "Blocked",
             "status-needs-review",
-            "Sells exist, but linked Form 8949-style rows cannot be generated yet. Run FIFO or review missing basis.",
-            "Run FIFO",
+            "Sells exist, but linked Form 8949-style rows cannot be generated yet. Recalculate basis or review missing basis.",
+            "Review basis",
             "/holdings_accounting/?guided=1&mode=reconcile",
         ))
 

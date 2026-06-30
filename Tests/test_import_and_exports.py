@@ -1028,6 +1028,33 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual(4400.0, totals["total"]["cost_basis"])
         self.assertEqual(3300.0, totals["total"]["gain_loss"])
 
+    def test_demo_import_route_runs_default_fifo_automatically(self):
+        transactions = empty_transactions()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app = create_app(config_dict["Debug"], selenium=True)
+            app.config.update(
+                WTF_CSRF_ENABLED=False,
+                transactions=transactions,
+                UPLOAD_FOLDER=temp_dir,
+            )
+
+            with app.test_request_context("/import_transactions/demo", method="POST"):
+                response = import_routes.import_demo_data.__wrapped__()
+
+        payload = response.get_json()
+        totals = get_form_8949_totals(transactions)
+
+        self.assertEqual(8, payload["imported_count"])
+        self.assertEqual(3, payload["auto_link"]["links_created"])
+        self.assertEqual("fifo", payload["auto_link"]["algo"])
+        self.assertEqual([], payload["auto_link"]["failures"])
+        self.assertEqual(3, totals["total"]["rows"])
+        self.assertIn(
+            "Automatically added FIFO basis links after demo data import",
+            transactions.saved_descriptions,
+        )
+
     def test_export_includes_8949_short_totals(self):
         transactions = empty_transactions()
         buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "demo")
@@ -1149,6 +1176,7 @@ class ImportAndExportTests(unittest.TestCase):
                 self.assertEqual(200, response.status_code)
                 self.assertEqual("ok", response.get_json())
                 self.assertIsNone(auto_link_mock.call_args.kwargs["year"])
+                self.assertTrue(auto_link_mock.call_args.kwargs["rebuild"])
 
             with app.app_context():
                 db.drop_all()

@@ -22,6 +22,7 @@ from flask import Blueprint, request
 from transactions import Transactions
 from date_parsing import parse_gainz_datetime
 from app.services.import_service import ImportService
+from app.services.auto_link_service import AutoLinkService, public_auto_link_result
 from app.services.import_warning_service import (
     clear_import_warnings_for_source,
     import_warning_review_rows,
@@ -296,6 +297,18 @@ def _public_import_response(transactions, result):
     return public_result
 
 
+def _ensure_fifo_after_data_change(transactions, result, reason):
+    if result.get("mapping_required") or result.get("imported_count", 0) <= 0:
+        return result
+
+    auto_link_result = AutoLinkService().ensure_default_fifo_links(
+        transactions,
+        reason=reason,
+    )
+    result["auto_link"] = public_auto_link_result(auto_link_result)
+    return result
+
+
 def _import_error_response(action):
     current_app.logger.exception("Import failed while handling %s.", action)
     return jsonify({
@@ -388,6 +401,12 @@ def import_wizard():
                     return _import_error_response("uploaded CSV")
                 if result.get("mapping_required"):
                     session["pending_import_file_path"] = result["file_path"]
+                else:
+                    result = _ensure_fifo_after_data_change(
+                        transactions,
+                        result,
+                        "import",
+                    )
                 return jsonify(_public_import_response(transactions, result))
 
         # Current holdings
@@ -427,6 +446,10 @@ def import_wizard():
             transactions.save(
                 description=f"Manually Added {count} Transaction{'s' if count != 1 else ''}"
             )
+            AutoLinkService().ensure_default_fifo_links(
+                transactions,
+                reason="manual transaction update",
+            )
             return redirect(
                 url_for(
                     'import_transactions_blueprint.import_wizard',
@@ -445,6 +468,10 @@ def import_wizard():
 
             transactions.transactions.append(trans)
             transactions.save(description="Manually Added Transaction")
+            AutoLinkService().ensure_default_fifo_links(
+                transactions,
+                reason="manual transaction update",
+            )
             return redirect(
                 url_for(
                     'import_transactions_blueprint.import_wizard',
@@ -506,6 +533,11 @@ def mapped_import():
 
     if not result.get("mapping_required"):
         session.pop("pending_import_file_path", None)
+        result = _ensure_fifo_after_data_change(
+            transactions,
+            result,
+            "mapped import",
+        )
 
     return jsonify(_public_import_response(transactions, result))
 
@@ -521,6 +553,11 @@ def import_demo_data():
         )
     except Exception:
         return _import_error_response("demo data")
+    result = _ensure_fifo_after_data_change(
+        transactions,
+        result,
+        "demo data import",
+    )
     return jsonify(_public_import_response(transactions, result))
 
 
@@ -542,6 +579,10 @@ def remove_source():
     save_path = transactions.save(
         description=f"Removed data source {result['source_name']}"
     )
+    auto_link_result = AutoLinkService().ensure_default_fifo_links(
+        transactions,
+        reason="source removal",
+    )
 
     return jsonify({
         "message": (
@@ -553,6 +594,7 @@ def remove_source():
         "source": result["source"],
         "source_name": result["source_name"],
         "save_path": save_path,
+        "auto_link": public_auto_link_result(auto_link_result),
         "save_summary": _current_save_summary(transactions, refresh=True),
         "data_summary": _data_source_summary(transactions),
     })

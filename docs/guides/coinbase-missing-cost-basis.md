@@ -28,7 +28,7 @@ Missing Coinbase basis usually means the sale exists, but the earlier acquisitio
 4. Confirm Coinbase Convert rows appear as both the disposed asset and the acquired asset.
 5. Return to **Dashboard** and follow the highlighted current stage.
 6. Declare current holdings in **Reconcile** and review whether the calculated balance matches what you actually hold.
-7. Run FIFO auto-link for the affected asset when Dashboard or Reports & Export says sales still need basis links.
+7. Let Gainz apply automatic FIFO basis links when matching acquisitions are available; use Auto Link only when you need to recalculate or compare another method.
 8. Use **Stats & Charts** only for deeper asset-level inspection after the dashboard points to a specific issue.
 9. Add manual transactions only when you have source records that support the entry.
 

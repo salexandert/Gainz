@@ -96,7 +96,11 @@ def _holdings_reconciliation_rows(raw_holdings_rows, stats_table_data, transacti
                     row[7] += " Note: " + basis_note["note"]
             else:
                 row[6] = "Unlinked sales"
-                row[7] = "Run FIFO Auto Link or review basis links before using this asset in generated reports."
+                row[7] = (
+                    "Gainz uses FIFO automatically when it can. Recalculate FIFO basis "
+                    "if records changed, or review basis links before using this asset "
+                    "in generated reports."
+                )
 
         table_rows.append(row)
 
