@@ -1338,6 +1338,31 @@
     margin-top: 4px;
 }
 
+.gainz-current-decision-help {
+    border-top: 1px solid rgba(81, 203, 206, 0.35);
+    grid-column: 1 / -1;
+    padding-top: 12px;
+}
+
+.gainz-current-decision-help p {
+    color: #26323d;
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 6px 0 8px;
+}
+
+.gainz-current-decision-help ul {
+    color: #26323d;
+    font-size: 14px;
+    line-height: 1.45;
+    margin: 0;
+    padding-left: 18px;
+}
+
+.gainz-current-decision-help li + li {
+    margin-top: 4px;
+}
+
 @media (max-width: 900px) {
     .gainz-current-decision {
         grid-template-columns: 1fr;

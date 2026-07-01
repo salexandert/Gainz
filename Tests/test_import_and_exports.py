@@ -305,6 +305,8 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("Reconcile Gaps", reconcile_page)
         self.assertIn("Review one holdings gap", reconcile_page)
         self.assertIn("A gap means imported activity does not yet explain declared holdings", reconcile_page)
+        self.assertIn('id="holdings_current_help"', reconcile_page)
+        self.assertIn("What missing basis means", reconcile_page)
         self.assertIn("Open Guided Review Queue", reconcile_page)
         self.assertIn("Current gap", reconcile_page)
         self.assertIn("Current Gap Actions", reconcile_page)

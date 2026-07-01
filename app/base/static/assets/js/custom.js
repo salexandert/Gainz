@@ -1368,10 +1368,31 @@ $(document).ready(function() {
         }
     }
 
-    function holdingsSetCurrentDecision(task, why, bestAction) {
+    function holdingsSetCurrentDecision(task, why, bestAction, help) {
         $('#holdings_current_task').text(task || '');
         $('#holdings_current_why').text(why || '');
         $('#holdings_current_best_action').text(bestAction || '');
+
+        var helpPanel = $('#holdings_current_help');
+        if (helpPanel.length === 0) {
+            return;
+        }
+
+        var examples = help && Array.isArray(help.examples) ? help.examples : [];
+        if (!help || (!help.text && examples.length === 0)) {
+            helpPanel.hide();
+            $('#holdings_current_help_text').text('');
+            $('#holdings_current_examples').empty();
+            return;
+        }
+
+        $('#holdings_current_help_title').text(help.title || 'What this means');
+        $('#holdings_current_help_text').text(help.text || '');
+        var examplesList = $('#holdings_current_examples').empty();
+        examples.forEach(function(example) {
+            $('<li></li>').text(example).appendTo(examplesList);
+        });
+        helpPanel.show();
     }
 
     function holdingsRowStatus(rowData) {
@@ -1434,7 +1455,7 @@ $(document).ready(function() {
             return 'Enter what you currently hold for ' + asset + '.';
         }
         if (status == 'unlinked') {
-            return 'Review missing basis links before using reports.';
+            return 'Review missing cost basis before using reports.';
         }
         if (status == 'mismatch') {
             return 'Investigate the holdings gap and document the next decision.';
@@ -1492,9 +1513,18 @@ $(document).ready(function() {
         var difference = holdingsDifferenceForRow(rowData);
         if (status == 'unlinked') {
             holdingsSetCurrentDecision(
-                'Resolve ' + asset + ' missing basis',
-                asset + ' has sales without complete basis links.',
-                'Gainz uses FIFO automatically; recalculate FIFO basis if records changed, or leave missing basis as needs research.'
+                'Understand ' + asset + ' missing basis',
+                asset + ' has sales without enough earlier buy or receive lots linked to those sales.',
+                'Gainz applies FIFO automatically after imports and edits. If records are still missing, leave this as needs research or send it to your CPA.',
+                {
+                    title: 'What missing basis means',
+                    text: 'Missing basis means Gainz sees ' + asset + ' being sold or disposed of, but it cannot find enough earlier ' + asset + ' acquisition records to show what you paid for the amount sold.',
+                    examples: [
+                        'Example: a ' + asset + ' sale needs earlier ' + asset + ' buy, receive, fork, income, or transfer-in records before Gainz can calculate gain or loss.',
+                        'If the asset came from another exchange or wallet, import that source file or document where the missing records should come from.',
+                        'If you do not know yet, mark it as needs research so the draft packet clearly shows the unresolved gap.'
+                    ]
+                }
             );
             return;
         }
@@ -1861,7 +1891,7 @@ $(document).ready(function() {
             $('#holdings_contextual_action_hint')
                 .removeClass('alert-success alert-light alert-info')
                 .addClass('alert-warning')
-                .text('This asset has sales without complete basis. Gainz uses FIFO automatically; recalculate FIFO if records changed, or leave missing basis as needs research.');
+                .text('This asset has sales without complete cost basis. Gainz uses FIFO automatically when matching acquisition records exist; if records are still missing, leave this as needs research.');
             return;
         }
 
@@ -1929,7 +1959,7 @@ $(document).ready(function() {
 
         if (soldUnlinked > tolerance) {
             holdingsSetReadinessBadge('Unlinked sales');
-            holdingsSetReadinessMessage(asset + ' has sales without complete basis links. Gainz runs FIFO automatically when it can; recalculate FIFO for this asset if records changed, or review links manually before using generated reports.', 'warning');
+            holdingsSetReadinessMessage(asset + ' has sales without complete cost basis. Gainz needs earlier buy, receive, fork, income, or transfer-in records before generated reports can explain the gain or loss.', 'warning');
             return;
         }
 
