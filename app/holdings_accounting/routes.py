@@ -377,20 +377,22 @@ def leave_basis_unresolved():
     payload = request.get_json(silent=True) or {}
     asset = _request_asset(payload)
     note = str(payload.get("note") or "").strip()
+    gap_type = str(payload.get("gap_type") or "").strip().lower()
     if not note:
         note = "User will investigate source records later."
 
     if not asset:
-        return jsonify({"message": "Select an asset before marking basis review status."}), 400
+        return jsonify({"message": "Select an asset before marking review status."}), 400
 
     transactions.set_basis_review_note(asset, status="needs_research", note=note)
-    transactions.save(description=f"Marked {asset} basis review as needs research")
+    review_label = "holdings gap" if gap_type == "mismatch" else "basis review"
+    transactions.save(description=f"Marked {asset} {review_label} as needs research")
 
     return jsonify(
         _holdings_update_payload(
             transactions,
             asset,
-            f"{asset} basis review left unresolved as needs user research.",
+            f"{asset} {review_label} left unresolved as needs user research.",
         )
     )
 

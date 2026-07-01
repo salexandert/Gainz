@@ -1535,7 +1535,16 @@ $(document).ready(function() {
                 'Imported activity differs from declared ' + asset + ' holdings by ' + holdingsFormatQuantity(difference) + '.',
                 difference > 0
                     ? 'Review missing disposals, transfers, losses, or documented sends.'
-                    : 'Review missing acquisitions, income, gifts, transfers, or external records.'
+                    : 'Review missing acquisitions, income, gifts, transfers, or external records.',
+                {
+                    title: 'What a holdings gap means',
+                    text: 'A holdings gap means Gainz can calculate one amount from imported buy and sell records, but your declared current holdings say a different amount.',
+                    examples: [
+                        'Example: if imported activity says you should still hold more ' + asset + ' than you declared, look for a missing sale, spend, transfer out, loss, or duplicate source file.',
+                        'Example: if you declared more ' + asset + ' than imports explain, look for a missing buy, receive, income record, gift, transfer in, or old exchange export.',
+                        'If you do not know yet, leave the holdings gap as needs research so the draft packet shows what still needs CPA or source-file review.'
+                    ]
+                }
             );
             return;
         }
@@ -1875,6 +1884,7 @@ $(document).ready(function() {
         $('#basis_review_note').prop('disabled', !selected);
 
         if (!selected) {
+            $('#holdings_leave_basis_unresolved_button').text('Leave As Needs Research');
             $('#holdings_contextual_action_hint')
                 .removeClass('alert-success alert-warning alert-info')
                 .addClass('alert-light')
@@ -1883,6 +1893,7 @@ $(document).ready(function() {
         }
 
         if (declaredHoldings === null) {
+            $('#holdings_leave_basis_unresolved_button').text('Leave As Needs Research');
             $('#holdings_contextual_action_hint')
                 .removeClass('alert-success alert-warning alert-light')
                 .addClass('alert-info')
@@ -1892,6 +1903,7 @@ $(document).ready(function() {
 
         if (soldUnlinked > tolerance) {
             $('#holdings_run_fifo_button, #holdings_leave_basis_unresolved_button').prop('disabled', false).show();
+            $('#holdings_leave_basis_unresolved_button').text('Leave Missing Basis As Needs Research');
             $('#holdings_contextual_action_hint')
                 .removeClass('alert-success alert-light alert-info')
                 .addClass('alert-warning')
@@ -1901,6 +1913,7 @@ $(document).ready(function() {
 
         if (difference !== null && Math.abs(difference) > tolerance) {
             $('#holdings_leave_basis_unresolved_button').prop('disabled', false).show();
+            $('#holdings_leave_basis_unresolved_button').text('Leave Holdings Gap As Needs Research');
             if (difference > 0) {
                 $('#sends_to_sells_button, #classify_sends_fifo_button').prop('disabled', false).show();
                 $('#holdings_contextual_action_hint')
@@ -1917,6 +1930,7 @@ $(document).ready(function() {
             return;
         }
 
+        $('#holdings_leave_basis_unresolved_button').text('Leave As Needs Research');
         $('#holdings_contextual_action_hint')
             .removeClass('alert-warning alert-light alert-info')
             .addClass('alert-success')
@@ -1948,7 +1962,7 @@ $(document).ready(function() {
         $('#holdings_readiness_unlinked').text(holdingsFormatQuantity(soldUnlinked));
         $('#holdings_readiness_difference').text(difference === null ? '--' : holdingsFormatQuantity(difference));
         $('#holdings_run_fifo_button').prop('disabled', soldUnlinked <= tolerance).text('Recalculate FIFO Basis for Selected Asset');
-        $('#holdings_leave_basis_unresolved_button').prop('disabled', soldUnlinked <= tolerance);
+        $('#holdings_leave_basis_unresolved_button').prop('disabled', soldUnlinked <= tolerance && !(difference !== null && Math.abs(difference) > tolerance));
         holdingsSetContextualActions(rowData, {
             soldUnlinked: soldUnlinked,
             difference: difference,
@@ -2751,7 +2765,8 @@ $(document).ready(function() {
             url: "/holdings_accounting/leave_basis_unresolved",
             data: JSON.stringify({
                 'asset': rowData,
-                'note': note
+                'note': note,
+                'gap_type': holdingsRowStatus(rowData)
             }),
             dataType: "json",
             contentType: 'application/json',
@@ -2788,7 +2803,6 @@ $(document).ready(function() {
             },
             complete: function() {
                 $('#leave_basis_unresolved_button').prop('disabled', false).text('Leave Unresolved / Needs Research');
-                $('#holdings_leave_basis_unresolved_button').text('Leave Missing Basis As Needs Research');
                 holdingsRenderReadiness();
             },
         });
@@ -2798,6 +2812,9 @@ $(document).ready(function() {
         var rowData = holdingsSelectedAssetRow();
         var asset = rowData ? rowData[0] : null;
         var note = $('#basis_review_note').val();
+        var status = rowData ? holdingsRowStatus(rowData) : '';
+        var isHoldingsGap = status == 'mismatch';
+        var gapLabel = isHoldingsGap ? 'holdings gap' : 'missing basis';
 
         if (!rowData) {
             alert('Select an asset first.');
@@ -2806,7 +2823,7 @@ $(document).ready(function() {
 
         holdingsShowActionConfirm(
             'Leave gap unresolved?',
-            'Leave missing basis for ' + asset + ' unresolved as needs user research? Generated exports will remain draft/not filing-ready.',
+            'Leave the ' + asset + ' ' + gapLabel + ' unresolved as needs user research? Generated exports will remain draft/not filing-ready.',
             'Leave As Needs Research',
             function() {
                 holdingsSaveBasisUnresolved(rowData, asset, note);

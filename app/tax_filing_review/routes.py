@@ -134,6 +134,17 @@ def _available_years(alignment):
     return sorted(years, reverse=True)
 
 
+def _format_year_list(years):
+    sorted_years = sorted(int(year) for year in years if year)
+    if not sorted_years:
+        return ""
+
+    if len(sorted_years) > 3:
+        return f"{sorted_years[0]}-{sorted_years[-1]}"
+
+    return ", ".join(str(year) for year in sorted_years)
+
+
 def _optional_year(value, *fallback_values):
     if value not in (None, ""):
         try:
@@ -344,6 +355,7 @@ def index():
         skipped_tax_rows=request.args.get("skipped_tax_rows"),
         tax_import_error=request.args.get("tax_import_error"),
         skipped_evidence_folders=request.args.get("skipped_evidence_folders"),
+        scan_completed_years=request.args.get("scan_completed_years"),
         default_evidence_scan_exclude_folders=DEFAULT_EVIDENCE_SCAN_EXCLUDE_FOLDERS,
     )
 
@@ -482,6 +494,7 @@ def scan_tax_evidence_folder():
     include_keywords = _scan_keyword_filters("include_keywords", "include_keywords")
     exclude_keywords = _scan_keyword_filters("exclude_keywords", "exclude_keywords")
     copy_scanned_evidence = request.form.get("copy_scanned_evidence") == "1"
+    scanned_years = set()
 
     if not folder.exists() or not folder.is_dir():
         return redirect(url_for('tax_filing_review_blueprint.index', **_scan_redirect_args(saved_evidence=0)))
@@ -502,8 +515,11 @@ def scan_tax_evidence_folder():
             continue
 
         evidence_type = classify_tax_evidence(str(path))
+        record_year = infer_tax_evidence_year(path.name, path.parent.name)
+        if record_year:
+            scanned_years.add(record_year)
         transactions.set_tax_evidence_record(
-            year=infer_tax_evidence_year(path.name, path.parent.name),
+            year=record_year,
             evidence_type=evidence_type,
             evidence_label=path.name,
             evidence_path=str(path),
@@ -527,6 +543,7 @@ def scan_tax_evidence_folder():
         **_scan_redirect_args(
             saved_evidence=added,
             skipped_evidence_folders=len(skipped_default_folders),
+            scan_completed_years=_format_year_list(year_filters or scanned_years),
         ),
     ))
 

@@ -316,6 +316,10 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertNotIn("Save Declared Holdings", reconcile_page)
         self.assertNotIn("Save 0 Holdings", reconcile_page)
 
+        custom_js = Path("app/base/static/assets/js/custom.js").read_text(encoding="utf-8")
+        self.assertIn("What a holdings gap means", custom_js)
+        self.assertIn("Leave Holdings Gap As Needs Research", custom_js)
+
     def test_import_page_renders_import_warning_workflow(self):
         app = create_app(config_dict["Debug"], selenium=True)
         app.config.update(WTF_CSRF_ENABLED=False)
@@ -1585,8 +1589,10 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertIn("guided=1", response.location)
             self.assertIn("scan_preset=transaction_csvs", response.location)
             self.assertIn("evidence_years=2024", response.location)
+            self.assertIn("scan_completed_years=2024", response.location)
             self.assertIn(b'value="transaction_csvs" selected', redirected_page.data)
             self.assertIn(b'value="2024"', redirected_page.data)
+            self.assertIn(b"2024 scan complete.", redirected_page.data)
             self.assertEqual(1, len(transactions.tax_evidence_records))
             self.assertEqual("coinbase_transactions_2024.csv", transactions.tax_evidence_records[0]["evidence_label"])
             self.assertIn("Transaction CSVs only", transactions.tax_evidence_records[0]["notes"])

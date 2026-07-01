@@ -133,6 +133,16 @@
       {% if skipped_evidence_folders and skipped_evidence_folders != "0" %}
       Gainz skipped {{ skipped_evidence_folders }} likely app/output folder{% if skipped_evidence_folders != "1" %}s{% endif %} during the scan.
       {% endif %}
+      {% if scan_completed_years %}
+      <p class="mb-0 mt-2">
+        <strong>{{ scan_completed_years }} scan complete.</strong>
+        {% if next_tax_review %}
+        Next unresolved tax year is {{ next_tax_review.year }}: {{ next_tax_review.status }}.
+        {% else %}
+        No unresolved tax evidence years remain in the current review list.
+        {% endif %}
+      </p>
+      {% endif %}
     </div>
   </div>
 </div>

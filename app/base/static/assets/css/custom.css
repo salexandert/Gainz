@@ -1506,10 +1506,37 @@
     margin-top: 18px;
 }
 
+.guided-review-form-priority {
+    background: #fff;
+    border: 1px solid rgba(43, 108, 176, 0.18);
+    border-radius: 8px;
+    margin-bottom: 18px;
+    padding: 14px;
+}
+
+.guided-review-form-priority h3 {
+    color: #252422;
+    font-size: 16px;
+    font-weight: 800;
+    margin: 0 0 10px;
+}
+
 .guided-review-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+}
+
+.guided-review-notes-details {
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    margin-top: 12px;
+    padding-top: 12px;
+}
+
+.guided-review-notes-details summary {
+    color: #2b6cb0;
+    cursor: pointer;
+    font-weight: 800;
 }
 
 .guided-review-secondary-actions {
