@@ -1569,16 +1569,24 @@ class ImportAndExportTests(unittest.TestCase):
                 return_value={"detected_taxes": str(evidence_dir)},
             ):
                 response = client.post(
-                    "/tax_filing_review/scan_evidence_folder",
+                    "/tax_filing_review/scan_evidence_folder?guided=1",
                     data={
+                        "guided": "1",
                         "scan_location": "detected_taxes",
                         "scan_preset": "transaction_csvs",
+                        "evidence_years": "2024",
                         "recursive": "1",
                     },
                 )
+                redirected_page = client.get(response.location)
 
             self.assertEqual(302, response.status_code)
             self.assertIn("saved_evidence=1", response.location)
+            self.assertIn("guided=1", response.location)
+            self.assertIn("scan_preset=transaction_csvs", response.location)
+            self.assertIn("evidence_years=2024", response.location)
+            self.assertIn(b'value="transaction_csvs" selected', redirected_page.data)
+            self.assertIn(b'value="2024"', redirected_page.data)
             self.assertEqual(1, len(transactions.tax_evidence_records))
             self.assertEqual("coinbase_transactions_2024.csv", transactions.tax_evidence_records[0]["evidence_label"])
             self.assertIn("Transaction CSVs only", transactions.tax_evidence_records[0]["notes"])
@@ -1716,7 +1724,7 @@ class ImportAndExportTests(unittest.TestCase):
                 )
                 packet_response = client.post(
                     "/export/audit_packet",
-                    json={"output_location": "audit_packets", "draft_acknowledged": True},
+                    json={"output_location": "audit_packets", "draft_acknowledged": True, "guided": "1"},
                 )
                 success_response = client.get(packet_response.get_json()["success_url"])
 
@@ -1727,7 +1735,7 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual(200, packet_response.status_code)
             self.assertEqual(output_dir.resolve(), Path(export_payload["output_dir"]))
             self.assertEqual(output_dir.resolve(), Path(packet_payload["output_dir"]))
-            self.assertIn("/export/packet_success", packet_payload["success_url"])
+            self.assertIn("/export/packet_success?guided=1", packet_payload["success_url"])
             self.assertEqual(output_dir.resolve(), Path(export_payload["path"]).parent)
             self.assertEqual(output_dir.resolve(), Path(packet_payload["path"]).parent)
             self.assertTrue(Path(export_payload["path"]).exists())

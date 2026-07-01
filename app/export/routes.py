@@ -81,6 +81,15 @@ def _draft_acknowledged():
     return _truthy_payload_value(payload.get("draft_acknowledged") or request.form.get("draft_acknowledged"))
 
 
+def _guided_requested():
+    payload = request.get_json(silent=True) or {}
+    return _truthy_payload_value(
+        payload.get("guided")
+        or request.form.get("guided")
+        or request.args.get("guided")
+    )
+
+
 def _draft_ack_error(transactions, output_label):
     readiness = get_audit_readiness_summary(transactions)
     if readiness["is_ready"] or _draft_acknowledged():
@@ -502,7 +511,7 @@ def audit_packet():
     return jsonify({
         "path": packet_path,
         "output_dir": str(output_dir),
-        "success_url": url_for("export_blueprint.packet_success"),
+        "success_url": url_for("export_blueprint.packet_success", guided=1) if _guided_requested() else url_for("export_blueprint.packet_success"),
     })
 
 
@@ -511,6 +520,8 @@ def audit_packet():
 def packet_success():
     packet_path = _last_packet_path()
     if not packet_path:
+        if _guided_requested():
+            return redirect(url_for("export_blueprint.index", guided=1))
         return redirect(url_for("export_blueprint.index"))
 
     return render_template(
@@ -526,6 +537,8 @@ def open_folder():
     packet_path = _last_packet_path()
     if packet_path:
         _open_existing_local_path(packet_path)
+    if _guided_requested():
+        return redirect(url_for("export_blueprint.packet_success", guided=1, opened="folder"))
     return redirect(url_for("export_blueprint.packet_success", opened="folder"))
 
 
@@ -535,5 +548,7 @@ def open_path():
     packet_path = _last_packet_path()
     if packet_path:
         _open_existing_local_path(packet_path / "README_FIRST.md")
+    if _guided_requested():
+        return redirect(url_for("export_blueprint.packet_success", guided=1, opened="readme"))
     return redirect(url_for("export_blueprint.packet_success", opened="readme"))
 

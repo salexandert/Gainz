@@ -224,13 +224,13 @@
                   <small class="text-muted">{{ candidate.notes }}</small>
                 </td>
                 <td>
-                  <form id="{{ suggested_form_id }}" method="POST" action="{{ url_for('tax_filing_review_blueprint.confirm_suggested_filed_totals') }}"></form>
+                  <form id="{{ suggested_form_id }}" method="POST" action="{{ url_for('tax_filing_review_blueprint.confirm_suggested_filed_totals', guided=1) if guided_mode else url_for('tax_filing_review_blueprint.confirm_suggested_filed_totals') }}"></form>
                   {% if candidate_is_ambiguous %}
-                  <button form="{{ suggested_form_id }}" type="submit" class="btn btn-sm btn-warning btn-block" formaction="{{ url_for('tax_filing_review_blueprint.mark_suggested_filed_totals_needs_research') }}" formnovalidate>Needs Research</button>
+                  <button form="{{ suggested_form_id }}" type="submit" class="btn btn-sm btn-warning btn-block" formaction="{{ url_for('tax_filing_review_blueprint.mark_suggested_filed_totals_needs_research', guided=1) if guided_mode else url_for('tax_filing_review_blueprint.mark_suggested_filed_totals_needs_research') }}" formnovalidate>Needs Research</button>
                   <button form="{{ suggested_form_id }}" type="submit" class="btn btn-sm btn-outline-primary btn-block">Confirm / Edit</button>
                   {% else %}
                   <button form="{{ suggested_form_id }}" type="submit" class="btn btn-sm btn-success btn-block">Confirm / Edit</button>
-                  <button form="{{ suggested_form_id }}" type="submit" class="btn btn-sm btn-outline-warning btn-block" formaction="{{ url_for('tax_filing_review_blueprint.mark_suggested_filed_totals_needs_research') }}" formnovalidate>Needs Research</button>
+                  <button form="{{ suggested_form_id }}" type="submit" class="btn btn-sm btn-outline-warning btn-block" formaction="{{ url_for('tax_filing_review_blueprint.mark_suggested_filed_totals_needs_research', guided=1) if guided_mode else url_for('tax_filing_review_blueprint.mark_suggested_filed_totals_needs_research') }}" formnovalidate>Needs Research</button>
                   {% endif %}
                 </td>
               </tr>
@@ -248,7 +248,7 @@
         <div class="mt-4">
           <h6>Import Filed Totals from CSV</h6>
           <p class="text-muted small">Upload a CSV file with historical tax filing totals to populate Tax Filing Review records.</p>
-          <form method="POST" action="{{ url_for('tax_filing_review_blueprint.import_filed_totals_csv') }}" enctype="multipart/form-data" class="form-inline">
+          <form method="POST" action="{{ url_for('tax_filing_review_blueprint.import_filed_totals_csv', guided=1) if guided_mode else url_for('tax_filing_review_blueprint.import_filed_totals_csv') }}" enctype="multipart/form-data" class="form-inline">
             <div class="form-group mb-2 mr-2">
               <input id="csv_file" name="csv_file" type="file" class="form-control-file" accept=".csv" required>
             </div>
@@ -272,7 +272,8 @@
 
         <div class="row">
           <div class="col-md-6">
-            <form method="POST" action="{{ url_for('tax_filing_review_blueprint.scan_tax_evidence_folder') }}">
+            <form method="POST" action="{{ url_for('tax_filing_review_blueprint.scan_tax_evidence_folder', guided=1) if guided_mode else url_for('tax_filing_review_blueprint.scan_tax_evidence_folder') }}">
+              {% if guided_mode %}<input type="hidden" name="guided" value="1">{% endif %}
               <label for="scan_location">Scan Local Evidence Folder</label>
               <div class="input-group">
                 <select id="scan_location" name="scan_location" class="form-control">
@@ -306,9 +307,9 @@
               <div class="form-group mt-3">
                 <label for="scan_preset">Scan Preset</label>
                 <select id="scan_preset" name="scan_preset" class="form-control">
-                  <option value="">Custom scan</option>
+                  <option value="" {% if not selected_scan_preset %}selected{% endif %}>Custom scan</option>
                   {% for preset in evidence_scan_presets %}
-                  <option value="{{ preset.value }}">{{ preset.label }}</option>
+                  <option value="{{ preset.value }}" {% if preset.value == selected_scan_preset %}selected{% endif %}>{{ preset.label }}</option>
                   {% endfor %}
                 </select>
                 <small class="form-text text-muted">
@@ -318,34 +319,34 @@
               <div class="row mt-3">
                 <div class="col-md-4">
                   <label for="evidence_years">Years</label>
-                  <input id="evidence_years" name="evidence_years" type="text" class="form-control" placeholder="2019, 2020">
+                  <input id="evidence_years" name="evidence_years" type="text" class="form-control" value="{{ selected_scan_years }}" placeholder="2019, 2020">
                 </div>
                 <div class="col-md-4">
                   <label for="include_keywords">Include Keywords</label>
-                  <input id="include_keywords" name="include_keywords" type="text" class="form-control" placeholder="crypto, 8949, payment">
+                  <input id="include_keywords" name="include_keywords" type="text" class="form-control" value="{{ selected_include_keywords }}" placeholder="crypto, 8949, payment">
                 </div>
                 <div class="col-md-4">
                   <label for="exclude_keywords">Exclude Keywords</label>
-                  <input id="exclude_keywords" name="exclude_keywords" type="text" class="form-control" placeholder="personal, w2, mortgage">
+                  <input id="exclude_keywords" name="exclude_keywords" type="text" class="form-control" value="{{ selected_exclude_keywords }}" placeholder="personal, w2, mortgage">
                 </div>
               </div>
               <div class="mt-3">
                 <span class="d-block text-muted small mb-1">File Types</span>
                 {% for extension in [".pdf", ".csv", ".xlsx", ".xls", ".txt", ".png", ".jpg", ".jpeg"] %}
                 <label class="form-check-label mr-3">
-                  <input class="gainz-native-checkbox" type="checkbox" name="evidence_file_types" value="{{ extension }}" checked>
+                  <input class="gainz-native-checkbox" type="checkbox" name="evidence_file_types" value="{{ extension }}" {% if extension in selected_evidence_file_types %}checked{% endif %}>
                   {{ extension }}
                 </label>
                 {% endfor %}
               </div>
               <div class="gainz-native-checkbox-row mt-2">
-                <input id="tax_evidence_recursive" class="gainz-native-checkbox" type="checkbox" name="recursive" value="1" checked>
+                <input id="tax_evidence_recursive" class="gainz-native-checkbox" type="checkbox" name="recursive" value="1" {% if selected_recursive %}checked{% endif %}>
                 <label for="tax_evidence_recursive" class="mb-0">
                   Include subfolders
                 </label>
               </div>
               <div class="gainz-native-checkbox-row mt-2">
-                <input id="copy_scanned_evidence" class="gainz-native-checkbox" type="checkbox" name="copy_scanned_evidence" value="1">
+                <input id="copy_scanned_evidence" class="gainz-native-checkbox" type="checkbox" name="copy_scanned_evidence" value="1" {% if selected_copy_scanned_evidence %}checked{% endif %}>
                 <label for="copy_scanned_evidence" class="mb-0">
                   Copy scanned evidence files into audit packets
                 </label>
@@ -354,7 +355,7 @@
             </form>
           </div>
           <div class="col-md-6">
-            <form method="POST" action="{{ url_for('tax_filing_review_blueprint.save_tax_evidence_record') }}" enctype="multipart/form-data">
+            <form method="POST" action="{{ url_for('tax_filing_review_blueprint.save_tax_evidence_record', guided=1) if guided_mode else url_for('tax_filing_review_blueprint.save_tax_evidence_record') }}" enctype="multipart/form-data">
               <div class="row">
                 <div class="col-md-3">
                   <label for="evidence_year">Year</label>
@@ -487,7 +488,7 @@
       <div class="card-body">
         <h5 id="record-filed-totals" class="card-title">Record Filed Totals</h5>
         <p class="text-muted">Enter the totals from your filed return or tax software, plus a reference to the filing/payment evidence you keep outside Gainz.</p>
-        <form method="POST" action="{{ url_for('tax_filing_review_blueprint.save_tax_year_record') }}">
+        <form method="POST" action="{{ url_for('tax_filing_review_blueprint.save_tax_year_record', guided=1) if guided_mode else url_for('tax_filing_review_blueprint.save_tax_year_record') }}">
           <div class="row">
             <div class="col-md-2">
               <label for="tax_year">Year<span class="required">*</span></label>

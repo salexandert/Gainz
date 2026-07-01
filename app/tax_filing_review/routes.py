@@ -86,6 +86,41 @@ def _scan_location_choices():
     return choices
 
 
+def _guided_requested():
+    return str(
+        request.form.get("guided")
+        or request.args.get("guided")
+        or ""
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _tax_review_redirect_args(**kwargs):
+    args = {}
+    if _guided_requested():
+        args["guided"] = 1
+    args.update(kwargs)
+    return args
+
+
+def _scan_redirect_args(**kwargs):
+    args = _tax_review_redirect_args()
+    for field in ("scan_location", "scan_preset", "evidence_years", "include_keywords", "exclude_keywords"):
+        value = (request.form.get(field) or "").strip()
+        if value:
+            args[field] = value
+
+    file_types = [value for value in request.form.getlist("evidence_file_types") if value]
+    if file_types:
+        args["evidence_file_types"] = ",".join(file_types)
+
+    args["recursive"] = "1" if request.form.get("recursive") == "1" else "0"
+    if request.form.get("copy_scanned_evidence") == "1":
+        args["copy_scanned_evidence"] = "1"
+
+    args.update(kwargs)
+    return args
+
+
 def _scan_folder_for_location():
     scan_location = (request.form.get("scan_location") or "").strip()
     folder = _scan_location_choices().get(scan_location) or _detected_tax_folder()
@@ -262,12 +297,27 @@ def index():
     alignment = get_tax_filing_alignment_summary(transactions)
     evidence_inventory = get_tax_evidence_inventory_summary(transactions, alignment)
     suggested_totals = get_suggested_filed_totals(transactions)
+    guided_mode = _guided_requested()
+    selected_scan_location = request.args.get("scan_location") or "detected_taxes"
+    selected_evidence_file_types = {
+        value
+        for value in (request.args.get("evidence_file_types") or "").split(",")
+        if value
+    } or set(TAX_EVIDENCE_SCAN_EXTENSIONS)
 
     return render_template(
         'tax_filing_review.html',
         alignment=alignment,
         evidence_inventory=evidence_inventory,
         suggested_totals=suggested_totals,
+        guided_mode=guided_mode,
+        selected_scan_preset=request.args.get("scan_preset") or "",
+        selected_scan_years=request.args.get("evidence_years") or "",
+        selected_include_keywords=request.args.get("include_keywords") or "",
+        selected_exclude_keywords=request.args.get("exclude_keywords") or "",
+        selected_evidence_file_types=selected_evidence_file_types,
+        selected_recursive=request.args.get("recursive", "1") != "0",
+        selected_copy_scanned_evidence=request.args.get("copy_scanned_evidence") == "1",
         evidence_type_choices=TAX_EVIDENCE_TYPE_CHOICES,
         evidence_scan_presets=[
             {"value": value, "label": preset["label"]}
@@ -281,7 +331,7 @@ def index():
                     "uploaded_evidence": "Gainz uploaded evidence folder",
                 }.get(value, value),
                 "path": path,
-                "selected": value == "detected_taxes",
+                "selected": value == selected_scan_location,
             }
             for value, path in _scan_location_choices().items()
         ],
@@ -320,7 +370,7 @@ def save_tax_year_record():
         reason="filed tax totals update",
     )
 
-    return redirect(url_for('tax_filing_review_blueprint.index', saved_year=year))
+    return redirect(url_for('tax_filing_review_blueprint.index', **_tax_review_redirect_args(saved_year=year)))
 
 
 @blueprint.route('/suggested_totals/confirm', methods=['POST'])
@@ -358,7 +408,7 @@ def confirm_suggested_filed_totals():
         reason="filed tax totals update",
     )
 
-    return redirect(url_for('tax_filing_review_blueprint.index', saved_year=year, saved_suggestion=1))
+    return redirect(url_for('tax_filing_review_blueprint.index', **_tax_review_redirect_args(saved_year=year, saved_suggestion=1)))
 
 
 @blueprint.route('/suggested_totals/research', methods=['POST'])
@@ -390,7 +440,7 @@ def mark_suggested_filed_totals_needs_research():
     )
     transactions.save(description=f"Marked suggested filed totals for {year} as needs research")
 
-    return redirect(url_for('tax_filing_review_blueprint.index', research_year=year, saved_suggestion=1))
+    return redirect(url_for('tax_filing_review_blueprint.index', **_tax_review_redirect_args(research_year=year, saved_suggestion=1)))
 
 
 @blueprint.route('/evidence', methods=['POST'])
@@ -403,7 +453,7 @@ def save_tax_evidence_record():
     copy_to_packet = request.form.get("copy_to_packet") == "1"
 
     if not reference and not notes:
-        return redirect(url_for('tax_filing_review_blueprint.index'))
+        return redirect(url_for('tax_filing_review_blueprint.index', **_tax_review_redirect_args()))
 
     _add_tax_evidence_record(
         transactions,
@@ -416,7 +466,7 @@ def save_tax_evidence_record():
     )
     transactions.save(description="Added tax evidence inventory item")
 
-    return redirect(url_for('tax_filing_review_blueprint.index', saved_evidence=1))
+    return redirect(url_for('tax_filing_review_blueprint.index', **_tax_review_redirect_args(saved_evidence=1)))
 
 
 @blueprint.route('/scan_evidence_folder', methods=['POST'])
@@ -434,7 +484,7 @@ def scan_tax_evidence_folder():
     copy_scanned_evidence = request.form.get("copy_scanned_evidence") == "1"
 
     if not folder.exists() or not folder.is_dir():
-        return redirect(url_for('tax_filing_review_blueprint.index', saved_evidence=0))
+        return redirect(url_for('tax_filing_review_blueprint.index', **_scan_redirect_args(saved_evidence=0)))
 
     paths = folder.rglob("*") if recursive else folder.iterdir()
     added = 0
@@ -474,8 +524,10 @@ def scan_tax_evidence_folder():
 
     return redirect(url_for(
         'tax_filing_review_blueprint.index',
-        saved_evidence=added,
-        skipped_evidence_folders=len(skipped_default_folders),
+        **_scan_redirect_args(
+            saved_evidence=added,
+            skipped_evidence_folders=len(skipped_default_folders),
+        ),
     ))
 
 
@@ -485,7 +537,7 @@ def import_filed_totals_csv():
     transactions = current_app.config['transactions']
     file_storage = request.files.get("csv_file")
     if not file_storage or not file_storage.filename:
-        return redirect(url_for('tax_filing_review_blueprint.index'))
+        return redirect(url_for('tax_filing_review_blueprint.index', **_tax_review_redirect_args()))
 
     try:
         summary = import_tax_total_records(file_storage, transactions, file_storage.filename)
@@ -498,9 +550,11 @@ def import_filed_totals_csv():
 
         return redirect(url_for(
             'tax_filing_review_blueprint.index',
-            imported_tax_rows=summary["imported_count"],
-            skipped_tax_rows=summary["skipped_count"],
+            **_tax_review_redirect_args(
+                imported_tax_rows=summary["imported_count"],
+                skipped_tax_rows=summary["skipped_count"],
+            ),
         ))
     except Exception:
         current_app.logger.exception("Error importing filed totals CSV")
-        return redirect(url_for('tax_filing_review_blueprint.index', tax_import_error=1))
+        return redirect(url_for('tax_filing_review_blueprint.index', **_tax_review_redirect_args(tax_import_error=1)))

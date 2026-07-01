@@ -1318,6 +1318,7 @@ $(document).ready(function() {
     var holdingsIsGuided = String(holdingsContext.data('guided-mode')) == '1';
     var holdingsMode = String(holdingsContext.data('holdings-mode') || 'full');
     var activeHoldingsFilter = 'all';
+    var holdingsReviewedGapAssets = {};
 
     function holdingsParseQuantity(value) {
         if (value === undefined || value === null || value === 'N/A') {
@@ -1790,12 +1791,15 @@ $(document).ready(function() {
         holdingsRenderSendDisposalRecommendation(summary);
 
         if (summary.basis_review_status == 'needs_research') {
+            holdingsReviewedGapAssets[summary.asset] = true;
             $('#basis_review_note').val(summary.basis_review_note || '');
             $('#holdings_save_message')
                 .removeClass('alert-success')
                 .addClass('alert-warning')
                 .text('Missing basis for ' + summary.asset + ' is marked as needs user research. Exports remain draft/not filing-ready until resolved.')
                 .show();
+        } else if (summary.asset) {
+            delete holdingsReviewedGapAssets[summary.asset];
         }
 
         if (holdingsClassificationReviewTable) {
@@ -2269,7 +2273,7 @@ $(document).ready(function() {
 
         var rows = holdingsGuidedEligibleRows();
         return rows.some(function(rowData) {
-            return rowData && rowData[0] != asset;
+            return rowData && rowData[0] != asset && !holdingsReviewedGapAssets[rowData[0]];
         });
     }
 
@@ -2752,6 +2756,7 @@ $(document).ready(function() {
             dataType: "json",
             contentType: 'application/json',
             success: function(data) {
+                holdingsReviewedGapAssets[asset] = true;
                 holdingsRowsSet(data['stats_table_rows']);
                 holdingsSetSummary(data['holdings_summary']);
                 var updatedRow = holdingsSelectAsset(asset);
@@ -3830,9 +3835,11 @@ $(document).ready(function() {
 
     function exportOutputPayload() {
         var isReady = String($('#draft_export_ack_panel').data('ready')) == '1';
+        var isGuided = new URLSearchParams(window.location.search || '').get('guided') == '1';
         return {
             'output_location': $('#export_output_location').val(),
-            'draft_acknowledged': isReady || $('#draft_export_ack').is(':checked')
+            'draft_acknowledged': isReady || $('#draft_export_ack').is(':checked'),
+            'guided': isGuided ? '1' : ''
         };
     }
 
