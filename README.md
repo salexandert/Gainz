@@ -159,7 +159,7 @@ Public screenshots are captured from synthetic demo data so they can show the fi
 
 Current public screenshots live under `docs/assets/screenshots/`, including Dashboard, Import, Reconcile, Reports & Export, advanced Stats & Charts, Model Sell, and blank batch manual entry screens captured from synthetic demo data.
 
-When a product change affects public documentation, update `docs/` first. Regenerate the GitHub Wiki from these docs, then sync selected public docs/screenshots into the separate Gainz website repository before Netlify deploys.
+When a product change affects public documentation, update `docs/` first. Regenerate the GitHub Wiki from these docs, then sync selected public docs/screenshots into the separate Gainz website repository before Netlify deploys. The `Trigger Website Sync` workflow dispatches the separate website sync after relevant app/docs changes when the repository secret `WEBSITE_REPO_TOKEN` is configured.
 
 ## Support Gainz
 
