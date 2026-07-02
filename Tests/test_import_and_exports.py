@@ -1930,6 +1930,52 @@ class ImportAndExportTests(unittest.TestCase):
                 db.session.remove()
                 db.engine.dispose()
 
+    def test_guided_review_queue_shows_filed_tax_cross_check_for_gap_year(self):
+        transactions = empty_transactions()
+        buy = Buy("BTC", 0.1, datetime.datetime(2024, 1, 1), 100, "coinbase.csv")
+        linked_sell = Sell("BTC", 0.1, datetime.datetime(2024, 5, 1), 300, "coinbase.csv")
+        linked_sell.link_transaction(buy, 0.1)
+        missing_basis_sell = Sell("BTC", 0.5, datetime.datetime(2024, 6, 1), 900, "coinbase.csv")
+        transactions.transactions = [buy, linked_sell, missing_basis_sell]
+        transactions.set_holdings("BTC", 0)
+        transactions.set_tax_year_record(
+            2024,
+            reported_proceeds=1200,
+            reported_cost_basis=500,
+            reported_gain_loss=700,
+            tax_paid=150,
+            filing_status="Filed",
+            evidence_reference="2024 filed Form 8949",
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class ExportRouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(ExportRouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.get("/export/review_queue?guided=1")
+
+            self.assertEqual(200, response.status_code)
+            self.assertIn(b"Filed tax cross-check", response.data)
+            self.assertIn(b"2024 filed evidence is recorded", response.data)
+            self.assertIn(b"Gainz proceeds", response.data)
+            self.assertIn(b"Filed proceeds", response.data)
+            self.assertIn(b"$1,200.00", response.data)
+            self.assertIn(b"$150.00", response.data)
+            self.assertIn(b"comparison evidence only", response.data)
+            self.assertIn(b"they do not replace source records", response.data)
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
     def test_export_routes_require_draft_acknowledgement_when_not_ready(self):
         transactions = empty_transactions()
 

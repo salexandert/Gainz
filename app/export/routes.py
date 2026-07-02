@@ -339,6 +339,60 @@ def _professional_review_options(row):
     return options_by_type.get(blocker_type, [])
 
 
+def _tax_cross_check_for_item(transactions, row):
+    year_value = row.get("year")
+    if year_value in (None, ""):
+        return None
+
+    try:
+        year = int(year_value)
+    except (TypeError, ValueError):
+        return None
+
+    alignment = get_tax_filing_alignment_summary(transactions)
+    alignment_row = next(
+        (item for item in alignment.get("rows", []) if int(item.get("year", 0)) == year),
+        None,
+    )
+    if not alignment_row:
+        return None
+
+    has_filed_totals = bool(alignment_row.get("has_record"))
+    if has_filed_totals:
+        headline = f"{year} filed evidence is recorded"
+        guidance = (
+            "Use this as a cross-check while reviewing the gap. If a source-backed classification moves Gainz closer "
+            "to filed Form 8949/Schedule D totals, that can support the review trail. If it moves farther away, review "
+            "source records before relying on the classification."
+        )
+    else:
+        headline = f"No filed totals recorded for {year}"
+        guidance = (
+            "You can still review this gap from source records. Add filed Form 8949/Schedule D totals later to compare "
+            "whether Gainz's calculated totals align with what was originally filed."
+        )
+
+    return {
+        "year": year,
+        "headline": headline,
+        "status": alignment_row.get("status", ""),
+        "status_class": alignment_row.get("status_class", ""),
+        "guidance": guidance,
+        "calculated_rows": alignment_row.get("calculated_rows", 0),
+        "calculated_proceeds_display": alignment_row.get("calculated_proceeds_display", "$0.00"),
+        "calculated_cost_basis_display": alignment_row.get("calculated_cost_basis_display", "$0.00"),
+        "calculated_gain_loss_display": alignment_row.get("calculated_gain_loss_display", "$0.00"),
+        "reported_proceeds_display": alignment_row.get("reported_proceeds_display") or "Not recorded",
+        "reported_cost_basis_display": alignment_row.get("reported_cost_basis_display") or "Not recorded",
+        "reported_gain_loss_display": alignment_row.get("reported_gain_loss_display") or "Not recorded",
+        "difference_gain_loss_display": alignment_row.get("difference_gain_loss_display") or "N/A",
+        "tax_paid_display": alignment_row.get("tax_paid_display") or "Not recorded",
+        "evidence_reference": alignment_row.get("evidence_reference") or "Not recorded",
+        "next_action": alignment_row.get("next_action", ""),
+        "has_filed_totals": has_filed_totals,
+    }
+
+
 def _review_queue_choices_for_item(row):
     blocker_type = (row or {}).get("blocker_type")
     values_by_type = {
@@ -461,6 +515,7 @@ def _review_queue_context(transactions, item_id=""):
         current["review_question"] = _work_order_item_question(current)
         current["review_summary"] = _work_order_item_summary(current)
         current["professional_review_options"] = _professional_review_options(current)
+        current["tax_cross_check"] = _tax_cross_check_for_item(transactions, current)
         choices = _review_queue_choices_for_item(current)
         current["allowed_outcomes"] = [choice["label"] for choice in choices]
     else:

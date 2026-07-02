@@ -1570,6 +1570,78 @@
     overflow-wrap: anywhere;
 }
 
+.guided-review-tax-cross-check {
+    background: #fff;
+    border: 1px solid rgba(40, 167, 69, 0.2);
+    border-left: 4px solid #2fbf71;
+    border-radius: 8px;
+    margin-top: 14px;
+    padding: 14px;
+}
+
+.guided-review-tax-cross-check-header {
+    align-items: flex-start;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+}
+
+.guided-review-tax-cross-check h3 {
+    color: #111820;
+    font-size: 20px;
+    font-weight: 800;
+    margin: 2px 0 8px;
+}
+
+.guided-review-tax-cross-check p {
+    color: #4f5d6b;
+    margin-bottom: 10px;
+}
+
+.guided-review-tax-cross-check-grid {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    margin: 10px 0;
+}
+
+.guided-review-tax-cross-check-grid div {
+    background: #f8f9fa;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 6px;
+    padding: 8px 10px;
+}
+
+.guided-review-tax-cross-check-grid span,
+.guided-review-tax-cross-check-grid strong {
+    display: block;
+}
+
+.guided-review-tax-cross-check-grid span {
+    color: #6c757d;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.guided-review-tax-cross-check-grid strong {
+    color: #111820;
+    font-size: 15px;
+    overflow-wrap: anywhere;
+}
+
+.guided-review-tax-cross-check-disclaimer {
+    background: #fff7e6;
+    border-radius: 6px;
+    color: #5d4200 !important;
+    font-size: 14px;
+    padding: 8px 10px;
+}
+
+.guided-review-tax-cross-check-note {
+    font-size: 14px;
+}
+
 .guided-review-professional-options {
     border-top: 1px solid rgba(0, 0, 0, 0.08);
     margin-top: 14px;

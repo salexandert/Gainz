@@ -80,6 +80,64 @@
               {% endfor %}
             </dl>
             {% endif %}
+            {% if item.tax_cross_check %}
+            <aside class="guided-review-tax-cross-check" aria-labelledby="tax_cross_check_heading">
+              <div class="guided-review-tax-cross-check-header">
+                <div>
+                  <span class="section-kicker">Filed tax cross-check</span>
+                  <h3 id="tax_cross_check_heading">{{ item.tax_cross_check.headline }}</h3>
+                </div>
+                <span class="gainz-status-badge {{ item.tax_cross_check.status_class }}">{{ item.tax_cross_check.status }}</span>
+              </div>
+              <p>{{ item.tax_cross_check.guidance }}</p>
+              <div class="guided-review-tax-cross-check-grid">
+                <div>
+                  <span>Gainz rows</span>
+                  <strong>{{ item.tax_cross_check.calculated_rows }}</strong>
+                </div>
+                <div>
+                  <span>Gainz proceeds</span>
+                  <strong>{{ item.tax_cross_check.calculated_proceeds_display }}</strong>
+                </div>
+                <div>
+                  <span>Filed proceeds</span>
+                  <strong>{{ item.tax_cross_check.reported_proceeds_display }}</strong>
+                </div>
+                <div>
+                  <span>Gainz cost basis</span>
+                  <strong>{{ item.tax_cross_check.calculated_cost_basis_display }}</strong>
+                </div>
+                <div>
+                  <span>Filed cost basis</span>
+                  <strong>{{ item.tax_cross_check.reported_cost_basis_display }}</strong>
+                </div>
+                <div>
+                  <span>Gainz gain/loss</span>
+                  <strong>{{ item.tax_cross_check.calculated_gain_loss_display }}</strong>
+                </div>
+                <div>
+                  <span>Filed gain/loss</span>
+                  <strong>{{ item.tax_cross_check.reported_gain_loss_display }}</strong>
+                </div>
+                <div>
+                  <span>Difference</span>
+                  <strong>{{ item.tax_cross_check.difference_gain_loss_display }}</strong>
+                </div>
+                <div>
+                  <span>Tax paid</span>
+                  <strong>{{ item.tax_cross_check.tax_paid_display }}</strong>
+                </div>
+              </div>
+              <p class="guided-review-tax-cross-check-disclaimer">
+                Filed totals and tax paid are comparison evidence only. They can help explain whether a transfer/disposal
+                classification matches prior filings, but they do not replace source records, basis support, or CPA review.
+              </p>
+              <p class="guided-review-tax-cross-check-note">
+                Evidence: {{ item.tax_cross_check.evidence_reference }}.
+                {{ item.tax_cross_check.next_action }}
+              </p>
+            </aside>
+            {% endif %}
             {% if item.professional_review_options %}
             <div class="guided-review-professional-options" aria-labelledby="professional_review_options_heading">
               <h3 id="professional_review_options_heading">CPA review options</h3>
