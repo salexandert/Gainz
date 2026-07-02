@@ -303,6 +303,7 @@ class ImportAndExportTests(unittest.TestCase):
 
         self.assertIn("Step 3 of 4", reconcile_page)
         self.assertIn("Reconcile Gaps", reconcile_page)
+        self.assertNotIn("Work one asset gap at a time.", reconcile_page)
         self.assertIn("Review one holdings gap", reconcile_page)
         self.assertIn("A gap means imported activity does not yet explain declared holdings", reconcile_page)
         self.assertIn('id="holdings_current_help"', reconcile_page)
@@ -1917,6 +1918,10 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertIn(b"I will import or add missing records", response.data)
             self.assertIn(b"Document unknown basis", response.data)
             self.assertIn(b"I do not know yet / needs research", response.data)
+            self.assertIn(b"CPA review options", response.data)
+            self.assertIn(b"Reconstruct basis from records", response.data)
+            self.assertIn(b"Correct source classification", response.data)
+            self.assertIn(b"Ask CPA to determine basis treatment", response.data)
             self.assertNotIn(b"Keep as owner transfer", response.data)
             self.assertNotIn(b"Decide what to do with this work order item", response.data)
 

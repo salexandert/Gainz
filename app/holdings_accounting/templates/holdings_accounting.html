@@ -26,15 +26,15 @@
             <h1 class="gainz-page-title">
               {% if is_declare_mode %}Declare Holdings{% elif is_reconcile_mode %}Reconcile Gaps{% else %}Reconcile Holdings{% endif %}
             </h1>
+            {% if is_declare_mode or not is_reconcile_mode %}
             <p class="card-category">
               {% if is_declare_mode %}
               Enter what you currently hold for each imported asset. This gives Gainz a real-world target before it asks you to explain gaps.
-              {% elif is_reconcile_mode %}
-              Work one asset gap at a time. If you do not know what happened yet, document that uncertainty for research or CPA review.
               {% else %}
               Use this page to record what you currently hold, compare that against imported activity, and identify records that may need review.
               {% endif %}
             </p>
+            {% endif %}
           </div>
           {% if guided_mode %}
           <div>

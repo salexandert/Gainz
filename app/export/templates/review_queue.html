@@ -80,6 +80,23 @@
               {% endfor %}
             </dl>
             {% endif %}
+            {% if item.professional_review_options %}
+            <div class="guided-review-professional-options" aria-labelledby="professional_review_options_heading">
+              <h3 id="professional_review_options_heading">CPA review options</h3>
+              <p>
+                A CPA may use one or more of these paths depending on the source records. Gainz records the path you choose;
+                it does not choose a tax position for you.
+              </p>
+              <div class="guided-review-professional-grid">
+                {% for option in item.professional_review_options %}
+                <div>
+                  <strong>{{ option[0] }}</strong>
+                  <span>{{ option[1] }}</span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
           </div>
           <div class="alert alert-info" role="note">
             It is valid to choose "I do not know yet." Gainz keeps that as a documented draft blocker instead of forcing certainty.

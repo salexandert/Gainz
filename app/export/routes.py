@@ -274,6 +274,71 @@ def _work_order_item_summary(row):
     return parts
 
 
+def _professional_review_options(row):
+    blocker_type = row.get("blocker_type")
+    asset = row.get("asset") or "this asset"
+    year = row.get("year") or "the affected year"
+
+    options_by_type = {
+        "Missing acquisition basis": [
+            (
+                "Reconstruct basis from records",
+                (
+                    f"Look for earlier {asset} exchange CSVs, wallet receives, broker forms, tax software exports, "
+                    "email receipts, CPA workbooks, income/fork/airdrop records, or transfer-in records before the sale."
+                ),
+            ),
+            (
+                "Correct source classification",
+                (
+                    "If this row is not actually a taxable disposal, correct the import or add source-backed manual rows "
+                    "so Gainz is not treating the wrong activity as a sale."
+                ),
+            ),
+            (
+                "Document unsupported or unknown basis",
+                (
+                    "If records cannot be reconstructed, leave the item as a draft blocker with notes describing what was checked "
+                    "and what remains unknown for professional review."
+                ),
+            ),
+            (
+                "Compare against filed tax records",
+                (
+                    f"Compare {year} filed Form 8949/Schedule D, tax software worksheets, or CPA files to determine whether "
+                    "the original filing already addressed this disposal or whether follow-up is needed."
+                ),
+            ),
+        ],
+        "Holdings explanation needed": [
+            (
+                "Trace transfers",
+                "Review destination wallet or exchange records to determine whether sends stayed under the taxpayer's control.",
+            ),
+            (
+                "Identify disposals",
+                "Determine whether documented sends were sales, trades, payments, gifts, losses, or another taxable/non-taxable event.",
+            ),
+            (
+                "Remove duplicate activity",
+                "Check whether overlapping CSV exports are duplicating buys, sells, receives, or sends.",
+            ),
+        ],
+        "Tax evidence review": [
+            (
+                "Confirm filed totals",
+                f"Compare Gainz totals with filed return, Form 8949, Schedule D, payment evidence, or CPA workpapers for {year}.",
+            ),
+            (
+                "Mark zero or not applicable",
+                "If there was no reportable digital-asset activity for the year, document that confirmation.",
+            ),
+        ],
+    }
+
+    return options_by_type.get(blocker_type, [])
+
+
 def _review_queue_choices_for_item(row):
     blocker_type = (row or {}).get("blocker_type")
     values_by_type = {
@@ -336,7 +401,7 @@ def _review_queue_choices_for_item(row):
             "import_missing_records": "I will import or add missing records",
             "document_unknown_basis": "Document unknown basis",
             "needs_research": "I do not know yet / needs research",
-            "sent_to_cpa": "Send this question to CPA",
+            "sent_to_cpa": "Ask CPA to determine basis treatment",
             "ignored_for_draft": "Leave unresolved for draft only",
             "resolved": "Already resolved",
         },
@@ -395,6 +460,7 @@ def _review_queue_context(transactions, item_id=""):
         current["review_title"] = _work_order_item_title(current)
         current["review_question"] = _work_order_item_question(current)
         current["review_summary"] = _work_order_item_summary(current)
+        current["professional_review_options"] = _professional_review_options(current)
         choices = _review_queue_choices_for_item(current)
         current["allowed_outcomes"] = [choice["label"] for choice in choices]
     else:
