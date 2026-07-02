@@ -1837,6 +1837,9 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual(200, response.status_code)
             self.assertIn(b"Guided Review Queue", response.data)
             self.assertIn(b"Current holdings missing", response.data)
+            self.assertIn(b"Enter current BTC holdings", response.data)
+            self.assertIn(b"What amount of BTC do you currently hold", response.data)
+            self.assertIn(b"Current holdings are entered", response.data)
             self.assertIn(b"Gap Investigator", response.data)
             self.assertIn(b"What Gainz Knows", response.data)
             self.assertIn(b"What Gainz Does Not Know", response.data)
@@ -1846,7 +1849,7 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertIn(b"/export/?guided=1", response.data)
             response_text = response.data.decode("utf-8")
             self.assertLess(
-                response_text.index("User memory notes / files checked"),
+                response_text.index("Choose what happened next"),
                 response_text.index("Gap Investigator"),
             )
 
@@ -1881,6 +1884,41 @@ class ImportAndExportTests(unittest.TestCase):
                 "What source records should be checked next?",
                 record["cpa_question"],
             )
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_guided_review_queue_explains_missing_basis_item_clearly(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Sell("BCH", 0.5, datetime.datetime(2024, 2, 1), 200, "cash_app_report.csv")
+        ]
+        transactions.set_holdings("BCH", 0)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class ExportRouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(ExportRouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.get("/export/review_queue?guided=1")
+
+            self.assertEqual(200, response.status_code)
+            self.assertIn(b"Resolve BCH missing cost basis", response.data)
+            self.assertIn(b"Can you find earlier BCH buy", response.data)
+            self.assertIn(b"cash_app_report.csv", response.data)
+            self.assertIn(b"I will import or add missing records", response.data)
+            self.assertIn(b"Document unknown basis", response.data)
+            self.assertIn(b"I do not know yet / needs research", response.data)
+            self.assertNotIn(b"Keep as owner transfer", response.data)
+            self.assertNotIn(b"Decide what to do with this work order item", response.data)
 
             with app.app_context():
                 db.drop_all()

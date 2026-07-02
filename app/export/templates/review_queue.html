@@ -35,7 +35,7 @@
         <div class="gainz-current-decision mt-3" role="region" aria-label="Current decision">
           <div>
             <span>Current task</span>
-            <strong>{% if item %}Decide what to do with this work order item{% else %}Review packet preview{% endif %}</strong>
+            <strong>{% if item %}{{ item.review_title }}{% else %}Review packet preview{% endif %}</strong>
           </div>
           <div>
             <span>Why</span>
@@ -66,10 +66,25 @@
 
         <form method="POST" action="{{ url_for('export_blueprint.review_queue_save') }}" class="guided-review-form guided-review-form-priority">
           <input type="hidden" name="item_id" value="{{ item.item_id }}">
+          <div class="guided-review-decision-context" aria-labelledby="guided_review_decision_heading">
+            <span class="section-kicker">{{ item.blocker_type }}</span>
+            <h2 id="guided_review_decision_heading">{{ item.review_title }}</h2>
+            <p class="guided-review-question">{{ item.review_question }}</p>
+            {% if item.review_summary %}
+            <dl class="guided-review-decision-summary">
+              {% for detail in item.review_summary %}
+              <div>
+                <dt>{{ detail.label }}</dt>
+                <dd>{{ detail.value }}</dd>
+              </div>
+              {% endfor %}
+            </dl>
+            {% endif %}
+          </div>
           <div class="alert alert-info" role="note">
             It is valid to choose "I do not know yet." Gainz keeps that as a documented draft blocker instead of forcing certainty.
           </div>
-          <h3>Choose a decision</h3>
+          <h3>Choose what happened next</h3>
           <div class="guided-review-actions" role="group" aria-label="Review decisions">
             {% for choice in choices %}
             <button

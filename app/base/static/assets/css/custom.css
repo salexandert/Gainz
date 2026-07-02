@@ -1521,6 +1521,55 @@
     margin: 0 0 10px;
 }
 
+.guided-review-decision-context {
+    background: #f8f9fa;
+    border: 1px solid rgba(43, 108, 176, 0.14);
+    border-radius: 8px;
+    margin-bottom: 14px;
+    padding: 14px;
+}
+
+.guided-review-decision-context h2 {
+    color: #111820;
+    font-size: 24px;
+    font-weight: 800;
+    margin: 4px 0 8px;
+}
+
+.guided-review-question {
+    color: #252422;
+    font-size: 17px;
+    line-height: 1.45;
+    margin-bottom: 12px;
+}
+
+.guided-review-decision-summary {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    margin: 0;
+}
+
+.guided-review-decision-summary div {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 6px;
+    padding: 8px 10px;
+}
+
+.guided-review-decision-summary dt {
+    color: #6c757d;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.guided-review-decision-summary dd {
+    color: #252422;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
 .guided-review-actions {
     display: flex;
     flex-wrap: wrap;

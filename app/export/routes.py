@@ -201,6 +201,171 @@ def _work_order_related_url(row):
     return url_for("export_blueprint.index", guided=1)
 
 
+def _work_order_item_title(row):
+    blocker_type = row.get("blocker_type")
+    asset = row.get("asset") or ""
+    year = row.get("year") or ""
+    source_file = row.get("source_file") or ""
+
+    if blocker_type == "Missing acquisition basis":
+        return f"Resolve {asset} missing cost basis" if asset else "Resolve missing cost basis"
+    if blocker_type == "Holdings explanation needed":
+        return f"Explain the {asset} holdings gap" if asset else "Explain a holdings gap"
+    if blocker_type == "Current holdings missing":
+        return f"Enter current {asset} holdings" if asset else "Enter current holdings"
+    if blocker_type == "Import warning decision":
+        return f"Decide what happened in {source_file}" if source_file else "Decide what happened in an import row"
+    if blocker_type == "Reviewed import warning blocker":
+        return f"Resolve reviewed warning in {source_file}" if source_file else "Resolve a reviewed import warning"
+    if blocker_type == "Possible overlapping source files":
+        return "Decide whether source files overlap"
+    if blocker_type == "Tax evidence review":
+        return f"Review {year} tax evidence" if year else "Review tax evidence"
+
+    return row.get("blocker_type") or "Review packet item"
+
+
+def _work_order_item_question(row):
+    blocker_type = row.get("blocker_type")
+    asset = row.get("asset") or "this asset"
+    year = row.get("year") or "this year"
+
+    questions = {
+        "Missing acquisition basis": (
+            f"Can you find earlier {asset} buy, receive, income, fork, airdrop, or transfer-in records "
+            "for this sale, or should this remain documented as unknown/research for CPA review?"
+        ),
+        "Holdings explanation needed": (
+            f"Why does Gainz calculate a different {asset} balance than you declared: missing transfer, disposal, loss, "
+            "gift, duplicate source file, or another source record?"
+        ),
+        "Current holdings missing": (
+            f"What amount of {asset} do you currently hold across exchanges, wallets, and custody accounts?"
+        ),
+        "Import warning decision": (
+            "Does this source row belong in the review, and if so does it need corrected columns, a manual USD value, "
+            "or a source-backed manual row?"
+        ),
+        "Reviewed import warning blocker": (
+            "You already made a warning decision, but what evidence or correction is still needed before this stops blocking the packet?"
+        ),
+        "Possible overlapping source files": (
+            "Do these source files duplicate the same activity, or do they represent different accounts or date ranges?"
+        ),
+        "Tax evidence review": (
+            f"What filed return, Form 8949/Schedule D, payment evidence, workbook, or zero-year confirmation supports {year}?"
+        ),
+    }
+    return questions.get(blocker_type, "What should be documented before treating this item as reviewed?")
+
+
+def _work_order_item_summary(row):
+    parts = []
+    for label, value in (
+        ("Asset", row.get("asset")),
+        ("Year", row.get("year")),
+        ("Date", row.get("date")),
+        ("Source", row.get("source_file")),
+        ("Issue", row.get("suspected_issue")),
+    ):
+        value = str(value or "").strip()
+        if value:
+            parts.append({"label": label, "value": value})
+    return parts
+
+
+def _review_queue_choices_for_item(row):
+    blocker_type = (row or {}).get("blocker_type")
+    values_by_type = {
+        "Missing acquisition basis": [
+            "import_missing_records",
+            "document_unknown_basis",
+            "needs_research",
+            "sent_to_cpa",
+            "ignored_for_draft",
+            "resolved",
+        ],
+        "Holdings explanation needed": [
+            "import_missing_records",
+            "classify_documented_disposal",
+            "keep_owner_transfer",
+            "needs_research",
+            "sent_to_cpa",
+            "ignored_for_draft",
+            "resolved",
+        ],
+        "Current holdings missing": [
+            "resolved",
+            "needs_research",
+            "sent_to_cpa",
+        ],
+        "Import warning decision": [
+            "resolved",
+            "import_missing_records",
+            "needs_research",
+            "ignored_for_draft",
+            "sent_to_cpa",
+        ],
+        "Reviewed import warning blocker": [
+            "resolved",
+            "import_missing_records",
+            "needs_research",
+            "ignored_for_draft",
+            "sent_to_cpa",
+        ],
+        "Possible overlapping source files": [
+            "resolved",
+            "needs_research",
+            "ignored_for_draft",
+            "sent_to_cpa",
+        ],
+        "Tax evidence review": [
+            "resolved",
+            "import_missing_records",
+            "needs_research",
+            "ignored_for_draft",
+            "sent_to_cpa",
+        ],
+    }
+    values = values_by_type.get(blocker_type)
+    if not values:
+        return work_order_review_choices()
+
+    label_overrides = {
+        "Missing acquisition basis": {
+            "import_missing_records": "I will import or add missing records",
+            "document_unknown_basis": "Document unknown basis",
+            "needs_research": "I do not know yet / needs research",
+            "sent_to_cpa": "Send this question to CPA",
+            "ignored_for_draft": "Leave unresolved for draft only",
+            "resolved": "Already resolved",
+        },
+        "Holdings explanation needed": {
+            "import_missing_records": "I will import missing records",
+            "classify_documented_disposal": "Classify documented send as disposal",
+            "keep_owner_transfer": "Keep as owner transfer",
+            "needs_research": "I do not know yet / needs research",
+            "sent_to_cpa": "Send this question to CPA",
+            "ignored_for_draft": "Leave unresolved for draft only",
+            "resolved": "Already resolved",
+        },
+        "Current holdings missing": {
+            "resolved": "Current holdings are entered",
+            "needs_research": "I do not know yet / needs research",
+            "sent_to_cpa": "Send this question to CPA",
+        },
+    }
+
+    return [
+        {
+            "value": value,
+            "label": label_overrides.get(blocker_type, {}).get(value, WORK_ORDER_REVIEW_DECISIONS[value]),
+        }
+        for value in values
+        if value in WORK_ORDER_REVIEW_DECISIONS
+    ]
+
+
 def _review_queue_context(transactions, item_id=""):
     rows = _work_order_rows(transactions)
     unreviewed = [row for row in rows if not row.get("review_decision")]
@@ -227,6 +392,13 @@ def _review_queue_context(transactions, item_id=""):
     if current:
         current["why_it_matters"] = _work_order_why_it_matters(current)
         current["related_url"] = _work_order_related_url(current)
+        current["review_title"] = _work_order_item_title(current)
+        current["review_question"] = _work_order_item_question(current)
+        current["review_summary"] = _work_order_item_summary(current)
+        choices = _review_queue_choices_for_item(current)
+        current["allowed_outcomes"] = [choice["label"] for choice in choices]
+    else:
+        choices = work_order_review_choices()
 
     return {
         "rows": rows,
@@ -236,7 +408,7 @@ def _review_queue_context(transactions, item_id=""):
         "unreviewed_count": len(unreviewed),
         "reviewed_count": len(rows) - len(unreviewed),
         "next_item_id": next_item.get("item_id") if next_item else "",
-        "choices": work_order_review_choices(),
+        "choices": choices,
     }
 
 
