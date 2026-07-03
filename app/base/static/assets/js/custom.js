@@ -1495,16 +1495,16 @@ $(document).ready(function() {
             holdingsSetCurrentDecision(
                 'Declare what you currently hold',
                 'Declared holdings give Gainz the real-world target for reconciliation.',
-                'Select an asset card or use Bulk Current Holdings.'
+                'Start with Step 2.1 if most assets are zero, or Step 2.2 to choose one asset.'
             );
             return;
         }
 
         if (!rowData) {
             holdingsSetCurrentDecision(
-                'Review one holdings gap',
+                'Step 3.1: Choose one holdings gap',
                 'A gap means imported activity does not yet explain declared holdings.',
-                'Select a Needs Review asset and record a supported decision or research note.'
+                'Select the current Needs Review card; Step 3.2 will explain what Gainz found.'
             );
             return;
         }
@@ -1514,7 +1514,7 @@ $(document).ready(function() {
         var difference = holdingsDifferenceForRow(rowData);
         if (status == 'unlinked') {
             holdingsSetCurrentDecision(
-                'Understand ' + asset + ' missing basis',
+                'Step 3.2: Understand ' + asset + ' missing basis',
                 asset + ' has sales without enough earlier buy or receive lots linked to those sales.',
                 'Gainz applies FIFO automatically after imports and edits. If records are still missing, leave this as needs research or send it to your CPA.',
                 {
@@ -1531,7 +1531,7 @@ $(document).ready(function() {
         }
         if (status == 'mismatch') {
             holdingsSetCurrentDecision(
-                'Resolve ' + asset + ' holdings mismatch',
+                'Step 3.2: Understand ' + asset + ' holdings gap',
                 'Imported activity differs from declared ' + asset + ' holdings by ' + holdingsFormatQuantity(difference) + '.',
                 difference > 0
                     ? 'Review missing disposals, transfers, losses, or documented sends.'
@@ -1550,7 +1550,7 @@ $(document).ready(function() {
         }
         if (status == 'needs') {
             holdingsSetCurrentDecision(
-                'Declare ' + asset + ' holdings',
+                'Step 2.3: Declare ' + asset + ' holdings',
                 'Gainz needs current holdings before reviewing this asset gap.',
                 'Open Declare Holdings and enter the current ' + asset + ' amount.'
             );
@@ -1558,7 +1558,7 @@ $(document).ready(function() {
         }
 
         holdingsSetCurrentDecision(
-            asset + ' is verified in Gainz',
+            'Step 3.4: ' + asset + ' is verified in Gainz',
             'Declared holdings and imported buy/sell activity currently match for this asset.',
             'Move to the next gap or open Reports & Export.'
         );
@@ -2047,7 +2047,7 @@ $(document).ready(function() {
 
     function holdingsRenderSelection(rowData) {
         if (!rowData) {
-            $('#holdings_workbench_title').text(holdingsIsGuided ? (holdingsMode == 'reconcile' ? 'Current Gap' : 'Current Asset') : 'Asset Workbench');
+            $('#holdings_workbench_title').text(holdingsIsGuided ? (holdingsMode == 'reconcile' ? 'Step 3.2: Understand This Gap' : 'Step 2.3: Enter Current Holdings') : 'Asset Workbench');
             $('#holdings_selected_asset').text('Select an asset above to begin.');
             $('#holdings_expected_from_activity, #holdings_declared_current, #holdings_difference, #holdings_unlinked_sales').text('--');
             $('#holdings_next_action').text('Pick an asset to see the next action.');
@@ -2065,7 +2065,11 @@ $(document).ready(function() {
         var holdings = holdingsParseQuantity(rowData[8]);
         var expectedHoldings = buys - sells;
 
-        $('#holdings_workbench_title').text(holdingsIsGuided ? asset : asset + ' Workbench');
+        $('#holdings_workbench_title').text(
+            holdingsIsGuided
+                ? (holdingsMode == 'reconcile' ? 'Step 3.2: Understand ' + asset + ' Gap' : 'Step 2.3: Enter ' + asset + ' Holdings')
+                : asset + ' Workbench'
+        );
         $('#holdings_selected_asset').text(asset + ' selected');
         $('#holdings_expected_from_activity').text(holdingsFormatQuantity(expectedHoldings));
         $('#holdings_unlinked_sales').text(holdingsFormatQuantity(soldUnlinked));

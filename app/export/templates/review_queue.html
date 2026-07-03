@@ -14,8 +14,9 @@
       <div class="card-body">
         <div class="gainz-page-hero">
           <div>
-            <h1 class="gainz-page-title">Guided Review Queue</h1>
-            <p class="card-category">Review one unresolved packet item at a time.</p>
+            <p class="gainz-stage-kicker">{% if request.args.get('guided') %}Step 4.2 of 4{% else %}Review Queue{% endif %}</p>
+            <h1 class="gainz-page-title">{% if request.args.get('guided') %}Step 4.2: Guided Review Queue{% else %}Guided Review Queue{% endif %}</h1>
+            <p class="card-category">Review one unresolved packet item at a time and save a decision before moving on.</p>
             <p class="mb-0">
               Mark each item based on what you found. Decisions are saved into the reconciliation work order,
               dashboard readiness state, and generated audit packet files.

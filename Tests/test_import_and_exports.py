@@ -180,7 +180,8 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("Current task", rendered_page)
         self.assertIn("Upload source data", rendered_page)
         self.assertIn("Try demo data or upload one exchange CSV.", rendered_page)
-        self.assertIn("Start With Source Data", rendered_page)
+        self.assertIn("Step 1.1: Start With Source Data", rendered_page)
+        self.assertIn("Optional: Add Manual Transactions", rendered_page)
         self.assertIn("Choose CSV file", rendered_page)
         self.assertIn('id="upload_exchange_csv"', rendered_page)
         self.assertIn('aria-label="Upload exchange CSV"', rendered_page)
@@ -190,7 +191,7 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("<summary>Add manual rows</summary>", rendered_page)
         self.assertIn("<summary>Review data sources and revisions</summary>", rendered_page)
         self.assertLess(
-            rendered_page.index("Start With Source Data"),
+            rendered_page.index("Step 1.1: Start With Source Data"),
             rendered_page.index("Show current import status"),
         )
 
@@ -293,6 +294,9 @@ class ImportAndExportTests(unittest.TestCase):
         )
         self.assertIn("holdings-guided-card-grid", declare_page)
         self.assertIn("holdings-data-source-only", declare_page)
+        self.assertIn("Step 2.1: Bulk Current Holdings", declare_page)
+        self.assertIn("Step 2.2: Choose An Asset To Declare", declare_page)
+        self.assertIn("Step 2.3: Enter Current Holdings", declare_page)
         self.assertIn("Confirm zero holdings", declare_page)
         self.assertIn("Add Another Holding", declare_page)
         self.assertIn("Save These Holdings And Set The Rest To 0", declare_page)
@@ -304,20 +308,24 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("Step 3 of 4", reconcile_page)
         self.assertIn("Reconcile Gaps", reconcile_page)
         self.assertNotIn("Work one asset gap at a time.", reconcile_page)
+        self.assertIn("Start with Step 3.1 below", reconcile_page)
+        self.assertIn("Step 3.1: Choose One Gap To Review", reconcile_page)
+        self.assertIn("Step 3.2: Understand This Gap", reconcile_page)
+        self.assertIn("Step 3.3: Record A Gap Decision", reconcile_page)
+        self.assertIn("Step 3.4: Confirm The Next Action", reconcile_page)
         self.assertIn("Review one holdings gap", reconcile_page)
         self.assertIn("A gap means imported activity does not yet explain declared holdings", reconcile_page)
         self.assertIn('id="holdings_current_help"', reconcile_page)
         self.assertIn("What missing basis means", reconcile_page)
         self.assertIn("Open Guided Review Queue", reconcile_page)
         self.assertIn("Current gap", reconcile_page)
-        self.assertIn("Current Gap Actions", reconcile_page)
-        self.assertIn("Documented Activity Classification", reconcile_page)
         self.assertIn("Advanced gap details", reconcile_page)
         self.assertIn("Open Declare Holdings", reconcile_page)
         self.assertNotIn("Save Declared Holdings", reconcile_page)
         self.assertNotIn("Save 0 Holdings", reconcile_page)
 
         custom_js = Path("app/base/static/assets/js/custom.js").read_text(encoding="utf-8")
+        self.assertIn("Step 3.2: Understand ", custom_js)
         self.assertIn("What a holdings gap means", custom_js)
         self.assertIn("Leave Holdings Gap As Needs Research", custom_js)
 
@@ -386,6 +394,8 @@ class ImportAndExportTests(unittest.TestCase):
         )
 
         self.assertIn("Decide what row 261 represents", rendered_page)
+        self.assertIn("Step 1.2: Import warnings need review", rendered_page)
+        self.assertIn("Step 1.3: Import data is loaded, but review is still needed", rendered_page)
         self.assertIn("This needs a corrected value", rendered_page)
         self.assertNotIn("Try demo data or upload one exchange CSV.", rendered_page)
 
@@ -463,9 +473,11 @@ class ImportAndExportTests(unittest.TestCase):
             )
 
         self.assertIn("Import data is loaded, but review is still needed", blocked_page)
+        self.assertIn("Step 1.3: Import data is loaded, but review is still needed", blocked_page)
         self.assertIn('class="btn btn-primary btn-round btn-sm import-continue-action"', blocked_page)
         self.assertIn('style="display: none;"', blocked_page)
         self.assertIn("Import data is ready for the next step", ready_page)
+        self.assertIn("Step 1.3: Import data is ready for the next step", ready_page)
         self.assertIn("Continue to Declare Holdings", ready_page)
 
     def test_import_page_renders_column_review_workflow(self):
@@ -1836,6 +1848,7 @@ class ImportAndExportTests(unittest.TestCase):
                 response = client.get("/export/review_queue?guided=1")
 
             self.assertEqual(200, response.status_code)
+            self.assertIn(b"Step 4.2: Guided Review Queue", response.data)
             self.assertIn(b"Guided Review Queue", response.data)
             self.assertIn(b"Current holdings missing", response.data)
             self.assertIn(b"Enter current BTC holdings", response.data)

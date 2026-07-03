@@ -51,7 +51,7 @@
       <div class="card-body">
         <div class="d-flex flex-wrap justify-content-between align-items-start">
           <div>
-            <h2 class="gainz-section-title">Readiness Review</h2>
+            <h2 class="gainz-section-title">{% if request.args.get('guided') %}Step 4.1: {% endif %}Readiness Review</h2>
             <p class="card-category">What Gainz found, what still needs review, and where to go next.</p>
           </div>
           <span class="gainz-status-badge {{ audit_readiness.status_class }}">{{ audit_readiness.status }}</span>
@@ -108,7 +108,7 @@
 
         {% if audit_readiness.blocker_groups %}
         <div class="audit-packet-list">
-          <h3 class="gainz-section-title">Review queue</h3>
+          <h3 class="gainz-section-title">{% if request.args.get('guided') %}Step 4.2: {% endif %}Review queue</h3>
           <div class="audit-blocker-grid">
             {% for group in audit_readiness.blocker_groups %}
             <a class="audit-blocker-card" href="{{ group.action_url }}">
@@ -125,7 +125,7 @@
         {% endif %}
 
         <div class="audit-packet-list">
-          <h3 class="gainz-section-title">Reconciliation checklist</h3>
+          <h3 class="gainz-section-title">{% if request.args.get('guided') %}Step 4.3: {% endif %}Reconciliation checklist</h3>
           <div class="audit-checklist-grid">
             {% for item in audit_readiness.checklist %}
             <div class="audit-checklist-item {% if item.complete %}audit-checklist-complete{% else %}audit-checklist-open{% endif %}">

@@ -82,7 +82,7 @@
               {% if is_declare_mode and holdings_summary.assets_needing_holdings == 0 %}
               Continue to Reconcile Gaps
               {% elif is_declare_mode %}
-              Select an asset card or use Bulk Current Holdings.
+              Start with Step 2.1 if most assets are zero, or Step 2.2 to choose one asset at a time.
               {% else %}
               Select a Needs Review asset and record a supported decision or research note.
               {% endif %}
@@ -128,7 +128,7 @@
             This step is complete; continue to Reconcile Gaps when you are ready.
             {% endif %}
             {% else %}
-            Select an asset marked Needs Review, read the workbench guidance, and record a supported decision or research note.
+            Start with Step 3.1 below. Select the current Needs Review gap; Step 3.2 explains it, and Step 3.3 records the decision or research note.
             {% endif %}
           </p>
         </div>
@@ -189,7 +189,7 @@
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
-        <h4 class="card-title">Bulk Current Holdings</h4>
+        <h4 class="card-title">{% if guided_mode and is_declare_mode %}Step 2.1: Bulk Current Holdings{% else %}Bulk Current Holdings{% endif %}</h4>
         <p class="card-category">Enter the assets you currently hold. Gainz will set every other tracked asset to zero in one revision.</p>
         <div id="bulk_holdings_message" class="alert alert-info" role="status" style="display: none;"></div>
         <div id="bulk_holdings_confirm_panel" class="holdings-inline-confirm alert alert-warning" role="dialog" aria-modal="false" style="display: none;">
@@ -231,13 +231,13 @@
     <div class="card">
       <div class="card-body">
         <h4 class="card-title">
-          {% if is_declare_mode %}Choose An Asset To Declare{% elif is_reconcile_mode %}Choose One Gap To Review{% else %}Step 2: Select an Asset{% endif %}
+          {% if is_declare_mode %}{% if guided_mode %}Step 2.2: {% endif %}Choose An Asset To Declare{% elif is_reconcile_mode %}{% if guided_mode %}Step 3.1: {% endif %}Choose One Gap To Review{% else %}Select an Asset{% endif %}
         </h4>
         <p class="card-category">
           {% if is_declare_mode %}
           Start with assets that need holdings. Selecting a card loads it into the current task below.
           {% elif is_reconcile_mode %}
-          Work one gap at a time. Use Previous and Next to move through assets that need review.
+          Choose the one gap to work now. Use Previous and Next only to move between review gaps.
           {% else %}
           Choose an asset, then use the workbench below to declare holdings and interpret the difference.
           {% endif %}
@@ -247,7 +247,7 @@
           <div class="holdings-guided-queue-header">
             <div>
               <strong id="holdings_guided_queue_title">{% if is_reconcile_mode %}Current gap{% else %}Asset cards{% endif %}</strong>
-              <p id="holdings_guided_queue_status" class="card-category mb-0">Select a card to continue.</p>
+              <p id="holdings_guided_queue_status" class="card-category mb-0">{% if is_reconcile_mode %}Select the current gap to load Step 3.2 below.{% else %}Select a card to continue.{% endif %}</p>
             </div>
             <div class="holdings-guided-queue-actions">
               <button type="button" id="holdings_guided_prev_asset" class="btn btn-outline-secondary btn-sm">Previous</button>
@@ -269,7 +269,7 @@
             {% endfor %}
           </div>
           <p id="holdings_guided_queue_empty" class="alert alert-success mb-0" role="status" style="display: none;">
-            No assets are waiting in this step. Return to Guided Reconciliation for the next stage.
+            {% if is_reconcile_mode %}Step 3.1 is complete. Return to Guided Reconciliation or continue to Reports & Export.{% else %}No assets are waiting in this step. Return to Guided Reconciliation for the next stage.{% endif %}
           </p>
         </div>
         {% endif %}
@@ -316,7 +316,7 @@
       <div class="card-body">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start">
           <div>
-            <h4 id="holdings_workbench_title" class="card-title">{% if guided_mode %}{% if is_reconcile_mode %}Current Gap{% else %}Current Asset{% endif %}{% else %}Asset Workbench{% endif %}</h4>
+            <h4 id="holdings_workbench_title" class="card-title">{% if guided_mode %}{% if is_reconcile_mode %}Step 3.2: Understand This Gap{% else %}Step 2.3: Enter Current Holdings{% endif %}{% else %}Asset Workbench{% endif %}</h4>
             <p id="holdings_selected_asset" class="card-category">Select an asset above to begin.</p>
           </div>
           <div id="holdings_status_badge" class="gainz-status-badge status-needs-declared-holdings">Needs asset</div>
@@ -483,7 +483,7 @@
 
         {% if not guided_mode or is_reconcile_mode %}
         <div class="holdings-resolution-panel">
-          <h5>Documented Activity Classification</h5>
+          <h5>{% if guided_mode and is_reconcile_mode %}Step 3.3: Record A Gap Decision{% else %}Documented Activity Classification{% endif %}</h5>
           <p id="convert_text">Use these only when supported by source records. If you know the missing transaction, adding the actual transaction is preferable to automatic classification. Owner transfers should not be recorded as disposals.</p>
           <div id="holdings_send_disposal_recommendation" class="alert alert-warning" role="status" style="display: none;">
             <strong>Possible documented send-disposal workflow.</strong>
@@ -529,8 +529,8 @@
       <div class="card-body">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start">
           <div>
-            <h4 class="card-title">{% if guided_mode %}Current Gap Actions{% else %}Step 4: Review Readiness{% endif %}</h4>
-            <p class="card-category">{% if guided_mode %}Choose the next supported action for this one gap. If you do not know what happened yet, leave it as needs research.{% else %}Use the selected asset status to decide whether to add holdings, create basis links, review source records, or move to Reports & Export.{% endif %}</p>
+            <h4 class="card-title">{% if guided_mode %}Step 3.4: Confirm The Next Action{% else %}Review Readiness{% endif %}</h4>
+            <p class="card-category">{% if guided_mode %}Use this as the final check for the selected gap. If you do not know what happened yet, leave it as needs research or send it to CPA review.{% else %}Use the selected asset status to decide whether to add holdings, create basis links, review source records, or move to Reports & Export.{% endif %}</p>
           </div>
           <span id="holdings_readiness_badge" class="gainz-status-badge status-needs-declared-holdings">Select asset</span>
         </div>
