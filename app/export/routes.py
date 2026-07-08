@@ -232,8 +232,8 @@ def _work_order_item_question(row):
 
     questions = {
         "Missing acquisition basis": (
-            f"Can you find earlier {asset} buy, receive, income, fork, airdrop, or transfer-in records "
-            "for this sale, or should this remain documented as unknown/research for CPA review?"
+            f"Gainz found {asset} sales, but not the {asset} acquisition history. Can you prove the basis, "
+            "confirm it was already filed, or treat the unknown basis conservatively for CPA review?"
         ),
         "Holdings explanation needed": (
             f"Why does Gainz calculate a different {asset} balance than you declared: missing transfer, disposal, loss, "
@@ -296,10 +296,10 @@ def _professional_review_options(row):
                 ),
             ),
             (
-                "Document unsupported or unknown basis",
+                "Treat unknown basis conservatively",
                 (
-                    "If records cannot be reconstructed, leave the item as a draft blocker with notes describing what was checked "
-                    "and what remains unknown for professional review."
+                    "If records cannot be reconstructed, document a conservative CPA-reviewed path such as treating proceeds "
+                    "as fully taxable with $0 basis unless the CPA adjusts."
                 ),
             ),
             (
@@ -395,13 +395,14 @@ def _tax_cross_check_for_item(transactions, row):
 
 def _review_queue_choices_for_item(row):
     blocker_type = (row or {}).get("blocker_type")
+    asset = (row or {}).get("asset") or "this asset"
     values_by_type = {
         "Missing acquisition basis": [
             "import_missing_records",
-            "document_unknown_basis",
-            "needs_research",
+            "fork_airdrop_basis",
+            "already_in_filed_totals",
+            "zero_basis_cpa_review",
             "sent_to_cpa",
-            "ignored_for_draft",
             "resolved",
         ],
         "Holdings explanation needed": [
@@ -452,11 +453,11 @@ def _review_queue_choices_for_item(row):
 
     label_overrides = {
         "Missing acquisition basis": {
-            "import_missing_records": "I will import or add missing records",
-            "document_unknown_basis": "Document unknown basis",
-            "needs_research": "I do not know yet / needs research",
-            "sent_to_cpa": "Ask CPA to determine basis treatment",
-            "ignored_for_draft": "Leave unresolved for draft only",
+            "import_missing_records": f"Import missing {asset} acquisition records",
+            "fork_airdrop_basis": f"This {asset} came from a fork/airdrop",
+            "already_in_filed_totals": "Already included in filed tax totals",
+            "zero_basis_cpa_review": "Treat unknown basis as $0 for CPA review",
+            "sent_to_cpa": f"Send this {asset} gap to CPA",
             "resolved": "Already resolved",
         },
         "Holdings explanation needed": {

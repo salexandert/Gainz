@@ -616,7 +616,7 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertIn("Missing acquisition before sale.", rows[0]["likely_explanations"])
         self.assertTrue(rows[0]["evidence_to_look_for"])
         self.assertTrue(rows[0]["plain_language_questions"])
-        self.assertIn("Document unknown basis", rows[0]["allowed_outcomes"])
+        self.assertIn("Treat unknown basis as $0 for CPA review", rows[0]["allowed_outcomes"])
         self.assertIn("basis", rows[0]["suggested_cpa_question"].lower())
 
     def test_reconciliation_work_order_applies_saved_review_state(self):
@@ -695,20 +695,20 @@ class TransactionsEngineTests(unittest.TestCase):
 
         transactions.set_work_order_review(
             rows[0]["item_id"],
-            decision="document_unknown_basis",
-            note="User does not know yet; older records still need review.",
-            cpa_question="Can this be documented as unknown basis for review?",
+            decision="zero_basis_cpa_review",
+            note="Unknown basis treated conservatively for CPA review.",
+            cpa_question="Can this be treated as zero basis unless source records are found?",
         )
         reviewed_rows = reconciliation_work_order_rows(readiness, transactions)
         reviewed_memos = unresolved_gap_memo_rows(reviewed_rows)
         memo_text = unknown_gap_memos_markdown(reviewed_rows)
 
-        self.assertEqual("Document unknown basis", reviewed_memos[0]["current_decision"])
+        self.assertEqual("Treat unknown basis as $0 for CPA review", reviewed_memos[0]["current_decision"])
         self.assertEqual(
-            "User does not know yet; older records still need review.",
+            "Unknown basis treated conservatively for CPA review.",
             reviewed_memos[0]["user_memory_notes"],
         )
-        self.assertIn("Can this be documented as unknown basis", memo_text)
+        self.assertIn("Can this be treated as zero basis", memo_text)
 
         transactions.set_work_order_review(rows[0]["item_id"], decision="resolved")
         resolved_rows = reconciliation_work_order_rows(readiness, transactions)

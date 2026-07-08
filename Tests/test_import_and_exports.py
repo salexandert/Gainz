@@ -1467,13 +1467,18 @@ class ImportAndExportTests(unittest.TestCase):
                     "/holdings_accounting/leave_basis_unresolved",
                     json={
                         "asset": ["LTC"],
+                        "decision": "zero_basis_cpa_review",
                         "note": "User will investigate source records later.",
                     },
                 )
 
             self.assertEqual(200, response.status_code)
             payload = response.get_json()
-            self.assertIn("needs user research", payload["message"])
+            self.assertIn("unknown basis treated as $0 for CPA review", payload["message"])
+            self.assertEqual(
+                "zero_basis_cpa_review",
+                transactions.get_basis_review_note("LTC")["status"],
+            )
             self.assertEqual(
                 "User will investigate source records later.",
                 transactions.get_basis_review_note("LTC")["note"],
@@ -1481,12 +1486,12 @@ class ImportAndExportTests(unittest.TestCase):
 
             readiness = get_audit_readiness_summary(transactions)
             self.assertFalse(readiness["is_ready"])
-            self.assertEqual("Needs user research", readiness["missing_records"]["basis"][0]["status"])
+            self.assertEqual("Unknown basis treated as $0 for CPA review", readiness["missing_records"]["basis"][0]["status"])
             self.assertTrue(
-                any("Missing basis left as needs user research" in blocker for blocker in readiness["blockers"])
+                any("Missing basis documented for draft/CPA review" in blocker for blocker in readiness["blockers"])
             )
             basis_group = next(group for group in readiness["blocker_groups"] if group["key"] == "missing_basis")
-            self.assertEqual("Needs research", basis_group["status"])
+            self.assertEqual("Documented for review", basis_group["status"])
             self.assertEqual("/holdings_accounting/?guided=1&mode=reconcile", basis_group["action_url"])
 
             with app.app_context():
@@ -1926,15 +1931,17 @@ class ImportAndExportTests(unittest.TestCase):
 
             self.assertEqual(200, response.status_code)
             self.assertIn(b"Resolve BCH missing cost basis", response.data)
-            self.assertIn(b"Can you find earlier BCH buy", response.data)
+            self.assertIn(b"Gainz found BCH sales, but not the BCH acquisition history", response.data)
             self.assertIn(b"cash_app_report.csv", response.data)
-            self.assertIn(b"I will import or add missing records", response.data)
-            self.assertIn(b"Document unknown basis", response.data)
-            self.assertIn(b"I do not know yet / needs research", response.data)
+            self.assertIn(b"Import missing BCH acquisition records", response.data)
+            self.assertIn(b"This BCH came from a fork/airdrop", response.data)
+            self.assertIn(b"Already included in filed tax totals", response.data)
+            self.assertIn(b"Treat unknown basis as $0 for CPA review", response.data)
+            self.assertIn(b"Send this BCH gap to CPA", response.data)
             self.assertIn(b"CPA review options", response.data)
             self.assertIn(b"Reconstruct basis from records", response.data)
             self.assertIn(b"Correct source classification", response.data)
-            self.assertIn(b"Ask CPA to determine basis treatment", response.data)
+            self.assertIn(b"Treat unknown basis conservatively", response.data)
             self.assertNotIn(b"Keep as owner transfer", response.data)
             self.assertNotIn(b"Decide what to do with this work order item", response.data)
 

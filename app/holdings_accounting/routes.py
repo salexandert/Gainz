@@ -378,21 +378,40 @@ def leave_basis_unresolved():
     asset = _request_asset(payload)
     note = str(payload.get("note") or "").strip()
     gap_type = str(payload.get("gap_type") or "").strip().lower()
+    decision = str(payload.get("decision") or "needs_research").strip().lower()
+    allowed_decisions = {
+        "import_missing_records": "import missing acquisition records",
+        "fork_airdrop_basis": "fork/airdrop acquisition",
+        "already_in_filed_totals": "already included in filed tax totals",
+        "zero_basis_cpa_review": "unknown basis treated as $0 for CPA review",
+        "sent_to_cpa": "sent to CPA",
+        "needs_research": "needs user research",
+    }
+    if decision not in allowed_decisions:
+        decision = "needs_research"
     if not note:
-        note = "User will investigate source records later."
+        note_defaults = {
+            "import_missing_records": "User will import or add missing acquisition records.",
+            "fork_airdrop_basis": "User indicates this asset may have come from a fork or airdrop; basis treatment needs source support or CPA review.",
+            "already_in_filed_totals": "User indicates this gap may already be reflected in filed tax totals; compare against filed Form 8949/Schedule D or CPA workpapers.",
+            "zero_basis_cpa_review": "Unknown basis is documented for conservative CPA review; draft reports should not claim unproven basis.",
+            "sent_to_cpa": "User will ask a CPA to review this missing basis gap.",
+            "needs_research": "User will investigate source records later.",
+        }
+        note = note_defaults.get(decision, note_defaults["needs_research"])
 
     if not asset:
         return jsonify({"message": "Select an asset before marking review status."}), 400
 
-    transactions.set_basis_review_note(asset, status="needs_research", note=note)
+    transactions.set_basis_review_note(asset, status=decision, note=note)
     review_label = "holdings gap" if gap_type == "mismatch" else "basis review"
-    transactions.save(description=f"Marked {asset} {review_label} as needs research")
+    transactions.save(description=f"Marked {asset} {review_label} as {allowed_decisions[decision]}")
 
     return jsonify(
         _holdings_update_payload(
             transactions,
             asset,
-            f"{asset} {review_label} left unresolved as needs user research.",
+            f"{asset} {review_label} recorded as {allowed_decisions[decision]}. This remains a draft/CPA review item until resolved.",
         )
     )
 

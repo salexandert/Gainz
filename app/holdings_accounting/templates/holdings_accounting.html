@@ -485,21 +485,34 @@
         <div class="holdings-resolution-panel">
           <h5>{% if guided_mode and is_reconcile_mode %}Step 3.3: Record A Gap Decision{% else %}Documented Activity Classification{% endif %}</h5>
           <p id="convert_text">Use these only when supported by source records. If you know the missing transaction, adding the actual transaction is preferable to automatic classification. Owner transfers should not be recorded as disposals.</p>
-          <div id="holdings_send_disposal_recommendation" class="alert alert-warning" role="status" style="display: none;">
-            <strong>Possible documented send-disposal workflow.</strong>
-            <p id="holdings_send_disposal_text" class="mb-2"></p>
-            <button type="button" id="classify_sends_fifo_button" class="btn btn-warning">
-              Classify Documented Sends And Recalculate FIFO
-            </button>
-          </div>
-          <div class="form-group row">
-            <label class="control-label col-md-2 col-sm-3" for="convert_quantity">Quantity</label>
-            <div class="col-md-4 col-sm-5">
-              <input type="number" step="any" id="convert_quantity" class="form-control" placeholder="Quantity to resolve">
+          <div id="missing_basis_decision_panel" class="guided-review-panel" style="display: none;">
+            <h6 id="missing_basis_decision_title">Choose the conservative review path</h6>
+            <p id="missing_basis_decision_text" class="mb-3"></p>
+            <div class="guided-review-actions" role="group" aria-label="Missing basis decisions">
+              <button type="button" class="btn btn-outline-primary missing-basis-decision-button" data-decision="import_missing_records">Import missing acquisition records</button>
+              <button type="button" class="btn btn-outline-primary missing-basis-decision-button" data-decision="fork_airdrop_basis">This asset came from a fork/airdrop</button>
+              <button type="button" class="btn btn-outline-primary missing-basis-decision-button" data-decision="already_in_filed_totals">Already included in filed tax totals</button>
+              <button type="button" class="btn btn-primary missing-basis-decision-button" data-decision="zero_basis_cpa_review">Treat unknown basis as $0 for CPA review</button>
+              <button type="button" class="btn btn-outline-primary missing-basis-decision-button" data-decision="sent_to_cpa">Send this gap to CPA</button>
             </div>
-            <div class="col-md-6 col-sm-12">
-              <button type="button" id="sends_to_sells_button" class="btn btn-warning">Classify Documented Sends as Disposals</button>
-              <button type="button" id="buys_to_lost_button" class="btn btn-warning">Mark Loss for Review</button>
+          </div>
+          <div id="activity_classification_tools">
+            <div id="holdings_send_disposal_recommendation" class="alert alert-warning" role="status" style="display: none;">
+              <strong>Possible documented send-disposal workflow.</strong>
+              <p id="holdings_send_disposal_text" class="mb-2"></p>
+              <button type="button" id="classify_sends_fifo_button" class="btn btn-warning">
+                Classify Documented Sends And Recalculate FIFO
+              </button>
+            </div>
+            <div class="form-group row">
+              <label class="control-label col-md-2 col-sm-3" for="convert_quantity">Quantity</label>
+              <div class="col-md-4 col-sm-5">
+                <input type="number" step="any" id="convert_quantity" class="form-control" placeholder="Quantity to resolve">
+              </div>
+              <div class="col-md-6 col-sm-12">
+                <button type="button" id="sends_to_sells_button" class="btn btn-warning">Classify Documented Sends as Disposals</button>
+                <button type="button" id="buys_to_lost_button" class="btn btn-warning">Mark Loss for Review</button>
+              </div>
             </div>
           </div>
           <div class="form-group row">
@@ -507,9 +520,9 @@
             <div class="col-md-6 col-sm-6">
               <input type="text" id="basis_review_note" class="form-control" placeholder="User will investigate source records later.">
             </div>
-            <div class="col-md-4 col-sm-12">
+            <div id="basis_review_note_action" class="col-md-4 col-sm-12">
               <button type="button" id="leave_basis_unresolved_button" class="btn btn-outline-warning">
-                Leave Unresolved / Needs Research
+                Save Needs Research Note
               </button>
             </div>
           </div>
@@ -563,7 +576,7 @@
 
         <div class="holdings-readiness-actions">
           <button type="button" id="holdings_run_fifo_button" class="btn btn-primary" disabled>Recalculate FIFO Basis for Selected Asset</button>
-          <button type="button" id="holdings_leave_basis_unresolved_button" class="btn btn-outline-warning" disabled>Leave Missing Basis As Needs Research</button>
+          <button type="button" id="holdings_leave_basis_unresolved_button" class="btn btn-outline-warning" disabled>Leave Missing Basis For CPA Review</button>
           <a class="btn btn-outline-primary" href="{{ url_for('export_blueprint.index', guided=1) if guided_mode else '/export' }}">Open Reports & Export</a>
           {% if not guided_mode %}
           <a class="btn btn-outline-secondary" href="/stats">Open Stats & Charts</a>

@@ -1467,6 +1467,50 @@ $(document).ready(function() {
         return 'Select this asset to continue.';
     }
 
+    function holdingsBasisDecisionLabel(decision) {
+        var labels = {
+            import_missing_records: 'Import missing acquisition records',
+            fork_airdrop_basis: 'Fork/airdrop acquisition needs support',
+            already_in_filed_totals: 'Already included in filed tax totals',
+            zero_basis_cpa_review: 'Unknown basis treated as $0 for CPA review',
+            sent_to_cpa: 'Sent to CPA',
+            needs_research: 'Needs user research'
+        };
+        return labels[decision] || 'Needs user research';
+    }
+
+    function holdingsBasisDecisionNote(decision, asset) {
+        var notes = {
+            import_missing_records: 'User will import or add missing ' + asset + ' acquisition records.',
+            fork_airdrop_basis: asset + ' may have come from a fork or airdrop; basis treatment needs source support or CPA review.',
+            already_in_filed_totals: asset + ' gap may already be reflected in filed tax totals; compare against filed Form 8949/Schedule D or CPA workpapers.',
+            zero_basis_cpa_review: 'Unknown ' + asset + ' basis is documented for conservative CPA review; draft reports should not claim unproven basis.',
+            sent_to_cpa: 'User will ask a CPA to review this ' + asset + ' missing basis gap.',
+            needs_research: 'User will investigate source records later.'
+        };
+        return notes[decision] || notes.needs_research;
+    }
+
+    function holdingsConfigureMissingBasisDecisionPanel(asset, declaredHoldings) {
+        var holdingsText = declaredHoldings === null ? 'not entered' : holdingsFormatQuantity(declaredHoldings);
+        $('#missing_basis_decision_title').text('What should Gainz do with this ' + asset + ' missing basis gap?');
+        $('#missing_basis_decision_text').text(
+            'Gainz found ' + asset + ' sales, but not the ' + asset + ' acquisition history. ' +
+            'Your current ' + asset + ' holdings are ' + holdingsText + '; now decide whether to prove the basis, confirm it was already filed, or treat the unknown basis conservatively.'
+        );
+        $('.missing-basis-decision-button').each(function() {
+            var button = $(this);
+            var decision = button.data('decision');
+            if (decision == 'import_missing_records') {
+                button.text('Import missing ' + asset + ' acquisition records');
+            } else if (decision == 'fork_airdrop_basis') {
+                button.text('This ' + asset + ' came from a fork/airdrop');
+            } else if (decision == 'sent_to_cpa') {
+                button.text('Send this ' + asset + ' gap to CPA');
+            }
+        });
+    }
+
     function holdingsRefreshCurrentDecision(rowData) {
         if (!holdingsIsGuided || $('#holdings_current_task').length === 0) {
             return;
@@ -1513,17 +1557,19 @@ $(document).ready(function() {
         var status = holdingsRowStatus(rowData);
         var difference = holdingsDifferenceForRow(rowData);
         if (status == 'unlinked') {
+            var declaredHoldings = holdingsParseQuantity(rowData[8]);
             holdingsSetCurrentDecision(
                 'Step 3.2: Understand ' + asset + ' missing basis',
-                asset + ' has sales without enough earlier buy or receive lots linked to those sales.',
-                'Gainz applies FIFO automatically after imports and edits. If records are still missing, leave this as needs research or send it to your CPA.',
+                'Gainz found ' + asset + ' sales, but not enough ' + asset + ' acquisition history. Current ' + asset + ' holdings are ' + (declaredHoldings === null ? 'not entered' : holdingsFormatQuantity(declaredHoldings)) + '.',
+                'Prove the basis, confirm it was already filed, or treat unknown basis conservatively as $0 for CPA review.',
                 {
                     title: 'What missing basis means',
                     text: 'Missing basis means Gainz sees ' + asset + ' being sold or disposed of, but it cannot find enough earlier ' + asset + ' acquisition records to show what you paid for the amount sold.',
                     examples: [
-                        'Example: a ' + asset + ' sale needs earlier ' + asset + ' buy, receive, fork, income, or transfer-in records before Gainz can calculate gain or loss.',
+                        'If records cannot be found, a conservative CPA-reviewed path can document unknown basis as $0 for draft review instead of claiming unproven basis.',
+                        'Example: a ' + asset + ' sale needs earlier ' + asset + ' buy, receive, fork, income, airdrop, or transfer-in records before Gainz can calculate supported gain or loss.',
                         'If the asset came from another exchange or wallet, import that source file or document where the missing records should come from.',
-                        'If you do not know yet, mark it as needs research so the draft packet clearly shows the unresolved gap.'
+                        'If this was already included in filed totals, document that cross-check so the CPA can compare Gainz to the filed return.'
                     ]
                 }
             );
@@ -1799,13 +1845,13 @@ $(document).ready(function() {
             .text(transactionCount + ' transaction' + (transactionCount == 1 ? '' : 's'));
         holdingsRenderSendDisposalRecommendation(summary);
 
-        if (summary.basis_review_status == 'needs_research') {
+        if (summary.basis_review_status) {
             holdingsReviewedGapAssets[summary.asset] = true;
             $('#basis_review_note').val(summary.basis_review_note || '');
             $('#holdings_save_message')
                 .removeClass('alert-success')
                 .addClass('alert-warning')
-                .text('Missing basis for ' + summary.asset + ' is marked as needs user research. Exports remain draft/not filing-ready until resolved.')
+                .text('Missing basis for ' + summary.asset + ' is recorded as ' + holdingsBasisDecisionLabel(summary.basis_review_status) + '. Exports remain draft/not filing-ready until resolved or reviewed.')
                 .show();
         } else if (summary.asset) {
             delete holdingsReviewedGapAssets[summary.asset];
@@ -1903,11 +1949,11 @@ $(document).ready(function() {
 
         if (soldUnlinked > tolerance) {
             $('#holdings_run_fifo_button, #holdings_leave_basis_unresolved_button').prop('disabled', false).show();
-            $('#holdings_leave_basis_unresolved_button').text('Leave Missing Basis As Needs Research');
+            $('#holdings_leave_basis_unresolved_button').text('Leave Missing Basis For CPA Review');
             $('#holdings_contextual_action_hint')
                 .removeClass('alert-success alert-light alert-info')
                 .addClass('alert-warning')
-                .text('This asset has sales without complete cost basis. Gainz uses FIFO automatically when matching acquisition records exist; if records are still missing, leave this as needs research.');
+                .text('This asset has sales without complete cost basis. Gainz uses FIFO automatically when matching acquisition records exist; if records are still missing, document whether you will import records, cross-check filed totals, use conservative $0 basis for CPA review, or send it to CPA.');
             return;
         }
 
@@ -2053,6 +2099,9 @@ $(document).ready(function() {
             $('#holdings_next_action').text('Pick an asset to see the next action.');
             $('#holdings_quantity').attr('placeholder', 'Select an asset first').val('');
             $('#convert_quantity').attr('placeholder', 'Quantity to resolve').val('');
+            $('#missing_basis_decision_panel').hide();
+            $('#activity_classification_tools').show();
+            $('#basis_review_note_action').show();
             holdingsSetBadge('Needs asset');
             holdingsClearDifferenceBreakdown();
             return;
@@ -2076,6 +2125,9 @@ $(document).ready(function() {
         $('#holdings_quantity').attr('placeholder', 'Current holding for ' + asset);
         $('#convert_quantity').attr('placeholder', 'Quantity to classify for ' + asset);
         $('#convert_text').text('Use these tools only when supported by source records. If you know the missing transaction, adding the actual transaction is preferable to automatic classification. Owner transfers should stay as transfers.');
+        $('#missing_basis_decision_panel').hide();
+        $('#activity_classification_tools').show();
+        $('#basis_review_note_action').show();
 
         if (holdings === null) {
             $('#holdings_declared_current').text('--');
@@ -2096,7 +2148,12 @@ $(document).ready(function() {
             $('#holdings_next_action').text(asset + ' has no quantity difference from imported buys and sells. Review source records, lots, and basis links before using generated reports.');
             holdingsSetBadge('Verified');
         } else if (soldUnlinked > 0.00000001) {
-            $('#holdings_next_action').text(asset + ' still has unlinked sales. Run Auto Link or manually review links before using generated reports.');
+            $('#holdings_next_action').text('Gainz found ' + asset + ' sales, but not the ' + asset + ' acquisition history. Your current ' + asset + ' holdings are ' + holdingsFormatQuantity(holdings) + '; decide whether to prove the basis, confirm it was already filed, or treat the unknown basis conservatively.');
+            $('#convert_text').text('Unknown basis is not resolved. Choose a documented path: import records, identify fork/airdrop origin, cross-check filed totals, treat as $0 basis for CPA review, or send the gap to CPA.');
+            holdingsConfigureMissingBasisDecisionPanel(asset, holdings);
+            $('#missing_basis_decision_panel').show();
+            $('#activity_classification_tools').hide();
+            $('#basis_review_note_action').hide();
             holdingsSetBadge('Unlinked sales');
         } else if (difference > 0) {
             $('#holdings_next_action').text('The calculated net from imported buys and sells is higher than declared ' + asset + '. Review source records for missing disposals, transfers, losses, or other activity before using generated reports.');
@@ -2762,15 +2819,18 @@ $(document).ready(function() {
         );
     });
 
-    function holdingsSaveBasisUnresolved(rowData, asset, note) {
+    function holdingsSaveBasisUnresolved(rowData, asset, note, decision) {
+        decision = decision || 'needs_research';
         $('#leave_basis_unresolved_button, #holdings_leave_basis_unresolved_button').prop('disabled', true).text('Saving...');
+        $('.missing-basis-decision-button').prop('disabled', true);
         $.ajax({
             type: "POST",
             url: "/holdings_accounting/leave_basis_unresolved",
             data: JSON.stringify({
                 'asset': rowData,
                 'note': note,
-                'gap_type': holdingsRowStatus(rowData)
+                'gap_type': holdingsRowStatus(rowData),
+                'decision': decision
             }),
             dataType: "json",
             contentType: 'application/json',
@@ -2806,37 +2866,47 @@ $(document).ready(function() {
                 alert(message);
             },
             complete: function() {
-                $('#leave_basis_unresolved_button').prop('disabled', false).text('Leave Unresolved / Needs Research');
+                $('#leave_basis_unresolved_button').prop('disabled', false).text('Save Needs Research Note');
+                $('.missing-basis-decision-button').prop('disabled', false);
                 holdingsRenderReadiness();
             },
         });
     }
 
-    function holdingsLeaveBasisUnresolved() {
+    function holdingsLeaveBasisUnresolved(decision) {
         var rowData = holdingsSelectedAssetRow();
         var asset = rowData ? rowData[0] : null;
         var note = $('#basis_review_note').val();
         var status = rowData ? holdingsRowStatus(rowData) : '';
         var isHoldingsGap = status == 'mismatch';
         var gapLabel = isHoldingsGap ? 'holdings gap' : 'missing basis';
+        decision = decision || 'needs_research';
 
         if (!rowData) {
             alert('Select an asset first.');
             return;
         }
 
+        if (!note) {
+            note = holdingsBasisDecisionNote(decision, asset);
+        }
+
         holdingsShowActionConfirm(
-            'Leave gap unresolved?',
-            'Leave the ' + asset + ' ' + gapLabel + ' unresolved as needs user research? Generated exports will remain draft/not filing-ready.',
-            'Leave As Needs Research',
+            'Record ' + asset + ' gap decision?',
+            'Record "' + holdingsBasisDecisionLabel(decision) + '" for the ' + asset + ' ' + gapLabel + '? Generated exports will remain draft/not filing-ready until this is resolved or reviewed.',
+            'Record Decision',
             function() {
-                holdingsSaveBasisUnresolved(rowData, asset, note);
+                holdingsSaveBasisUnresolved(rowData, asset, note, decision);
             }
         );
     }
 
     $('#leave_basis_unresolved_button, #holdings_leave_basis_unresolved_button').click(function() {
-        holdingsLeaveBasisUnresolved();
+        holdingsLeaveBasisUnresolved('needs_research');
+    });
+
+    $('.missing-basis-decision-button').click(function() {
+        holdingsLeaveBasisUnresolved($(this).data('decision') || 'needs_research');
     });
 
     function holdingsSaveDocumentedSendClassification(rowData, asset, quantity) {

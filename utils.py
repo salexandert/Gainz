@@ -572,7 +572,21 @@ def _basis_review_note(transactions, asset):
 
 def _basis_review_needs_research(transactions, asset):
     note = _basis_review_note(transactions, asset)
-    return bool(note and note.get("status") == "needs_research")
+    return bool(note and note.get("status"))
+
+
+def _basis_review_status_label(transactions, asset, default="Missing acquisition basis"):
+    note = _basis_review_note(transactions, asset) or {}
+    status = str(note.get("status") or "").strip()
+    labels = {
+        "import_missing_records": "Import missing acquisition records",
+        "fork_airdrop_basis": "Fork/airdrop acquisition needs support",
+        "already_in_filed_totals": "Already included in filed tax totals",
+        "zero_basis_cpa_review": "Unknown basis treated as $0 for CPA review",
+        "sent_to_cpa": "Sent to CPA",
+        "needs_research": "Needs user research",
+    }
+    return labels.get(status, default)
 
 
 def _basis_review_note_text(transactions, asset):
@@ -598,7 +612,6 @@ def get_missing_basis_review_rows(transactions):
             continue
 
         asset = transaction.symbol
-        needs_research = _basis_review_needs_research(transactions, asset)
         note_text = _basis_review_note_text(transactions, asset)
         rows.append({
             "asset": asset,
@@ -606,7 +619,7 @@ def get_missing_basis_review_rows(transactions):
             "quantity": format_quantity(transaction.quantity),
             "unlinked_quantity": format_quantity(unlinked_quantity),
             "source": os.path.basename(str(getattr(transaction, "source", "") or "")) or "Unknown source",
-            "status": "Needs user research" if needs_research else "Missing acquisition basis",
+            "status": _basis_review_status_label(transactions, asset),
             "note": note_text,
             "message": (
                 f"{asset} sale on {_format_report_datetime(transaction.time_stamp)} needs "
@@ -742,7 +755,7 @@ def _reconciliation_checklist(
         else (
             "Import transactions first; Gainz will apply automatic FIFO when matching basis is available."
             if not has_transactions
-            else "Gainz applies FIFO automatically when it can. Recalculate basis or leave specific missing basis as needs user research."
+            else "Gainz applies FIFO automatically when it can. Recalculate basis or document specific missing basis for draft/CPA review."
         )
     )
     source_overlap_detail = (
@@ -982,24 +995,24 @@ def _audit_readiness_groups(
         ))
 
     if missing_basis_rows:
-        research_count = sum(1 for row in missing_basis_rows if row["status"] == "Needs user research")
-        missing_count = len(missing_basis_rows) - research_count
-        if missing_count and research_count:
+        documented_count = sum(1 for row in missing_basis_rows if row["status"] != "Missing acquisition basis")
+        missing_count = len(missing_basis_rows) - documented_count
+        if missing_count and documented_count:
             detail = (
                 f"{_count_label(missing_count, 'sale row')} still "
                 f"{'needs' if missing_count == 1 else 'need'} earlier acquisition basis, and "
-                f"{_count_label(research_count, 'row')} "
-                f"{'is' if research_count == 1 else 'are'} parked as needs user research."
+                f"{_count_label(documented_count, 'row')} "
+                f"{'is' if documented_count == 1 else 'are'} documented for draft/CPA review."
             )
             status = "Needs action"
             status_class = "status-needs-review"
-        elif research_count:
+        elif documented_count:
             detail = (
-                f"{_count_label(research_count, 'sale row')} "
-                f"{'is' if research_count == 1 else 'are'} documented as needs user research. "
+                f"{_count_label(documented_count, 'sale row')} "
+                f"{'is' if documented_count == 1 else 'are'} documented for draft/CPA review. "
                 "Draft exports can include the notes, but this is not filing-ready."
             )
-            status = "Needs research"
+            status = "Documented for review"
             status_class = "status-needs-user-research"
         else:
             detail = (
@@ -1204,15 +1217,15 @@ def get_audit_readiness_summary(transactions):
         for row in holdings_rows
         if row[6] == "Needs Review"
     ]
-    basis_assets_needing_research = sorted({
+    basis_assets_documented_for_review = sorted({
         row["asset"]
         for row in missing_basis_rows
-        if row["status"] == "Needs user research"
+        if row["status"] != "Missing acquisition basis"
     })
     basis_assets_missing = sorted({
         row["asset"]
         for row in missing_basis_rows
-        if row["status"] != "Needs user research"
+        if row["status"] == "Missing acquisition basis"
     })
     blockers = []
     warnings = []
@@ -1235,9 +1248,9 @@ def get_audit_readiness_summary(transactions):
             "Missing acquisition basis before sales for: " + ", ".join(basis_assets_missing)
         )
 
-    if basis_assets_needing_research:
+    if basis_assets_documented_for_review:
         blockers.append(
-            "Missing basis left as needs user research for: " + ", ".join(basis_assets_needing_research)
+            "Missing basis documented for draft/CPA review for: " + ", ".join(basis_assets_documented_for_review)
         )
 
     warning_state = _import_warning_state_summary(unresolved_warning_rows) if unresolved_warning_rows else None
