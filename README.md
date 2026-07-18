@@ -13,7 +13,7 @@ Gainz is a pre-existing open-source project. The Build Week submission evaluates
 - Pre-event baseline: [`6caf421` from July 8, 2026](https://github.com/salexandert/Gainz/commit/6caf421)
 - Build Week work began after July 13, 2026.
 - Validated Build Week release baseline: [`905e57f`, Gainz 0.2.44](https://github.com/salexandert/Gainz/commit/905e57f)
-- Public Build Week release: [Gainz v0.2.44](https://github.com/salexandert/Gainz/releases/tag/v0.2.44)
+- Public Build Week release: [Gainz v0.2.46](https://github.com/salexandert/Gainz/releases/tag/v0.2.46)
 
 The Build Week contribution turns an unresolved missing-basis sale into an explicit professional workflow: preserve source-reported gross value, fees, and net proceeds; separate supported FIFO quantity from unresolved quantity; select a treatment for an exact disposition; preview the before/change/after Form 8949 impact; apply or reverse the treatment; and preserve calculation receipts, professional workpapers, material assumptions, and CPA handoff documents in the audit packet. This period also added stronger guided UX, packaged-release verification, and synthetic public demonstration assets.
 
