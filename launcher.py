@@ -209,7 +209,7 @@ class GainzLauncher(tk.Tk):
         credentials.pack(side="left", fill="x", expand=True, anchor="w")
         ttk.Button(
             credentials_frame,
-            text="Copy Password Path",
+            text="Copy Credentials File Path",
             command=self.copy_credentials_path,
         ).pack(side="right", padx=(8, 0), anchor="n")
 
@@ -221,7 +221,6 @@ class GainzLauncher(tk.Tk):
 
         ttk.Button(button_frame, text="Copy Link", command=self.copy_link).pack(side="left", padx=(8, 0))
         ttk.Button(button_frame, text="Reset Password", command=self.reset_password).pack(side="left", padx=(8, 0))
-        ttk.Button(button_frame, text="Donate", command=self.open_support).pack(side="left", padx=(8, 0))
         ttk.Button(button_frame, text="Quit", command=self.close_app).pack(side="right")
 
     def start_server_thread(self):

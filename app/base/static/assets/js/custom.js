@@ -24,7 +24,21 @@ function gainzFormatImportResult(result, fileName) {
         message += " Next: import more files, then continue to Declare Holdings.";
     }
 
+    if (result.demo_profile && result.demo_profile.guidance) {
+        message += " " + result.demo_profile.guidance;
+    }
+
     return message;
+}
+
+function gainzFocusImportStatus(selector) {
+    var target = document.querySelector(selector);
+    if (!target) {
+        return;
+    }
+    target.setAttribute("tabindex", "-1");
+    target.focus({preventScroll: true});
+    target.scrollIntoView({behavior: "smooth", block: "start"});
 }
 
 function gainzShowImportResult(result, fileName, alertClass) {
@@ -57,6 +71,7 @@ function gainzShowImportResult(result, fileName, alertClass) {
         gainzUpdateImportContinuePanel(result.data_summary);
         gainzUpdateImportCurrentDecision(result.data_summary);
     }
+    gainzFocusImportStatus("#import_upload_result");
 }
 
 function gainzConfirmDialog(options) {
@@ -871,6 +886,7 @@ $(document).on("click", ".import-warning-decision-button", function() {
                     .addClass(unresolvedCount > 0 ? "alert-warning" : "alert-success")
                     .text(savedMessage)
                     .show();
+                gainzFocusImportStatus(unresolvedCount > 0 ? "#import_warning_first_panel" : "#import_continue_panel");
             }
         },
         error: function(xhr) {
@@ -1180,11 +1196,13 @@ $(document).ready(function () {
         openLinkedDetails($(this).attr("href"));
     });
 
-    $("#import_demo_data_button").on("click", function () {
+    $(".import-demo-button").on("click", function () {
         var button = $(this);
         var demoUrl = button.data("demo-url");
+        var originalLabel = button.text();
+        var demoName = button.data("demo-name") || "demo data";
 
-        button.prop("disabled", true).text("Loading Demo Data...");
+        button.prop("disabled", true).text(button.data("loading-label") || "Loading Demo Data...");
         $("#import_upload_result")
             .removeClass("alert-danger alert-warning")
             .addClass("alert-info")
@@ -1194,7 +1212,7 @@ $(document).ready(function () {
         $.post(demoUrl)
             .done(function (result) {
                 $("#import_column_mapper").hide();
-                gainzShowImportResult(result, "demo data");
+                gainzShowImportResult(result, demoName);
             })
             .fail(function (xhr) {
                 var message = "Demo import failed.";
@@ -1208,7 +1226,7 @@ $(document).ready(function () {
                     .show();
             })
             .always(function () {
-                button.prop("disabled", false).text("Try Demo Data");
+                button.prop("disabled", false).text(originalLabel);
             });
     });
 
@@ -2385,7 +2403,11 @@ $(document).ready(function() {
         var label = labels[activeHoldingsFilter] || labels.all;
         var visibleRows = table.rows({ filter: 'applied' }).data();
 
-        if (activeHoldingsFilter == 'review' && visibleRows.length === 0) {
+        if (activeHoldingsFilter == 'needs' && visibleRows.length === 0 && holdingsIsGuided && holdingsMode == 'declare') {
+            $('#holdings_summary_action').text(
+                'Holdings entry is complete. Review the receipt below, then continue to Reconcile Gaps.'
+            );
+        } else if (activeHoldingsFilter == 'review' && visibleRows.length === 0) {
             $('#holdings_summary_action').text(
                 'No reconciliation gaps remain. Continue to Reports & Export for any remaining evidence or packet review.'
             );
@@ -2490,6 +2512,8 @@ $(document).ready(function() {
 
         $('#holdings_stage_callout').hide();
         $('#bulk_holdings_section').hide();
+        $('#holdings_gap_queue').hide();
+        $('#holdings_workbench_section').hide();
         $('#holdings_completion_summary').text(summaryText || 'All tracked assets now have declared current holdings for this review pass.');
         $('#holdings_completion_actions').html(
             '<a class="btn btn-sm btn-primary" href="/holdings_accounting/?guided=1&amp;mode=reconcile">Continue to Reconcile Gaps</a> ' +
@@ -2507,6 +2531,8 @@ $(document).ready(function() {
         $('#holdings_completion_panel').hide();
         $('#holdings_stage_callout').show();
         $('#bulk_holdings_section').show();
+        $('#holdings_gap_queue').show();
+        $('#holdings_workbench_section').show();
         holdingsScrollTo('#bulk_holdings_section');
     });
 
@@ -2552,7 +2578,7 @@ $(document).ready(function() {
             .text('All listed assets now have declared holdings. Use the completion panel to continue.')
             .show();
         holdingsShowDeclaredCompletion('Declared holdings for ' + savedAsset + ' saved. All listed assets now have declared holdings.');
-        holdingsScrollTo('#holdings_guided_queue');
+        holdingsScrollTo('#holdings_completion_panel');
         return true;
     }
 
@@ -2693,7 +2719,7 @@ $(document).ready(function() {
                     .html('<strong>Bulk holdings saved.</strong> ' + $('<span></span>').text(data['message'] + ' Completed in ' + Math.max(1, Math.round((Date.now() - startedAt) / 1000)) + ' second(s). Continue below.').html())
                     .show();
                 holdingsShowDeclaredCompletion(data['message']);
-                holdingsScrollTo('#bulk_holdings_message');
+                holdingsScrollTo('#holdings_completion_panel');
             },
             error: function(xhr) {
                 var message = 'Bulk holdings could not be saved.';
@@ -2966,6 +2992,12 @@ $(document).ready(function() {
                     'Decision recorded for ' + asset,
                     'This gap is documented and remains visible for draft or CPA review.',
                     holdingsHasAnotherGuidedGap(asset) ? 'Review the next gap.' : 'Open Guided Review Queue or continue to Reports & Export.'
+                );
+                $('#holdings_stage_callout').hide();
+                $('#holdings_guided_queue_status').text(
+                    holdingsHasAnotherGuidedGap(asset)
+                        ? 'Decision recorded for ' + asset + '. Choose Next gap to continue.'
+                        : 'Decision recorded for the final gap. Continue to Guided Review Queue or Reports & Export.'
                 );
                 holdingsScrollTo('#holdings_save_message');
             },

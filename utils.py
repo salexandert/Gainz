@@ -1456,6 +1456,9 @@ def get_audit_readiness_summary(transactions):
             "assets_with_mismatches": len(assets_with_mismatches),
             "assets_with_unlinked_sales": len(assets_with_unlinked_sales),
             "import_warnings": len(import_warnings),
+            "reviewed_import_warnings": sum(
+                1 for row in warning_rows if str(row.get("decision") or "").strip()
+            ),
             "unresolved_import_warnings": len(unresolved_warning_rows),
             "import_economics_warnings": len(economics_warning_rows),
             "missing_basis_rows": len(missing_basis_rows),

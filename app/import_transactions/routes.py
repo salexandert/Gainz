@@ -588,6 +588,25 @@ def import_demo_data():
     return jsonify(_public_import_response(transactions, result))
 
 
+@blueprint.route('/demo_missing_basis', methods=['POST'])
+@login_required
+def import_missing_basis_demo():
+    transactions = current_app.config['transactions']
+    try:
+        result = ImportService(current_app.config['UPLOAD_FOLDER']).import_missing_basis_demo(
+            transactions,
+            repo_root=resource_dir(),
+        )
+    except Exception:
+        return _import_error_response("missing-basis demo data")
+    result = _ensure_fifo_after_data_change(
+        transactions,
+        result,
+        "missing-basis demo import",
+    )
+    return jsonify(_public_import_response(transactions, result))
+
+
 @blueprint.route('/remove_source', methods=['POST'])
 @login_required
 def remove_source():

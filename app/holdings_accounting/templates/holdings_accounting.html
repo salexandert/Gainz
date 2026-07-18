@@ -130,7 +130,7 @@
         </div>
 
         {% if guided_mode %}
-        <div id="holdings_stage_callout" class="gainz-stage-callout">
+        <div id="holdings_stage_callout" class="gainz-stage-callout" {% if is_declare_mode and holdings_summary.assets_needing_holdings == 0 %}style="display: none;"{% endif %}>
           <strong>Do this now.</strong>
           <p class="mb-0">
             {% if is_declare_mode %}
@@ -246,7 +246,7 @@
 </div>
 {% endif %}
 
-<div id="holdings_gap_queue" class="row">
+<div id="holdings_gap_queue" class="row" {% if guided_mode and is_declare_mode and holdings_summary.assets_needing_holdings == 0 %}style="display: none;"{% endif %}>
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
@@ -330,7 +330,7 @@
   </div>
 </div>
 
-<div class="row">
+<div id="holdings_workbench_section" class="row" {% if guided_mode and is_declare_mode and holdings_summary.assets_needing_holdings == 0 %}style="display: none;"{% endif %}>
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">

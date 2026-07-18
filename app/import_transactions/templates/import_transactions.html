@@ -112,7 +112,24 @@
             <h2 class="gainz-section-title mb-1">{% if guided_import %}Step 1.1: Start With Source Data{% else %}Start With Source Data{% endif %}</h2>
             <p class="text-muted mb-0">Try the synthetic demo data or upload one exchange CSV.</p>
           </div>
-          <button type="button" id="import_demo_data_button" class="btn btn-primary btn-round btn-sm" data-demo-url="{{ url_for('import_transactions_blueprint.import_demo_data') }}">Try Demo Data</button>
+          <div class="d-flex flex-wrap align-items-center">
+            <button
+              type="button"
+              id="import_demo_data_button"
+              class="btn btn-primary btn-round btn-sm import-demo-button"
+              data-demo-url="{{ url_for('import_transactions_blueprint.import_demo_data') }}"
+              data-demo-name="basic demo data"
+              data-loading-label="Loading Demo Data..."
+            >Try Demo Data</button>
+            <button
+              type="button"
+              id="import_missing_basis_demo_button"
+              class="btn btn-outline-primary btn-round btn-sm ml-2 import-demo-button"
+              data-demo-url="{{ url_for('import_transactions_blueprint.import_missing_basis_demo') }}"
+              data-demo-name="missing-basis demo"
+              data-loading-label="Loading Missing-Basis Demo..."
+            >Try Missing-Basis Demo</button>
+          </div>
         </div>
         <div id="import_upload_result" class="alert alert-info" role="alert" style="display: none;"></div>
         <div

@@ -14,6 +14,9 @@ class ImportService:
         "coinbase_sample.csv",
         "coinbase_convert_sample.csv",
     ]
+    MISSING_BASIS_DEMO_FILES = [
+        "coinbase_partial_basis_fee_sample.csv",
+    ]
 
     def __init__(self, upload_folder):
         self.upload_folder = upload_folder
@@ -134,6 +137,32 @@ class ImportService:
         )
 
     def import_demo_data(self, transactions, repo_root=None):
+        return self._import_demo_files(
+            transactions,
+            self.DEMO_FILES,
+            repo_root=repo_root,
+            demo_kind="basic",
+        )
+
+    def import_missing_basis_demo(self, transactions, repo_root=None):
+        result = self._import_demo_files(
+            transactions,
+            self.MISSING_BASIS_DEMO_FILES,
+            repo_root=repo_root,
+            demo_kind="missing_basis",
+        )
+        result["demo_profile"] = {
+            "name": "Missing-basis professional review",
+            "asset": "BCH",
+            "declared_holdings": "0",
+            "guidance": (
+                "Next: declare BCH holdings as 0, then continue to Reconcile to review "
+                "the partially supported sale and its professional treatment options."
+            ),
+        }
+        return result
+
+    def _import_demo_files(self, transactions, demo_files, repo_root=None, demo_kind="basic"):
         repo_root = Path(repo_root) if repo_root else resource_dir()
         demo_root = repo_root / "demo_data"
         results = []
@@ -141,7 +170,7 @@ class ImportService:
         total_skipped = 0
         warnings = []
 
-        for demo_file in self.DEMO_FILES:
+        for demo_file in demo_files:
             source = demo_root / demo_file
             clear_import_warnings_for_source(transactions, demo_file)
             imported_count, skipped_count = import_transactions(str(source), transactions)
@@ -163,6 +192,7 @@ class ImportService:
             "warnings": warnings,
             "files": results,
             "demo": True,
+            "demo_kind": demo_kind,
         }
 
     def _mapping_required_result(self, file_path, analysis, message=None):

@@ -79,8 +79,9 @@
             <strong>{{ audit_readiness.metrics.assets_with_mismatches }}</strong>
           </div>
           <div class="audit-readiness-item">
-            <span>Warnings</span>
-            <strong>{{ audit_readiness.metrics.import_warnings }}</strong>
+            <span>Import Warnings</span>
+            <strong>{{ audit_readiness.metrics.reviewed_import_warnings }} reviewed</strong>
+            <small>{{ audit_readiness.metrics.unresolved_import_warnings }} blocking</small>
           </div>
           <div class="audit-readiness-item">
             <span>Source Overlaps</span>
@@ -345,9 +346,9 @@
             <small>Listed as missing in the manifest</small>
           </div>
           <div class="audit-readiness-item">
-            <span>Unresolved Items</span>
+            <span>Unresolved Groups</span>
             <strong>{{ packet_preview.unresolved_blocker_count }}</strong>
-            <small>Blockers and warnings carried into output</small>
+            <small>Blocker groups and warning groups carried into output</small>
           </div>
         </div>
 

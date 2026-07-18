@@ -67,8 +67,8 @@
     <div class="card">
       <div class="card-body">
         <div class="guided-review-meta">
-          <span class="gainz-status-badge {% if item.review_decision %}status-verified{% else %}status-needs-review{% endif %}">
-            {% if item.review_decision_label %}{{ item.review_decision_label }}{% else %}Not reviewed{% endif %}
+          <span class="gainz-status-badge {% if item.calculation_applied == 'Yes' %}status-verified{% else %}status-needs-review{% endif %}">
+            {% if item.calculation_applied == 'Yes' %}Treatment applied{% elif item.review_decision_label %}{{ item.review_decision_label }}{% else %}Not reviewed{% endif %}
           </span>
           <span>Open item {{ index }} of {{ unreviewed_count }}</span>
           <span>{{ resolved_count }} resolved, {{ unreviewed_count }} unresolved, {{ deferred_count }} deferred</span>
@@ -114,6 +114,8 @@
             </section>
             {% endif %}
             {% if item.tax_cross_check %}
+            <details class="gainz-advanced-details guided-review-supporting-details">
+              <summary>Review filed totals cross-check</summary>
             <aside class="guided-review-tax-cross-check" aria-labelledby="tax_cross_check_heading">
               <div class="guided-review-tax-cross-check-header">
                 <div>
@@ -170,8 +172,11 @@
                 {{ item.tax_cross_check.next_action }}
               </p>
             </aside>
+            </details>
             {% endif %}
             {% if item.professional_review_options %}
+            <details class="gainz-advanced-details guided-review-supporting-details">
+              <summary>Review professional research options</summary>
             <div class="guided-review-professional-options" aria-labelledby="professional_review_options_heading">
               <h3 id="professional_review_options_heading">CPA review options</h3>
               <p>
@@ -187,6 +192,7 @@
                 {% endfor %}
               </div>
             </div>
+            </details>
             {% endif %}
           </div>
           <div class="alert alert-info" role="note">
@@ -624,7 +630,7 @@
             <strong>{{ resolved_count }}</strong>
           </div>
           <div class="audit-readiness-item">
-            <span>Unresolved Items</span>
+            <span>Unresolved Queue Items</span>
             <strong>{{ unreviewed_count }}</strong>
           </div>
           <div class="audit-readiness-item">

@@ -188,6 +188,8 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("Current task", rendered_page)
         self.assertIn("Upload source data", rendered_page)
         self.assertIn("Try demo data or upload one exchange CSV.", rendered_page)
+        self.assertIn("Try Missing-Basis Demo", rendered_page)
+        self.assertIn("/import_transactions/demo_missing_basis", rendered_page)
         self.assertIn("Step 1.1: Start With Source Data", rendered_page)
         self.assertIn("Optional: Add Manual Transactions", rendered_page)
         self.assertIn("Choose CSV file", rendered_page)
@@ -310,6 +312,8 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("Continue to Reconcile Gaps", ready_declare_page)
         self.assertIn("Current holdings are recorded. Gainz can now compare them to imported activity.", ready_declare_page)
         self.assertIn('id="holdings_current_task"', ready_declare_page)
+        self.assertIn('id="holdings_gap_queue" class="row" style="display: none;"', ready_declare_page)
+        self.assertIn('id="holdings_workbench_section" class="row" style="display: none;"', ready_declare_page)
         self.assertLess(
             ready_declare_page.index('id="holdings_current_task"'),
             ready_declare_page.index("Current holdings are recorded"),
@@ -1342,6 +1346,51 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual(3, totals["total"]["rows"])
         self.assertIn(
             "Automatically added FIFO basis links after demo data import",
+            transactions.saved_descriptions,
+        )
+
+    def test_missing_basis_demo_exposes_partial_bch_basis_workflow(self):
+        transactions = empty_transactions()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = ImportService(temp_dir).import_missing_basis_demo(
+                transactions,
+                repo_root=Path.cwd(),
+            )
+
+        self.assertEqual(2, result["imported_count"])
+        self.assertEqual("missing_basis", result["demo_kind"])
+        self.assertEqual("BCH", result["demo_profile"]["asset"])
+        self.assertEqual("0", result["demo_profile"]["declared_holdings"])
+        transactions.auto_link(asset=None, algo="fifo")
+        sell = next(transaction for transaction in transactions.transactions if transaction.trans_type == "sell")
+        self.assertAlmostEqual(0.3, sell.unlinked_quantity)
+        self.assertAlmostEqual(495.0, sell.tax_usd_total)
+        self.assertAlmostEqual(5.0, sell.fee)
+
+    def test_missing_basis_demo_route_runs_fifo_and_returns_judge_guidance(self):
+        transactions = empty_transactions()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app = create_app(config_dict["Debug"], selenium=True)
+            app.config.update(
+                WTF_CSRF_ENABLED=False,
+                transactions=transactions,
+                UPLOAD_FOLDER=temp_dir,
+            )
+
+            with app.test_request_context("/import_transactions/demo_missing_basis", method="POST"):
+                response = import_routes.import_missing_basis_demo.__wrapped__()
+
+        payload = response.get_json()
+        sell = next(transaction for transaction in transactions.transactions if transaction.trans_type == "sell")
+        self.assertEqual(2, payload["imported_count"])
+        self.assertEqual(1, payload["auto_link"]["links_created"])
+        self.assertEqual("fifo", payload["auto_link"]["algo"])
+        self.assertAlmostEqual(0.3, sell.unlinked_quantity)
+        self.assertIn("declare BCH holdings as 0", payload["demo_profile"]["guidance"])
+        self.assertIn(
+            "Automatically added FIFO basis links after missing-basis demo import",
             transactions.saved_descriptions,
         )
 

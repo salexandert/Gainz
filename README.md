@@ -6,6 +6,30 @@ It helps import transactions, link dispositions to acquisition lots, review unre
 
 Gainz is best understood as **private offline crypto tax reconciliation**. It does not try to be a hosted tax service. It helps you turn messy exchange exports into traceable basis links, Form 8949-style rows, current holdings reconciliation, and a documentation packet you can review with a qualified tax professional without uploading your transaction history.
 
+## OpenAI Build Week 2026
+
+Gainz is a pre-existing open-source project. The Build Week submission evaluates the meaningful extension built after the event submission period began, not the entire prior application.
+
+- Pre-event baseline: [`6caf421` from July 8, 2026](https://github.com/salexandert/Gainz/commit/6caf421)
+- Build Week work began after July 13, 2026.
+- Validated Build Week release baseline: [`905e57f`, Gainz 0.2.44](https://github.com/salexandert/Gainz/commit/905e57f)
+- Public Build Week release: [Gainz v0.2.44](https://github.com/salexandert/Gainz/releases/tag/v0.2.44)
+
+The Build Week contribution turns an unresolved missing-basis sale into an explicit professional workflow: preserve source-reported gross value, fees, and net proceeds; separate supported FIFO quantity from unresolved quantity; select a treatment for an exact disposition; preview the before/change/after Form 8949 impact; apply or reverse the treatment; and preserve calculation receipts, professional workpapers, material assumptions, and CPA handoff documents in the audit packet. This period also added stronger guided UX, packaged-release verification, and synthetic public demonstration assets.
+
+Codex with GPT-5.6 was used as an implementation and product-review partner for code changes, browser-first workflow testing, edge-case discovery, regression tests, release QA, and documentation. The human set the product boundaries: private/offline positioning, a conservative tax posture, professional-directed treatment rather than autonomous tax advice, exact-disposition selection, and refusal to invent missing transaction history.
+
+### Five-Minute Judge Path
+
+1. Download and launch the current packaged build from the [Gainz download page](https://cryptogainz.store/download/).
+2. Open **Import** and click **Try Missing-Basis Demo**.
+3. Continue to **Declare Holdings**, enter `0` BCH, and save the remaining synthetic holdings as zero.
+4. Open **Reconcile**. Gainz shows a `0.5 BCH` sale with `0.2 BCH` supported by FIFO and `0.3 BCH` still missing acquisition basis.
+5. Open the Guided Review Queue, choose a synthetic professional-directed treatment, review its exact calculation impact, and apply it.
+6. Open **Reports & Export**, preview the draft status and assumptions, then generate the synthetic audit packet.
+
+The missing-basis demo uses only the synthetic file [`demo_data/coinbase_partial_basis_fee_sample.csv`](demo_data/coinbase_partial_basis_fee_sample.csv). It contains no personal or production tax data.
+
 ## What Gainz Is
 
 - Private offline workflow: runs locally on your machine without requiring a hosted account or transaction-history upload.
@@ -116,6 +140,7 @@ The `demo_data/` folder contains synthetic CSVs that are safe to use for testing
 - `demo_data/cash_app_sample.csv`
 - `demo_data/coinbase_sample.csv`
 - `demo_data/coinbase_convert_sample.csv`
+- `demo_data/coinbase_partial_basis_fee_sample.csv` for the Build Week missing-basis workflow
 
 A good demo run is:
 
@@ -131,6 +156,8 @@ A good demo run is:
 10. Expand **Review Details** only when you need row-level evidence.
 11. Review the audit packet preview, then generate the workbook or draft audit packet.
 12. Use the packet success screen to copy the packet path or CPA summary, open the packet folder, and review `README_FIRST.md`, `PACKET_STATUS.md`, and `FOR_CPAS.md`.
+
+To test Gainz's professional-resolution workflow directly, click **Try Missing-Basis Demo** instead. Declare BCH holdings as `0`, continue to Reconcile, and review the partially supported BCH sale in the Guided Review Queue.
 
 The audit packet includes root `README_FIRST.md`, `PACKET_STATUS.md`, `FOR_CPAS.md`, `CPA_HANDOFF.md`, and `PRIVACY_AND_EVIDENCE_HANDLING.md` files, the Excel workbook with a visible packet status sheet, import economics, Form 8949 detail CSVs and totals, tax filing review, tax evidence inventory, suggested filed totals, reconciliation work order CSV/Markdown, professional resolution workpapers and reversible calculation receipts, unknown gap memo CSV/Markdown, holdings reconciliation, current holdings lots, active and preserved import-warning decisions, missing-basis review, source-overlap review, copied transaction source files when available, tax evidence references, explicitly selected tax evidence copies, hashes, and a methodology memo.
 
