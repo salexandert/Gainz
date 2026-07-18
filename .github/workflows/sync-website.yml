@@ -26,9 +26,9 @@ jobs:
           TARGET_SHA: ${{ github.sha }}
         run: |
           if [ -z "$WEBSITE_REPO_TOKEN" ]; then
-            echo "WEBSITE_REPO_TOKEN is not configured; skipping website repository dispatch."
-            echo "Create a fine-grained token with Actions: write access to salexandert/Gainz-Website and save it as WEBSITE_REPO_TOKEN."
-            exit 0
+            echo "::error::Website sync was not dispatched because WEBSITE_REPO_TOKEN is not configured."
+            echo "Configure the cross-repository Actions credential before treating this workflow as successful."
+            exit 1
           fi
 
           curl --fail-with-body \
