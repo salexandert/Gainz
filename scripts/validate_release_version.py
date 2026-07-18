@@ -1,4 +1,6 @@
 import argparse
+import hashlib
+import json
 import re
 import sys
 from pathlib import Path
@@ -23,6 +25,25 @@ def read_docs_version():
     return match.group(1).strip().strip('"').strip("'")
 
 
+def validate_sample_packet(version):
+    downloads_dir = Path("docs/assets/downloads")
+    metadata_path = downloads_dir / "gainz-synthetic-audit-packet-sample.json"
+    zip_path = downloads_dir / "gainz-synthetic-audit-packet-sample.zip"
+    if not metadata_path.exists() or not zip_path.exists():
+        raise ValueError("Synthetic sample packet ZIP and metadata are required for a release.")
+
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    if metadata.get("version") != version:
+        raise ValueError(
+            "Synthetic sample metadata version "
+            f"({metadata.get('version')}) does not match VERSION ({version})."
+        )
+
+    sample_hash = hashlib.sha256(zip_path.read_bytes()).hexdigest()
+    if metadata.get("sha256", "").lower() != sample_hash:
+        raise ValueError("Synthetic sample metadata checksum does not match the sample ZIP.")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--expected-tag", default="")
@@ -39,6 +60,8 @@ def main():
     docs_version = read_docs_version()
     if docs_version != version:
         raise ValueError(f"docs/_config.yml ({docs_version}) does not match VERSION ({version}).")
+
+    validate_sample_packet(version)
 
     tag = f"v{version}"
     if args.expected_tag and args.expected_tag != tag:
