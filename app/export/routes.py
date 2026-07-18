@@ -280,8 +280,12 @@ def _apply_cpa_calculation_resolution(transactions, item, item_id, decision, det
             evidence_reference=details.get("evidence_reference"),
             work_order_item_id=item_id,
         )
-    except (TypeError, ValueError) as exc:
-        return str(exc)
+    except (TypeError, ValueError):
+        current_app.logger.exception("CPA calculation resolution could not be applied")
+        return (
+            "Gainz could not apply this CPA resolution. Check the selected sale, "
+            "unresolved quantity, acquisition date, and USD values, then try again."
+        )
 
     details["calculation_applied"] = "Yes"
     details["adjustment_transaction_uid"] = adjustment_buy.uid
