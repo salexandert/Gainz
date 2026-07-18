@@ -32,6 +32,10 @@
         <div class="alert alert-warning mt-3" role="alert">
           Choose a review decision before saving this item.
         </div>
+        {% elif request.args.get("reversed") == "1" %}
+        <div class="alert alert-success mt-3" role="status">
+          Resolution reversed. Gainz removed the adjustment link and returned the item to Needs research.
+        </div>
         {% endif %}
         {% if save_error %}
         <div class="alert alert-warning mt-3" role="alert">
@@ -66,8 +70,8 @@
           <span class="gainz-status-badge {% if item.review_decision %}status-verified{% else %}status-needs-review{% endif %}">
             {% if item.review_decision_label %}{{ item.review_decision_label }}{% else %}Not reviewed{% endif %}
           </span>
-          <span>Item {{ index }} of {{ total }}</span>
-          <span>{{ reviewed_count }} reviewed, {{ unreviewed_count }} still open</span>
+          <span>Open item {{ index }} of {{ unreviewed_count }}</span>
+          <span>{{ resolved_count }} resolved, {{ unreviewed_count }} unresolved, {{ deferred_count }} deferred</span>
         </div>
 
         <form method="POST" action="{{ url_for('export_blueprint.review_queue_save') }}" class="guided-review-form guided-review-form-priority">
@@ -85,6 +89,29 @@
               </div>
               {% endfor %}
             </dl>
+            {% endif %}
+            {% if item.sale_split %}
+            <section class="gainz-sale-split" aria-labelledby="sale_split_heading">
+              <span class="section-kicker">What this sale contains</span>
+              <h3 id="sale_split_heading">Supported and unresolved amounts</h3>
+              <div class="gainz-sale-split-grid">
+                <div>
+                  <span>Full imported sale</span>
+                  <strong>{{ '%.8f'|format(item.sale_split.full_quantity) }} {{ item.asset }}</strong>
+                  <small>${{ '%.2f'|format(item.sale_split.full_net) }} net proceeds after ${{ '%.2f'|format(item.sale_split.full_fee) }} fee</small>
+                </div>
+                <div>
+                  <span>Supported by linked acquisition lots</span>
+                  <strong>{{ '%.8f'|format(item.sale_split.supported_quantity) }} {{ item.asset }}</strong>
+                  <small>${{ '%.2f'|format(item.sale_split.supported_proceeds) }} proceeds, ${{ '%.2f'|format(item.sale_split.supported_basis) }} basis</small>
+                </div>
+                <div>
+                  <span>Still unresolved</span>
+                  <strong>{{ '%.8f'|format(item.sale_split.unresolved_quantity) }} {{ item.asset }}</strong>
+                  <small>${{ '%.2f'|format(item.sale_split.unresolved_proceeds) }} allocated net proceeds; acquisition basis is missing</small>
+                </div>
+              </div>
+            </section>
             {% endif %}
             {% if item.tax_cross_check %}
             <aside class="guided-review-tax-cross-check" aria-labelledby="tax_cross_check_heading">
@@ -166,11 +193,40 @@
             It is valid to choose "I do not know yet." Gainz keeps that as a documented draft blocker instead of forcing certainty.
           </div>
           {% if item.show_cpa_resolution %}
+          {% if not selected_decision %}
+          <h3>1. Select treatment</h3>
+          <p class="text-muted">Choose the path that matches the records or professional direction you have. No calculation changes at this step.</p>
+          <div class="guided-review-treatment-options" role="radiogroup" aria-label="Professional resolution treatments">
+            {% for choice in choices %}
+            <label class="guided-review-treatment-option">
+              <input
+                type="radio"
+                name="decision"
+                value="{{ choice.value }}"
+                required
+                {% if selected_decision == choice.value or (not selected_decision and item.review_decision == choice.value) %}checked{% endif %}
+              >
+              <span>{{ choice.label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          <button type="submit" name="workflow_action" value="configure" class="btn btn-primary">
+            Continue with selected treatment
+          </button>
+          {% else %}
+          <input type="hidden" name="decision" value="{{ selected_decision }}">
+          <div class="gainz-selected-treatment" role="status">
+            <div>
+              <span class="section-kicker">Selected treatment</span>
+              <strong>{{ selected_decision_label }}</strong>
+            </div>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('export_blueprint.review_queue', guided=1, item_id=item.item_id) }}">Change treatment</a>
+          </div>
           <section class="cpa-resolution-workbook" aria-labelledby="cpa_resolution_heading">
             <div class="cpa-resolution-heading">
               <div>
                 <span class="section-kicker">Professional workpaper</span>
-                <h3 id="cpa_resolution_heading">CPA Resolution Worksheet</h3>
+                <h3 id="cpa_resolution_heading">Professional Resolution Worksheet</h3>
               </div>
               <span class="gainz-status-badge {% if item.resolution_status == 'cpa_reviewed_position' %}status-verified{% else %}status-needs-review{% endif %}">
                 {{ item.resolution_status_label or "Not set" }}
@@ -182,17 +238,17 @@
             </p>
             <div class="cpa-resolution-warning" role="note">
               Draft and research choices document the audit trail without changing calculations. For a missing-basis sale,
-              <strong>Apply CPA Resolution To Calculations</strong> creates an identified basis-adjustment lot, links it to
-              this exact sale, refreshes Form 8949 output, and preserves the cited professional workpaper.
+              Gainz first previews the exact effect. Applying the confirmed treatment then creates an identified
+              basis-adjustment lot, links it only to this sale, refreshes Form 8949 output, and preserves the workpaper.
             </div>
             {% if item.blocker_type == 'Missing acquisition basis' %}
             <div class="cpa-resolution-conservative" role="note">
-              <strong>Worst-case fallback when acquisition records truly cannot be found</strong>
+              <strong>Conservative fallback when acquisition records truly cannot be found</strong>
               <p>
-                A reviewing CPA, EA, or tax professional can apply supported proceeds with $0 adjusted basis and a
-                short-term holding-period assumption to this exact unresolved quantity. Gainz leaves the unknown
-                acquisition date blank in reports and records that the treatment may overstate tax. This is a documented
-                professional assumption, not a recovered transaction fact.
+                You can record a named CPA, EA, or tax professional's direction to apply supported proceeds with $0
+                adjusted basis and a short-term holding-period assumption to this exact unresolved quantity. Gainz leaves
+                the unknown acquisition date blank and states that the treatment may overstate tax. Gainz records what the
+                user entered; it does not verify the professional's identity or credentials.
               </p>
             </div>
             {% endif %}
@@ -234,6 +290,9 @@
                   placeholder="0.00"
                 >
                 <small class="form-text text-muted">For a market valuation, multiply the unresolved quantity shown below by the supported disposition-date price.</small>
+                {% if item.proceeds_allocation_explanation %}
+                <small class="form-text gainz-derived-value-note">{{ item.proceeds_allocation_explanation }}</small>
+                {% endif %}
               </div>
               <div class="form-group">
                 <label for="guided_review_basis_method">Adjusted basis method</label>
@@ -276,7 +335,7 @@
                   class="form-control"
                   value="{{ item.acquisition_date }}"
                 >
-                <small class="form-text text-muted">Required for a documented-date resolution. Leave blank for the CPA-directed short-term assumption.</small>
+                <small class="form-text text-muted">Required for a documented-date resolution. Leave blank for the recorded short-term assumption.</small>
               </div>
               <div class="form-group">
                 <label>Quantity this resolution will link</label>
@@ -296,7 +355,7 @@
                 >
               </div>
               <div class="form-group">
-                <label for="guided_review_reviewer_name">Reviewer name</label>
+                <label for="guided_review_reviewer_name">Professional name recorded by user</label>
                 <input
                   id="guided_review_reviewer_name"
                   name="reviewer_name"
@@ -314,6 +373,49 @@
                   {% endfor %}
                 </select>
               </div>
+              <div class="form-group">
+                <label for="guided_review_direction_date">Professional direction date</label>
+                <input
+                  id="guided_review_direction_date"
+                  name="direction_date"
+                  type="date"
+                  class="form-control"
+                  value="{{ item.direction_date }}"
+                >
+              </div>
+              <div class="form-group">
+                <label for="guided_review_direction_entered_by">Direction entered into Gainz by</label>
+                <input
+                  id="guided_review_direction_entered_by"
+                  name="direction_entered_by"
+                  type="text"
+                  class="form-control"
+                  value="{{ item.direction_entered_by }}"
+                  placeholder="Local Gainz user"
+                >
+              </div>
+              <div class="form-group">
+                <label for="guided_review_reviewer_credential">Credential stated by user (optional)</label>
+                <input
+                  id="guided_review_reviewer_credential"
+                  name="reviewer_credential"
+                  type="text"
+                  class="form-control"
+                  value="{{ item.reviewer_credential }}"
+                  placeholder="Example: CPA or EA"
+                >
+              </div>
+              <div class="form-group">
+                <label for="guided_review_reviewer_jurisdiction">Jurisdiction stated by user (optional)</label>
+                <input
+                  id="guided_review_reviewer_jurisdiction"
+                  name="reviewer_jurisdiction"
+                  type="text"
+                  class="form-control"
+                  value="{{ item.reviewer_jurisdiction }}"
+                  placeholder="Example: State or country"
+                >
+              </div>
             </div>
             <label class="cpa-resolution-attestation" for="guided_review_professional_attestation">
               <input
@@ -324,26 +426,60 @@
                 {% if item.professional_attestation %}checked{% endif %}
               >
               <span>
-                I confirm this treatment is supported by cited records or documented professional judgment; proceeds
-                and basis were determined separately; disposition-date market value was not reused as acquisition basis;
-                and any conservative short-term/$0-basis treatment is an explicit assumption that may overstate tax.
+                I am recording the named professional's direction. I confirm the treatment is supported by cited records
+                or documented professional judgment; proceeds and basis were determined separately; disposition-date
+                market value was not reused as acquisition basis; and any conservative short-term/$0-basis treatment is
+                an explicit assumption that may overstate tax. I understand Gainz does not verify professional credentials.
               </span>
             </label>
           </section>
+          <button type="submit" name="workflow_action" value="preview" class="btn btn-primary">
+            2. Review calculation impact
+          </button>
           {% endif %}
+          {% else %}
           <h3>Choose the resolution outcome</h3>
           <div class="guided-review-actions" role="group" aria-label="Review decisions">
             {% for choice in choices %}
-            <button
-              type="submit"
-              name="decision"
-              value="{{ choice.value }}"
-              class="btn {% if item.review_decision == choice.value or (item.blocker_type == 'Missing acquisition basis' and choice.value == 'resolved') %}btn-primary{% elif choice.value == 'conservative_max_gain' %}btn-warning{% else %}btn-outline-primary{% endif %}"
-            >
+            <button type="submit" name="decision" value="{{ choice.value }}" class="btn btn-outline-primary">
               {{ choice.label }}
             </button>
             {% endfor %}
           </div>
+          {% endif %}
+          {% if resolution_preview %}
+          <section class="gainz-resolution-receipt" aria-labelledby="resolution_impact_heading">
+            <span class="section-kicker">Calculation receipt</span>
+            <h3 id="resolution_impact_heading">Review impact before applying</h3>
+            <p><strong>{{ resolution_preview.decision_label }}</strong> for {{ resolution_preview.quantity }} {{ resolution_preview.asset }}.</p>
+            {% if resolution_preview.changes_calculations %}
+            <div class="gainz-resolution-source-values">
+              <span>Source gross <strong>${{ '%.2f'|format(resolution_preview.source_gross) }}</strong></span>
+              <span>Allocated fee <strong>${{ '%.2f'|format(resolution_preview.source_fee) }}</strong></span>
+              <span>Net proceeds <strong>${{ '%.2f'|format(resolution_preview.source_net) }}</strong></span>
+            </div>
+            <table class="table gainz-resolution-impact-table">
+              <thead><tr><th></th><th>Before</th><th>Change</th><th>After</th></tr></thead>
+              <tbody>
+                <tr><th>Proceeds</th><td>${{ '%.2f'|format(resolution_preview.before_proceeds) }}</td><td>+${{ '%.2f'|format(resolution_preview.added_proceeds) }}</td><td>${{ '%.2f'|format(resolution_preview.after_proceeds) }}</td></tr>
+                <tr><th>Cost basis</th><td>${{ '%.2f'|format(resolution_preview.before_basis) }}</td><td>+${{ '%.2f'|format(resolution_preview.added_basis) }}</td><td>${{ '%.2f'|format(resolution_preview.after_basis) }}</td></tr>
+                <tr><th>Gain / loss</th><td>${{ '%.2f'|format(resolution_preview.before_gain_loss) }}</td><td>${{ '%+.2f'|format(resolution_preview.added_gain_loss) }}</td><td>${{ '%.2f'|format(resolution_preview.after_gain_loss) }}</td></tr>
+              </tbody>
+            </table>
+            <p><strong>Holding-period treatment:</strong> {{ resolution_preview.term }}.</p>
+            {% else %}
+            <p>This selection records a review state and does not change Form 8949 calculations.</p>
+            {% endif %}
+            <p class="text-muted">{{ resolution_preview.credential_notice }}</p>
+            <label class="cpa-resolution-attestation">
+              <input type="checkbox" name="preview_confirmed" value="yes">
+              <span>I reviewed this before/after receipt and want Gainz to apply or record the selected treatment.</span>
+            </label>
+            <input type="hidden" name="preview_required" value="yes">
+            <input type="hidden" name="decision" value="{{ selected_decision }}">
+            <button type="submit" name="workflow_action" value="apply" class="btn btn-primary">3. Apply confirmed treatment</button>
+          </section>
+          {% endif %}
           <details class="guided-review-notes-details">
             <summary>Add notes before saving</summary>
             <div class="form-group mt-3">
@@ -477,19 +613,24 @@
     <div class="card">
       <div class="card-body">
         {% if total > 0 %}
-        <h2 class="gainz-section-title">All Queue Items Reviewed</h2>
+        <h2 class="gainz-section-title">No Undecided Queue Items Remain</h2>
         <p class="text-muted">
-          Every current work order item has a saved review decision. Generate or refresh the packet so those decisions appear in
-          the packet status files and reconciliation work order.
+          Every current work order item has a saved decision. Deferred items still remain visible as draft limitations;
+          generate or refresh the packet so the current state appears in its status files and reconciliation work order.
         </p>
         <div class="audit-readiness-grid">
           <div class="audit-readiness-item">
-            <span>Reviewed Items</span>
-            <strong>{{ reviewed_count }}</strong>
+            <span>Resolved Items</span>
+            <strong>{{ resolved_count }}</strong>
           </div>
           <div class="audit-readiness-item">
-            <span>Unreviewed Items</span>
+            <span>Unresolved Items</span>
             <strong>{{ unreviewed_count }}</strong>
+          </div>
+          <div class="audit-readiness-item">
+            <span>Deferred Items</span>
+            <strong>{{ deferred_count }}</strong>
+            <small>Still disclosed as research, draft, or professional follow-up.</small>
           </div>
           <div class="audit-readiness-item">
             <span>Next Step</span>
@@ -507,6 +648,37 @@
           <a class="btn btn-primary btn-round" href="{{ url_for('export_blueprint.index', guided=1) }}#packet_preview">Review packet preview</a>
           <a class="btn btn-outline-primary btn-round" href="{{ url_for('home_blueprint.index') }}">Back to Dashboard</a>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if applied_resolutions %}
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="gainz-section-title">Applied Resolution History</h2>
+        <p>Each applied adjustment has a saved calculation receipt and can be reversed without deleting the source transaction.</p>
+        {% for resolution in applied_resolutions %}
+        <section class="guided-review-panel">
+          <h3>{{ resolution.asset }}: {{ resolution.decision_label }}</h3>
+          <p>
+            Applied {{ resolution.resolution_applied_at or resolution.updated_at }}.
+            {% if resolution.receipt %}
+            Gain/loss changed from ${{ '%.2f'|format(resolution.receipt.before_gain_loss or 0) }}
+            to ${{ '%.2f'|format(resolution.receipt.actual_after_gain_loss or resolution.receipt.after_gain_loss or 0) }}.
+            {% endif %}
+          </p>
+          <form method="POST" action="{{ url_for('export_blueprint.review_queue_reverse') }}">
+            <input type="hidden" name="item_id" value="{{ resolution.item_id }}">
+            <label for="reversal_note_{{ loop.index }}">Reason for reversing</label>
+            <input id="reversal_note_{{ loop.index }}" name="reversal_note" type="text" class="form-control" placeholder="Example: corrected source records were imported">
+            <button type="submit" class="btn btn-outline-danger mt-2">Reverse this resolution</button>
+          </form>
+        </section>
+        {% endfor %}
       </div>
     </div>
   </div>

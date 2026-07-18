@@ -42,7 +42,7 @@ schema_type: SoftwareApplication
 
 ## Before You Run It
 
-Windows may show a SmartScreen warning and macOS may show an unidentified developer warning while Gainz is young because the packages are not code-signed yet. Only download Gainz from `cryptogainz.store` or the official GitHub repository. See [Windows SmartScreen Warning For Gainz]({{ '/guides/windows-smartscreen/' | relative_url }}) before clicking through the Windows warning.
+Windows may show a SmartScreen warning and macOS may show an operating-system trust prompt. Only download Gainz from `cryptogainz.store` or the official GitHub repository, then verify the published checksum. See [Windows SmartScreen Warning For Gainz]({{ '/guides/windows-smartscreen/' | relative_url }}) before continuing through a Windows warning.
 
 Gainz runs on your machine without requiring a hosted account, exchange API sync, wallet sync, or transaction-history upload. Imported CSVs, saves, exports, and audit packets stay local unless you choose to share them.
 

@@ -245,6 +245,26 @@ def _data_source_summary(transactions):
     import_warnings = getattr(transactions, "import_warnings", []) or []
     warning_rows = import_warning_review_rows(import_warnings, transactions=transactions)
     unresolved_warning_rows = unresolved_import_warning_rows(transactions)
+    all_economics_rows = get_import_economics_rows(transactions)
+    economics_rows = []
+    for row in reversed(all_economics_rows):
+        timestamp = row.get("date")
+        if hasattr(timestamp, "strftime"):
+            timestamp = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        trans_type = str(row.get("transaction_type") or "").lower()
+        economics_rows.append({
+            **row,
+            "date": str(timestamp or ""),
+            "source_file": _safe_filename(row.get("source_file")) or "Manual / Unknown",
+            "source_row": row.get("source_row") or "N/A",
+            "total_label": (
+                "Total cost"
+                if trans_type in {"buy", "receive"}
+                else "Net proceeds" if trans_type in {"sell", "send"} else "Net USD value"
+            ),
+        })
+        if len(economics_rows) >= 12:
+            break
 
     return {
         "transaction_count": len(getattr(transactions, "transactions", [])),
@@ -264,6 +284,13 @@ def _data_source_summary(transactions):
         "import_warning_rows": warning_rows,
         "unresolved_import_warning_rows": unresolved_warning_rows,
         "unresolved_import_warning_count": len(unresolved_warning_rows),
+        "import_economics_count": len(all_economics_rows),
+        "import_economics_warning_count": sum(
+            1
+            for row in all_economics_rows
+            if str(row.get("economic_warning") or "").strip()
+        ),
+        "import_economics_rows": economics_rows,
     }
 
 

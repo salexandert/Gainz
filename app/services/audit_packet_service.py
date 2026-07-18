@@ -16,6 +16,8 @@ from app.services.tax_evidence_service import (
 from app.services.tax_total_extraction_service import get_suggested_filed_totals
 from app.services.packet_plan_service import (
     cpa_resolution_workpaper_rows,
+    material_assumption_rows,
+    packet_review_status,
     reconciliation_work_order_markdown,
     reconciliation_work_order_rows,
     tax_evidence_packet_counts,
@@ -30,6 +32,7 @@ from utils import (
     get_current_holdings_lots,
     get_form_8949_report_rows,
     get_form_8949_totals,
+    get_import_economics_rows,
     get_missing_basis_review_rows,
     get_multi_asset_holdings_reconciliation_table_data,
     get_tax_filing_alignment_summary,
@@ -114,6 +117,7 @@ class AuditPacketService:
         if not readiness["is_ready"]:
             self._write_draft_not_ready_memo(packet_dir, readiness)
         self._write_methodology(packet_dir, transactions)
+        self._write_import_economics(packet_dir, transactions)
         self._write_tax_reports(packet_dir, transactions)
         self._write_tax_filing_alignment(packet_dir, transactions)
         self._write_tax_evidence_inventory(packet_dir, transactions)
@@ -202,7 +206,12 @@ class AuditPacketService:
 
     def _write_packet_status_files(self, packet_dir, readiness, manifest_rows, transactions):
         counts = self._manifest_evidence_counts(manifest_rows)
-        status = "FILING-READY REVIEW PACKET" if readiness["is_ready"] else "DRAFT - NOT FILING READY"
+        status = (
+            packet_review_status(True).upper()
+            if readiness["is_ready"]
+            else "DRAFT - NOT FILING READY"
+        )
+        assumptions = material_assumption_rows(transactions)
         status_lines = [
             "# Gainz Packet Status",
             "",
@@ -236,7 +245,7 @@ class AuditPacketService:
         ]
         applied_positions = [
             row for row in cpa_workpapers
-            if row.get("calculation_applied")
+            if row.get("calculation_applied") == "Yes"
         ]
         conservative_positions = [
             row for row in cpa_workpapers
@@ -261,10 +270,15 @@ class AuditPacketService:
             f"- Needs research: {work_order_summary.get('needs_research_count', 0)}",
             f"- Leave unresolved for draft only: {work_order_summary.get('ignored_for_draft_count', 0)}",
             f"- Sent to CPA: {work_order_summary.get('sent_to_cpa_count', 0)}",
-            f"- Items with CPA resolution details: {len(cpa_workpapers)}",
-            f"- CPA-reviewed filing positions: {len(cpa_reviewed_positions)}",
-            f"- CPA resolutions applied to calculations: {len(applied_positions)}",
+            f"- Items with professional resolution details: {len(cpa_workpapers)}",
+            f"- Professional directions recorded by user: {len(cpa_reviewed_positions)}",
+            f"- Professional resolutions applied to calculations: {len(applied_positions)}",
         ])
+        status_lines.extend(["", "## Material Calculation Inputs And Assumptions", ""])
+        status_lines.extend(
+            [f"- **{row['title']}** ({row['status']}): {row['detail']}" for row in assumptions]
+            or ["- None recorded"]
+        )
         status_lines.extend([
             "",
             "## Important",
@@ -289,6 +303,7 @@ class AuditPacketService:
             "4. Open `PRIVACY_AND_EVIDENCE_HANDLING.md` before sharing the packet.",
             "5. Review `01_reports/reconciliation_work_order.csv` for the itemized work queue.",
             "6. Review `01_reports/unknown_gap_memos.md` for unresolved items that are documented for research or CPA review.",
+            "7. Review `01_reports/import_economics.csv` for gross values, fees, and net tax amounts preserved from source files.",
             "",
             "## Folder Map",
             "",
@@ -306,16 +321,30 @@ class AuditPacketService:
             "",
             "Reference-only evidence is listed for review but is not copied into this packet.",
             "",
+            "## Material Inputs And Assumptions",
+            "",
+        ]
+        readme_lines.extend(
+            [f"- **{row['title']}** ({row['status']}): {row['detail']}" for row in assumptions]
+            or ["- None recorded"]
+        )
+        readme_lines.extend([
+            "",
             "Gainz is documentation support only. It is not legal, financial, accounting, filing, or tax advice.",
             "If sharing this packet with a tax professional, start with `FOR_CPAS.md`.",
             "",
-        ]
+        ])
         (packet_dir / "README_FIRST.md").write_text("\n".join(readme_lines), encoding="utf-8")
         (packet_dir / "PACKET_STATUS.md").write_text("\n".join(status_lines), encoding="utf-8")
 
     def _write_cpa_handoff(self, packet_dir, readiness, manifest_rows, transactions):
         counts = self._manifest_evidence_counts(manifest_rows)
-        status = "FILING-READY REVIEW PACKET" if readiness["is_ready"] else "DRAFT - NOT FILING READY"
+        status = (
+            packet_review_status(True).upper()
+            if readiness["is_ready"]
+            else "DRAFT - NOT FILING READY"
+        )
+        assumptions = material_assumption_rows(transactions)
         assets = ", ".join(sorted(transactions.assets)) if transactions.assets else "None"
         lines = [
             "# CPA Handoff",
@@ -347,16 +376,31 @@ class AuditPacketService:
             "1. Open `README_FIRST.md` or `PACKET_STATUS.md` for readiness and open blockers.",
             "2. Review `01_reports/reconciliation_work_order.csv` for the itemized work queue.",
             "3. Review Form 8949-style detail and totals in the workbook and CSV reports.",
-            "4. Review source files and evidence references before relying on generated totals.",
+            "4. Review `01_reports/import_economics.csv` for gross values, fees, and net tax amounts.",
+            "5. Review source files and evidence references before relying on generated totals.",
+            "",
+            "## Material Inputs And Assumptions",
+            "",
+        ]
+        lines.extend(
+            [f"- **{row['title']}** ({row['status']}): {row['detail']}" for row in assumptions]
+            or ["- None recorded"]
+        )
+        lines.extend([
             "",
             "Gainz is documentation support only. It is not legal, financial, accounting, filing, or tax advice.",
             "",
-        ]
+        ])
         (packet_dir / "CPA_HANDOFF.md").write_text("\n".join(lines), encoding="utf-8")
 
     def _write_for_cpas(self, packet_dir, readiness, manifest_rows, transactions):
         counts = self._manifest_evidence_counts(manifest_rows)
-        status = "FILING-READY REVIEW PACKET" if readiness["is_ready"] else "DRAFT - NOT FILING READY"
+        status = (
+            packet_review_status(True).upper()
+            if readiness["is_ready"]
+            else "DRAFT - NOT FILING READY"
+        )
+        assumptions = material_assumption_rows(transactions)
         assets = ", ".join(sorted(transactions.assets)) if transactions.assets else "None"
         lines = [
             "# For CPAs",
@@ -378,11 +422,12 @@ class AuditPacketService:
             "1. `PACKET_STATUS.md` for readiness, blockers, warnings, and evidence counts.",
             "2. `01_reports/reconciliation_work_order.csv` for the itemized unresolved work queue.",
             "3. `01_reports/cpa_resolution_workpapers.csv` for separately documented event, proceeds, basis, evidence, and reviewer fields.",
-            "4. `01_reports/unknown_gap_memos.md` for documented unknowns, user notes, candidate explanations, and CPA questions.",
-            "5. `01_reports/tax_filing_alignment.csv` for calculated totals compared with user-entered filed totals.",
-            "6. `01_reports/form_8949_totals.csv` and the Form 8949 detail CSVs for proceeds, basis, and gain/loss.",
-            "7. `01_reports/holdings_reconciliation.csv` and `01_reports/current_holdings_lots.csv` for holdings explanation.",
-            "8. `03_manifests/evidence_manifest.csv` for copied files, reference-only evidence, missing paths, and hashes.",
+            "4. `01_reports/import_economics.csv` for source gross values, fees, and net tax amounts.",
+            "5. `01_reports/unknown_gap_memos.md` for documented unknowns, user notes, candidate explanations, and CPA questions.",
+            "6. `01_reports/tax_filing_alignment.csv` for calculated totals compared with user-entered filed totals.",
+            "7. `01_reports/form_8949_totals.csv` and the Form 8949 detail CSVs for proceeds, basis, and gain/loss.",
+            "8. `01_reports/holdings_reconciliation.csv` and `01_reports/current_holdings_lots.csv` for holdings explanation.",
+            "9. `03_manifests/evidence_manifest.csv` for copied files, reference-only evidence, missing paths, and hashes.",
             "",
             "## Evidence Handling",
             "",
@@ -393,6 +438,15 @@ class AuditPacketService:
             "",
             "Reference-only tax evidence records list a local path or label but do not include the file in this packet.",
             "Copied files are present in `02_source_files/` and are listed with hashes in the evidence manifest.",
+            "",
+            "## Material Inputs And Assumptions",
+            "",
+        ]
+        lines.extend(
+            [f"- **{row['title']}** ({row['status']}): {row['detail']}" for row in assumptions]
+            or ["- None recorded"]
+        )
+        lines.extend([
             "",
             "## Items That Commonly Need Professional Judgment",
             "",
@@ -410,7 +464,7 @@ class AuditPacketService:
             "- Which reference-only evidence files should be copied or shared for professional review?",
             "- Are any unresolved review decisions intentionally left for draft discussion rather than filing support?",
             "",
-        ]
+        ])
         (packet_dir / "FOR_CPAS.md").write_text("\n".join(lines), encoding="utf-8")
 
     def _write_privacy_and_evidence_handling(self, packet_dir, manifest_rows):
@@ -538,6 +592,8 @@ class AuditPacketService:
             "This packet was generated locally by Gainz.",
             "",
             "Gainz links sale records to earlier buy lots according to the user's selected method. Unlinked sells, unexplained sends, and unexplained receives should be reviewed against source records before using generated reports.",
+            "Imported USD fees are included in disposal proceeds or acquisition cost when the source file provides them. `01_reports/import_economics.csv` shows source gross, fee, and net values.",
+            "Any user-recorded professional calculation treatment is item-specific, shown in the professional resolution workpaper, accompanied by a before/after receipt, and reversible in Gainz.",
             "",
             f"Transaction count: {len(transactions.transactions)}",
             f"Assets: {assets}",
@@ -592,6 +648,41 @@ class AuditPacketService:
             json.dumps(totals, indent=2),
             encoding="utf-8",
         )
+
+    def _write_import_economics(self, packet_dir, transactions):
+        rows = get_import_economics_rows(transactions)
+        fieldnames = [
+            "source_file",
+            "source_row",
+            "source_transaction_id",
+            "date",
+            "transaction_type",
+            "asset",
+            "quantity",
+            "usd_spot",
+            "gross_usd",
+            "fee_usd",
+            "source_fee_amount",
+            "fee_currency",
+            "net_tax_usd",
+            "economic_source",
+            "economic_warning",
+            "source_notes",
+        ]
+        with open(packet_dir / "01_reports" / "import_economics.csv", "w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                output = dict(row)
+                output["date"] = self._format_datetime(row.get("date"))
+                for field in ("usd_spot", "gross_usd", "fee_usd", "net_tax_usd"):
+                    value = row.get(field)
+                    output[field] = "" if value is None else f"{float(value):.2f}"
+                source_fee_amount = row.get("source_fee_amount")
+                output["source_fee_amount"] = (
+                    "" if source_fee_amount is None else f"{float(source_fee_amount):.8f}"
+                )
+                writer.writerow(output)
 
     def _write_tax_filing_alignment(self, packet_dir, transactions):
         alignment = get_tax_filing_alignment_summary(transactions)
@@ -921,6 +1012,10 @@ class AuditPacketService:
             "reviewer_name",
             "reviewer_role",
             "reviewer_role_label",
+            "direction_date",
+            "direction_entered_by",
+            "reviewer_credential",
+            "reviewer_jurisdiction",
             "event_classification",
             "event_classification_label",
             "proceeds_method",
@@ -979,6 +1074,10 @@ class AuditPacketService:
             "resolution_status_label",
             "reviewer_name",
             "reviewer_role_label",
+            "direction_date",
+            "direction_entered_by",
+            "reviewer_credential",
+            "reviewer_jurisdiction",
             "event_classification_label",
             "proceeds_method_label",
             "proceeds_value",
@@ -993,6 +1092,10 @@ class AuditPacketService:
             "calculation_applied",
             "target_transaction_uid",
             "adjustment_transaction_uid",
+            "calculation_receipt_json",
+            "resolution_applied_at",
+            "resolution_reversed_at",
+            "reversal_note",
             "review_note",
             "cpa_question",
             "review_updated_at",
@@ -1094,6 +1197,7 @@ class AuditPacketService:
             "reconciliation_checklist": readiness["checklist"],
             "work_order_review_summary": readiness.get("work_order_review_summary", {}),
             "reconciliation_work_order_rows": reconciliation_work_order_rows(readiness, transactions),
+            "material_assumptions": material_assumption_rows(transactions),
         }
         (packet_dir / "03_manifests" / "audit_packet_summary.json").write_text(
             json.dumps(summary, indent=2),

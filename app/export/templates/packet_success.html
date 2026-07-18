@@ -56,7 +56,7 @@
         <div class="audit-readiness-grid">
           <div class="audit-readiness-item">
             <span>Status</span>
-            <strong>{% if packet.is_draft %}Draft{% else %}Ready{% endif %}</strong>
+            <strong>{% if packet.is_draft %}Draft{% else %}Reconciliation complete{% endif %}</strong>
           </div>
           <div class="audit-readiness-item">
             <span>Copied Files</span>
@@ -98,6 +98,21 @@
         <div class="alert alert-success" role="status">
           No unresolved blocker groups were recorded in the packet summary.
         </div>
+        {% endif %}
+
+        <h3 class="gainz-subsection-title">Material Inputs And Assumptions</h3>
+        {% if packet.material_assumptions %}
+        <div class="gainz-assumption-list">
+          {% for assumption in packet.material_assumptions %}
+          <article>
+            <span>{{ assumption.category }} · {{ assumption.status }}</span>
+            <strong>{{ assumption.title }}</strong>
+            <p>{{ assumption.detail }}</p>
+          </article>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">No material calculation assumptions were recorded.</p>
         {% endif %}
       </div>
     </div>

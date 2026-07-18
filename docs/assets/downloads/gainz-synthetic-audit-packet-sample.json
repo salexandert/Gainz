@@ -1,0 +1,14 @@
+{
+  "version": "0.2.43",
+  "generated_date": "2026-07-18",
+  "sha256": "af66034015d41a081dd862b93dcb1ece88463c0fd01fe9ca5cc26f337001e670",
+  "scenario": "Synthetic partial-basis BCH sale with a fee-inclusive Coinbase import, documented FIFO basis first, and an exact professional-directed conservative treatment for the unsupported remainder.",
+  "totals": {
+    "proceeds": 495.0,
+    "cost_basis": 25.5,
+    "gain_loss": 469.5,
+    "short_term_gain_loss": 297.0,
+    "long_term_gain_loss": 172.5,
+    "source_fees": 5.5
+  }
+}

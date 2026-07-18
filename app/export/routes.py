@@ -1,5 +1,6 @@
 import csv
 import datetime
+import hashlib
 import json
 import os
 import subprocess
@@ -9,7 +10,7 @@ from pathlib import Path
 
 from . import blueprint
 from flask import render_template, request, jsonify, current_app, redirect, session, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 from utils import *
 from app.services.export_service import ExportService
 from app.services.audit_packet_service import AuditPacketService
@@ -24,6 +25,7 @@ from app.services.packet_plan_service import (
     WORK_ORDER_REVIEW_DECISIONS,
     cpa_resolution_choices,
     get_packet_preview,
+    packet_review_status,
     reconciliation_work_order_rows,
     work_order_review_choices,
 )
@@ -105,6 +107,7 @@ def _optional_money(value, label):
 
 
 def _cpa_resolution_details(source):
+    entered_by = str(getattr(current_user, "username", "") or "").strip()
     proceeds_value, proceeds_error = _optional_money(
         source.get("proceeds_value"),
         "proceeds or amount realized for the unresolved quantity",
@@ -118,6 +121,12 @@ def _cpa_resolution_details(source):
     details = {
         "reviewer_name": str(source.get("reviewer_name") or "").strip(),
         "reviewer_role": str(source.get("reviewer_role") or "").strip(),
+        "direction_date": str(source.get("direction_date") or datetime.date.today().isoformat()).strip(),
+        "direction_entered_by": str(
+            source.get("direction_entered_by") or entered_by or "Local Gainz user"
+        ).strip(),
+        "reviewer_credential": str(source.get("reviewer_credential") or "").strip(),
+        "reviewer_jurisdiction": str(source.get("reviewer_jurisdiction") or "").strip(),
         "event_classification": str(source.get("event_classification") or "").strip(),
         "proceeds_method": str(source.get("proceeds_method") or "").strip(),
         "proceeds_value": proceeds_value,
@@ -135,7 +144,7 @@ def _cpa_resolution_details(source):
     return details, error
 
 
-def _validate_cpa_resolution(item, decision, details, note=""):
+def _validate_cpa_resolution(item, decision, details, note="", for_preview=False):
     choice_sets = (
         ("reviewer_role", CPA_REVIEWER_ROLES, "reviewer role"),
         ("event_classification", CPA_EVENT_CLASSIFICATIONS, "event classification"),
@@ -189,7 +198,7 @@ def _validate_cpa_resolution(item, decision, details, note=""):
         if not details["proceeds_value"]:
             return "Enter supported proceeds or amount realized for the unresolved quantity in U.S. dollars."
         if not details["evidence_reference"] and not note:
-            return "Cite the records checked, valuation source, and CPA workpaper supporting this assumption."
+            return "Cite the records checked, valuation source, and professional workpaper supporting this assumption."
         details["basis_method"] = "unknown_zero_for_review"
         details["basis_value"] = "0.00"
         details["acquisition_date_method"] = "cpa_conservative_short_term"
@@ -215,11 +224,19 @@ def _validate_cpa_resolution(item, decision, details, note=""):
 
     if details["resolution_status"] == "cpa_reviewed_position":
         if details["reviewer_role"] != "cpa_ea_tax_professional":
-            return "A CPA-reviewed filing position requires the CPA, EA, or tax professional reviewer role."
+            return "Recorded professional direction requires the CPA, EA, or tax professional reviewer role."
         if not details["reviewer_name"]:
             return "Enter the reviewing professional's name."
         if not details["professional_attestation"]:
-            return "Confirm the professional-review statement before recording a filing position."
+            return "Confirm that you are recording the named professional's direction."
+        if not details["direction_date"]:
+            return "Enter the date of the professional direction."
+        try:
+            datetime.date.fromisoformat(details["direction_date"])
+        except ValueError:
+            return "Enter a valid professional direction date."
+        if not details["direction_entered_by"]:
+            return "Record who entered the professional direction into Gainz."
         if not details["evidence_reference"]:
             return "Cite the evidence or workpaper supporting the filing position."
         if details["event_classification"] in {"", "unknown"}:
@@ -234,8 +251,8 @@ def _validate_cpa_resolution(item, decision, details, note=""):
                     return "Enter the supported total adjusted basis."
 
     if decision in {"resolved", "conservative_max_gain"} and item.get("blocker_type") == "Missing acquisition basis":
-        if details["resolution_status"] != "cpa_reviewed_position":
-            return "Choose CPA-reviewed filing position before applying this resolution to calculations."
+        if not for_preview and details["resolution_status"] != "cpa_reviewed_position":
+            return "Choose Professional direction recorded by user before applying this resolution to calculations."
         if details["event_classification"] not in {
             "cash_sale",
             "crypto_exchange",
@@ -253,7 +270,7 @@ def _validate_cpa_resolution(item, decision, details, note=""):
             "specific_identification",
         }:
             return (
-                "Choose the CPA-approved basis adjustment method. Import or link actual lots instead "
+                "Choose the professionally directed basis adjustment method. Import or link actual lots instead "
                 "when using FIFO or specific identification."
             )
         if details["basis_method"] in {"actual_zero_basis", "unknown_zero_for_review"}:
@@ -262,7 +279,7 @@ def _validate_cpa_resolution(item, decision, details, note=""):
             return "Enter the adjusted basis for the unresolved quantity."
         if details["acquisition_date_method"] == "cpa_conservative_short_term":
             if details["basis_method"] != "unknown_zero_for_review" or details["basis_value"] != "0.00":
-                return "The conservative short-term assumption must use the CPA-directed $0-basis method."
+                return "The conservative short-term assumption must use the recorded $0-basis method."
             if not details["assumption_disclosure"]:
                 details["assumption_disclosure"] = CONSERVATIVE_MAX_GAIN_DISCLOSURE
         else:
@@ -296,10 +313,130 @@ def _work_order_context_fields(item):
     }
 
 
+def _resolution_impact_preview(transactions, item, decision, details):
+    totals_before = get_form_8949_totals(transactions)["total"]
+    changes_calculations = (
+        decision in {"resolved", "conservative_max_gain"}
+        and item.get("blocker_type") == "Missing acquisition basis"
+    )
+    proceeds = float(details.get("proceeds_value") or 0.0)
+    basis = float(details.get("basis_value") or 0.0)
+    gain_loss = proceeds - basis
+    target_sell = next(
+        (
+            transaction
+            for transaction in transactions
+            if transaction.uid == item.get("target_transaction_uid")
+            and transaction.trans_type == "sell"
+        ),
+        None,
+    )
+    source_fee = 0.0
+    source_gross = 0.0
+    source_net = 0.0
+    if target_sell is not None:
+        quantity = float(item.get("quantity") or 0.0)
+        source_fee = target_sell.prorated_fee_usd(quantity)
+        source_gross = target_sell.prorated_gross_usd(quantity)
+        source_net = target_sell.prorated_tax_usd(quantity)
+
+    added_proceeds = proceeds if changes_calculations else 0.0
+    added_basis = basis if changes_calculations else 0.0
+    added_gain_loss = gain_loss if changes_calculations else 0.0
+    return {
+        "changes_calculations": changes_calculations,
+        "decision": decision,
+        "decision_label": WORK_ORDER_REVIEW_DECISIONS.get(decision, decision),
+        "asset": item.get("asset", ""),
+        "quantity": item.get("quantity", ""),
+        "source_file": item.get("source_file", ""),
+        "source_gross": source_gross,
+        "source_fee": source_fee,
+        "source_net": source_net,
+        "added_proceeds": added_proceeds,
+        "added_basis": added_basis,
+        "added_gain_loss": added_gain_loss,
+        "before_proceeds": totals_before["proceeds"],
+        "before_basis": totals_before["cost_basis"],
+        "before_gain_loss": totals_before["gain_loss"],
+        "after_proceeds": totals_before["proceeds"] + added_proceeds,
+        "after_basis": totals_before["cost_basis"] + added_basis,
+        "after_gain_loss": totals_before["gain_loss"] + added_gain_loss,
+        "term": (
+            "Short-term assumption"
+            if details.get("acquisition_date_method") == "cpa_conservative_short_term"
+            else "Based on recorded acquisition date"
+        ),
+        "assumption_disclosure": details.get("assumption_disclosure", ""),
+        "evidence_reference": details.get("evidence_reference", ""),
+        "reviewer_name": details.get("reviewer_name", ""),
+        "direction_date": details.get("direction_date", ""),
+        "direction_entered_by": details.get("direction_entered_by", ""),
+        "reviewer_credential": details.get("reviewer_credential", ""),
+        "reviewer_jurisdiction": details.get("reviewer_jurisdiction", ""),
+        "credential_notice": (
+            "Professional name, role, credential, jurisdiction, and direction are entered by the user. Gainz does not verify them."
+        ),
+    }
+
+
+def _resolution_preview_fingerprint(item, decision, details, note="", cpa_question=""):
+    payload = {
+        "item_id": str(item.get("item_id") or ""),
+        "target_transaction_uid": str(item.get("target_transaction_uid") or ""),
+        "quantity": str(item.get("quantity") or ""),
+        "decision": str(decision or ""),
+        "details": {key: str(value or "") for key, value in sorted(details.items())},
+        "note": str(note or ""),
+        "cpa_question": str(cpa_question or ""),
+    }
+    serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _resolution_form_context(transactions, item_id, decision, details=None, note="", cpa_question=""):
+    context = _review_queue_context(transactions, item_id=item_id)
+    context["selected_decision"] = decision
+    context["selected_decision_label"] = WORK_ORDER_REVIEW_DECISIONS.get(decision, decision)
+    if context.get("item") is None:
+        return context
+
+    item = context["item"]
+    for field, value in (details or {}).items():
+        if value not in (None, ""):
+            item[field] = value
+    item["review_note"] = note
+    item["cpa_question"] = cpa_question
+
+    if decision == "conservative_max_gain":
+        item["event_classification"] = "conservative_unknown_disposition"
+        item["basis_method"] = "unknown_zero_for_review"
+        item["basis_value"] = "0.00"
+        item["acquisition_date_method"] = "cpa_conservative_short_term"
+        item["acquisition_date"] = ""
+        item["assumption_disclosure"] = CONSERVATIVE_MAX_GAIN_DISCLOSURE
+        item["resolution_status"] = "cpa_reviewed_position"
+    elif decision == "zero_basis_cpa_review":
+        item["basis_method"] = "unknown_zero_for_review"
+        item["basis_value"] = "0.00"
+        item["resolution_status"] = "prepared_for_cpa"
+    elif decision == "fork_airdrop_basis":
+        item["basis_method"] = item.get("basis_method") or "fork_airdrop_supported"
+    elif decision == "already_in_filed_totals":
+        item["resolution_status"] = item.get("resolution_status") or "previously_filed"
+    elif decision in {"needs_research", "ignored_for_draft"}:
+        item["resolution_status"] = item.get("resolution_status") or "draft_research"
+    elif decision == "sent_to_cpa":
+        item["resolution_status"] = item.get("resolution_status") or "prepared_for_cpa"
+
+    return context
+
+
 def _apply_cpa_calculation_resolution(transactions, item, item_id, decision, details):
     if decision not in {"resolved", "conservative_max_gain"} or item.get("blocker_type") != "Missing acquisition basis":
         return ""
 
+    receipt_before = _resolution_impact_preview(transactions, item, decision, details)
     try:
         adjustment_buy, _link = transactions.apply_cpa_basis_resolution(
             target_sell_uid=item.get("target_transaction_uid"),
@@ -315,12 +452,21 @@ def _apply_cpa_calculation_resolution(transactions, item, item_id, decision, det
     except (TypeError, ValueError):
         current_app.logger.exception("CPA calculation resolution could not be applied")
         return (
-            "Gainz could not apply this CPA resolution. Check the selected sale, "
+            "Gainz could not apply this professional resolution. Check the selected sale, "
             "unresolved quantity, acquisition date, and USD values, then try again."
         )
 
     details["calculation_applied"] = "Yes"
     details["adjustment_transaction_uid"] = adjustment_buy.uid
+    receipt_after = _resolution_impact_preview(transactions, item, decision, details)
+    receipt = dict(receipt_before)
+    receipt["actual_after_proceeds"] = receipt_after["before_proceeds"]
+    receipt["actual_after_basis"] = receipt_after["before_basis"]
+    receipt["actual_after_gain_loss"] = receipt_after["before_gain_loss"]
+    details["calculation_receipt_json"] = json.dumps(receipt, sort_keys=True)
+    details["resolution_applied_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    details["resolution_reversed_at"] = ""
+    details["reversal_note"] = ""
     return ""
 
 
@@ -544,10 +690,11 @@ def _professional_review_options(row):
                 ),
             ),
             (
-                "Apply a CPA-reviewed basis adjustment",
+                "Apply a professionally directed basis adjustment",
                 (
                     "When records cannot be reconstructed, the CPA can document a supported acquisition date, proceeds, "
-                    "basis treatment, and workpaper. Gainz can then apply that exact resolution to the sale and Form 8949 output."
+                    "basis treatment, and workpaper. Gainz can then apply that exact resolution to the sale and Form 8949 output. "
+                    "The user records the direction; Gainz does not verify the professional's identity or credentials."
                 ),
             ),
             (
@@ -708,7 +855,7 @@ def _review_queue_choices_for_item(row):
             "zero_basis_cpa_review": "Document conservative $0 basis for CPA review",
             "conservative_max_gain": "Apply conservative $0-basis short-term treatment",
             "sent_to_cpa": f"Send this {asset} gap to CPA",
-            "resolved": "Apply CPA Resolution To Calculations",
+            "resolved": "Apply Professional-Directed Treatment",
         },
         "Holdings explanation needed": {
             "import_missing_records": "I will import missing records",
@@ -747,7 +894,11 @@ def _review_queue_context(transactions, item_id=""):
     if current is None:
         current = unreviewed[0] if unreviewed else None
 
-    index = rows.index(current) + 1 if current in rows else 0
+    index = (
+        unreviewed.index(current) + 1
+        if current in unreviewed
+        else rows.index(current) + 1 if current in rows else 0
+    )
     next_item = None
     if current and unreviewed:
         current_position = rows.index(current)
@@ -771,6 +922,12 @@ def _review_queue_context(transactions, item_id=""):
             "Missing acquisition basis",
             "Holdings explanation needed",
         }
+        if current["show_cpa_resolution"]:
+            current["direction_date"] = current.get("direction_date") or datetime.date.today().isoformat()
+            entered_by = str(getattr(current_user, "username", "") or "").strip()
+            current["direction_entered_by"] = (
+                current.get("direction_entered_by") or entered_by or "Local Gainz user"
+            )
         if current.get("blocker_type") == "Missing acquisition basis":
             target_sell = next(
                 (
@@ -783,11 +940,56 @@ def _review_queue_context(transactions, item_id=""):
             )
             if target_sell is not None:
                 unresolved_quantity = float(current.get("quantity") or 0)
-                current["source_proceeds_value"] = f"{target_sell.usd_spot * unresolved_quantity:.2f}"
+                transaction_quantity = float(target_sell.quantity or 0)
+                supported_links = [
+                    link
+                    for link in getattr(target_sell, "links", []) or []
+                    if getattr(link, "sell", None) is target_sell
+                ]
+                supported_quantity = sum(float(link.quantity or 0) for link in supported_links)
+                supported_proceeds = sum(float(link.proceeds or 0) for link in supported_links)
+                supported_basis = sum(float(link.cost_basis or 0) for link in supported_links)
+                supported_gain_loss = supported_proceeds - supported_basis
+                full_gross = float(target_sell.gross_usd_total or 0)
+                full_fee = float(target_sell.prorated_fee_usd(transaction_quantity) or 0)
+                full_net = float(target_sell.tax_usd_total or 0)
+                unresolved_proceeds = float(target_sell.prorated_tax_usd(unresolved_quantity) or 0)
+                unresolved_fee = float(target_sell.prorated_fee_usd(unresolved_quantity) or 0)
+                current["sale_split"] = {
+                    "full_quantity": transaction_quantity,
+                    "full_gross": full_gross,
+                    "full_fee": full_fee,
+                    "full_net": full_net,
+                    "supported_quantity": supported_quantity,
+                    "supported_proceeds": supported_proceeds,
+                    "supported_basis": supported_basis,
+                    "supported_gain_loss": supported_gain_loss,
+                    "unresolved_quantity": unresolved_quantity,
+                    "unresolved_proceeds": unresolved_proceeds,
+                    "unresolved_fee": unresolved_fee,
+                }
+                current["source_proceeds_value"] = f"{target_sell.prorated_tax_usd(unresolved_quantity):.2f}"
                 if not current.get("proceeds_value"):
                     current["proceeds_value"] = current["source_proceeds_value"]
                 if not current.get("proceeds_method"):
-                    current["proceeds_method"] = "source_reported"
+                    current["proceeds_method"] = (
+                        "allocated_source_value"
+                        if unresolved_quantity + 0.00000001 < transaction_quantity
+                        else "source_reported"
+                    )
+                if unresolved_quantity + 0.00000001 < transaction_quantity:
+                    current["proceeds_allocation_explanation"] = (
+                        f"Calculated suggestion: {unresolved_quantity:.8f} {target_sell.symbol} / "
+                        f"{transaction_quantity:.8f} {target_sell.symbol} x ${full_net:.2f} imported net "
+                        f"proceeds = ${unresolved_proceeds:.2f}. This is a proportional allocation from "
+                        "the source transaction, not a separately source-reported amount. Confirm it "
+                        "before applying a treatment."
+                    )
+                else:
+                    current["proceeds_allocation_explanation"] = (
+                        f"The imported source transaction reports ${full_net:.2f} of net proceeds "
+                        f"after ${full_fee:.2f} of fees for this full quantity."
+                    )
                 if not current.get("acquisition_date_method"):
                     current["acquisition_date_method"] = "documented_date"
         choices = _review_queue_choices_for_item(current)
@@ -795,16 +997,59 @@ def _review_queue_context(transactions, item_id=""):
     else:
         choices = work_order_review_choices()
 
+    applied_resolutions = []
+    for review in getattr(transactions, "work_order_reviews", []) or []:
+        if str(review.get("calculation_applied") or "") != "Yes":
+            continue
+        receipt = {}
+        try:
+            receipt = json.loads(review.get("calculation_receipt_json") or "{}")
+        except (TypeError, ValueError):
+            receipt = {}
+        applied_resolutions.append({
+            **review,
+            "decision_label": WORK_ORDER_REVIEW_DECISIONS.get(review.get("decision"), review.get("decision", "")),
+            "receipt": receipt,
+        })
+
+    active_ids = {str(row.get("item_id") or "") for row in rows}
+    review_records = {
+        str(review.get("item_id") or ""): review
+        for review in getattr(transactions, "work_order_reviews", []) or []
+        if str(review.get("item_id") or "")
+    }
+    stable_ids = active_ids | set(review_records)
+    resolved_ids = set()
+    deferred_ids = set()
+    unresolved_ids = {
+        str(row.get("item_id") or "")
+        for row in rows
+        if not row.get("review_decision")
+    }
+    for stable_item_id in stable_ids:
+        review = review_records.get(stable_item_id) or {}
+        decision = str(review.get("decision") or "")
+        if str(review.get("calculation_applied") or "") == "Yes":
+            resolved_ids.add(stable_item_id)
+        elif stable_item_id not in active_ids and decision:
+            resolved_ids.add(stable_item_id)
+        elif stable_item_id in active_ids and decision:
+            deferred_ids.add(stable_item_id)
+
     return {
         "rows": rows,
         "item": current,
         "index": index,
-        "total": len(rows),
-        "unreviewed_count": len(unreviewed),
-        "reviewed_count": len(rows) - len(unreviewed),
+        "total": len(stable_ids),
+        "active_total": len(rows),
+        "unreviewed_count": len(unresolved_ids),
+        "reviewed_count": len(resolved_ids) + len(deferred_ids),
+        "resolved_count": len(resolved_ids),
+        "deferred_count": len(deferred_ids),
         "next_item_id": next_item.get("item_id") if next_item else "",
         "choices": choices,
         "cpa_resolution_choices": cpa_resolution_choices(),
+        "applied_resolutions": applied_resolutions,
     }
 
 
@@ -872,7 +1117,7 @@ def _packet_success_context(packet_path):
         "packet_name": packet_path.name,
         "readme_first_path": str(packet_path / "README_FIRST.md"),
         "packet_exists": packet_path.exists() and packet_path.is_dir(),
-        "status": "Filing-ready review packet" if is_ready else "Draft packet",
+        "status": packet_review_status(is_ready),
         "status_class": "status-verified" if is_ready else "status-needs-review",
         "is_draft": not is_ready,
         "summary": summary.get("readiness_summary", "Open the packet status file for details."),
@@ -882,9 +1127,10 @@ def _packet_success_context(packet_path):
         "reference_only_files_count": counts["reference_only_tax_evidence"],
         "missing_evidence_count": counts["missing_tax_evidence"],
         "open_blocker_groups": blocker_groups,
+        "material_assumptions": summary.get("material_assumptions") or [],
         "review_first": review_first,
         "cpa_summary": (
-            f"Gainz audit packet: {'filing-ready review packet' if is_ready else 'draft packet'}. "
+            f"Gainz audit packet: {packet_review_status(is_ready).lower()}. "
             f"Packet path: {packet_path}. "
             f"Summary: {summary.get('readiness_summary', 'Open PACKET_STATUS.md for details.')}. "
             f"Copied files: {counts['copied_files']}. "
@@ -965,7 +1211,12 @@ def work_order_review():
         if request.is_json:
             return jsonify({"message": "The work order item is no longer open. Refresh before saving."}), 409
         return redirect(url_for('export_blueprint.index', work_order_reviewed=0))
-    validation_error = detail_error or _validate_cpa_resolution(item or {}, decision, details, note=note)
+    validation_error = detail_error or _validate_cpa_resolution(
+        item or {},
+        decision,
+        details,
+        note=note,
+    )
     validation_error = validation_error or _apply_cpa_calculation_resolution(
         transactions,
         item,
@@ -1012,6 +1263,7 @@ def review_queue_save():
     transactions = current_app.config['transactions']
     item_id = str(request.form.get("item_id") or "").strip()
     decision = str(request.form.get("decision") or "").strip()
+    workflow_action = str(request.form.get("workflow_action") or "apply").strip()
     note = str(request.form.get("note") or "").strip()
     cpa_question = str(request.form.get("cpa_question") or "").strip()
 
@@ -1027,7 +1279,74 @@ def review_queue_save():
         context = _review_queue_context(transactions)
         context["save_error"] = "That review item is no longer open. Continue with the next item."
         return render_template("review_queue.html", **context), 409
-    validation_error = detail_error or _validate_cpa_resolution(item or {}, decision, details, note=note)
+
+    if workflow_action == "configure":
+        context = _resolution_form_context(
+            transactions,
+            item_id,
+            decision,
+            note=note,
+            cpa_question=cpa_question,
+        )
+        return render_template("review_queue.html", **context)
+
+    validation_error = detail_error or _validate_cpa_resolution(
+        item or {},
+        decision,
+        details,
+        note=note,
+        for_preview=workflow_action == "preview",
+    )
+    if not validation_error and workflow_action == "preview":
+        context = _resolution_form_context(
+            transactions,
+            item_id,
+            decision,
+            details=details,
+            note=note,
+            cpa_question=cpa_question,
+        )
+        context["resolution_preview"] = _resolution_impact_preview(
+            transactions,
+            item,
+            decision,
+            details,
+        )
+        session["gainz_resolution_preview"] = {
+            "item_id": item_id,
+            "fingerprint": _resolution_preview_fingerprint(
+                item,
+                decision,
+                details,
+                note=note,
+                cpa_question=cpa_question,
+            ),
+        }
+        return render_template("review_queue.html", **context)
+
+    preview_required = bool(item.get("blocker_type") in {
+        "Missing acquisition basis",
+        "Holdings explanation needed",
+    })
+    if workflow_action == "apply" and preview_required and not validation_error:
+        pending_preview = session.get("gainz_resolution_preview") or {}
+        expected_fingerprint = _resolution_preview_fingerprint(
+            item,
+            decision,
+            details,
+            note=note,
+            cpa_question=cpa_question,
+        )
+        if (
+            pending_preview.get("item_id") != item_id
+            or pending_preview.get("fingerprint") != expected_fingerprint
+        ):
+            validation_error = (
+                "Review the current before/after impact before applying this treatment. "
+                "If any field changed, generate a new preview."
+            )
+        elif not _truthy_payload_value(request.form.get("preview_confirmed")):
+            validation_error = "Review the calculation impact and confirm it before applying this treatment."
     validation_error = validation_error or _apply_cpa_calculation_resolution(
         transactions,
         item,
@@ -1036,7 +1355,14 @@ def review_queue_save():
         details,
     )
     if validation_error:
-        context = _review_queue_context(transactions, item_id=item_id)
+        context = _resolution_form_context(
+            transactions,
+            item_id,
+            decision,
+            details=details,
+            note=note,
+            cpa_question=cpa_question,
+        )
         context["save_error"] = validation_error
         return render_template("review_queue.html", **context), 400
 
@@ -1049,8 +1375,27 @@ def review_queue_save():
         **details,
     )
     transactions.save(description=f"Updated review queue item: {WORK_ORDER_REVIEW_DECISIONS[decision]}")
+    session.pop("gainz_resolution_preview", None)
 
     return redirect(url_for('export_blueprint.review_queue', guided=1, saved=1))
+
+
+@blueprint.route('/review_queue/reverse', methods=['POST'])
+@login_required
+def review_queue_reverse():
+    transactions = current_app.config['transactions']
+    item_id = str(request.form.get("item_id") or "").strip()
+    note = str(request.form.get("reversal_note") or "").strip()
+    try:
+        transactions.reverse_work_order_resolution(item_id, note=note)
+        transactions.save(description="Reversed professional calculation resolution")
+    except ValueError:
+        context = _review_queue_context(transactions)
+        context["save_error"] = (
+            "Gainz could not reverse that resolution. Refresh the queue and confirm the applied resolution still exists."
+        )
+        return render_template("review_queue.html", **context), 400
+    return redirect(url_for('export_blueprint.review_queue', guided=1, reversed=1))
 
 
 @blueprint.route('/packet_preview.json', methods=['GET', 'POST'])

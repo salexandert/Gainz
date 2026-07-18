@@ -64,6 +64,11 @@ def _holdings_summary(transactions):
 def _all_crypto_assets(transactions):
     assets = set(getattr(transactions, "assets", set()) or set())
     assets.update(
+        str(getattr(transaction, "symbol", "") or "").upper()
+        for transaction in getattr(transactions, "transactions", []) or []
+        if getattr(transaction, "symbol", None)
+    )
+    assets.update(
         asset.symbol
         for asset in getattr(transactions, "asset_objects", []) or []
         if getattr(asset, "symbol", None)
@@ -193,6 +198,7 @@ def holdings_accounting():
         holdings_mode = "declare" if guided_mode else "full"
 
     stats_table_data = get_stats_table_data(transactions)
+    tracked_assets = _all_crypto_assets(transactions)
 
     return render_template(
         'holdings_accounting.html',
@@ -200,6 +206,7 @@ def holdings_accounting():
         holdings_summary=_holdings_summary(transactions),
         guided_mode=guided_mode,
         holdings_mode=holdings_mode,
+        default_holdings_asset=tracked_assets[0] if len(tracked_assets) == 1 else "",
     )
 
 
@@ -464,7 +471,7 @@ def sends_to_sells():
                 acquisition_date="",
                 basis_value=0,
                 proceeds_value=sell.usd_spot * conservative_quantity,
-                basis_method="CPA-directed conservative $0 basis when records remain unavailable",
+                basis_method="Conservative $0 basis under professional direction recorded by user",
                 evidence_reference=evidence_reference,
                 work_order_item_id=work_order_item["item_id"],
                 acquisition_date_method="cpa_conservative_short_term",
@@ -477,7 +484,7 @@ def sends_to_sells():
             work_order_item["item_id"],
             decision="conservative_max_gain",
             note=(
-                "Exact send was treated as a taxable disposition under a CPA-directed conservative fallback. "
+                "Exact send was treated as a taxable disposition under professional direction recorded by the user. "
                 "Documented basis lots were linked first; only the remaining unresolved quantity received $0 basis."
             ),
             reviewer_name=reviewer_name,
@@ -525,7 +532,7 @@ def sends_to_sells():
     if conservative_applied:
         result_str = (
             f"{result_str} For the remaining {format_quantity(conservative_quantity)} {asset}, Gainz applied the "
-            "CPA-directed $0-basis short-term assumption. The acquisition date remains unknown, the report row "
+            "recorded $0-basis short-term assumption. The acquisition date remains unknown, the report row "
             "leaves it blank, and the packet records that this may overstate tax."
         )
     elif conservative_max_gain:

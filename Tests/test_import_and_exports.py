@@ -15,6 +15,7 @@ from app import create_app
 from app.extensions import db
 from app.import_transactions import routes as import_routes
 from app.import_transactions.routes import (
+    _data_source_summary,
     _manual_batch_rows,
     _manual_row_is_blank,
     _manual_transaction_from_values,
@@ -100,6 +101,9 @@ def import_template_context(**overrides):
             "import_warning_rows": [],
             "unresolved_import_warning_rows": [],
             "unresolved_import_warning_count": 0,
+            "import_economics_count": 0,
+            "import_economics_warning_count": 0,
+            "import_economics_rows": [],
             "type_counts": {
                 "buy": 0,
                 "sell": 0,
@@ -283,6 +287,20 @@ class ImportAndExportTests(unittest.TestCase):
                 guided_mode=True,
                 holdings_mode="reconcile",
             )
+        with app.test_request_context("/holdings_accounting/?guided=1&mode=reconcile"):
+            complete_reconcile_page = app.jinja_env.get_template(
+                "holdings_accounting.html"
+            ).render(
+                stats_table_data=stats_rows,
+                holdings_summary={
+                    **holdings_summary,
+                    "assets_needing_holdings": 0,
+                    "assets_with_mismatch": 0,
+                    "assets_matched": 1,
+                },
+                guided_mode=True,
+                holdings_mode="reconcile",
+            )
 
         self.assertIn("Step 2 of 4", declare_page)
         self.assertIn("Declare Holdings", declare_page)
@@ -321,17 +339,22 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("A gap means imported activity does not yet explain declared holdings", reconcile_page)
         self.assertIn('id="holdings_current_help"', reconcile_page)
         self.assertIn("What missing basis means", reconcile_page)
-        self.assertIn("Open Guided Review Queue", reconcile_page)
+        self.assertNotIn("Open Guided Review Queue", reconcile_page)
+        self.assertIn("Start Step 3.1", reconcile_page)
         self.assertIn("Current gap", reconcile_page)
         self.assertIn("Advanced gap details", reconcile_page)
         self.assertIn("Open Declare Holdings", reconcile_page)
         self.assertNotIn("Save Declared Holdings", reconcile_page)
         self.assertNotIn("Save 0 Holdings", reconcile_page)
+        self.assertIn("Reconciliation gaps complete", complete_reconcile_page)
+        self.assertIn("Continue to Reports &amp; Export", complete_reconcile_page)
+        self.assertNotIn("Start Step 3.1", complete_reconcile_page)
 
         custom_js = Path("app/base/static/assets/js/custom.js").read_text(encoding="utf-8")
         self.assertIn("Step 3.2: Understand ", custom_js)
         self.assertIn("What a holdings gap means", custom_js)
         self.assertIn("Leave Holdings Gap As Needs Research", custom_js)
+        self.assertIn("Reconciliation gaps complete", custom_js)
 
     def test_import_page_renders_import_warning_workflow(self):
         app = create_app(config_dict["Debug"], selenium=True)
@@ -399,7 +422,8 @@ class ImportAndExportTests(unittest.TestCase):
 
         self.assertIn("Decide what row 261 represents", rendered_page)
         self.assertIn("Step 1.2: Import warnings need review", rendered_page)
-        self.assertIn("Step 1.3: Import data is loaded, but review is still needed", rendered_page)
+        self.assertIn("Step 1.3: Confirm Imported Values", rendered_page)
+        self.assertIn("Step 1.4: Import data is loaded, but review is still needed", rendered_page)
         self.assertIn("This needs a corrected value", rendered_page)
         self.assertNotIn("Try demo data or upload one exchange CSV.", rendered_page)
 
@@ -477,11 +501,12 @@ class ImportAndExportTests(unittest.TestCase):
             )
 
         self.assertIn("Import data is loaded, but review is still needed", blocked_page)
-        self.assertIn("Step 1.3: Import data is loaded, but review is still needed", blocked_page)
+        self.assertIn("Step 1.3: Confirm Imported Values", blocked_page)
+        self.assertIn("Step 1.4: Import data is loaded, but review is still needed", blocked_page)
         self.assertIn('class="btn btn-primary btn-round btn-sm import-continue-action"', blocked_page)
         self.assertIn('style="display: none;"', blocked_page)
         self.assertIn("Import data is ready for the next step", ready_page)
-        self.assertIn("Step 1.3: Import data is ready for the next step", ready_page)
+        self.assertIn("Step 1.4: Import data is ready for the next step", ready_page)
         self.assertIn("Continue to Declare Holdings", ready_page)
 
     def test_import_page_renders_column_review_workflow(self):
@@ -777,6 +802,248 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual({"BTC"}, transactions.assets)
         self.assertEqual([0.1, 0.05], sorted([t.quantity for t in transactions.transactions], reverse=True))
 
+    def test_coinbase_partial_basis_fee_golden_totals(self):
+        transactions = empty_transactions()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = ImportService(temp_dir).import_upload(
+                FileUpload(Path("Tests/fixtures/coinbase_partial_basis_fees.csv")),
+                transactions,
+            )
+
+        self.assertEqual(2, result["imported_count"])
+        self.assertEqual([], result["warnings"])
+        buy, sell = sorted(transactions.transactions, key=lambda item: item.time_stamp)
+        self.assertEqual(25.0, buy.gross_usd_total)
+        self.assertEqual(0.5, buy.fee)
+        self.assertEqual(25.5, buy.net_usd_total)
+        self.assertEqual(500.0, sell.gross_usd_total)
+        self.assertEqual(5.0, sell.fee)
+        self.assertEqual(495.0, sell.net_usd_total)
+
+        sell.link_transaction(buy, 0.2)
+        unresolved_quantity = sell.unlinked_quantity
+        transactions.apply_cpa_basis_resolution(
+            target_sell_uid=sell.uid,
+            quantity=unresolved_quantity,
+            acquisition_date=sell.time_stamp,
+            basis_value=0.0,
+            proceeds_value=sell.prorated_tax_usd(unresolved_quantity),
+            basis_method="unknown_zero_for_review",
+            evidence_reference="Synthetic golden fixture",
+            work_order_item_id="golden-bch-partial-basis",
+            acquisition_date_method="cpa_conservative_short_term",
+        )
+
+        totals = get_form_8949_totals(transactions)
+        self.assertAlmostEqual(495.0, totals["total"]["proceeds"])
+        self.assertAlmostEqual(25.5, totals["total"]["cost_basis"])
+        self.assertAlmostEqual(469.5, totals["total"]["gain_loss"])
+        preview = get_packet_preview(
+            transactions,
+            get_audit_readiness_summary(transactions),
+            "C:/synthetic-output",
+        )
+        self.assertEqual(1, preview["material_assumption_count"])
+        self.assertIn("$5.50", preview["material_assumptions"][0]["detail"])
+
+        import_summary = _data_source_summary(transactions)
+        self.assertEqual(2, import_summary["import_economics_count"])
+        sell_row = next(
+            row for row in import_summary["import_economics_rows"]
+            if row["transaction_type"] == "sell"
+        )
+        self.assertEqual("Net proceeds", sell_row["total_label"])
+        self.assertAlmostEqual(500.0, sell_row["gross_usd"])
+        self.assertAlmostEqual(5.0, sell_row["fee_usd"])
+        self.assertAlmostEqual(495.0, sell_row["net_tax_usd"])
+
+    def test_cash_app_fee_golden_round_trip(self):
+        transactions = empty_transactions()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = ImportService(temp_dir).import_upload(
+                FileUpload(Path("Tests/fixtures/cash_app_fee_round_trip.csv")),
+                transactions,
+            )
+
+        self.assertEqual(2, result["imported_count"])
+        self.assertEqual([], result["warnings"])
+        self.assertEqual([], transactions.auto_link(asset=None, algo="fifo"))
+        totals = get_form_8949_totals(transactions)
+        self.assertAlmostEqual(1485.0, totals["total"]["proceeds"])
+        self.assertAlmostEqual(1010.0, totals["total"]["cost_basis"])
+        self.assertAlmostEqual(475.0, totals["total"]["gain_loss"])
+
+    def test_gdax_fee_golden_round_trip(self):
+        transactions = empty_transactions()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = ImportService(temp_dir).import_upload(
+                FileUpload(Path("Tests/fixtures/gdax_fee_round_trip.csv")),
+                transactions,
+            )
+
+        self.assertEqual(2, result["imported_count"])
+        self.assertEqual([], result["warnings"])
+        self.assertEqual([], transactions.auto_link(asset=None, algo="fifo"))
+        totals = get_form_8949_totals(transactions)
+        self.assertAlmostEqual(1485.0, totals["total"]["proceeds"])
+        self.assertAlmostEqual(1010.0, totals["total"]["cost_basis"])
+        self.assertAlmostEqual(475.0, totals["total"]["gain_loss"])
+
+    def test_coinbase_convert_fee_golden_round_trip(self):
+        transactions = empty_transactions()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = ImportService(temp_dir).import_upload(
+                FileUpload(Path("Tests/fixtures/coinbase_convert_fee_round_trip.csv")),
+                transactions,
+            )
+
+        self.assertEqual(3, result["imported_count"])
+        self.assertEqual(1, len(result["warnings"]))
+        self.assertIn("acquired-asset basis", result["warnings"][0])
+        self.assertEqual([], transactions.auto_link(asset=None, algo="fifo"))
+        totals = get_form_8949_totals(transactions)
+        self.assertAlmostEqual(1485.0, totals["total"]["proceeds"])
+        self.assertAlmostEqual(1010.0, totals["total"]["cost_basis"])
+        self.assertAlmostEqual(475.0, totals["total"]["gain_loss"])
+        readiness = get_audit_readiness_summary(transactions)
+        self.assertEqual(1, readiness["metrics"]["import_economics_warnings"])
+        self.assertTrue(any(
+            group["key"] == "import_economics"
+            for group in readiness["blocker_groups"]
+        ))
+        self.assertFalse(readiness["is_ready"])
+
+    def test_mapped_csv_fee_golden_round_trip(self):
+        transactions = empty_transactions()
+        csv_text = "\n".join([
+            "When,Kind,Thing,Units,Unit USD,Gross USD,Fee USD,Net USD,Reference",
+            "2023-01-05 10:15:00 UTC,Acquire,BTC,1,1000,1000,10,1010,mapped-buy-001",
+            "2024-02-05 10:15:00 UTC,Dispose,BTC,1,1500,1500,15,1485,mapped-sell-001",
+        ])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "mapped_fee_round_trip.csv"
+            source.write_text(csv_text, encoding="utf-8")
+            result = ImportService(Path(temp_dir) / "uploads").import_mapped_file(
+                source,
+                transactions,
+                header_row=1,
+                column_mapping={
+                    "date": "When",
+                    "transaction_type": "Kind",
+                    "asset_type": "Thing",
+                    "asset_amount": "Units",
+                    "asset_price": "Unit USD",
+                    "fiat_amount": "Gross USD",
+                    "fee": "Fee USD",
+                    "net_amount": "Net USD",
+                    "transaction_id": "Reference",
+                },
+            )
+
+        self.assertEqual(2, result["imported_count"])
+        self.assertEqual([], result["warnings"])
+        self.assertEqual([], transactions.auto_link(asset=None, algo="fifo"))
+        totals = get_form_8949_totals(transactions)
+        self.assertAlmostEqual(1485.0, totals["total"]["proceeds"])
+        self.assertAlmostEqual(1010.0, totals["total"]["cost_basis"])
+        self.assertAlmostEqual(475.0, totals["total"]["gain_loss"])
+
+    def test_kraken_template_fee_golden_round_trip(self):
+        transactions = empty_transactions()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = ImportService(Path(temp_dir) / "uploads").import_mapped_file(
+                Path("Tests/fixtures/kraken_mapped_fee_round_trip.csv"),
+                transactions,
+                header_row=1,
+                column_mapping={
+                    "date": "time",
+                    "transaction_type": "type",
+                    "asset_type": "pair",
+                    "asset_amount": "vol",
+                    "asset_price": "price",
+                    "fiat_amount": "cost",
+                    "fee": "fee",
+                    "transaction_id": "txid",
+                },
+            )
+
+        self.assertEqual(2, result["imported_count"])
+        self.assertEqual([], result["warnings"])
+        self.assertEqual([], transactions.auto_link(asset=None, algo="fifo"))
+        totals = get_form_8949_totals(transactions)
+        self.assertAlmostEqual(1485.0, totals["total"]["proceeds"])
+        self.assertAlmostEqual(1010.0, totals["total"]["cost_basis"])
+        self.assertAlmostEqual(475.0, totals["total"]["gain_loss"])
+
+    def test_mapped_crypto_fee_is_preserved_and_blocks_readiness(self):
+        transactions = empty_transactions()
+        csv_text = "\n".join([
+            "When,Kind,Thing,Units,Unit USD,Gross USD,Fee,Fee Currency,Reference",
+            "2024-02-05 10:15:00 UTC,Dispose,ETH,1,1500,1500,0.01,ETH,crypto-fee-001",
+        ])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "crypto_fee.csv"
+            source.write_text(csv_text, encoding="utf-8")
+            result = ImportService(Path(temp_dir) / "uploads").import_mapped_file(
+                source,
+                transactions,
+                header_row=1,
+                column_mapping={
+                    "date": "When",
+                    "transaction_type": "Kind",
+                    "asset_type": "Thing",
+                    "asset_amount": "Units",
+                    "asset_price": "Unit USD",
+                    "fiat_amount": "Gross USD",
+                    "fee": "Fee",
+                    "fee_currency": "Fee Currency",
+                    "transaction_id": "Reference",
+                },
+            )
+
+        self.assertEqual(1, result["imported_count"])
+        self.assertTrue(any("not converted to USD" in warning for warning in result["warnings"]))
+        transaction = transactions.transactions[0]
+        self.assertIsNone(transaction.fee)
+        self.assertEqual(0.01, transaction.source_fee_amount)
+        self.assertEqual("ETH", transaction.fee_currency)
+        self.assertIn("not converted to USD", transaction.economics_warning)
+        readiness = get_audit_readiness_summary(transactions)
+        self.assertFalse(readiness["is_ready"])
+        self.assertEqual(1, readiness["metrics"]["import_economics_warnings"])
+
+    def test_transaction_economics_survive_save_reload(self):
+        transactions = empty_transactions()
+        del transactions.save
+        buy = Buy("BTC", 1, datetime.datetime(2023, 1, 5), 1000, "fee-source.csv")
+        buy.set_economics(
+            fee=10,
+            gross_usd_total=1000,
+            net_usd_total=1010,
+            source_row=2,
+            source_transaction_id="saved-buy-001",
+            economics_source="gross value, fee, net amount",
+        )
+        transactions.transactions = [buy]
+
+        with tempfile.TemporaryDirectory() as temp_dir, patch("transactions.basedir", temp_dir):
+            save_path = transactions.save(description="Fee persistence golden")
+            loaded = Transactions(view=save_path)
+
+        loaded_buy = loaded.transactions[0]
+        self.assertEqual(10.0, loaded_buy.fee)
+        self.assertEqual(1000.0, loaded_buy.gross_usd_total)
+        self.assertEqual(1010.0, loaded_buy.net_usd_total)
+        self.assertEqual(2, loaded_buy.source_row)
+        self.assertEqual("saved-buy-001", loaded_buy.source_transaction_id)
+
     def test_import_service_imports_cash_app_with_updated_headers(self):
         transactions = empty_transactions()
         csv_text = "\n".join([
@@ -1040,16 +1307,16 @@ class ImportAndExportTests(unittest.TestCase):
         totals = get_form_8949_totals(transactions)
         self.assertEqual(1, totals["short"]["rows"])
         self.assertEqual(2000.0, totals["short"]["proceeds"])
-        self.assertEqual(600.0, totals["short"]["cost_basis"])
-        self.assertEqual(1400.0, totals["short"]["gain_loss"])
+        self.assertEqual(605.0, totals["short"]["cost_basis"])
+        self.assertEqual(1395.0, totals["short"]["gain_loss"])
         self.assertEqual(2, totals["long"]["rows"])
-        self.assertEqual(5700.0, totals["long"]["proceeds"])
-        self.assertEqual(3800.0, totals["long"]["cost_basis"])
-        self.assertEqual(1900.0, totals["long"]["gain_loss"])
+        self.assertEqual(5648.0, totals["long"]["proceeds"])
+        self.assertEqual(3815.0, totals["long"]["cost_basis"])
+        self.assertEqual(1833.0, totals["long"]["gain_loss"])
         self.assertEqual(3, totals["total"]["rows"])
-        self.assertEqual(7700.0, totals["total"]["proceeds"])
-        self.assertEqual(4400.0, totals["total"]["cost_basis"])
-        self.assertEqual(3300.0, totals["total"]["gain_loss"])
+        self.assertEqual(7648.0, totals["total"]["proceeds"])
+        self.assertEqual(4420.0, totals["total"]["cost_basis"])
+        self.assertEqual(3228.0, totals["total"]["gain_loss"])
 
     def test_demo_import_route_runs_default_fifo_automatically(self):
         transactions = empty_transactions()
@@ -2101,9 +2368,10 @@ class ImportAndExportTests(unittest.TestCase):
                 )
 
             self.assertEqual(200, save_response.status_code)
-            self.assertIn(b"All Queue Items Reviewed", save_response.data)
+            self.assertIn(b"No Undecided Queue Items Remain", save_response.data)
+            self.assertIn(b"Deferred Items", save_response.data)
             self.assertIn(b"/export/?guided=1#packet_preview", save_response.data)
-            self.assertIn(b"Generate or refresh the packet", save_response.data)
+            self.assertIn(b"generate or refresh the packet", save_response.data)
             record = transactions.get_work_order_review(item_id)
             self.assertEqual("needs_research", record["decision"])
             self.assertEqual("User will research source records.", record["note"])
@@ -2149,7 +2417,7 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertIn(b"CPA review options", response.data)
             self.assertIn(b"Reconstruct basis from records", response.data)
             self.assertIn(b"Correct source classification", response.data)
-            self.assertIn(b"CPA-directed conservative $0 basis", response.data)
+            self.assertIn(b"Apply a professionally directed basis adjustment", response.data)
             self.assertNotIn(b"Keep as owner transfer", response.data)
             self.assertNotIn(b"Decide what to do with this work order item", response.data)
 
@@ -2157,6 +2425,53 @@ class ImportAndExportTests(unittest.TestCase):
                 db.drop_all()
                 db.session.remove()
                 db.engine.dispose()
+
+    def test_guided_review_queue_splits_supported_and_unresolved_sale_values(self):
+        transactions = empty_transactions()
+        buy = Buy("BCH", 0.2, datetime.datetime(2021, 3, 15), 125, "coinbase.csv")
+        buy.set_economics(gross_usd_total=25, fee=0.5, net_usd_total=25.5)
+        sell = Sell("BCH", 0.5, datetime.datetime(2024, 2, 1), 1000, "coinbase.csv")
+        sell.set_economics(gross_usd_total=500, fee=5, net_usd_total=495)
+        sell.link_transaction(buy, 0.2)
+        transactions.transactions = [buy, sell]
+        transactions.set_holdings("BCH", 0)
+
+        app = create_app(config_dict["Debug"], selenium=True)
+        app.config.update(WTF_CSRF_ENABLED=False)
+        app.config["transactions"] = transactions
+
+        readiness = get_audit_readiness_summary(transactions)
+        item = next(
+            row
+            for row in reconciliation_work_order_rows(readiness, transactions)
+            if row.get("blocker_type") == "Missing acquisition basis"
+        )
+
+        with app.test_client() as client:
+            response = client.get("/export/review_queue?guided=1")
+            configured = client.post(
+                "/export/review_queue/save",
+                data={
+                    "item_id": item["item_id"],
+                    "decision": "resolved",
+                    "workflow_action": "configure",
+                },
+            )
+
+        self.assertEqual(200, response.status_code)
+        page = response.data.decode("utf-8", errors="replace")
+        self.assertIn("Supported and unresolved amounts", page)
+        self.assertIn("0.20000000 BCH", page)
+        self.assertIn("0.30000000 BCH", page)
+        self.assertIn("$297.00 allocated net proceeds", page)
+        self.assertNotIn("Professional Resolution Worksheet", page)
+        configured_page = configured.data.decode("utf-8", errors="replace")
+        self.assertIn("Professional Resolution Worksheet", configured_page)
+        self.assertIn("Calculated suggestion: 0.30000000 BCH / 0.50000000 BCH", configured_page)
+        self.assertIn(
+            '<option value="allocated_source_value" selected>Calculated allocation from imported source transaction</option>',
+            configured_page,
+        )
 
     def test_cpa_resolution_reaches_ready_form_8949_and_packet_workpaper(self):
         transactions = empty_transactions()
@@ -2191,24 +2506,34 @@ class ImportAndExportTests(unittest.TestCase):
             )
             self.assertEqual(sell.uid, missing_basis_item["target_transaction_uid"])
 
+            resolution_data = {
+                "item_id": missing_basis_item["item_id"],
+                "decision": "resolved",
+                "event_classification": "cash_sale",
+                "proceeds_method": "source_reported",
+                "proceeds_value": "500",
+                "basis_method": "documented_acquisition_cost",
+                "basis_value": "125",
+                "acquisition_date": "2021-03-15",
+                "evidence_reference": "CPA workpaper BCH-2024-01",
+                "resolution_status": "cpa_reviewed_position",
+                "reviewer_name": "Jamie Reviewer",
+                "reviewer_role": "cpa_ea_tax_professional",
+                "professional_attestation": "yes",
+                "note": "Acquisition cost reconstructed from exchange statements.",
+            }
             with app.test_client() as client:
+                preview = client.post(
+                    "/export/review_queue/save",
+                    data={**resolution_data, "workflow_action": "preview"},
+                )
+                self.assertEqual(200, preview.status_code)
                 response = client.post(
                     "/export/review_queue/save",
                     data={
-                        "item_id": missing_basis_item["item_id"],
-                        "decision": "resolved",
-                        "event_classification": "cash_sale",
-                        "proceeds_method": "source_reported",
-                        "proceeds_value": "500",
-                        "basis_method": "documented_acquisition_cost",
-                        "basis_value": "125",
-                        "acquisition_date": "2021-03-15",
-                        "evidence_reference": "CPA workpaper BCH-2024-01",
-                        "resolution_status": "cpa_reviewed_position",
-                        "reviewer_name": "Jamie Reviewer",
-                        "reviewer_role": "cpa_ea_tax_professional",
-                        "professional_attestation": "yes",
-                        "note": "Acquisition cost reconstructed from exchange statements.",
+                        **resolution_data,
+                        "workflow_action": "apply",
+                        "preview_confirmed": "yes",
                     },
                 )
 
@@ -2228,7 +2553,7 @@ class ImportAndExportTests(unittest.TestCase):
             workpapers = cpa_resolution_workpaper_rows(after, transactions)
             self.assertEqual(1, len(workpapers))
             self.assertEqual("Yes", workpapers[0]["calculation_applied"])
-            self.assertEqual("CPA-reviewed filing position", workpapers[0]["resolution_status_label"])
+            self.assertEqual("Professional direction recorded by user", workpapers[0]["resolution_status_label"])
             self.assertEqual("500.00", workpapers[0]["proceeds_value"])
             self.assertEqual("125.00", workpapers[0]["basis_value"])
 
@@ -2238,6 +2563,10 @@ class ImportAndExportTests(unittest.TestCase):
             ).create_packet(transactions)
             workpaper_path = Path(packet_dir) / "01_reports" / "cpa_resolution_workpapers.csv"
             self.assertTrue(workpaper_path.exists())
+            packet_status = (Path(packet_dir) / "PACKET_STATUS.md").read_text(encoding="utf-8")
+            self.assertIn("RECONCILIATION COMPLETE - PROFESSIONAL FILING REVIEW REQUIRED", packet_status)
+            self.assertNotIn("FILING-READY REVIEW PACKET", packet_status)
+            self.assertIn("Professional directions recorded by user", packet_status)
             with workpaper_path.open("r", encoding="utf-8-sig", newline="") as handle:
                 packet_rows = list(csv.DictReader(handle))
             self.assertEqual(1, len(packet_rows))
@@ -2271,30 +2600,157 @@ class ImportAndExportTests(unittest.TestCase):
                 if row.get("blocker_type") == "Missing acquisition basis"
             )
 
+            resolution_data = {
+                "item_id": item["item_id"],
+                "decision": "resolved",
+                "event_classification": "cash_sale",
+                "proceeds_method": "source_reported",
+                "proceeds_value": "500",
+                "basis_method": "documented_acquisition_cost",
+                "basis_value": "125",
+                "acquisition_date": "2021-03-15",
+                "evidence_reference": "CPA workpaper BCH-2024-01",
+                "resolution_status": "cpa_reviewed_position",
+                "reviewer_name": "Jamie Reviewer",
+                "reviewer_role": "cpa_ea_tax_professional",
+            }
             with app.test_client() as client:
+                client.post(
+                    "/export/review_queue/save",
+                    data={**resolution_data, "workflow_action": "preview", "professional_attestation": "yes"},
+                )
                 response = client.post(
                     "/export/review_queue/save",
-                    data={
-                        "item_id": item["item_id"],
-                        "decision": "resolved",
-                        "event_classification": "cash_sale",
-                        "proceeds_method": "source_reported",
-                        "proceeds_value": "500",
-                        "basis_method": "documented_acquisition_cost",
-                        "basis_value": "125",
-                        "acquisition_date": "2021-03-15",
-                        "evidence_reference": "CPA workpaper BCH-2024-01",
-                        "resolution_status": "cpa_reviewed_position",
-                        "reviewer_name": "Jamie Reviewer",
-                        "reviewer_role": "cpa_ea_tax_professional",
-                    },
+                    data={**resolution_data, "workflow_action": "apply", "preview_confirmed": "yes"},
                 )
 
             self.assertEqual(400, response.status_code)
-            self.assertIn(b"Confirm the professional-review statement", response.data)
+            self.assertIn(b"Confirm that you are recording the named professional&#39;s direction", response.data)
             self.assertEqual([], sell.links)
             self.assertEqual([sell], transactions.transactions)
             self.assertIsNone(transactions.get_work_order_review(item["item_id"]))
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_professional_resolution_previews_without_mutation_then_applies_and_reverses(self):
+        transactions = empty_transactions()
+        sell = Sell("BCH", 0.5, datetime.datetime(2024, 2, 1), 1000, "exchange.csv")
+        sell.set_economics(
+            gross_usd_total=500,
+            fee=5,
+            net_usd_total=495,
+            economics_source="Coinbase subtotal/fee/total",
+        )
+        transactions.transactions = [sell]
+        transactions.set_holdings("BCH", 0)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class ExportRouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(ExportRouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+            readiness = get_audit_readiness_summary(transactions)
+            item = next(
+                row
+                for row in reconciliation_work_order_rows(readiness, transactions)
+                if row.get("blocker_type") == "Missing acquisition basis"
+            )
+            resolution_data = {
+                "item_id": item["item_id"],
+                "decision": "resolved",
+                "event_classification": "cash_sale",
+                "proceeds_method": "source_reported",
+                "proceeds_value": "495",
+                "basis_method": "documented_acquisition_cost",
+                "basis_value": "125",
+                "acquisition_date": "2021-03-15",
+                "resolution_status": "cpa_reviewed_position",
+                "evidence_reference": "Professional workpaper BCH-2024-01",
+                "reviewer_name": "Jamie Reviewer",
+                "reviewer_role": "cpa_ea_tax_professional",
+                "professional_attestation": "yes",
+            }
+
+            with app.test_client() as client:
+                direct_apply = client.post(
+                    "/export/review_queue/save",
+                    data={
+                        **resolution_data,
+                        "workflow_action": "apply",
+                        "preview_confirmed": "yes",
+                    },
+                )
+                self.assertEqual(400, direct_apply.status_code)
+                self.assertIn(b"Review the current before/after impact", direct_apply.data)
+                self.assertEqual([], sell.links)
+
+                preview = client.post(
+                    "/export/review_queue/save",
+                    data={**resolution_data, "workflow_action": "preview"},
+                )
+
+                preview_text = preview.data.decode("utf-8", errors="replace")
+                error_position = preview_text.find("Review not saved")
+                self.assertEqual(200, preview.status_code, preview_text[error_position:error_position + 500])
+                self.assertIn(b"Review impact before applying", preview.data)
+                self.assertIn(b"Allocated fee", preview.data)
+                self.assertEqual([], sell.links)
+                self.assertEqual([sell], transactions.transactions)
+                self.assertIsNone(transactions.get_work_order_review(item["item_id"]))
+
+                unconfirmed = client.post(
+                    "/export/review_queue/save",
+                    data={
+                        **resolution_data,
+                        "workflow_action": "apply",
+                    },
+                )
+                self.assertEqual(400, unconfirmed.status_code)
+                self.assertEqual([], sell.links)
+
+                applied = client.post(
+                    "/export/review_queue/save",
+                    data={
+                        **resolution_data,
+                        "workflow_action": "apply",
+                        "preview_confirmed": "yes",
+                    },
+                )
+                self.assertEqual(302, applied.status_code)
+
+                review = transactions.get_work_order_review(item["item_id"])
+                self.assertEqual("Yes", review["calculation_applied"])
+                self.assertEqual(datetime.date.today().isoformat(), review["direction_date"])
+                self.assertEqual("Local Gainz user", review["direction_entered_by"])
+                receipt = json.loads(review["calculation_receipt_json"])
+                self.assertAlmostEqual(500, receipt["source_gross"])
+                self.assertAlmostEqual(5, receipt["source_fee"])
+                self.assertAlmostEqual(495, receipt["source_net"])
+                self.assertAlmostEqual(370, receipt["added_gain_loss"])
+                self.assertEqual(1, len(sell.links))
+
+                reversed_response = client.post(
+                    "/export/review_queue/reverse",
+                    data={
+                        "item_id": item["item_id"],
+                        "reversal_note": "Corrected source records will be imported.",
+                    },
+                )
+                self.assertEqual(302, reversed_response.status_code)
+
+            self.assertEqual([], sell.links)
+            self.assertEqual([sell], transactions.transactions)
+            reversed_review = transactions.get_work_order_review(item["item_id"])
+            self.assertEqual("needs_research", reversed_review["decision"])
+            self.assertEqual("Reversed", reversed_review["calculation_applied"])
+            self.assertIn("Corrected source records", reversed_review["reversal_note"])
 
             with app.app_context():
                 db.drop_all()
@@ -2332,18 +2788,28 @@ class ImportAndExportTests(unittest.TestCase):
                 if row.get("blocker_type") == "Missing acquisition basis"
             )
 
+            resolution_data = {
+                "item_id": item["item_id"],
+                "decision": "conservative_max_gain",
+                "proceeds_method": "source_reported",
+                "proceeds_value": "500",
+                "evidence_reference": "Records searched; CPA workpaper BCH-2024-unknown-basis",
+                "reviewer_name": "Jamie Reviewer",
+                "reviewer_role": "cpa_ea_tax_professional",
+                "professional_attestation": "yes",
+            }
             with app.test_client() as client:
+                preview = client.post(
+                    "/export/review_queue/save",
+                    data={**resolution_data, "workflow_action": "preview"},
+                )
+                self.assertEqual(200, preview.status_code)
                 response = client.post(
                     "/export/review_queue/save",
                     data={
-                        "item_id": item["item_id"],
-                        "decision": "conservative_max_gain",
-                        "proceeds_method": "source_reported",
-                        "proceeds_value": "500",
-                        "evidence_reference": "Records searched; CPA workpaper BCH-2024-unknown-basis",
-                        "reviewer_name": "Jamie Reviewer",
-                        "reviewer_role": "cpa_ea_tax_professional",
-                        "professional_attestation": "yes",
+                        **resolution_data,
+                        "workflow_action": "apply",
+                        "preview_confirmed": "yes",
                     },
                 )
 
@@ -2363,7 +2829,7 @@ class ImportAndExportTests(unittest.TestCase):
             workpapers = cpa_resolution_workpaper_rows(after, transactions)
             self.assertEqual(1, len(workpapers))
             self.assertEqual("Apply conservative $0-basis short-term treatment", workpapers[0]["review_decision_label"])
-            self.assertEqual("Unknown date - CPA-directed short-term assumption", workpapers[0]["acquisition_date_method_label"])
+            self.assertEqual("Unknown date - recorded short-term assumption", workpapers[0]["acquisition_date_method_label"])
             self.assertEqual("", workpapers[0]["acquisition_date"])
             self.assertIn("may overstate tax", workpapers[0]["assumption_disclosure"])
 
@@ -2381,9 +2847,9 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertIn("may overstate tax", packet_rows[0]["assumption_disclosure"])
             workbook_path = next((Path(packet_dir) / "01_reports").glob("*.xlsx"))
             workbook = load_workbook(workbook_path, data_only=False)
-            workpaper_sheet = workbook["CPA Resolution Workpapers"]
+            workpaper_sheet = workbook["Professional Workpapers"]
             self.assertEqual("Apply conservative $0-basis short-term treatment", workpaper_sheet["B5"].value)
-            self.assertEqual("Unknown date - CPA-directed short-term assumption", workpaper_sheet["N5"].value)
+            self.assertEqual("Unknown date - recorded short-term assumption", workpaper_sheet["N5"].value)
             self.assertIsNone(workpaper_sheet["O5"].value)
             self.assertIn("may overstate tax", workpaper_sheet["P5"].value)
             workbook.close()
@@ -2640,6 +3106,7 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertTrue((packet_path / "03_manifests" / "evidence_manifest.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "form_8949_short_term.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "form_8949_totals.csv").exists())
+            self.assertTrue((packet_path / "01_reports" / "import_economics.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "holdings_reconciliation.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "current_holdings_lots.csv").exists())
             self.assertTrue((packet_path / "01_reports" / "import_warnings.csv").exists())
@@ -2730,6 +3197,12 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertIn("Packet Status", workbook.sheetnames)
             status_sheet = workbook["Packet Status"]
             self.assertEqual("DRAFT - NOT FILING READY", status_sheet["A1"].value)
+            status_values = [
+                str(cell.value or "")
+                for row in status_sheet.iter_rows()
+                for cell in row
+            ]
+            self.assertIn("Material inputs and assumptions", status_values)
             workbook.close()
 
             with open(packet_path / "01_reports" / "reconciliation_work_order.csv", newline="", encoding="utf-8") as file:

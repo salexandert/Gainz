@@ -1,0 +1,3 @@
+txid,pair,time,type,ordertype,price,cost,fee,vol
+kraken-buy-001,BTC/USD,2023-01-05 10:15:00 UTC,buy,market,1000,1000,10,1
+kraken-sell-001,BTC/USD,2024-02-05 10:15:00 UTC,sell,market,1500,1500,15,1

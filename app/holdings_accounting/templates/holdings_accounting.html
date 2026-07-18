@@ -10,6 +10,7 @@
 
 {% set is_declare_mode = holdings_mode == 'declare' %}
 {% set is_reconcile_mode = holdings_mode == 'reconcile' %}
+{% set reconciliation_complete = is_reconcile_mode and holdings_summary.assets_needing_holdings == 0 and holdings_summary.assets_with_mismatch == 0 %}
 <div id="holdings_page_context"
      data-guided-mode="{% if guided_mode %}1{% else %}0{% endif %}"
      data-holdings-mode="{{ holdings_mode }}"></div>
@@ -44,7 +45,11 @@
             <a class="btn btn-primary btn-round" href="{{ url_for('holdings_accounting_blueprint.holdings_accounting', guided=1, mode='reconcile') }}">Continue to Reconcile Gaps</a>
             {% endif %}
             {% else %}
-            <a class="btn btn-primary btn-round" href="{{ url_for('export_blueprint.review_queue', guided=1) }}">Open Guided Review Queue</a>
+            {% if reconciliation_complete %}
+            <a class="btn btn-primary btn-round" href="{{ url_for('export_blueprint.index', guided=1) }}">Continue to Reports &amp; Export</a>
+            {% else %}
+            <a class="btn btn-primary btn-round" href="#holdings_gap_queue">Start Step 3.1</a>
+            {% endif %}
             {% endif %}
           </div>
           {% endif %}
@@ -59,6 +64,8 @@
               Continue to Reconcile Gaps
               {% elif is_declare_mode %}
               Declare what you currently hold
+              {% elif reconciliation_complete %}
+              Reconciliation gaps complete
               {% else %}
               Review one holdings gap
               {% endif %}
@@ -71,6 +78,8 @@
               Current holdings are recorded. Gainz can now compare them to imported activity.
               {% elif is_declare_mode %}
               Declared holdings give Gainz the real-world target for reconciliation.
+              {% elif reconciliation_complete %}
+              Declared holdings now agree with the activity and supported treatments recorded in Gainz.
               {% else %}
               A gap means imported activity does not yet explain declared holdings.
               {% endif %}
@@ -83,6 +92,8 @@
               Continue to Reconcile Gaps
               {% elif is_declare_mode %}
               Start with Step 2.1 if most assets are zero, or Step 2.2 to choose one asset at a time.
+              {% elif reconciliation_complete %}
+              Continue to Reports &amp; Export to review any remaining tax-evidence or packet items.
               {% else %}
               Select a Needs Review asset and record a supported decision or research note.
               {% endif %}
@@ -128,14 +139,23 @@
             This step is complete; continue to Reconcile Gaps when you are ready.
             {% endif %}
             {% else %}
+            {% if reconciliation_complete %}
+            Step 3 is complete. Continue to Reports &amp; Export for the remaining evidence and packet review.
+            {% else %}
             Start with Step 3.1 below. Select the current Needs Review gap; Step 3.2 explains it, and Step 3.3 records the decision or research note.
+            {% endif %}
             {% endif %}
           </p>
         </div>
-        <div id="holdings_completion_panel" class="alert alert-success holdings-completion-panel" role="status" style="display: none;">
+        <div id="holdings_completion_panel" class="alert alert-success holdings-completion-panel" role="status" {% if holdings_summary.assets_needing_holdings != 0 or not is_declare_mode %}style="display: none;"{% endif %}>
           <strong>Holdings declared</strong>
-          <p id="holdings_completion_summary" class="mb-2"></p>
-          <div id="holdings_completion_actions"></div>
+          <p id="holdings_completion_summary" class="mb-2">{% if holdings_summary.assets_needing_holdings == 0 and is_declare_mode %}All tracked assets have declared current holdings for this review pass.{% endif %}</p>
+          <div id="holdings_completion_actions">
+            {% if holdings_summary.assets_needing_holdings == 0 and is_declare_mode %}
+            <a class="btn btn-sm btn-primary" href="{{ url_for('holdings_accounting_blueprint.holdings_accounting', guided=1, mode='reconcile') }}">Continue to Reconcile Gaps</a>
+            <button type="button" id="holdings_edit_after_completion" class="btn btn-sm btn-outline-secondary">Edit declared holdings</button>
+            {% endif %}
+          </div>
         </div>
         {% else %}
         <div class="holdings-walkthrough">
@@ -185,7 +205,7 @@
 </div>
 
 {% if not guided_mode or is_declare_mode %}
-<div class="row">
+<div id="bulk_holdings_section" class="row" {% if guided_mode and is_declare_mode and holdings_summary.assets_needing_holdings == 0 %}style="display: none;"{% endif %}>
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
@@ -202,7 +222,7 @@
           <div class="bulk-holdings-row">
             <div>
               <label for="bulk_holding_asset_1">Asset</label>
-              <input id="bulk_holding_asset_1" class="form-control text-uppercase bulk-holdings-asset" value="BTC" placeholder="BTC">
+              <input id="bulk_holding_asset_1" class="form-control text-uppercase bulk-holdings-asset" value="{{ default_holdings_asset }}" placeholder="BTC">
             </div>
             <div>
               <label for="bulk_holding_quantity_1">Current holdings</label>
@@ -226,7 +246,7 @@
 </div>
 {% endif %}
 
-<div class="row">
+<div id="holdings_gap_queue" class="row">
   <div class="col-md-12">
     <div class="card">
       <div class="card-body">
@@ -439,7 +459,7 @@
                   </div>
                 </div>
                 <details class="cpa-exact-send-conservative">
-                  <summary>CPA worst-case fallback when records cannot resolve this send</summary>
+                  <summary>Conservative professional fallback when records cannot resolve this send</summary>
                   <div class="cpa-exact-send-conservative-body">
                     <p>
                       Gainz will first use any documented FIFO basis it can link. For only the remaining unresolved
@@ -466,7 +486,7 @@
                     <label class="cpa-resolution-attestation" for="exact_send_conservative_max_gain">
                       <input id="exact_send_conservative_max_gain" type="checkbox" value="yes" disabled>
                       <span>
-                        Apply the CPA-directed conservative fallback if basis remains missing. I confirm this exact send
+                        Apply the conservative fallback recorded under professional direction if basis remains missing. I confirm this exact send
                         is being treated as a taxable disposition for the Gainz calculation; supported proceeds and basis
                         were determined separately; and $0-basis short-term treatment may overstate tax.
                       </span>

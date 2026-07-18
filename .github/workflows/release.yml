@@ -71,6 +71,14 @@ jobs:
       - name: Verify Windows release artifacts
         run: python scripts/test_release_artifacts.py --platform windows --version "${{ needs.validate.outputs.version }}"
 
+      - name: Exercise packaged Windows workflow and golden fee totals
+        run: >-
+          python scripts/test_downloaded_release_zip.py
+          --version "${{ needs.validate.outputs.version }}"
+          --local-zip dist/Gainz-Windows.zip
+          --local-checksum dist/Gainz-Windows.zip.sha256
+          --launch
+
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
@@ -150,7 +158,7 @@ jobs:
           - Windows: download \`Gainz-Windows.zip\`, unzip it, and double-click \`Gainz.exe\`.
           - macOS: download \`Gainz-macOS.zip\`, unzip it, and open \`Gainz.app\`.
 
-          Windows may show a SmartScreen warning and macOS may show an unidentified developer warning because these early builds are not code-signed yet. Only run releases downloaded from this repository or cryptogainz.store.
+          Windows may show a SmartScreen warning and macOS may show an operating-system trust prompt. Only run releases downloaded from this repository or cryptogainz.store, and verify the attached SHA-256 checksum first.
 
           ## Verification
 

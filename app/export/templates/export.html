@@ -351,7 +351,7 @@
           </div>
         </div>
 
-        <div class="alert alert-light border" role="status">
+        <div class="gainz-packet-preview-context" role="status">
           <p class="mb-1"><strong>Output folder:</strong> <span id="packet_preview_output_folder">{{ packet_preview.output_folder }}</span></p>
           <p class="mb-1"><strong>Packet name:</strong> {{ packet_preview.packet_name }}</p>
           <p class="mb-1"><strong>Reference only:</strong> file path is listed, file is not copied.</p>
@@ -370,6 +370,21 @@
             {% endif %}
           </ul>
         </div>
+        {% endif %}
+
+        <h3 class="gainz-subsection-title">Material Inputs And Assumptions</h3>
+        {% if packet_preview.material_assumptions %}
+        <div class="gainz-assumption-list">
+          {% for assumption in packet_preview.material_assumptions %}
+          <article>
+            <span>{{ assumption.category }} &middot; {{ assumption.status }}</span>
+            <strong>{{ assumption.title }}</strong>
+            <p>{{ assumption.detail }}</p>
+          </article>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">No material calculation assumptions were recorded.</p>
         {% endif %}
       </div>
     </div>

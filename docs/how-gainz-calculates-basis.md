@@ -38,21 +38,36 @@ For general education, the [Gordon Law crypto cost basis guide](https://gordonla
 
 ## Proceeds, Basis, and Gain
 
-For each link:
+For each link, Gainz prorates source-reported transaction economics across the linked quantity:
 
 ```text
-linked proceeds = linked quantity * sell spot price
-linked basis    = linked quantity * buy spot price
-gain/loss       = linked proceeds - linked basis
+linked net proceeds = source sale net proceeds * (linked quantity / sale quantity)
+linked basis        = source acquisition total cost * (linked quantity / buy quantity)
+gain/loss           = linked net proceeds - linked basis
 ```
 
-Form 8949 rows are generated from those links. For partial links, Gainz prorates buy-side fees into cost basis and sell-side fees against proceeds using the linked quantity divided by the source transaction quantity.
+Form 8949 rows are generated from those links. Source-reported USD acquisition fees increase total cost. Source-reported USD disposition fees reduce net proceeds. Gainz preserves gross value, fee, and net tax value separately so the fee is included exactly once.
+
+### Fee-inclusive worked example
+
+A source file reports:
+
+- Buy: `$25.00` gross acquisition value plus a `$0.50` fee, so total cost is `$25.50`.
+- Sale: `$500.00` gross proceeds less a `$5.00` fee, so net proceeds are `$495.00`.
+
+Gainz calculates:
+
+```text
+$495.00 net proceeds - $25.50 total cost = $469.50 gain
+```
+
+The Import page's **Confirm Imported Values** step and the packet's `01_reports/import_economics.csv` show the source gross value, fee, fee currency, and resulting total cost or net proceeds. If a fee is denominated in crypto or source values do not reconcile, Gainz keeps the output in review status rather than silently guessing a USD fee.
 
 If a sell cannot be fully linked to earlier basis, Gainz reports the unlinked quantity. Unlinked sells are a warning condition, not a final answer.
 
-### CPA-applied resolution
+### Professional resolution recorded by the user
 
-When acquisition records cannot be imported directly, the Guided Review Queue provides a CPA Resolution Worksheet for the exact sale under review. A professional can separately record:
+When acquisition records cannot be imported directly, the Guided Review Queue provides a Professional Resolution Worksheet for the exact sale under review. The user can record a named professional's direction as separate fields:
 
 - Event classification.
 - Proceeds or amount realized for the unresolved quantity and the method used.
@@ -61,7 +76,7 @@ When acquisition records cannot be imported directly, the Guided Review Queue pr
 - Evidence or workpaper reference.
 - Reviewer name, role, review status, and attestation.
 
-Gainz does not allow a draft note alone to close missing basis. **Apply CPA Resolution To Calculations** requires a CPA-reviewed filing position and cited evidence. Gainz then creates an identified basis-adjustment acquisition lot for the unresolved quantity, links it only to the exact sale under review, refreshes Form 8949 output, and preserves the adjustment and workpaper IDs in the save and audit packet.
+Gainz does not allow a draft note alone to close missing basis. **Apply Professional-Directed Treatment** requires recorded professional direction, explicit confirmation, and cited evidence. Gainz does not verify the reviewer's identity or credentials. After a before/after preview, Gainz creates an identified basis-adjustment acquisition lot for the unresolved quantity, links it only to the exact sale under review, refreshes Form 8949 output, and preserves the adjustment, calculation receipt, and workpaper IDs in the save and audit packet. The user can reverse the resolution later.
 
 Disposition-date fair market value may support proceeds or amount realized. It is not automatically acquisition basis.
 
@@ -102,7 +117,7 @@ Gainz treats send and receive rows as classification questions. The **Reconcile*
 - A receive without a matching send may indicate a buy from another exchange, income, rewards, gift, or a transfer from an unimported wallet.
 - Classification changes should be based on records, not on making the reconciliation number look better.
 
-Gainz never converts the earliest sends, a quantity inferred from current holdings, or a group of sends automatically. To record a disposition, select one exact send row, choose the documented event, enter supported proceeds or amount realized, and cite the source row, valuation source, or CPA workpaper. Gainz replaces only that selected send and then applies FIFO to available supported acquisition lots. If the event itself remains unknown, a professional may explicitly treat that exact send as a taxable disposition for conservative review. Gainz still uses documented FIFO basis first; the CPA-directed `$0`-basis short-term fallback can apply only to any quantity that remains unsupported.
+Gainz never converts the earliest sends, a quantity inferred from current holdings, or a group of sends automatically. To record a disposition, select one exact send row, choose the documented event, enter supported proceeds or amount realized, and cite the source row, valuation source, or professional workpaper. Gainz replaces only that selected send and then applies FIFO to available supported acquisition lots. If the event itself remains unknown, a professional may explicitly direct a taxable-disposition treatment for that exact send. Gainz still uses documented FIFO basis first; the recorded `$0`-basis short-term fallback can apply only to a quantity that remains unsupported and must be previewed, confirmed, disclosed, and preserved as a reversible assumption.
 
 ## Loss Review
 
@@ -115,12 +130,12 @@ Loss treatment depends on the facts. The [Taxpayer Advocate Service digital asse
 An audit packet is a documentation bundle. Gainz can generate one with:
 
 - Exported Excel report.
-- A `CPA Resolution Workpapers` workbook sheet that separates professional assumptions from imported transaction facts.
+- A `Professional Workpapers` workbook sheet that separates user-recorded professional assumptions from imported transaction facts.
 - Linked Form 8949 detail and totals.
 - Holdings reconciliation.
 - Current holdings lots.
 - Import warnings.
-- CPA resolution workpapers showing event, proceeds, basis, evidence, reviewer, and whether the treatment was applied to calculations.
+- Professional resolution workpapers showing event, proceeds, basis, evidence, reviewer direction recorded by the user, before/after impact, reversal status, and whether the treatment was applied to calculations.
 - Source transaction files that are still available on disk.
 - Manifest and SHA-256 hashes.
 - A short methodology note.

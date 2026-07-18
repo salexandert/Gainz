@@ -186,15 +186,15 @@ def selected_save():
             if trans.trans_type.lower() == "buy":
                 total_purchased_quantity += trans.quantity
                 total_purchased_unlinked_quantity += trans.unlinked_quantity
-                total_purchased_usd += trans.usd_total
+                total_purchased_usd += trans.tax_usd_total
 
 
             elif trans.trans_type.lower() == "sell":
                 total_sold_quantity += trans.quantity
                 total_sold_unlinked_quantity += trans.unlinked_quantity
-                total_sold_usd += trans.usd_total
+                total_sold_usd += trans.tax_usd_total
                 if trans.unlinked_quantity > 0:
-                    profit_loss += (trans.unlinked_quantity * trans.usd_spot)
+                    profit_loss += trans.prorated_tax_usd(trans.unlinked_quantity)
 
             elif trans.trans_type.lower() == "send":
                 total_sent_quantity += trans.quantity
@@ -374,9 +374,9 @@ def selected_asset():
             acquired = trans.links[0].buy.time_stamp
 
         for link in trans.links:
-            cost_basis += link.cost_basis + link.buy.fee
+            cost_basis += link.cost_basis
 
-        proceeds = trans.usd_total - float(trans.fee)
+        proceeds = trans.tax_usd_total
         gain_loss = proceeds - cost_basis
         sold_date = trans.time_stamp
 

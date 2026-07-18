@@ -89,7 +89,7 @@
           <summary>Supported import notes</summary>
           <div class="gainz-import-detail-body">
             <p>
-              Supported sample workflows include Cash App, Coinbase, Coinbase Convert rows, Coinbase Pro/GDAX fills, Kraken, and the template import.
+              Native workflows cover Cash App, Coinbase, Coinbase Convert rows, and Coinbase Pro/GDAX fills. Use Advanced Import / Column Mapping for Kraken and other CSV formats.
             </p>
             <p class="mb-0">
               Coinbase Convert rows import as a source-asset sell and destination-asset buy using the Coinbase conversion total.
@@ -295,6 +295,58 @@
             </div>
           </details>
         </div>
+        <section
+          id="import_economics_confirmation"
+          class="gainz-import-economics-confirmation"
+          {% if not imported_count %}style="display: none;"{% endif %}
+          aria-labelledby="import_economics_heading"
+        >
+          <div class="d-flex flex-wrap align-items-start justify-content-between">
+            <div>
+              <h2 id="import_economics_heading" class="gainz-section-title mb-1">{% if guided_import %}Step 1.3: {% endif %}Confirm Imported Values</h2>
+              <p class="mb-2">Check a few source rows before continuing. Gainz keeps quantity, gross USD value, source fee, and total cost or net proceeds as separate values.</p>
+            </div>
+            <div class="gainz-import-economics-counts" aria-label="Imported value summary">
+              <span><strong id="import_economics_count">{{ data_summary.import_economics_count }}</strong> imported rows</span>
+              <span><strong id="import_economics_warning_count">{{ data_summary.import_economics_warning_count }}</strong> economic warning{% if data_summary.import_economics_warning_count != 1 %}s{% endif %}</span>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm gainz-import-economics-table">
+              <thead>
+                <tr>
+                  <th>Source row</th>
+                  <th>Type</th>
+                  <th>Asset / quantity</th>
+                  <th>Gross USD</th>
+                  <th>Fee</th>
+                  <th>Total cost / net proceeds</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody id="import_economics_confirmation_rows">
+                {% for row in data_summary.import_economics_rows %}
+                <tr>
+                  <td>{{ row.source_row }}</td>
+                  <td>{{ row.transaction_type|title }}</td>
+                  <td>{{ row.quantity }} {{ row.asset }}</td>
+                  <td>${{ '%.2f'|format(row.gross_usd|float) }}</td>
+                  <td>${{ '%.2f'|format(row.fee_usd|float) }} {{ row.fee_currency }}</td>
+                  <td><strong>{{ row.total_label }}</strong><br>${{ '%.2f'|format(row.net_tax_usd|float) }}</td>
+                  <td>
+                    {{ row.source_file }}
+                    {% if row.economic_warning %}
+                    <br><span class="gainz-status-badge status-needs-review">Review economics</span>
+                    <small class="gainz-import-economics-warning">{{ row.economic_warning }}</small>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="text-muted mb-0">Showing up to 12 recent rows. The workbook and audit packet include the complete Import Economics report.</p>
+        </section>
         <div
           id="import_continue_panel"
           class="alert {% if can_continue_import %}alert-success{% else %}alert-warning{% endif %} gainz-import-continue-panel"
@@ -302,7 +354,7 @@
           {% if not imported_count %}style="display: none;"{% endif %}
         >
           <div>
-            <strong>{% if guided_import %}Step 1.3: {% endif %}{% if can_continue_import %}Import data is ready for the next step.{% else %}Import data is loaded, but review is still needed.{% endif %}</strong>
+            <strong>{% if guided_import %}Step 1.4: {% endif %}{% if can_continue_import %}Import data is ready for the next step.{% else %}Import data is loaded, but review is still needed.{% endif %}</strong>
             <p class="mb-0 import-continue-message">
               {% if can_continue_import %}
               Continue when you have loaded the source files you want included in this review pass.

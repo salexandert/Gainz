@@ -1,0 +1,3 @@
+ID,Timestamp,Transaction Type,Asset,Quantity Transacted,Price Currency,Price at Transaction,Subtotal,Total (inclusive of fees and/or spread),Fees and/or Spread,Notes
+golden-bch-buy-001,2021-03-15 12:00:00 UTC,Buy,BCH,0.20000000,USD,$125.00,$25.00,$25.50,$0.50,Documented acquisition lot
+golden-bch-sell-001,2024-02-01 12:00:00 UTC,Sell,BCH,-0.50000000,USD,$1000.00,$500.00,$495.00,$5.00,Disposition with partial acquisition history

@@ -12,6 +12,9 @@ class Link:
         self.quantity = quantity
         self.trans1 = self.transactions[0]
         self.trans2 = self.transactions[1]
+        self.proceeds_override = None
+        self.cost_basis_override = None
+        self.resolution_item_id = ""
 
         tolerance = 1e-9  # Tolerance for floating-point comparison
 
@@ -38,10 +41,10 @@ class Link:
             self.buy = self.trans1
 
         self.symbol = self.buy.symbol
-        self.link_buy_price = (quantity * self.trans1.usd_spot)
-        self.link_sell_price = (quantity * self.trans2.usd_spot)
-        self.link_sell_date = self.trans2.time_stamp
-        self.link_buy_date = self.trans1.time_stamp
+        self.link_buy_price = self.cost_basis
+        self.link_sell_price = self.proceeds
+        self.link_sell_date = self.sell.time_stamp
+        self.link_buy_date = self.buy.time_stamp
         self.profit_loss = (self.link_sell_price - self.link_buy_price)
 
 
@@ -59,7 +62,12 @@ class Link:
 
     @property
     def holding_duration(self):
-        holding_time =  self.sell.time_stamp - self.buy.time_stamp
+        sell_time = self.sell.time_stamp
+        buy_time = self.buy.time_stamp
+        if getattr(sell_time, "tzinfo", None) or getattr(buy_time, "tzinfo", None):
+            sell_time = sell_time.replace(tzinfo=None)
+            buy_time = buy_time.replace(tzinfo=None)
+        holding_time = sell_time - buy_time
 
         return holding_time
 
@@ -67,11 +75,20 @@ class Link:
 
     @property
     def proceeds(self):
-        return self.quantity * self.sell.usd_spot
+        if self.proceeds_override is not None:
+            return float(self.proceeds_override)
+        return self.sell.prorated_tax_usd(self.quantity)
 
     @property
     def cost_basis(self):
-        return self.quantity * self.buy.usd_spot
+        if self.cost_basis_override is not None:
+            return float(self.cost_basis_override)
+        return self.buy.prorated_tax_usd(self.quantity)
+
+    def refresh_prices(self):
+        self.link_buy_price = self.cost_basis
+        self.link_sell_price = self.proceeds
+        self.profit_loss = self.link_sell_price - self.link_buy_price
 
     def other_transaction(self, trans):
         if trans == self.trans1:

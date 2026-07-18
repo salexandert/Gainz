@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 from pathlib import Path
 
@@ -36,6 +37,85 @@ def tax_evidence_packet_counts(transactions):
     return counts
 
 
+def packet_review_status(is_ready):
+    if is_ready:
+        return "Reconciliation complete - professional filing review required"
+    return "Draft packet"
+
+
+def material_assumption_rows(transactions):
+    rows = []
+
+    fee_transactions = []
+    total_fees = 0.0
+    for transaction in getattr(transactions, "transactions", []) or []:
+        try:
+            fee = float(transaction.prorated_fee_usd(transaction.quantity) or 0.0)
+        except (AttributeError, TypeError, ValueError):
+            fee = 0.0
+        if abs(fee) > 0.0000001:
+            fee_transactions.append(transaction)
+            total_fees += fee
+    if fee_transactions:
+        rows.append({
+            "category": "Imported fee treatment",
+            "title": f"Source fees included for {len(fee_transactions)} transaction(s)",
+            "detail": (
+                f"Gainz included ${total_fees:.2f} of imported USD fees in proceeds or cost basis. "
+                "Review 01_reports/import_economics.csv for source gross, fee, and net values."
+            ),
+            "status": "Calculation input",
+        })
+
+    seen_warnings = set()
+    for transaction in getattr(transactions, "transactions", []) or []:
+        warning = str(getattr(transaction, "economics_warning", "") or "").strip()
+        if not warning or warning in seen_warnings:
+            continue
+        seen_warnings.add(warning)
+        rows.append({
+            "category": "Imported economics warning",
+            "title": warning,
+            "detail": (
+                f"Source: {Path(str(getattr(transaction, 'source', '') or 'Unknown')).name}; "
+                f"asset: {getattr(transaction, 'symbol', '') or 'Unknown'}."
+            ),
+            "status": "Needs review",
+        })
+
+    for review in getattr(transactions, "work_order_reviews", []) or []:
+        if str(review.get("calculation_applied") or "") != "Yes":
+            continue
+        receipt = {}
+        try:
+            receipt = json.loads(str(review.get("calculation_receipt_json") or "{}"))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            receipt = {}
+        asset = str(review.get("asset") or receipt.get("asset") or "Asset")
+        basis_method = CPA_BASIS_METHODS.get(
+            str(review.get("basis_method") or ""),
+            str(review.get("basis_method") or "Not recorded"),
+        )
+        date_method = CPA_ACQUISITION_DATE_METHODS.get(
+            str(review.get("acquisition_date_method") or ""),
+            str(review.get("acquisition_date_method") or "Not recorded"),
+        )
+        rows.append({
+            "category": "Professional calculation treatment",
+            "title": f"{asset} treatment applied under direction recorded by the user",
+            "detail": (
+                f"Basis: {basis_method}; holding period: {date_method}; "
+                f"added proceeds ${float(receipt.get('added_proceeds') or 0):.2f}; "
+                f"added basis ${float(receipt.get('added_basis') or 0):.2f}; "
+                f"gain/loss effect ${float(receipt.get('added_gain_loss') or 0):.2f}. "
+                f"Evidence: {review.get('evidence_reference') or 'Not recorded'}."
+            ),
+            "status": "Applied - reversible",
+        })
+
+    return rows
+
+
 def get_packet_preview(transactions, readiness, output_dir):
     source_paths = transaction_source_paths(transactions)
     evidence_counts = tax_evidence_packet_counts(transactions)
@@ -44,8 +124,10 @@ def get_packet_preview(transactions, readiness, output_dir):
     unresolved_items = list(readiness.get("blockers") or []) + list(readiness.get("warnings") or [])
     unresolved_groups = list(readiness.get("blocker_groups") or [])
 
+    assumptions = material_assumption_rows(transactions)
+
     return {
-        "status": "Filing-ready review packet" if is_ready else "Draft packet",
+        "status": packet_review_status(is_ready),
         "status_class": readiness.get("status_class", ""),
         "is_draft": not is_ready,
         "copied_files_count": len(source_paths) + evidence_counts["copied"],
@@ -58,6 +140,8 @@ def get_packet_preview(transactions, readiness, output_dir):
         "unresolved_blocker_group_count": len(unresolved_groups),
         "unresolved_blocker_groups": unresolved_groups,
         "work_order_review_summary": readiness.get("work_order_review_summary", {}),
+        "material_assumption_count": len(assumptions),
+        "material_assumptions": assumptions,
         "output_folder": str(output_dir or ""),
         "packet_name": f"{packet_prefix}_YYYY-MM-DD_HH-MM-SS",
     }
@@ -112,6 +196,7 @@ CPA_EVENT_CLASSIFICATIONS = {
 CPA_PROCEEDS_METHODS = {
     "": "Not determined",
     "source_reported": "Amount reported by source record or broker form",
+    "allocated_source_value": "Calculated allocation from imported source transaction",
     "disposition_date_fmv": "Fair market value at disposition",
     "property_received_fmv": "Fair market value of property or services received",
     "filed_form": "Amount reported on filed Form 8949 or Schedule D",
@@ -129,7 +214,7 @@ CPA_BASIS_METHODS = {
     "fork_airdrop_supported": "Fork or airdrop basis supported by records",
     "carryover_basis": "Supported carryover basis",
     "actual_zero_basis": "Asset actually had a zero basis",
-    "unknown_zero_for_review": "CPA-directed conservative $0 basis when records remain unavailable",
+    "unknown_zero_for_review": "Conservative $0 basis under recorded professional direction",
     "unknown": "Unknown basis",
     "not_applicable": "Not applicable",
 }
@@ -138,22 +223,22 @@ CPA_RESOLUTION_STATUSES = {
     "": "Not set",
     "draft_research": "Draft - needs research",
     "prepared_for_cpa": "Prepared for CPA review",
-    "cpa_reviewed_position": "CPA-reviewed filing position",
+    "cpa_reviewed_position": "Professional direction recorded by user",
     "previously_filed": "Previously filed treatment",
 }
 
 CPA_ACQUISITION_DATE_METHODS = {
     "": "Not determined",
     "documented_date": "Documented acquisition date",
-    "cpa_conservative_short_term": "Unknown date - CPA-directed short-term assumption",
+    "cpa_conservative_short_term": "Unknown date - recorded short-term assumption",
 }
 
 CONSERVATIVE_MAX_GAIN_DISCLOSURE = (
-    "Gainz could not reconstruct the acquisition history for this exact quantity. At the direction "
-    "of the reviewing tax professional, Gainz used supported proceeds, $0 adjusted basis, and a "
+    "Gainz could not reconstruct the acquisition history for this exact quantity. The user recorded "
+    "professional direction to use supported proceeds, $0 adjusted basis, and a "
     "short-term holding-period assumption for its capital-gain calculation. The acquisition date "
     "remains unknown and is left blank in report rows. This treatment may overstate tax and does "
-    "not establish what actually happened."
+    "not establish what actually happened. Gainz does not verify the reviewer's identity or credentials."
 )
 
 
@@ -221,6 +306,10 @@ def _apply_work_order_review(row, transactions=None):
     row["reviewer_name"] = review.get("reviewer_name", "")
     row["reviewer_role"] = review.get("reviewer_role", "")
     row["reviewer_role_label"] = CPA_REVIEWER_ROLES.get(row["reviewer_role"], "")
+    row["direction_date"] = review.get("direction_date", "")
+    row["direction_entered_by"] = review.get("direction_entered_by", "")
+    row["reviewer_credential"] = review.get("reviewer_credential", "")
+    row["reviewer_jurisdiction"] = review.get("reviewer_jurisdiction", "")
     row["event_classification"] = review.get("event_classification", "")
     row["event_classification_label"] = CPA_EVENT_CLASSIFICATIONS.get(
         row["event_classification"],
@@ -257,9 +346,17 @@ def _apply_work_order_review(row, transactions=None):
     row["acquisition_date"] = review.get("acquisition_date", "")
     row["calculation_applied"] = review.get("calculation_applied", "")
     row["adjustment_transaction_uid"] = review.get("adjustment_transaction_uid", "")
+    row["calculation_receipt_json"] = review.get("calculation_receipt_json", "")
+    row["resolution_applied_at"] = review.get("resolution_applied_at", "")
+    row["resolution_reversed_at"] = review.get("resolution_reversed_at", "")
+    row["reversal_note"] = review.get("reversal_note", "")
     row["has_cpa_resolution_details"] = any([
         row["reviewer_name"],
         row["reviewer_role"],
+        row["direction_date"],
+        row["direction_entered_by"],
+        row["reviewer_credential"],
+        row["reviewer_jurisdiction"],
         row["event_classification"],
         row["proceeds_method"],
         row["proceeds_value"],
@@ -272,6 +369,7 @@ def _apply_work_order_review(row, transactions=None):
         row["professional_attestation"],
         row["acquisition_date"],
         row["calculation_applied"],
+        row["calculation_receipt_json"],
     ])
     row["review_updated_at"] = review.get("updated_at", "")
     if decision_label:
@@ -709,6 +807,10 @@ def reconciliation_work_order_markdown(rows):
             f"- Review decision: {row.get('review_decision_label') or 'Not reviewed'}",
             f"- Review note: {row.get('review_note') or 'N/A'}",
             f"- Reviewer: {row.get('reviewer_name') or 'N/A'} ({row.get('reviewer_role_label') or 'role not recorded'})",
+            f"- Direction date: {row.get('direction_date') or 'N/A'}",
+            f"- Direction entered by: {row.get('direction_entered_by') or 'N/A'}",
+            f"- Credential entered by user: {row.get('reviewer_credential') or 'Not recorded'}",
+            f"- Jurisdiction entered by user: {row.get('reviewer_jurisdiction') or 'Not recorded'}",
             f"- Resolution status: {row.get('resolution_status_label') or 'Not set'}",
             f"- Asset: {row['asset'] or 'N/A'}",
             f"- Year: {row['year'] or 'N/A'}",

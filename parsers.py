@@ -104,6 +104,13 @@ COLUMN_ALIASES = {
         'currency price',
         'fiat currency',
     ],
+    'fee_currency': [
+        'fee currency',
+        'fee asset',
+        'fee unit',
+        'commission currency',
+        'commission asset',
+    ],
     'fiat_amount': [
         'amount',
         'fiat amount',
@@ -157,7 +164,7 @@ COLUMN_ALIASES = {
 
 TRANSACTION_TYPE_KEYWORDS = {
     'Buy': ['buy', 'bought', 'purchase', 'purchased', 'acquire', 'acquired', 'acquisition'],
-    'Sell': ['sell', 'sold', 'sale', 'cash out'],
+    'Sell': ['sell', 'sold', 'sale', 'cash out', 'dispose', 'disposed', 'disposition', 'spend', 'spent', 'payment'],
     'Send': ['send', 'sent', 'withdrawal', 'withdraw', 'transfer out', 'outgoing'],
     'Receive': ['receive', 'received', 'deposit', 'incoming', 'reward', 'staking', 'interest', 'airdrop', 'earn', 'coinbase earn'],
 }
@@ -200,7 +207,12 @@ IMPORT_MAPPING_FIELDS = [
     {'field': 'asset_type', 'label': 'Asset symbol', 'required': True},
     {'field': 'asset_amount', 'label': 'Asset quantity', 'required': True},
     {'field': 'asset_price', 'label': 'USD spot price per unit', 'required': False},
-    {'field': 'fiat_amount', 'label': 'Total USD value', 'required': False},
+    {'field': 'fiat_amount', 'label': 'Gross USD value', 'required': False},
+    {'field': 'fee', 'label': 'Fee or spread', 'required': False},
+    {'field': 'fee_currency', 'label': 'Fee currency or asset', 'required': False},
+    {'field': 'subtotal', 'label': 'Subtotal before fees', 'required': False},
+    {'field': 'total', 'label': 'Total including fees', 'required': False},
+    {'field': 'net_amount', 'label': 'Net amount after fees', 'required': False},
     {'field': 'notes', 'label': 'Notes/details', 'required': False},
 ]
 
@@ -532,16 +544,133 @@ def derive_asset_price(row, column_lookup, quantity):
     return 0.0
 
 
-def _standard_row_from_lookup(row, column_lookup):
-    quantity = parse_quantity_value(get_row_value(row, column_lookup, 'asset_amount'))
+def _optional_money_field(row, column_lookup, field):
+    column = column_lookup.get(field)
+    if column is None:
+        return None
 
+    value = row.get(column)
+    if pd.isna(value) or str(value).strip().lower() in {'', 'nan', 'none'}:
+        return None
+
+    return abs(parse_money_value(value))
+
+
+def _standard_economics(row, column_lookup, quantity, transaction_type, profile='generic'):
+    transaction_type = standardize_transaction_type(transaction_type)
+    direct_price = abs(parse_money_value(get_row_value(row, column_lookup, 'asset_price')))
+    subtotal = _optional_money_field(row, column_lookup, 'subtotal')
+    total = _optional_money_field(row, column_lookup, 'total')
+    net_amount = _optional_money_field(row, column_lookup, 'net_amount')
+    fiat_amount = _optional_money_field(row, column_lookup, 'fiat_amount')
+    source_fee_amount = _optional_money_field(row, column_lookup, 'fee')
+    fee_currency = normalize_asset_symbol(
+        get_row_value(
+            row,
+            column_lookup,
+            'fee_currency',
+            get_row_value(row, column_lookup, 'price_currency', 'USD'),
+        )
+    ) or 'USD'
+    fee_is_usd = fee_currency in FIAT_ASSET_SYMBOLS
+    fee_usd = source_fee_amount if fee_is_usd else None
+
+    gross = None
+    net = None
+    source_parts = []
+
+    if profile == 'coinbase':
+        gross = subtotal
+        net = total
+        source_parts.extend(field for field, value in (('subtotal', subtotal), ('total', total)) if value is not None)
+    elif profile == 'cashapp':
+        gross = fiat_amount
+        net = net_amount
+        source_parts.extend(field for field, value in (('amount', fiat_amount), ('net amount', net_amount)) if value is not None)
+    else:
+        gross = subtotal if subtotal is not None else fiat_amount
+        net = net_amount if net_amount is not None else total
+        source_parts.extend(field for field, value in (
+            ('subtotal', subtotal),
+            ('gross value', fiat_amount),
+            ('net amount', net_amount),
+            ('total', total),
+        ) if value is not None)
+
+    spot_gross = direct_price * abs(quantity) if direct_price and quantity else None
+    if gross is None:
+        gross = spot_gross
+        if gross is not None:
+            source_parts.append('spot price')
+
+    if gross is None and net is not None:
+        if transaction_type == 'Buy' and fee_usd is not None:
+            gross = max(net - fee_usd, 0.0)
+        elif transaction_type == 'Sell' and fee_usd is not None:
+            gross = net + fee_usd
+        else:
+            gross = net
+
+    if gross is None:
+        gross = 0.0
+
+    if net is None:
+        if transaction_type == 'Buy':
+            net = gross + float(fee_usd or 0.0)
+        elif transaction_type == 'Sell':
+            net = max(gross - float(fee_usd or 0.0), 0.0)
+        else:
+            net = gross
+
+    warning = ''
+    if source_fee_amount and not fee_is_usd:
+        warning = (
+            f"Fee amount {source_fee_amount:g} {fee_currency} was preserved but not converted to USD. "
+            "Add a supported USD fee value before relying on tax totals."
+        )
+    elif source_fee_amount is not None and transaction_type in {'Buy', 'Sell'}:
+        expected_net = gross + source_fee_amount if transaction_type == 'Buy' else max(gross - source_fee_amount, 0.0)
+        if abs(net - expected_net) > 0.02:
+            warning = (
+                f"Source gross, fee, and net values differ by ${abs(net - expected_net):,.2f}. "
+                "Review the source economics before relying on tax totals."
+            )
+
+    asset_price = direct_price or (gross / abs(quantity) if quantity else 0.0)
     return {
+        'Asset Price': asset_price,
+        'Gross USD': gross,
+        'Fee USD': fee_usd,
+        'Source Fee Amount': source_fee_amount,
+        'Fee Currency': fee_currency,
+        'Net USD': net,
+        'Economic Source': ', '.join(dict.fromkeys(source_parts)) or 'spot price',
+        'Economic Warning': warning,
+    }
+
+
+def _standard_row_from_lookup(row, column_lookup, profile='generic'):
+    quantity = parse_quantity_value(get_row_value(row, column_lookup, 'asset_amount'))
+    transaction_type = standardize_transaction_type(get_row_value(row, column_lookup, 'transaction_type', ''))
+    economics = _standard_economics(
+        row,
+        column_lookup,
+        quantity,
+        transaction_type,
+        profile=profile,
+    )
+
+    standard_row = {
         'Asset Type': normalize_asset_symbol(get_row_value(row, column_lookup, 'asset_type')),
-        'Transaction Type': standardize_transaction_type(get_row_value(row, column_lookup, 'transaction_type', '')),
+        'Transaction Type': transaction_type,
         'Asset Amount': abs(quantity) if quantity < 0 else quantity,
         'Date': get_row_value(row, column_lookup, 'date'),
-        'Asset Price': derive_asset_price(row, column_lookup, quantity),
+        'Source Row': row.get('__gainz_source_row__'),
+        'Source Transaction ID': get_row_value(row, column_lookup, 'transaction_id', ''),
+        'Source Notes': get_row_value(row, column_lookup, 'notes', ''),
     }
+    standard_row.update(economics)
+    return standard_row
 
 
 def transform_generic_to_standard(df, column_mapping=None):
@@ -551,7 +680,10 @@ def transform_generic_to_standard(df, column_mapping=None):
     if not required_fields.issubset(column_lookup):
         return df
 
-    result_df = pd.DataFrame([_standard_row_from_lookup(row, column_lookup) for _, row in df.iterrows()])
+    result_df = pd.DataFrame([
+        _standard_row_from_lookup(row, column_lookup, profile='generic')
+        for _, row in df.iterrows()
+    ])
     result_df = result_df[
         result_df['Asset Type'].notna()
         & (result_df['Asset Type'] != '')
@@ -644,7 +776,10 @@ def transform_cashapp_to_standard(df):
         DataFrame: Transformed dataframe with standardized column names
     """
     column_lookup = build_column_lookup(df.columns)
-    result_df = pd.DataFrame([_standard_row_from_lookup(row, column_lookup) for _, row in df.iterrows()])
+    result_df = pd.DataFrame([
+        _standard_row_from_lookup(row, column_lookup, profile='cashapp')
+        for _, row in df.iterrows()
+    ])
 
     # Filter out rows with empty Asset Type or fiat-only activity.
     result_df = result_df[
@@ -675,19 +810,31 @@ def transform_coinbase_to_standard(df):
         trans_type_lower = trans_type.lower()
         timestamp = get_row_value(row, column_lookup, 'date')
         quantity = parse_quantity_value(get_row_value(row, column_lookup, 'asset_amount'))
-        asset_price = derive_asset_price(row, column_lookup, quantity)
+        standard_row = _standard_row_from_lookup(row, column_lookup, profile='coinbase')
+        asset_price = standard_row['Asset Price']
 
         if 'convert' in trans_type_lower:
             convert = parse_coinbase_convert_note(get_row_value(row, column_lookup, 'notes'))
             if convert:
-                conversion_total = (
-                    parse_money_value(get_row_value(row, column_lookup, 'total'))
-                    or parse_money_value(get_row_value(row, column_lookup, 'subtotal'))
+                conversion_gross = (
+                    abs(parse_money_value(get_row_value(row, column_lookup, 'subtotal')))
                     or (convert['from_quantity'] * asset_price)
+                    or abs(parse_money_value(get_row_value(row, column_lookup, 'total')))
                 )
+                conversion_net = (
+                    abs(parse_money_value(get_row_value(row, column_lookup, 'total')))
+                    or conversion_gross
+                )
+                conversion_fee = abs(parse_money_value(get_row_value(row, column_lookup, 'fee')))
 
-                sell_spot = conversion_total / convert['from_quantity'] if convert['from_quantity'] else asset_price
-                buy_spot = conversion_total / convert['to_quantity'] if convert['to_quantity'] else 0.0
+                sell_spot = conversion_gross / convert['from_quantity'] if convert['from_quantity'] else asset_price
+                buy_spot = conversion_gross / convert['to_quantity'] if convert['to_quantity'] else 0.0
+                conversion_warning = (
+                    "Coinbase Convert fee was preserved on the disposal side only; review the source "
+                    "before relying on acquired-asset basis."
+                    if conversion_fee
+                    else ''
+                )
 
                 rows.append({
                     'Asset Type': convert['from_asset'],
@@ -695,6 +842,16 @@ def transform_coinbase_to_standard(df):
                     'Asset Amount': abs(convert['from_quantity']),
                     'Date': timestamp,
                     'Asset Price': sell_spot,
+                    'Gross USD': conversion_gross,
+                    'Fee USD': conversion_fee,
+                    'Source Fee Amount': conversion_fee,
+                    'Fee Currency': standard_row['Fee Currency'],
+                    'Net USD': conversion_net,
+                    'Economic Source': standard_row['Economic Source'],
+                    'Economic Warning': '',
+                    'Source Row': standard_row['Source Row'],
+                    'Source Transaction ID': standard_row['Source Transaction ID'],
+                    'Source Notes': standard_row['Source Notes'],
                 })
                 rows.append({
                     'Asset Type': convert['to_asset'],
@@ -702,6 +859,16 @@ def transform_coinbase_to_standard(df):
                     'Asset Amount': abs(convert['to_quantity']),
                     'Date': timestamp,
                     'Asset Price': buy_spot,
+                    'Gross USD': conversion_gross,
+                    'Fee USD': 0.0,
+                    'Source Fee Amount': 0.0,
+                    'Fee Currency': standard_row['Fee Currency'],
+                    'Net USD': conversion_gross,
+                    'Economic Source': standard_row['Economic Source'],
+                    'Economic Warning': conversion_warning,
+                    'Source Row': standard_row['Source Row'],
+                    'Source Transaction ID': standard_row['Source Transaction ID'],
+                    'Source Notes': standard_row['Source Notes'],
                 })
                 continue
 
@@ -713,13 +880,14 @@ def transform_coinbase_to_standard(df):
         if standard_type in ('Sell', 'Send') or quantity < 0:
             quantity = abs(quantity)
 
-        rows.append({
+        standard_row.update({
             'Asset Type': asset,
             'Transaction Type': standard_type,
             'Asset Amount': quantity,
             'Date': timestamp,
             'Asset Price': asset_price,
         })
+        rows.append(standard_row)
 
     return pd.DataFrame(rows)
 
@@ -748,6 +916,21 @@ def transform_gdax_to_standard(df):
         timestamp = row.get('created at')
         quantity = parse_quantity_value(row.get('size'))
         asset_price = parse_money_value(row.get('price'))
+        gross = abs(parse_money_value(row.get('total'))) or (abs(quantity) * asset_price)
+        source_fee_amount = abs(parse_money_value(row.get('fee')))
+        fee_currency = normalize_asset_symbol(row.get('price/fee/total unit', 'USD')) or 'USD'
+        fee_usd = source_fee_amount if fee_currency in FIAT_ASSET_SYMBOLS else None
+        net = (
+            gross + float(fee_usd or 0.0)
+            if trans_type == 'Buy'
+            else max(gross - float(fee_usd or 0.0), 0.0)
+        )
+        economics_warning = ''
+        if source_fee_amount and fee_usd is None:
+            economics_warning = (
+                f"Fee amount {source_fee_amount:g} {fee_currency} was preserved but not converted to USD. "
+                "Add a supported USD fee value before relying on tax totals."
+            )
 
         rows.append({
             'Asset Type': asset,
@@ -755,6 +938,16 @@ def transform_gdax_to_standard(df):
             'Asset Amount': abs(quantity),
             'Date': timestamp,
             'Asset Price': asset_price,
+            'Gross USD': gross,
+            'Fee USD': fee_usd,
+            'Source Fee Amount': source_fee_amount,
+            'Fee Currency': fee_currency,
+            'Net USD': net,
+            'Economic Source': 'GDAX total, fee, and price',
+            'Economic Warning': economics_warning,
+            'Source Row': row.get('__gainz_source_row__'),
+            'Source Transaction ID': row.get('trade id', ''),
+            'Source Notes': '',
         })
 
     return pd.DataFrame(rows)
@@ -837,6 +1030,7 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
         rows_to_skip = max(data_start_row - header_row - 1, 0)
         if rows_to_skip:
             raw_df = raw_df.iloc[rows_to_skip:].reset_index(drop=True)
+        raw_df['__gainz_source_row__'] = range(data_start_row, data_start_row + len(raw_df))
 
         # Transform to standard format based on detected format
         if column_mapping:
@@ -877,10 +1071,14 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
 
         for row_number, (_, row) in enumerate(trans_df.iterrows(), start=data_start_row):
             try:
+                source_row_number = row.get('Source Row', row_number)
+                if pd.isna(source_row_number):
+                    source_row_number = row_number
+                source_row_number = int(source_row_number)
                 symbol = normalize_asset_symbol(row['Asset Type'])
                 if not symbol or symbol in FIAT_ASSET_SYMBOLS:
                     warning = (
-                        f"Skipped row {row_number} from {os.path.basename(file_path)}: "
+                        f"Skipped row {source_row_number} from {os.path.basename(file_path)}: "
                         f"missing or non-crypto asset '{row['Asset Type']}'"
                     )
                     print(f"Warning: {warning}")
@@ -911,16 +1109,37 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
                     temp_trans = Receive(symbol=symbol, quantity=quantity, time_stamp=time_stamp, usd_spot=usd_spot, source=file_path)
                 else:
                     warning = (
-                        f"Skipped row {row_number} from {os.path.basename(file_path)}: "
+                        f"Skipped row {source_row_number} from {os.path.basename(file_path)}: "
                         f"unrecognized transaction type '{row['Transaction Type']}'"
                     )
                     print(f"Warning: {warning}")
                     import_warnings.append(warning)
                     continue
 
+                temp_trans.set_economics(
+                    fee=None if pd.isna(row.get('Fee USD')) else row.get('Fee USD'),
+                    gross_usd_total=None if pd.isna(row.get('Gross USD')) else row.get('Gross USD'),
+                    net_usd_total=None if pd.isna(row.get('Net USD')) else row.get('Net USD'),
+                    fee_currency=row.get('Fee Currency', 'USD'),
+                    source_fee_amount=(
+                        None if pd.isna(row.get('Source Fee Amount')) else row.get('Source Fee Amount')
+                    ),
+                    source_row=source_row_number,
+                    source_transaction_id=row.get('Source Transaction ID', ''),
+                    economics_source=row.get('Economic Source', ''),
+                    economics_warning=row.get('Economic Warning', ''),
+                    source_notes=row.get('Source Notes', ''),
+                )
+
+                if temp_trans.economics_warning:
+                    import_warnings.append(
+                        f"Imported row {source_row_number} from {os.path.basename(file_path)} with an economic-value warning: "
+                        f"{temp_trans.economics_warning}"
+                    )
+
                 if usd_spot == 0:
                     import_warnings.append(
-                        f"Imported row {row_number} from {os.path.basename(file_path)} with $0 USD spot price. "
+                        f"Imported row {source_row_number} from {os.path.basename(file_path)} with $0 USD spot price. "
                         "Map a USD spot price or total USD value column if this is not intentional."
                     )
 
@@ -937,7 +1156,7 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
                     imported_count += 1
             except KeyError:
                 warning = (
-                    f"Skipped row {row_number} from {os.path.basename(file_path)}: "
+                    f"Skipped row {source_row_number if 'source_row_number' in locals() else row_number} from {os.path.basename(file_path)}: "
                     "missing one of the required import columns."
                 )
                 parsers_logger.exception("Import row is missing a required column.")
@@ -945,7 +1164,7 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
                 continue
             except Exception:
                 warning = (
-                    f"Skipped row {row_number} from {os.path.basename(file_path)}: "
+                    f"Skipped row {source_row_number if 'source_row_number' in locals() else row_number} from {os.path.basename(file_path)}: "
                     "Gainz could not parse this row. Check date, transaction type, "
                     "asset quantity, and USD value."
                 )

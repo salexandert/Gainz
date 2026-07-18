@@ -58,7 +58,9 @@ If you are learning Gainz, click **Try Demo Data**. This loads the bundled synth
 
 Upload one file at a time. After a file is selected, Gainz shows the filename, import progress, and how many rows were imported, skipped, or warned after each upload.
 
-After data is loaded, click **Continue to Declare Holdings** when you have imported the source files you want included in this review pass.
+After each import, complete **Step 1.3: Confirm Imported Values**. Compare the source row, quantity, gross value, fee, fee currency, and total cost or net proceeds. Gainz keeps economic warnings blocking when a crypto-denominated fee cannot be valued or when source gross, fee, and net values do not reconcile.
+
+After the imported economics look correct and source warnings have a decision, use **Step 1.4: Continue to Declare Holdings**.
 
 Supported workflows currently include:
 
@@ -66,10 +68,12 @@ Supported workflows currently include:
 - Coinbase CSV exports
 - Coinbase Convert rows
 - Coinbase Pro / GDAX fills
-- Kraken/custom template imports
+- Kraken and other custom CSVs through Advanced Import / Column Mapping
 - Batch manual transaction entry
 
-File names help Gainz detect the parser. Use names that include terms such as `cash_app`, `coinbase`, `coinbase_pro`, `gdax`, or `kraken`.
+See the [importer coverage and economic-fields matrix]({{ '/importer-coverage/' | relative_url }}) for the exact native and mapped fields, fee behavior, and current limitations.
+
+File names help Gainz detect native formats. Use names that include terms such as `cash_app`, `coinbase`, `coinbase_pro`, or `gdax`. Kraken and other formats should use Advanced Import / Column Mapping so you can confirm the header and economic fields explicitly.
 
 Gainz also recognizes common column-name variations. For example, headers like `Transaction Date`, `Activity Type`, `Crypto Quantity`, `Token Symbol`, `Spot Price USD`, and `Transaction Value` can be mapped into the import fields even when an exchange changes its export wording. If the columns are too unusual, Gainz asks for the header row and lets you choose the Date/time, Transaction type, Asset symbol, Asset quantity, and USD price/value columns.
 
@@ -153,9 +157,12 @@ Gainz applies default FIFO basis links automatically when matching earlier acqui
 
 For a simple first review pass, use the automatic FIFO result. FIFO links sales to the oldest available acquisition lots first, then creates Form 8949-style rows from those links.
 
-Repeat for assets with unlinked sales. If a sale still needs earlier basis, open **Reconcile**, then use the Guided Review Queue. A research note keeps the packet draft. To fully resolve the item, a CPA, EA, or tax professional records the event, proceeds, adjusted basis, acquisition-date method, evidence reference, and professional attestation in the CPA Resolution Worksheet, then applies the selected resolution. Gainz links the exact sale, refreshes Form 8949 output, and preserves the applied workpaper.
+Repeat for assets with unlinked sales. If a sale still needs earlier basis, open **Reconcile**, then use the Guided Review Queue. A research note keeps the packet draft. To apply a professional-directed treatment, first select one mutually exclusive treatment, then record the event, proceeds, adjusted basis, acquisition-date method, evidence reference, named professional direction, and attestation in the Professional Resolution Worksheet. Review the exact before/after Form 8949 impact and explicitly apply it. Gainz links only the unresolved quantity of the exact sale, refreshes output, preserves a calculation receipt, and provides a reversal action.
 
 If acquisition records truly cannot be reconstructed, the professional can choose **Apply conservative $0-basis short-term treatment**. Gainz uses documented basis first, then treats only the remaining unsupported quantity as short-term gain with `$0` basis, leaves the unknown acquisition date blank in report rows, and records that the assumption may overstate tax. This action is never automatic and cannot be applied to an inferred group of sends.
+
+![Gainz professional treatment calculation preview]({{ '/assets/screenshots/gainz-professional-resolution-preview.png' | relative_url }})
+{: .screenshot-frame }
 
 Use **Stats & Charts** as an advanced inspection page when you need deeper asset-level details, current-lot estimates, sales rows, Form 8949 rows, or charts. It is useful for analysis, but Dashboard and Reports & Export are the main workflow guides.
 
@@ -200,12 +207,12 @@ The guided queue shows one unresolved item at a time. The decision fields and bu
 
 Choose the review decision that matches what you found. Draft/research decisions document uncertainty but do not clear the underlying calculation blocker:
 
-- `Apply CPA Resolution To Calculations` for an evidence-supported, professionally reviewed missing-basis position.
-- `Apply conservative $0-basis short-term treatment` for an exact unsupported quantity when a CPA, EA, or tax professional directs the worst-case capital-gain assumption and signs the attestation.
+- `Apply Professional-Directed Treatment` for an evidence-supported missing-basis position whose professional direction the user has recorded.
+- `Apply conservative $0-basis short-term treatment` for an exact unsupported quantity when a CPA, EA, or tax professional directs that capital-gain assumption and the user records the direction and attestation.
 - `Import missing records`
 - `Classify documented send as disposal`
 - `Keep as owner transfer`
-- `Document conservative $0 basis for CPA review` as a draft workpaper choice, or select that basis method inside a CPA-reviewed worksheet before applying it.
+- `Document conservative $0 basis for professional review` as a draft workpaper choice, or record professional direction in the worksheet, review the calculation impact, and explicitly apply it. Gainz does not verify the reviewer's identity or credentials, and applied resolutions remain reversible.
 - `Needs research`
 - `Leave unresolved for draft only`
 - `Sent to CPA`
@@ -244,7 +251,7 @@ Before generating an audit packet, review **Audit Packet Preview**. It shows:
 - Copied files count.
 - Reference-only tax evidence count.
 - Missing evidence paths count.
-- Draft or filing-ready status.
+- Draft or reconciliation-complete status, with professional filing review still required.
 - Unresolved blockers and warnings.
 - Output folder.
 - Packet name pattern.
@@ -256,7 +263,7 @@ If blockers remain, Gainz can generate draft output only after you check the vis
 After Gainz generates an audit packet, it opens a packet success screen with:
 
 - Packet path.
-- Draft or filing-ready status.
+- Draft or reconciliation-complete status, with professional filing review still required.
 - Copied files count.
 - Reference-only evidence count.
 - Missing evidence paths count.
@@ -277,7 +284,7 @@ The audit packet includes:
 - Tax evidence inventory CSV and JSON.
 - Suggested filed totals CSV and JSON.
 - Reconciliation work order CSV and Markdown.
-- CPA resolution workpaper CSV and workbook sheet with the event, proceeds, basis, acquisition-date method, evidence, reviewer, attestation, target sale ID, adjustment lot ID, assumption disclosure, and calculation-applied status.
+- Professional resolution workpaper CSV and workbook sheet with the event, proceeds, basis, acquisition-date method, evidence, named reviewer direction, user-entered attestation, target sale ID, adjustment lot ID, assumption disclosure, before/after receipt, reversal status, and calculation-applied status.
 - Unknown gap memo CSV and Markdown for unresolved items documented as research or CPA questions.
 - Holdings reconciliation CSV.
 - Current holdings lots CSV.

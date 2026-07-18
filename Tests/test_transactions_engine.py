@@ -1168,7 +1168,7 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertAlmostEqual(2, sell.quantity)
         self.assertAlmostEqual(200, sell.usd_spot)
         self.assertEqual(1, len(transactions.conversions))
-        self.assertIn("CPA documented cash_sale", transactions.conversions[0].reason)
+        self.assertIn("Professional direction recorded by user: cash_sale", transactions.conversions[0].reason)
 
     def test_apply_cpa_basis_resolution_links_exact_sale_with_separate_basis(self):
         transactions = empty_transactions()
@@ -1233,9 +1233,9 @@ class TransactionsEngineTests(unittest.TestCase):
             work_order_item_id="basis-item-1",
         )
 
-        self.assertAlmostEqual(1000, sell.usd_spot)
-        self.assertAlmostEqual(500, existing_link.proceeds)
-        self.assertAlmostEqual(400, existing_link.profit_loss)
+        self.assertAlmostEqual(800, sell.usd_spot)
+        self.assertAlmostEqual(400, existing_link.proceeds)
+        self.assertAlmostEqual(300, existing_link.profit_loss)
         self.assertAlmostEqual(500, adjustment_link.proceeds)
         self.assertAlmostEqual(125, adjustment_link.cost_basis)
         self.assertEqual(0, sell.unlinked_quantity)
@@ -1251,7 +1251,7 @@ class TransactionsEngineTests(unittest.TestCase):
             acquisition_date="",
             basis_value=0,
             proceeds_value=500,
-            basis_method="CPA-directed conservative $0 basis",
+            basis_method="Conservative $0 basis under recorded professional direction",
             evidence_reference="CPA workpaper BTC-unknown-basis",
             work_order_item_id="btc-unknown-basis",
             acquisition_date_method="cpa_conservative_short_term",
@@ -1285,7 +1285,7 @@ class TransactionsEngineTests(unittest.TestCase):
                 acquisition_date="",
                 basis_value=1,
                 proceeds_value=500,
-                basis_method="CPA-directed conservative $0 basis",
+                basis_method="Conservative $0 basis under recorded professional direction",
                 evidence_reference="CPA workpaper BTC-unknown-basis",
                 work_order_item_id="btc-unknown-basis",
                 acquisition_date_method="cpa_conservative_short_term",

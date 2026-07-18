@@ -129,6 +129,7 @@ function gainzConfirmDialog(options) {
 }
 
 function gainzUpdateImportContinuePanel(summary) {
+    gainzUpdateImportEconomics(summary);
     var panel = $("#import_continue_panel");
     if (panel.length === 0 || !summary) {
         return;
@@ -157,6 +158,44 @@ function gainzUpdateImportContinuePanel(summary) {
     } else {
         panel.hide();
     }
+}
+
+function gainzImportMoney(value) {
+    var number = Number(value || 0);
+    return "$" + (Number.isFinite(number) ? number : 0).toFixed(2);
+}
+
+function gainzUpdateImportEconomics(summary) {
+    var panel = $("#import_economics_confirmation");
+    var tbody = $("#import_economics_confirmation_rows");
+    if (panel.length === 0 || tbody.length === 0 || !summary) {
+        return;
+    }
+
+    var rows = summary.import_economics_rows || [];
+    $("#import_economics_count").text(summary.import_economics_count || 0);
+    $("#import_economics_warning_count").text(summary.import_economics_warning_count || 0);
+    tbody.empty();
+    rows.forEach(function(row) {
+        var sourceCell = $("<td></td>").text(row.source_file || "Manual / Unknown");
+        if (row.economic_warning) {
+            sourceCell.append("<br>").append(
+                $('<span class="gainz-status-badge status-needs-review">Review economics</span>')
+            ).append(
+                $('<small class="gainz-import-economics-warning"></small>').text(row.economic_warning)
+            );
+        }
+        $("<tr></tr>")
+            .append($("<td></td>").text(row.source_row || "N/A"))
+            .append($("<td></td>").text(row.transaction_type || ""))
+            .append($("<td></td>").text((row.quantity || 0) + " " + (row.asset || "")))
+            .append($("<td></td>").text(gainzImportMoney(row.gross_usd)))
+            .append($("<td></td>").text(gainzImportMoney(row.fee_usd) + " " + (row.fee_currency || "USD")))
+            .append($("<td></td>").append($("<strong></strong>").text(row.total_label || "Net USD value")).append("<br>").append(document.createTextNode(gainzImportMoney(row.net_tax_usd))))
+            .append(sourceCell)
+            .appendTo(tbody);
+    });
+    panel.toggle((summary.transaction_count || 0) > 0);
 }
 
 function gainzUpdateImportCurrentDecision(summary) {
@@ -1368,6 +1407,18 @@ $(document).ready(function() {
                 'Continue to Reconcile Gaps'
             );
         }
+        if (
+            holdingsIsGuided &&
+            holdingsMode == 'reconcile' &&
+            Number(summary.assets_needing_holdings || 0) === 0 &&
+            Number(summary.assets_with_mismatch || 0) === 0
+        ) {
+            holdingsSetCurrentDecision(
+                'Reconciliation gaps complete',
+                'Declared holdings now agree with the activity and supported treatments recorded in Gainz.',
+                'Continue to Reports & Export to review any remaining tax-evidence or packet items.'
+            );
+        }
     }
 
     function holdingsSetCurrentDecision(task, why, bestAction, help) {
@@ -1398,6 +1449,18 @@ $(document).ready(function() {
     }
 
     function holdingsRowStatus(rowData) {
+        if (
+            Number($('#holdings_summary_need_holdings').text() || 0) === 0 &&
+            Number($('#holdings_summary_mismatch').text() || 0) === 0
+        ) {
+            holdingsSetCurrentDecision(
+                'Reconciliation gaps complete',
+                'Declared holdings now agree with the activity and supported treatments recorded in Gainz.',
+                'Continue to Reports & Export to review any remaining tax-evidence or packet items.'
+            );
+            return;
+        }
+
         if (!rowData) {
             return 'unknown';
         }
@@ -1567,7 +1630,7 @@ $(document).ready(function() {
                     title: 'What missing basis means',
                     text: 'Missing basis means Gainz sees ' + asset + ' being sold or disposed of, but it cannot find enough earlier ' + asset + ' acquisition records to show what you paid for the amount sold.',
                     examples: [
-                        'If records cannot be found, a conservative CPA-reviewed path can document unknown basis as $0 for draft review instead of claiming unproven basis.',
+                        'If records cannot be found, recorded professional direction can document unknown basis as $0 for review instead of claiming unproven basis. Gainz does not verify professional credentials.',
                         'Example: a ' + asset + ' sale needs earlier ' + asset + ' buy, receive, fork, income, airdrop, or transfer-in records before Gainz can calculate supported gain or loss.',
                         'If the asset came from another exchange or wallet, import that source file or document where the missing records should come from.',
                         'If this was already included in filed totals, document that cross-check so the CPA can compare Gainz to the filed return.'
@@ -2322,9 +2385,15 @@ $(document).ready(function() {
         var label = labels[activeHoldingsFilter] || labels.all;
         var visibleRows = table.rows({ filter: 'applied' }).data();
 
-        $('#holdings_summary_action').text(
-            label.message + ' ' + visibleRows.length + ' asset' + (visibleRows.length == 1 ? '' : 's') + ' shown.'
-        );
+        if (activeHoldingsFilter == 'review' && visibleRows.length === 0) {
+            $('#holdings_summary_action').text(
+                'No reconciliation gaps remain. Continue to Reports & Export for any remaining evidence or packet review.'
+            );
+        } else {
+            $('#holdings_summary_action').text(
+                label.message + ' ' + visibleRows.length + ' asset' + (visibleRows.length == 1 ? '' : 's') + ' shown.'
+            );
+        }
 
         if (visibleRows.length > 0 && activeHoldingsFilter != 'all') {
             table.rows().deselect();
@@ -2420,6 +2489,7 @@ $(document).ready(function() {
         }
 
         $('#holdings_stage_callout').hide();
+        $('#bulk_holdings_section').hide();
         $('#holdings_completion_summary').text(summaryText || 'All tracked assets now have declared current holdings for this review pass.');
         $('#holdings_completion_actions').html(
             '<a class="btn btn-sm btn-primary" href="/holdings_accounting/?guided=1&amp;mode=reconcile">Continue to Reconcile Gaps</a> ' +
@@ -2436,7 +2506,8 @@ $(document).ready(function() {
     $(document).on('click', '#holdings_edit_after_completion', function() {
         $('#holdings_completion_panel').hide();
         $('#holdings_stage_callout').show();
-        holdingsScrollTo('#holdings_guided_queue');
+        $('#bulk_holdings_section').show();
+        holdingsScrollTo('#bulk_holdings_section');
     });
 
     var initialHoldingsFilter = holdingsIsGuided && holdingsMode == 'declare'
@@ -3040,7 +3111,7 @@ $(document).ready(function() {
 
         holdingsShowActionConfirm(
             'Record this exact send as a disposition?',
-            'Gainz will replace only the selected ' + holdingsSelectedSendRow[2] + ' ' + asset + ' send with a disposition and link supported acquisition lots with FIFO. ' + (conservativeFallback ? 'If basis still remains missing, Gainz will apply the CPA-directed $0-basis short-term assumption only to that unresolved quantity and record that it may overstate tax.' : 'It will not use disposition value as acquisition basis.'),
+            'Gainz will replace only the selected ' + holdingsSelectedSendRow[2] + ' ' + asset + ' send with a disposition and link supported acquisition lots with FIFO. ' + (conservativeFallback ? 'If basis still remains missing, Gainz will apply the recorded $0-basis short-term assumption only to that unresolved quantity and disclose that it may overstate tax.' : 'It will not use disposition value as acquisition basis.'),
             'Record And Recalculate',
             function() {
                 holdingsSaveExactSendDisposition(rowData, asset);

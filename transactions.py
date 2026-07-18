@@ -5,6 +5,7 @@ import datetime
 import math
 from openpyxl import load_workbook
 from openpyxl.styles import Font
+from openpyxl.utils import get_column_letter
 import pandas as pd
 from conversion import Conversion
 from transaction import Buy, Sell, Send, Receive
@@ -58,6 +59,10 @@ WORK_ORDER_REVIEW_COLUMNS = [
     "cpa_question",
     "reviewer_name",
     "reviewer_role",
+    "direction_date",
+    "direction_entered_by",
+    "reviewer_credential",
+    "reviewer_jurisdiction",
     "event_classification",
     "proceeds_method",
     "proceeds_value",
@@ -80,6 +85,10 @@ WORK_ORDER_REVIEW_COLUMNS = [
     "assumption_disclosure",
     "calculation_applied",
     "adjustment_transaction_uid",
+    "calculation_receipt_json",
+    "resolution_applied_at",
+    "resolution_reversed_at",
+    "reversal_note",
     "updated_at",
 ]
 
@@ -136,6 +145,30 @@ def _bool_from_cell(value):
 
     normalized = str(value).strip().lower()
     return normalized in {"1", "true", "yes", "y", "on"}
+
+
+def _first_row_value(row, *columns):
+    for column in columns:
+        value = _optional_cell(row, column)
+        if value is not None:
+            return value
+    return None
+
+
+def _restore_transaction_economics(transaction, row):
+    transaction.set_economics(
+        fee=_first_row_value(row, "_fee", "fee"),
+        gross_usd_total=_first_row_value(row, "_gross_usd_total", "gross_usd_total"),
+        net_usd_total=_first_row_value(row, "_net_usd_total", "net_usd_total"),
+        fee_currency=_first_row_value(row, "fee_currency") or "USD",
+        source_fee_amount=_first_row_value(row, "source_fee_amount"),
+        source_row=_first_row_value(row, "source_row"),
+        source_transaction_id=_first_row_value(row, "source_transaction_id") or "",
+        economics_source=_first_row_value(row, "economics_source") or "spot_price",
+        economics_warning=_first_row_value(row, "economics_warning") or "",
+        source_notes=_first_row_value(row, "source_notes") or "",
+    )
+    return transaction
 
 
 def _save_dir():
@@ -355,26 +388,28 @@ class Transactions:
         # Load Sells
         for index, row in sell_df.iterrows():
             trans_obj = Sell(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'], source=row['source'], uid=_optional_cell(row, 'uid'))
-            # Check if 'fee' column exists before accessing it
-            if 'fee' in row:
-                trans_obj.fee = row['fee']
+            _restore_transaction_economics(trans_obj, row)
             sells.append(trans_obj)
 
         # Load Buys
         for index, row in buy_df.iterrows():
             trans_obj = Buy(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'],  source=row['source'], uid=_optional_cell(row, 'uid'))
-            # Check if 'fee' column exists before accessing it
-            if 'fee' in row:
-                trans_obj.fee = row['fee']
+            _restore_transaction_economics(trans_obj, row)
             buys.append(trans_obj)
 
         # Load Sends
         for index, row in send_df.iterrows():
-            sends.append(Send(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'],  source=row['source'], uid=_optional_cell(row, 'uid')))
+            sends.append(_restore_transaction_economics(
+                Send(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'],  source=row['source'], uid=_optional_cell(row, 'uid')),
+                row,
+            ))
 
         # Load Receives
         for index, row in receive_df.iterrows():
-            receives.append(Receive(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'], source=row['source'], uid=_optional_cell(row, 'uid')))
+            receives.append(_restore_transaction_economics(
+                Receive(symbol=row['symbol'], quantity=row['quantity'], time_stamp=row['time_stamp'], usd_spot=row['usd_spot'], source=row['source'], uid=_optional_cell(row, 'uid')),
+                row,
+            ))
 
         # Load Conversions
         for index, row in conversion_df.iterrows():
@@ -475,7 +510,11 @@ class Transactions:
                          continue
 
                     # Call link_transaction - this calls Link.__init__ internally
-                    sell_obj.link_transaction(buy_obj, link_quantity=quantity)
+                    link = sell_obj.link_transaction(buy_obj, link_quantity=quantity)
+                    link.proceeds_override = _float_or_none(_optional_cell(row, 'proceeds_override'))
+                    link.cost_basis_override = _float_or_none(_optional_cell(row, 'cost_basis_override'))
+                    link.resolution_item_id = _string_or_empty(_optional_cell(row, 'resolution_item_id'))
+                    link.refresh_prices()
                     links_created_count += 1
 
                 except ValueError as e:
@@ -716,6 +755,10 @@ class Transactions:
         cpa_question="",
         reviewer_name=None,
         reviewer_role=None,
+        direction_date=None,
+        direction_entered_by=None,
+        reviewer_credential=None,
+        reviewer_jurisdiction=None,
         event_classification=None,
         proceeds_method=None,
         proceeds_value=None,
@@ -738,6 +781,10 @@ class Transactions:
         assumption_disclosure=None,
         calculation_applied=None,
         adjustment_transaction_uid=None,
+        calculation_receipt_json=None,
+        resolution_applied_at=None,
+        resolution_reversed_at=None,
+        reversal_note=None,
     ):
         item_id = str(item_id or "")
         existing = self.get_work_order_review(item_id) or {}
@@ -754,6 +801,19 @@ class Transactions:
             "cpa_question": str(cpa_question or "").strip(),
             "reviewer_name": preserved_value(reviewer_name, "reviewer_name"),
             "reviewer_role": preserved_value(reviewer_role, "reviewer_role"),
+            "direction_date": preserved_value(direction_date, "direction_date"),
+            "direction_entered_by": preserved_value(
+                direction_entered_by,
+                "direction_entered_by",
+            ),
+            "reviewer_credential": preserved_value(
+                reviewer_credential,
+                "reviewer_credential",
+            ),
+            "reviewer_jurisdiction": preserved_value(
+                reviewer_jurisdiction,
+                "reviewer_jurisdiction",
+            ),
             "event_classification": preserved_value(event_classification, "event_classification"),
             "proceeds_method": preserved_value(proceeds_method, "proceeds_method"),
             "proceeds_value": preserved_value(proceeds_value, "proceeds_value"),
@@ -797,6 +857,19 @@ class Transactions:
                 adjustment_transaction_uid,
                 "adjustment_transaction_uid",
             ),
+            "calculation_receipt_json": preserved_value(
+                calculation_receipt_json,
+                "calculation_receipt_json",
+            ),
+            "resolution_applied_at": preserved_value(
+                resolution_applied_at,
+                "resolution_applied_at",
+            ),
+            "resolution_reversed_at": preserved_value(
+                resolution_reversed_at,
+                "resolution_reversed_at",
+            ),
+            "reversal_note": preserved_value(reversal_note, "reversal_note"),
             "updated_at": strftime("%Y-%m-%d %H:%M:%S"),
         }
 
@@ -809,6 +882,53 @@ class Transactions:
         records.sort(key=lambda item: item["item_id"])
         self.work_order_reviews = records
         return record
+
+    def reverse_work_order_resolution(self, item_id, note=""):
+        review = self.get_work_order_review(item_id)
+        if not review or str(review.get("calculation_applied") or "") != "Yes":
+            raise ValueError("This professional resolution is not currently applied.")
+
+        adjustment_uid = str(review.get("adjustment_transaction_uid") or "")
+        adjustment = next(
+            (transaction for transaction in self.transactions if transaction.uid == adjustment_uid),
+            None,
+        )
+        if adjustment is None:
+            raise ValueError("The adjustment lot could not be found. Restore the prior revision instead.")
+
+        links_to_remove = [
+            link
+            for link in list(adjustment.links)
+            if getattr(link, "resolution_item_id", "") == str(item_id)
+            or getattr(link.buy, "uid", "") == adjustment_uid
+        ]
+        for link in links_to_remove:
+            if link in link.buy.links:
+                link.buy.links.remove(link)
+            if link in link.sell.links:
+                link.sell.links.remove(link)
+            link.buy.update_linked_transactions()
+            link.sell.update_linked_transactions()
+            link.buy.set_multi_link()
+            link.sell.set_multi_link()
+
+        self.transactions.remove(adjustment)
+        self.conversions = [
+            conversion
+            for conversion in self.conversions
+            if f"work order {item_id}" not in str(getattr(conversion, "reason", ""))
+        ]
+        return self.set_work_order_review(
+            item_id,
+            decision="needs_research",
+            note=review.get("note", ""),
+            cpa_question=review.get("cpa_question", ""),
+            resolution_status="draft_research",
+            calculation_applied="Reversed",
+            adjustment_transaction_uid="",
+            resolution_reversed_at=strftime("%Y-%m-%d %H:%M:%S"),
+            reversal_note=str(note or "Professional resolution reversed by user."),
+        )
 
     def get_tax_year_record(self, year):
         year = int(year)
@@ -961,7 +1081,10 @@ class Transactions:
                 'sell_uid': getattr(l.sell, 'uid', None),
                 'buy': str(l.buy),
                 'sell': str(l.sell),
-                'symbol': l.symbol
+                'symbol': l.symbol,
+                'proceeds_override': getattr(l, 'proceeds_override', None),
+                'cost_basis_override': getattr(l, 'cost_basis_override', None),
+                'resolution_item_id': getattr(l, 'resolution_item_id', ''),
             })
         links_df = pd.DataFrame(links_data)
 
@@ -1010,10 +1133,16 @@ class Transactions:
         return save_as_filename
 
     def _write_export_status_sheet(self, workbook, readiness=None):
+        from app.services.packet_plan_service import material_assumption_rows
+
         readiness = readiness or get_audit_readiness_summary(self)
         sheet = workbook.create_sheet("Packet Status", 0)
         is_ready = bool(readiness.get("is_ready"))
-        title = "READY FOR REVIEW" if is_ready else "DRAFT - NOT FILING READY"
+        title = (
+            "RECONCILIATION COMPLETE - PROFESSIONAL REVIEW REQUIRED"
+            if is_ready
+            else "DRAFT - NOT FILING READY"
+        )
         title_cell = sheet["A1"]
         title_cell.value = title
         title_cell.font = Font(bold=True, size=16)
@@ -1055,6 +1184,22 @@ class Transactions:
         else:
             sheet.cell(row=write_row, column=1).value = "None"
 
+        write_row += 2
+        sheet.cell(row=write_row, column=1).value = "Material inputs and assumptions"
+        sheet.cell(row=write_row, column=1).font = Font(bold=True)
+        write_row += 1
+        assumptions = material_assumption_rows(self)
+        if assumptions:
+            for assumption in assumptions:
+                sheet.cell(row=write_row, column=1).value = assumption.get("category", "Assumption")
+                sheet.cell(row=write_row, column=2).value = (
+                    f"{assumption.get('title', '')}: {assumption.get('detail', '')} "
+                    f"[{assumption.get('status', '')}]"
+                ).strip()
+                write_row += 1
+        else:
+            sheet.cell(row=write_row, column=1).value = "None recorded"
+
         sheet.column_dimensions["A"].width = 28
         sheet.column_dimensions["B"].width = 110
 
@@ -1069,8 +1214,8 @@ class Transactions:
             WORK_ORDER_REVIEW_DECISIONS,
         )
 
-        sheet = workbook.create_sheet("CPA Resolution Workpapers", 1)
-        sheet["A1"] = "CPA Resolution Workpapers"
+        sheet = workbook.create_sheet("Professional Workpapers", 1)
+        sheet["A1"] = "Professional Workpapers"
         sheet["A1"].font = Font(bold=True, size=16)
         sheet["A2"] = (
             "These rows preserve professional assumptions and evidence separately from imported transaction facts. "
@@ -1096,9 +1241,17 @@ class Transactions:
             ("assumption_disclosure", "Assumption Disclosure"),
             ("evidence_reference", "Evidence / Workpaper"),
             ("professional_attestation", "Professional Attestation"),
+            ("direction_date", "Direction Date"),
+            ("direction_entered_by", "Direction Entered By"),
+            ("reviewer_credential", "Credential Entered By User"),
+            ("reviewer_jurisdiction", "Jurisdiction Entered By User"),
             ("calculation_applied", "Applied To Calculations"),
             ("target_transaction_uid", "Target Sale ID"),
             ("adjustment_transaction_uid", "Adjustment Lot ID"),
+            ("calculation_receipt_json", "Before / After Calculation Receipt"),
+            ("resolution_applied_at", "Applied At"),
+            ("resolution_reversed_at", "Reversed At"),
+            ("reversal_note", "Reversal Note"),
         ]
         for column_index, (_field, label) in enumerate(columns, start=1):
             cell = sheet.cell(row=4, column=column_index, value=label)
@@ -1126,9 +1279,54 @@ class Transactions:
                 sheet.cell(row=row_index, column=column_index, value=value)
 
         for column_index in range(1, len(columns) + 1):
-            sheet.column_dimensions[chr(64 + column_index)].width = 22
+            sheet.column_dimensions[get_column_letter(column_index)].width = 22
         sheet.column_dimensions["P"].width = 80
         sheet.column_dimensions["Q"].width = 45
+
+    def _write_import_economics_sheet(self, workbook):
+        sheet = workbook.create_sheet("Import Economics", 2)
+        sheet["A1"] = "Imported Transaction Economics"
+        sheet["A1"].font = Font(bold=True, size=16)
+        sheet["A2"] = (
+            "Gross values, source fees, and net tax values preserved from imported rows. "
+            "Review any Economic Warning before relying on generated totals."
+        )
+        columns = [
+            ("source_file", "Source File"),
+            ("source_row", "Source Row"),
+            ("source_transaction_id", "Source Transaction ID"),
+            ("date", "Date"),
+            ("transaction_type", "Transaction Type"),
+            ("asset", "Asset"),
+            ("quantity", "Quantity"),
+            ("usd_spot", "USD Spot"),
+            ("gross_usd", "Gross USD"),
+            ("fee_usd", "Fee USD"),
+            ("source_fee_amount", "Source Fee Amount"),
+            ("fee_currency", "Fee Currency"),
+            ("net_tax_usd", "Net Tax USD"),
+            ("economic_source", "Economic Source"),
+            ("economic_warning", "Economic Warning"),
+            ("source_notes", "Source Notes"),
+        ]
+        for column_index, (_field, label) in enumerate(columns, start=1):
+            cell = sheet.cell(row=4, column=column_index, value=label)
+            cell.font = Font(bold=True)
+
+        for row_index, row in enumerate(get_import_economics_rows(self), start=5):
+            for column_index, (field, _label) in enumerate(columns, start=1):
+                value = row.get(field, "")
+                if field == "date":
+                    value = _excel_datetime(value)
+                cell = sheet.cell(row=row_index, column=column_index, value=value)
+                if field in {"usd_spot", "gross_usd", "fee_usd", "net_tax_usd"}:
+                    cell.number_format = '"$"#,##0.00_-'
+
+        for column_index in range(1, len(columns) + 1):
+            sheet.column_dimensions[get_column_letter(column_index)].width = 20
+        sheet.column_dimensions["A"].width = 55
+        sheet.column_dimensions["O"].width = 65
+        sheet.column_dimensions["P"].width = 55
 
     def export_to_excel(self, asset=None, date_range=None, by_year=True, output_dir=None, readiness=None):
 
@@ -1143,6 +1341,7 @@ class Transactions:
         workbook = load_workbook(filename=_resource_file('Gainz_Export_Template-DO_NOT_MODIFY.xlsx'))
         self._write_export_status_sheet(workbook, readiness=readiness)
         self._write_cpa_resolution_sheet(workbook)
+        self._write_import_economics_sheet(workbook)
         c_sheet = workbook['Conversions']
         l_sheet = workbook['Gains']
         a_sheet = workbook['All Transactions']
@@ -1331,7 +1530,7 @@ class Transactions:
                     links_sheet.cell(row=row, column=buy_usd_spot_index, value=link.buy.usd_spot)
                     links_sheet.cell(row=row, column=buy_usd_spot_index).number_format = '"$"#,##0.00_-'
 
-                    links_sheet.cell(row=row, column=buy_usd_total_index, value=link.buy.usd_total)
+                    links_sheet.cell(row=row, column=buy_usd_total_index, value=link.buy.tax_usd_total)
                     links_sheet.cell(row=row, column=buy_usd_total_index).number_format = '"$"#,##0.00_-'
 
                     links_sheet.cell(row=row, column=buy_link_usd_index, value=link.link_buy_price)
@@ -1352,7 +1551,7 @@ class Transactions:
                     links_sheet.cell(row=row, column=sell_usd_spot_index, value=link.sell.usd_spot)
                     links_sheet.cell(row=row, column=sell_usd_spot_index).number_format = '"$"#,##0.00_-'
 
-                    links_sheet.cell(row=row, column=sell_usd_total_index, value=link.sell.usd_total)
+                    links_sheet.cell(row=row, column=sell_usd_total_index, value=link.sell.tax_usd_total)
                     links_sheet.cell(row=row, column=sell_usd_total_index).number_format = '"$"#,##0.00_-'
 
                     links_sheet.cell(row=row, column=sell_multi_link_index, value=link.sell.multi_link)
@@ -1374,7 +1573,8 @@ class Transactions:
                     if trans.unlinked_quantity <= 0.00000001:
                         continue
 
-                    profit_loss_total += float(trans.unlinked_quantity * trans.usd_spot)
+                    unresolved_proceeds = trans.prorated_tax_usd(trans.unlinked_quantity)
+                    profit_loss_total += float(unresolved_proceeds)
 
                     links_sheet.cell(row=row, column=link_symbol_index, value="N/A")
                     links_sheet.cell(row=row, column=link_id_index, value="N/A")
@@ -1388,10 +1588,10 @@ class Transactions:
                     links_sheet.cell(row=row, column=buy_link_usd_index, value="N/A")
                     links_sheet.cell(row=row, column=link_quantity_index, value=trans.unlinked_quantity)
 
-                    links_sheet.cell(row=row, column=link_profit_loss_index, value=(trans.unlinked_quantity * trans.usd_spot))
+                    links_sheet.cell(row=row, column=link_profit_loss_index, value=unresolved_proceeds)
                     links_sheet.cell(row=row, column=link_profit_loss_index).number_format = '"$"#,##0.00_);[Red]("$"#,##0.00)'
 
-                    links_sheet.cell(row=row, column=sell_link_usd_index, value=trans.usd_total)
+                    links_sheet.cell(row=row, column=sell_link_usd_index, value=unresolved_proceeds)
                     links_sheet.cell(row=row, column=sell_link_usd_index).number_format = '"$"#,##0.00_-'
 
                     links_sheet.cell(row=row, column=sell_date_index, value=_excel_datetime(trans.time_stamp))
@@ -1400,7 +1600,7 @@ class Transactions:
                     links_sheet.cell(row=row, column=sell_usd_spot_index, value=trans.usd_spot)
                     links_sheet.cell(row=row, column=sell_usd_spot_index).number_format = '"$"#,##0.00_-'
 
-                    links_sheet.cell(row=row, column=sell_usd_total_index, value=trans.usd_total)
+                    links_sheet.cell(row=row, column=sell_usd_total_index, value=trans.tax_usd_total)
                     links_sheet.cell(row=row, column=sell_usd_total_index).number_format = '"$"#,##0.00_-'
 
                     links_sheet.cell(row=row, column=sell_multi_link_index, value="N/A")
@@ -1452,7 +1652,7 @@ class Transactions:
                 all_trans_sheet.cell(row=row, column=usd_spot_index, value=trans.usd_spot)
                 all_trans_sheet.cell(row=row, column=usd_spot_index).number_format = '"$"#,##0.00_-'
 
-                all_trans_sheet.cell(row=row, column=usd_total_index, value=trans.usd_total)
+                all_trans_sheet.cell(row=row, column=usd_total_index, value=trans.tax_usd_total)
                 all_trans_sheet.cell(row=row, column=usd_total_index).number_format = '"$"#,##0.00_-'
 
                 all_trans_sheet.cell(row=row, column=source_index, value=trans.source)
@@ -1586,10 +1786,10 @@ class Transactions:
             quantity=send.quantity,
             time_stamp=send.time_stamp,
             usd_spot=proceeds_spot,
-            source=f"Gainz CPA documented disposition from {send.source}",
+            source=f"Gainz professional documented disposition from {send.source}",
         )
         reason = (
-            f"CPA documented {event_classification}; proceeds ${proceeds_value:.2f}; "
+            f"Professional direction recorded by user: {event_classification}; proceeds ${proceeds_value:.2f}; "
             f"evidence {evidence_reference}"
         )
 
@@ -1672,26 +1872,26 @@ class Transactions:
         if not evidence_reference:
             raise ValueError("Cite the source record or CPA workpaper supporting this resolution.")
 
-        sell.usd_spot = proceeds_value / quantity
-        for existing_link in sell.links:
-            existing_link.link_sell_price = existing_link.quantity * sell.usd_spot
-            existing_link.profit_loss = existing_link.link_sell_price - existing_link.link_buy_price
         adjustment_buy = Buy(
             symbol=sell.symbol,
             quantity=quantity,
             time_stamp=acquired_at,
             usd_spot=basis_value / quantity,
-            source=f"Gainz CPA basis adjustment {work_order_item_id}",
+            source=f"Gainz professional basis adjustment {work_order_item_id}",
         )
         self.transactions.append(adjustment_buy)
         link = sell.link_transaction(adjustment_buy, quantity)
+        link.proceeds_override = proceeds_value
+        link.cost_basis_override = basis_value
+        link.resolution_item_id = str(work_order_item_id or "")
+        link.refresh_prices()
 
         self._record_conversion(
             adjustment_buy,
             quantity,
             "basis_adjustment",
             (
-                f"CPA-applied basis resolution ({basis_method}); evidence {evidence_reference}; "
+                f"Professional basis resolution recorded by user ({basis_method}); evidence {evidence_reference}; "
                 f"acquisition-date method {acquisition_date_method}; work order {work_order_item_id}"
             ),
         )

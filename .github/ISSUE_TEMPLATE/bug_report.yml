@@ -13,7 +13,7 @@ body:
     attributes:
       label: Gainz version
       description: Check the launcher, Dashboard, or /healthz endpoint.
-      placeholder: 0.2.16
+      placeholder: Enter the version shown in Gainz Privacy Mode or /healthz
     validations:
       required: true
   - type: dropdown

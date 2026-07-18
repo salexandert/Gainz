@@ -132,6 +132,41 @@ def _prorated_fee(transaction, quantity):
     return _transaction_fee(transaction) * (float(quantity) / float(transaction.quantity))
 
 
+def get_import_economics_rows(transactions):
+    rows = []
+    for transaction in sorted(
+        getattr(transactions, "transactions", []) or [],
+        key=lambda item: (
+            comparable_datetime(item.time_stamp),
+            item.symbol,
+            item.trans_type,
+            item.uid,
+        ),
+    ):
+        source = str(getattr(transaction, "source", "") or "")
+        if source.startswith("Gainz professional basis adjustment"):
+            continue
+        rows.append({
+            "source_file": transaction.source,
+            "source_row": getattr(transaction, "source_row", None),
+            "source_transaction_id": getattr(transaction, "source_transaction_id", ""),
+            "date": transaction.time_stamp,
+            "transaction_type": transaction.trans_type,
+            "asset": transaction.symbol,
+            "quantity": transaction.quantity,
+            "usd_spot": transaction.usd_spot,
+            "gross_usd": transaction.gross_usd_total,
+            "fee_usd": _transaction_fee(transaction),
+            "source_fee_amount": getattr(transaction, "source_fee_amount", None),
+            "fee_currency": getattr(transaction, "fee_currency", "USD"),
+            "net_tax_usd": transaction.tax_usd_total,
+            "economic_source": getattr(transaction, "economics_source", "spot_price"),
+            "economic_warning": getattr(transaction, "economics_warning", ""),
+            "source_notes": getattr(transaction, "source_notes", ""),
+        })
+    return rows
+
+
 def is_long_term_link(link):
     return link.holding_duration.days > 365
 
@@ -194,10 +229,8 @@ def get_form_8949_report_rows(transactions, asset=None, date_range=None, term=No
         if term and link_term != term:
             continue
 
-        sell_fee = _prorated_fee(link.sell, link.quantity)
-        buy_fee = _prorated_fee(link.buy, link.quantity)
-        proceeds = link.proceeds - sell_fee
-        cost_basis = link.cost_basis + buy_fee
+        proceeds = link.proceeds
+        cost_basis = link.cost_basis
         gain_loss = proceeds - cost_basis
 
         rows.append({
@@ -529,8 +562,8 @@ def get_sales_report_rows(transactions, asset=None, date_range=None):
         short_count = 0
 
         for link in links:
-            proceeds += link.proceeds - _prorated_fee(link.sell, link.quantity)
-            cost_basis += link.cost_basis + _prorated_fee(link.buy, link.quantity)
+            proceeds += link.proceeds
+            cost_basis += link.cost_basis
             if is_long_term_link(link):
                 long_count += 1
             else:
@@ -967,6 +1000,7 @@ def _audit_readiness_groups(
     assets_needing_holdings,
     assets_with_mismatches,
     unresolved_warning_rows,
+    economics_warning_rows,
     source_overlap_rows,
     filed_total_records,
     form_8949_totals,
@@ -1029,6 +1063,22 @@ def _audit_readiness_groups(
             warning_state["detail"],
             "Review warnings",
             "/import_transactions/?guided=1#import_warning_workflow",
+            severity="warning",
+        ))
+
+    if economics_warning_rows:
+        groups.append(_readiness_group(
+            "import_economics",
+            "Imported economic values",
+            len(economics_warning_rows),
+            "Needs review",
+            "status-unlinked-sales",
+            (
+                "Some imported rows do not have complete, source-supported gross value, fee, "
+                "currency, or net tax value. Review these before relying on Form 8949 totals."
+            ),
+            "Review imported values",
+            "/import_transactions/?guided=1#import_economics_confirmation",
             severity="warning",
         ))
 
@@ -1235,6 +1285,10 @@ def get_audit_readiness_summary(transactions):
     import_warnings = getattr(transactions, "import_warnings", []) or []
     warning_rows = _import_warning_review_rows(import_warnings, transactions=transactions)
     unresolved_warning_rows = _unresolved_import_warning_rows(transactions)
+    economics_warning_rows = [
+        row for row in get_import_economics_rows(transactions)
+        if str(row.get("economic_warning") or "").strip()
+    ]
     missing_basis_rows = get_missing_basis_review_rows(transactions)
     source_overlap_rows = _source_overlap_rows(transactions)
     tax_alignment = get_tax_filing_alignment_summary(transactions)
@@ -1295,6 +1349,12 @@ def get_audit_readiness_summary(transactions):
     if warning_state:
         warnings.append(warning_state["warning"])
 
+    if economics_warning_rows:
+        warnings.append(
+            f"Review {_count_label(len(economics_warning_rows), 'imported economic value warning')} "
+            "before relying on proceeds, cost basis, or gain/loss totals."
+        )
+
     if source_overlap_rows:
         warnings.append(
             f"Review {len(source_overlap_rows)} possible overlapping source file pair"
@@ -1319,6 +1379,7 @@ def get_audit_readiness_summary(transactions):
         assets_needing_holdings,
         assets_with_mismatches,
         unresolved_warning_rows,
+        economics_warning_rows,
         source_overlap_rows,
         filed_total_records,
         form_8949_totals,
@@ -1339,6 +1400,29 @@ def get_audit_readiness_summary(transactions):
         status = "Ready for review"
         status_class = "status-verified"
         next_action = "Generate the audit packet, then review exported files against source records."
+
+    checklist = _reconciliation_checklist(
+        transactions,
+        holdings_rows,
+        missing_basis_rows,
+        warning_rows,
+        unresolved_warning_rows,
+        source_overlap_rows,
+        tax_alignment,
+        tax_evidence_inventory,
+    )
+    checklist.insert(5, {
+        "label": "Imported economic values reviewed",
+        "complete": len(economics_warning_rows) == 0,
+        "detail": (
+            "Gross value, source fee, fee currency, and net tax value are source-supported."
+            if not economics_warning_rows
+            else (
+                f"Review {_count_label(len(economics_warning_rows), 'row')} with incomplete or "
+                "assumed transaction economics in Step 1.3."
+            )
+        ),
+    })
 
     summary = {
         "status": status,
@@ -1361,17 +1445,9 @@ def get_audit_readiness_summary(transactions):
             "filed_totals": filed_total_records,
             "tax_evidence": tax_evidence_inventory["review_rows"],
             "source_overlaps": source_overlap_rows,
+            "import_economics": economics_warning_rows,
         },
-        "checklist": _reconciliation_checklist(
-            transactions,
-            holdings_rows,
-            missing_basis_rows,
-            warning_rows,
-            unresolved_warning_rows,
-            source_overlap_rows,
-            tax_alignment,
-            tax_evidence_inventory,
-        ),
+        "checklist": checklist,
         "metrics": {
             "transactions": len(getattr(transactions, "transactions", [])),
             "assets": len(getattr(transactions, "assets", set())),
@@ -1381,6 +1457,7 @@ def get_audit_readiness_summary(transactions):
             "assets_with_unlinked_sales": len(assets_with_unlinked_sales),
             "import_warnings": len(import_warnings),
             "unresolved_import_warnings": len(unresolved_warning_rows),
+            "import_economics_warnings": len(economics_warning_rows),
             "missing_basis_rows": len(missing_basis_rows),
             "source_overlaps": len(source_overlap_rows),
             "tax_evidence_years_needing_review": tax_evidence_inventory["metrics"]["years_needing_review"],
@@ -1393,6 +1470,7 @@ def get_audit_readiness_summary(transactions):
         "form_8949_totals": form_8949_totals,
         "packet_includes": [
             "Excel workbook with transactions, stats, links, sales, and 8949 sheets",
+            "Import economics report preserving source gross values, fees, and net tax values",
             "Form 8949 short-term and long-term detail CSVs",
             "Form 8949 totals CSV and JSON",
             "Tax filing review CSV and JSON",
@@ -1508,10 +1586,6 @@ def get_stats_table_data(transactions):
             if link.symbol == asset:
                 profit_loss += link.profit_loss
 
-        # set profit loss to total sold if all unlinked
-        if profit_loss == 0.0:
-            profit_loss = total_sold_usd
-
         for trans in transactions:
             if trans.symbol != asset:
                 continue
@@ -1519,21 +1593,24 @@ def get_stats_table_data(transactions):
             if trans.trans_type.lower() == "buy":
                 total_purchased_quantity += trans.quantity
                 total_purchased_unlinked_quantity += trans.unlinked_quantity
-                total_purchased_usd += trans.usd_total
+                total_purchased_usd += trans.tax_usd_total
 
 
             elif trans.trans_type.lower() == "sell":
                 total_sold_quantity += trans.quantity
                 total_sold_unlinked_quantity += trans.unlinked_quantity
-                total_sold_usd += trans.usd_total
+                total_sold_usd += trans.tax_usd_total
                 if trans.unlinked_quantity > 0:
-                    profit_loss += (trans.unlinked_quantity * trans.usd_spot)
+                    profit_loss += trans.prorated_tax_usd(trans.unlinked_quantity)
 
             elif trans.trans_type.lower() == "send":
                 total_sent_quantity += trans.quantity
 
             elif trans.trans_type.lower() == "receive":
                 total_received_quantity += trans.quantity
+
+        if not any(link.symbol == asset for link in links):
+            profit_loss = total_sold_usd
 
             # print(f"Total Sold in usd: {total_sold_usd}")
             # print(f"Trans USD Total {trans.usd_total}")
@@ -1661,7 +1738,6 @@ def get_linked_table_data(transactions, asset, date_range):
     # Get linked Table Data
     linked_table_data = []
     for link in links:
-        cost_basis = link.cost_basis + (link.buy.fee if link.buy.fee is not None else 0)
         linked_table_data.append([
             link.quantity,
             "${:,.2f}".format(link.profit_loss),
@@ -1835,8 +1911,8 @@ def get_stats_table_data_range(transactions, date_range=None):
                         if trans.unlinked_quantity < 0:
                             print(f"Unlinked Quantity is negative for {asset} {trans.symbol} {trans.trans_type} {trans.name} UNLINKED {trans.unlinked_quantity}")
                         total_purchased_unlinked_quantity += trans.unlinked_quantity
-                        total_purchased_usd += trans.usd_total
-                        buy_prices.append(trans.usd_total)
+                        total_purchased_usd += trans.tax_usd_total
+                        buy_prices.append(trans.tax_usd_total)
 
 
                     elif trans.trans_type.lower() == "sell":
@@ -1845,13 +1921,13 @@ def get_stats_table_data_range(transactions, date_range=None):
                         if trans.unlinked_quantity < 0:
                             print(f"Unlinked Quantity is negative for {asset} {trans.symbol} {trans.trans_type} {trans.name} UNLINKED {trans.unlinked_quantity}")
                         total_sold_unlinked_quantity += trans.unlinked_quantity
-                        total_sold_usd += trans.usd_total
+                        total_sold_usd += trans.tax_usd_total
 
                         # Not sure why this is here, probably for a good reason?? what to do with unlinked?
                         # if trans.unlinked_quantity > 0:
                             # profit_loss += (trans.usd_spot * trans.unlinked_quantity)
 
-                        sell_prices.append(trans.usd_total)
+                        sell_prices.append(trans.tax_usd_total)
 
                     elif trans.trans_type.lower() == "send":
                         num_sends += 1

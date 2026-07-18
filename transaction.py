@@ -45,6 +45,15 @@ class Transaction:
         self.usd_spot = float(usd_spot) if not math.isnan(usd_spot) else 0.0
         self.source = source
         self._fee = None
+        self._gross_usd_total = None
+        self._net_usd_total = None
+        self.fee_currency = "USD"
+        self.source_fee_amount = None
+        self.source_row = None
+        self.source_transaction_id = ""
+        self.economics_source = "spot_price"
+        self.economics_warning = ""
+        self.source_notes = ""
 
     @property
     def fee(self):
@@ -63,6 +72,57 @@ class Transaction:
                 raise ValueError(f"fee value: {value}, Type: {type(value)} ] must be a float")
         
         self._fee = float(value)
+
+    def set_economics(
+        self,
+        fee=None,
+        gross_usd_total=None,
+        net_usd_total=None,
+        fee_currency="USD",
+        source_fee_amount=None,
+        source_row=None,
+        source_transaction_id="",
+        economics_source="",
+        economics_warning="",
+        source_notes="",
+    ):
+        """Attach the source row's preserved economic values to this transaction."""
+        if fee not in (None, ""):
+            self.fee = abs(float(fee))
+        self._gross_usd_total = self._optional_float(gross_usd_total)
+        self._net_usd_total = self._optional_float(net_usd_total)
+        self.fee_currency = self._optional_text(fee_currency, "USD").upper()
+        self.source_fee_amount = self._optional_float(
+            source_fee_amount if source_fee_amount not in (None, "") else fee
+        )
+        self.source_row = source_row if source_row not in (None, "") else None
+        self.source_transaction_id = self._optional_text(source_transaction_id)
+        self.economics_source = self._optional_text(economics_source, "spot_price")
+        self.economics_warning = self._optional_text(economics_warning)
+        self.source_notes = self._optional_text(source_notes)
+
+    @staticmethod
+    def _optional_float(value):
+        if value in (None, ""):
+            return None
+        try:
+            if math.isnan(value):
+                return None
+        except (TypeError, ValueError):
+            pass
+        return abs(float(value))
+
+    @staticmethod
+    def _optional_text(value, default=""):
+        if value is None:
+            return default
+        try:
+            if math.isnan(value):
+                return default
+        except (TypeError, ValueError):
+            pass
+        text = str(value).strip()
+        return default if text.lower() in {"", "nan", "none"} else text
 
     def __repr__(self):
         return repr(f"{self.time_stamp} {self.quantity}")
@@ -130,6 +190,45 @@ class Transaction:
     @property
     def usd_total(self):
         return self.usd_spot * float(self.quantity)
+
+    @property
+    def gross_usd_total(self):
+        if self._gross_usd_total is not None:
+            return self._gross_usd_total
+        return self.usd_total
+
+    @property
+    def net_usd_total(self):
+        if self._net_usd_total is not None:
+            return self._net_usd_total
+
+        fee = self.fee or 0.0
+        if self.trans_type == "buy":
+            return self.gross_usd_total + fee
+        if self.trans_type == "sell":
+            return max(self.gross_usd_total - fee, 0.0)
+        return self.gross_usd_total
+
+    @property
+    def tax_usd_total(self):
+        if self.trans_type in {"buy", "sell"}:
+            return self.net_usd_total
+        return self.gross_usd_total
+
+    def prorated_gross_usd(self, quantity):
+        if not self.quantity:
+            return 0.0
+        return self.gross_usd_total * (float(quantity) / float(self.quantity))
+
+    def prorated_fee_usd(self, quantity):
+        if not self.quantity:
+            return 0.0
+        return float(self.fee or 0.0) * (float(quantity) / float(self.quantity))
+
+    def prorated_tax_usd(self, quantity):
+        if not self.quantity:
+            return 0.0
+        return self.tax_usd_total * (float(quantity) / float(self.quantity))
 
     @property
     def unlinked_quantity(self):

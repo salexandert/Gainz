@@ -1,12 +1,13 @@
 # Gainz Docs
 
-This folder is the source of truth for public Gainz documentation. The public website is built from these Markdown files, and the GitHub Wiki pages are generated from the same docs with inline synthetic screenshots.
+This folder is the source of truth for public Gainz product documentation and the generated GitHub Wiki. The public website remains in the separate `Gainz-Website` repository; its automation syncs the app version, synthetic screenshots, and synthetic sample downloads from this folder.
 
 Start here:
 
 - [Using Gainz from import to audit packet](user-walkthrough.md)
 - [Crypto cost basis learning path](guides/crypto-cost-basis-learning.md)
 - [How Gainz calculates basis](how-gainz-calculates-basis.md)
+- [Importer coverage and economic fields](importer-coverage.md)
 - [Offline privacy and evidence handling](guides/offline-privacy-and-network-transparency.md)
 - [Browse all guides](guides/index.md)
 

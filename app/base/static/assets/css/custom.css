@@ -1301,6 +1301,20 @@
     margin-top: 4px;
 }
 
+.gainz-packet-preview-context {
+    background: #f6f8fa;
+    border: 1px solid #d9e0e6;
+    color: #263544;
+    margin: 1rem 0;
+    padding: 1rem;
+}
+
+.gainz-packet-preview-context p,
+.gainz-packet-preview-context span {
+    color: inherit;
+    overflow-wrap: anywhere;
+}
+
 .audit-next-action {
     background: #f8f9fa;
     border: 1px solid rgba(0, 0, 0, 0.08);
@@ -1781,6 +1795,92 @@
     margin-top: 4px;
 }
 
+.guided-review-treatment-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin: 0 0 16px;
+}
+
+.guided-review-treatment-option {
+    align-items: flex-start;
+    background: #fff;
+    border: 1px solid #cfd9df;
+    cursor: pointer;
+    display: flex;
+    gap: 10px;
+    margin: 0;
+    min-height: 56px;
+    padding: 14px 16px;
+}
+
+.guided-review-treatment-option:has(input:checked) {
+    background: #eef6ff;
+    border-color: #2168ad;
+    box-shadow: inset 4px 0 0 #2168ad;
+}
+
+.guided-review-treatment-option input {
+    margin-top: 4px;
+}
+
+.gainz-resolution-receipt {
+    background: #f7fbff;
+    border: 2px solid #2168ad;
+    margin-top: 20px;
+    padding: 20px;
+}
+
+.gainz-resolution-source-values {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 16px 0;
+}
+
+.gainz-resolution-source-values span {
+    background: #fff;
+    border: 1px solid #d7e0e5;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+}
+
+.gainz-resolution-impact-table {
+    background: #fff;
+    margin-bottom: 16px;
+}
+
+.gainz-assumption-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.gainz-assumption-list article {
+    background: #fffaf0;
+    border-left: 4px solid #f0b429;
+    padding: 14px 16px;
+}
+
+.gainz-assumption-list article > span {
+    color: #6b7280;
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+
+.gainz-assumption-list article > strong {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.gainz-assumption-list article > p {
+    margin: 0;
+}
+
 .cpa-exact-send-review {
     margin: 20px 0 28px;
     padding: 18px;
@@ -1827,6 +1927,11 @@
 
     .cpa-resolution-span-two {
         grid-column: auto;
+    }
+
+    .guided-review-treatment-options,
+    .gainz-resolution-source-values {
+        grid-template-columns: 1fr;
     }
 
     .cpa-exact-send-grid {
@@ -2156,4 +2261,96 @@
     letter-spacing: 0;
     margin: 16px 20px 6px;
     text-transform: none;
+}
+.gainz-sale-split {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #c9d8e5;
+  background: #f7fafc;
+}
+
+.gainz-import-economics-confirmation {
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border: 1px solid #c9d8e5;
+  border-left: 4px solid #2c6cb0;
+  background: #f7fafc;
+}
+
+.gainz-import-economics-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.gainz-import-economics-counts span {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #d7e0e8;
+  background: #fff;
+}
+
+.gainz-import-economics-table td,
+.gainz-import-economics-table th {
+  vertical-align: top;
+}
+
+.gainz-import-economics-warning {
+  display: block;
+  max-width: 30rem;
+  margin-top: 0.4rem;
+  color: #8a4b08;
+  line-height: 1.4;
+}
+
+.gainz-selected-treatment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0;
+  padding: 0.85rem 1rem;
+  border-left: 4px solid #2c6cb0;
+  background: #f2f7fb;
+}
+
+.gainz-selected-treatment strong {
+  display: block;
+  margin-top: 0.15rem;
+}
+
+.gainz-sale-split-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.gainz-sale-split-grid > div {
+  min-width: 0;
+  padding: 0.75rem;
+  border-left: 3px solid #2c6cb0;
+  background: #fff;
+}
+
+.gainz-sale-split-grid span,
+.gainz-sale-split-grid small {
+  display: block;
+}
+
+.gainz-sale-split-grid strong {
+  display: block;
+  margin: 0.25rem 0;
+}
+
+.gainz-derived-value-note {
+  margin-top: 0.4rem;
+  padding: 0.6rem;
+  border-left: 3px solid #d99b17;
+  background: #fff8e6;
+  color: #4d3b13 !important;
+}
+
+@media (max-width: 900px) {
+  .gainz-sale-split-grid {
+    grid-template-columns: 1fr;
+  }
 }

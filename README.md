@@ -2,7 +2,7 @@
 
 Gainz is a local, offline crypto accounting workbench for people who want to reconcile exchange CSVs without uploading financial history to a cloud tax service.
 
-It helps import transactions, link dispositions to acquisition lots, review unresolved sends/receives, apply documented CPA resolutions to exact sales, and export Excel reports and workpapers for professional review.
+It helps import transactions, link dispositions to acquisition lots, review unresolved sends/receives, record and apply professional-directed treatments to exact sales, and export Excel reports and workpapers for professional review.
 
 Gainz is best understood as **private offline crypto tax reconciliation**. It does not try to be a hosted tax service. It helps you turn messy exchange exports into traceable basis links, Form 8949-style rows, current holdings reconciliation, and a documentation packet you can review with a qualified tax professional without uploading your transaction history.
 
@@ -11,7 +11,7 @@ Gainz is best understood as **private offline crypto tax reconciliation**. It do
 - Private offline workflow: runs locally on your machine without requiring a hosted account or transaction-history upload.
 - Privacy-oriented: imported files, saved revisions, reports, and audit packets stay on your machine unless you choose to share exports.
 - Reconciliation-focused: designed to help explain messy crypto history, not just produce a final number.
-- CPA resolution workflow: records proceeds and basis separately, requires evidence and professional attestation for applied missing-basis treatments, then updates the exact sale, Form 8949 rows, readiness, and packet workpaper together.
+- Professional-direction workflow: records proceeds and basis separately, requires evidence, named professional direction, a before/after preview, and explicit confirmation before an applied missing-basis treatment updates the exact sale, Form 8949 rows, readiness, and packet workpaper. Gainz does not verify professional identity or credentials.
 - No inferred disposals: Gainz does not convert sends based on age, holdings differences, or an assumed quantity. A specific send must be selected and supported before it can become a disposition.
 - Spreadsheet-friendly: exports Excel reports, Form 8949-style sheets, transaction history, and audit packets.
 
@@ -41,8 +41,10 @@ Gainz currently includes parsers or workflows for:
 - Cash App CSV exports
 - Coinbase CSV exports
 - Coinbase Pro / GDAX fills
-- Kraken/custom imports through the template workflow
+- Kraken and other custom CSVs through Advanced Import / Column Mapping
 - Batch manual transaction entry for source-backed buys and sells that were not imported from a CSV
+
+See the [importer coverage and economic-fields matrix](docs/importer-coverage.md) for native versus mapped workflows, fee handling, source traceability, and known limitations.
 
 The Cash App, Coinbase, and generic CSV import path recognizes common header aliases such as `Transaction Date`, `Activity Type`, `Crypto Quantity`, `Token Symbol`, `Spot Price USD`, and `Transaction Value`, so small export format changes are less likely to break imports.
 
@@ -70,7 +72,7 @@ If you forget the local password, click **Reset Password** in the launcher. It r
 
 The Gainz password gates the local browser UI. It does not encrypt imported CSVs, XLSX saves, exports, or audit packets, which remain normal local files. See [Reset your local Gainz password](docs/guides/local-password-reset.md).
 
-Windows may show a Microsoft Defender SmartScreen warning while Gainz is young and unsigned. Before clicking through that warning, verify that you downloaded Gainz from the official website or GitHub Releases and compare the SHA-256 checksum. See [Windows SmartScreen Warning For Gainz](docs/guides/windows-smartscreen.md).
+Windows may show a Microsoft Defender SmartScreen warning. Before continuing, verify that you downloaded Gainz from the official website or GitHub Releases and compare the SHA-256 checksum. See [Windows SmartScreen Warning For Gainz](docs/guides/windows-smartscreen.md).
 
 ## Developer Start From Source
 
@@ -100,7 +102,7 @@ From a source checkout, you can reset the local password with `python .\scripts\
 5. Continue to **Reconcile** after the source files for the review pass are loaded.
 6. Declare current holdings in **Reconcile** before deeper basis work unless Guided Reconciliation points somewhere else.
 7. Review import warnings, source overlaps, and transfer questions that affect the reconciliation.
-8. Let Gainz apply default FIFO basis links automatically. If acquisition records still cannot be found, use the Guided Review Queue CPA Resolution Worksheet to record and apply a supported professional treatment to the exact sale. A CPA, EA, or tax professional may explicitly apply the conservative `$0`-basis short-term fallback to only the unresolved quantity; Gainz leaves the unknown acquisition date blank and records that the assumption may overstate tax.
+8. Let Gainz apply default FIFO basis links automatically. If acquisition records still cannot be found, use the Guided Review Queue Professional Resolution Worksheet. First select a treatment, then review its exact Form 8949 impact, and only then apply it. A CPA, EA, or tax professional may direct the conservative `$0`-basis short-term fallback for only the unresolved quantity; Gainz leaves the unknown acquisition date blank, records that the assumption may overstate tax, and keeps the action reversible.
 9. Open **Tax Evidence**, build the year-by-year tax evidence inventory, and confirm or mark suggested filed totals for research.
 10. Open **Reports & Export**, then use **Start guided review** to work unresolved items one at a time.
 11. Review packet preview, generate the workbook or audit packet, then use the packet success screen to copy the packet path, open the output folder, and review the first files.
@@ -123,14 +125,14 @@ A good demo run is:
 4. Click **Continue to Declare Holdings** after data loads.
 5. Enter current holdings in **Reconcile**.
 6. Review warnings or tax evidence when Guided Reconciliation highlights them.
-7. Run **FIFO** in **Auto Link** only when Dashboard or Reports & Export says basis links are blocking readiness.
+7. Review the automatic FIFO result. Open **Auto Link** only to recalculate after records change or to intentionally compare another supported lot method.
 8. Open **Reports & Export** and review the **Readiness Review** checklist.
 9. Use **Start guided review** if the work order has open items.
 10. Expand **Review Details** only when you need row-level evidence.
 11. Review the audit packet preview, then generate the workbook or draft audit packet.
 12. Use the packet success screen to copy the packet path or CPA summary, open the packet folder, and review `README_FIRST.md`, `PACKET_STATUS.md`, and `FOR_CPAS.md`.
 
-The audit packet includes root `README_FIRST.md`, `PACKET_STATUS.md`, `FOR_CPAS.md`, `CPA_HANDOFF.md`, and `PRIVACY_AND_EVIDENCE_HANDLING.md` files, the Excel workbook with a visible packet status sheet, Form 8949 detail CSVs, Form 8949 totals, tax filing review, tax evidence inventory, suggested filed totals, reconciliation work order CSV/Markdown, CPA resolution workpapers, unknown gap memo CSV/Markdown, holdings reconciliation, current holdings lots, active and preserved import-warning decisions, missing-basis review, source-overlap review, copied transaction source files when available, tax evidence references, explicitly selected tax evidence copies, hashes, and a methodology memo.
+The audit packet includes root `README_FIRST.md`, `PACKET_STATUS.md`, `FOR_CPAS.md`, `CPA_HANDOFF.md`, and `PRIVACY_AND_EVIDENCE_HANDLING.md` files, the Excel workbook with a visible packet status sheet, import economics, Form 8949 detail CSVs and totals, tax filing review, tax evidence inventory, suggested filed totals, reconciliation work order CSV/Markdown, professional resolution workpapers and reversible calculation receipts, unknown gap memo CSV/Markdown, holdings reconciliation, current holdings lots, active and preserved import-warning decisions, missing-basis review, source-overlap review, copied transaction source files when available, tax evidence references, explicitly selected tax evidence copies, hashes, and a methodology memo.
 
 ## Documentation
 
@@ -143,6 +145,7 @@ The audit packet includes root `README_FIRST.md`, `PACKET_STATUS.md`, `FOR_CPAS.
 - [Crypto cost basis learning path](docs/guides/crypto-cost-basis-learning.md)
 - [Using Gainz from import to audit packet](docs/user-walkthrough.md)
 - [How Gainz calculates basis](docs/how-gainz-calculates-basis.md)
+- [Importer coverage and economic fields](docs/importer-coverage.md)
 - [Offline privacy and evidence handling](docs/guides/offline-privacy-and-network-transparency.md)
 - [Synthetic crypto audit packet sample](docs/guides/sample-crypto-audit-packet.md)
 - [What to give your CPA checklist](docs/guides/crypto-cpa-checklist.md)
@@ -159,7 +162,7 @@ The GitHub wiki is generated from `docs/` and includes an inline screenshot walk
 
 Public screenshots are captured from synthetic demo data so they can show the first-run workflow without exposing private transaction history.
 
-Current public screenshots live under `docs/assets/screenshots/`, including Dashboard, Import, Reconcile, Reports & Export, advanced Stats & Charts, Model Sell, and blank batch manual entry screens captured from synthetic demo data.
+Current public screenshots live under `docs/assets/screenshots/`, including Guided Reconciliation, fee-aware Import confirmation, Reconcile, the professional treatment preview, and Reports & Export. All release-facing screenshots use synthetic data.
 
 When a product change affects public documentation, update `docs/` first. Regenerate the GitHub Wiki from these docs, then sync selected public docs/screenshots into the separate Gainz website repository before Netlify deploys. The `Trigger Website Sync` workflow dispatches the separate website sync after relevant app/docs changes when the repository secret `WEBSITE_REPO_TOKEN` is configured.
 
@@ -194,8 +197,6 @@ Gainz is distributed as a local desktop-style build, not a hosted SaaS product. 
 ```
 
 Public releases are created from Git tags. After merging a version bump to `main`, the `Auto Tag Release Version` workflow creates the matching tag such as `v0.2.0` and dispatches the release workflow for that tag. The release workflow validates that the tag and version files match, builds Windows and macOS packages, verifies the release zips and checksums, publishes them to GitHub Releases, then downloads the published Windows ZIP by tag to verify the public package. The website download buttons point at GitHub's latest release assets, so they update when the release publishes.
-
-Daily GitHub Release download snapshots are captured by `.github/workflows/release-download-snapshots.yml` and written under `metrics/github-release-downloads/`. These snapshots use public aggregate GitHub Release asset counts only. They do not collect app usage, transaction data, tax data, IP addresses, user accounts, or local Gainz activity.
 
 For a clickable Windows build, install PyInstaller in the build environment and run:
 
