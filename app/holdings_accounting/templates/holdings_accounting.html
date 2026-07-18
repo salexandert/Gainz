@@ -401,9 +401,46 @@
                       <th>Question To Answer</th>
                       <th>Review Clues</th>
                       <th>Next Action</th>
+                      <th>Transaction ID</th>
                     </tr>
                   </thead>
                 </table>
+              </div>
+              <div id="exact_send_disposition_review" class="cpa-exact-send-review">
+                <h6>Record One Specific Documented Disposition</h6>
+                <p>
+                  Select an exact <strong>Send</strong> row above. Gainz will never choose sends from a holdings
+                  difference or by transaction age. Record a disposition only when source records show ownership changed.
+                </p>
+                <div id="exact_send_selection" class="alert alert-light" role="status">
+                  Select a Send row to begin.
+                </div>
+                <div class="cpa-exact-send-grid">
+                  <div class="form-group">
+                    <label for="exact_send_event_classification">Documented event</label>
+                    <select id="exact_send_event_classification" class="form-control" disabled>
+                      <option value="">Choose event</option>
+                      <option value="cash_sale">Sale for cash</option>
+                      <option value="crypto_exchange">Exchange for another digital asset</option>
+                      <option value="goods_or_services">Payment for goods or services</option>
+                      <option value="fee">Digital asset used to pay a fee</option>
+                      <option value="other_disposition">Other documented disposition</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="exact_send_proceeds_value">Total proceeds / amount realized (USD)</label>
+                    <input id="exact_send_proceeds_value" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" disabled>
+                    <small class="form-text text-muted">Disposition-date market value may support proceeds. It is not acquisition basis.</small>
+                  </div>
+                  <div class="form-group cpa-exact-send-span-two">
+                    <label for="exact_send_evidence_reference">Evidence or workpaper reference</label>
+                    <input id="exact_send_evidence_reference" type="text" class="form-control" placeholder="Source row, transaction ID, valuation source, or CPA workpaper" disabled>
+                  </div>
+                </div>
+                <button type="button" id="record_exact_send_disposition_button" class="btn btn-primary" disabled>
+                  Record Selected Send As Disposition
+                </button>
+                <div id="exact_send_disposition_message" class="alert mt-3" role="status" style="display: none;"></div>
               </div>
 
               <h6>Year-by-Year Movement</h6>
@@ -498,19 +535,18 @@
           </div>
           <div id="activity_classification_tools">
             <div id="holdings_send_disposal_recommendation" class="alert alert-warning" role="status" style="display: none;">
-              <strong>Possible documented send-disposal workflow.</strong>
+              <strong>Specific send rows may explain this gap.</strong>
               <p id="holdings_send_disposal_text" class="mb-2"></p>
-              <button type="button" id="classify_sends_fifo_button" class="btn btn-warning">
-                Classify Documented Sends And Recalculate FIFO
+              <button type="button" id="open_exact_send_review_button" class="btn btn-outline-primary">
+                Review Exact Send Rows
               </button>
             </div>
             <div class="form-group row">
-              <label class="control-label col-md-2 col-sm-3" for="convert_quantity">Quantity</label>
+              <label class="control-label col-md-2 col-sm-3" for="convert_quantity">Documented loss quantity</label>
               <div class="col-md-4 col-sm-5">
-                <input type="number" step="any" id="convert_quantity" class="form-control" placeholder="Quantity to resolve">
+                <input type="number" step="any" id="convert_quantity" class="form-control" placeholder="Quantity supported by loss records">
               </div>
               <div class="col-md-6 col-sm-12">
-                <button type="button" id="sends_to_sells_button" class="btn btn-warning">Classify Documented Sends as Disposals</button>
                 <button type="button" id="buys_to_lost_button" class="btn btn-warning">Mark Loss for Review</button>
               </div>
             </div>

@@ -9,7 +9,13 @@ Gainz models imported crypto activity as four transaction types:
 - `send`: moves crypto out of the visible account history.
 - `receive`: moves crypto into the visible account history.
 
-The core accounting task is linking sell quantities to earlier buy quantities. Each link carries a proportional cost basis from the buy lot to the sell.
+The core accounting task is linking disposition quantities to supported acquisition lots. Each link carries a proportional adjusted basis from the acquisition lot to the disposition.
+
+## What Fully Reconciled Means
+
+Gainz marks a review ready only when its internal blockers and warnings are cleared. For a disposition, that means the event is classified, proceeds or amount realized are supported, the disposed quantity is linked to supported basis, the acquisition date supports the holding period, and the supporting evidence or workpaper is identified. Current holdings, import warnings, source overlap questions, and year-level filed-total evidence must also be reviewed.
+
+`Ready for review` means the Gainz calculation and evidence workflow has no open internal blocker. It does not mean Gainz filed a return or independently approved a tax position. A qualified professional remains responsible for the filing position and return.
 
 ## Universal Wallet Model
 
@@ -28,7 +34,7 @@ Gainz supports several lot-selection strategies:
 
 The selected method determines which buy lot supplies cost basis for each sell.
 
-For general education, the [Gordon Law crypto cost basis guide](https://gordonlaw.com/learn/crypto-cost-basis/) is a helpful plain-language overview of cost basis concepts. For official federal tax framing, review the [IRS virtual currency FAQs](https://www.irs.gov/individuals/international-taxpayers/frequently-asked-questions-on-virtual-currency-transactions) and discuss your specific facts with a qualified tax professional.
+For general education, the [Gordon Law crypto cost basis guide](https://gordonlaw.com/learn/crypto-cost-basis/) is a helpful plain-language overview of cost basis concepts. For official federal tax framing, review the [IRS digital asset FAQs](https://www.irs.gov/individuals/international-taxpayers/frequently-asked-questions-on-digital-asset-transactions) and [Form 8949 instructions](https://www.irs.gov/instructions/i8949), then discuss the specific facts with a qualified tax professional.
 
 ## Proceeds, Basis, and Gain
 
@@ -43,6 +49,21 @@ gain/loss       = linked proceeds - linked basis
 Form 8949 rows are generated from those links. For partial links, Gainz prorates buy-side fees into cost basis and sell-side fees against proceeds using the linked quantity divided by the source transaction quantity.
 
 If a sell cannot be fully linked to earlier basis, Gainz reports the unlinked quantity. Unlinked sells are a warning condition, not a final answer.
+
+### CPA-applied resolution
+
+When acquisition records cannot be imported directly, the Guided Review Queue provides a CPA Resolution Worksheet for the exact sale under review. A professional can separately record:
+
+- Event classification.
+- Proceeds or amount realized for the unresolved quantity and the method used.
+- Total adjusted basis for the unresolved quantity and the basis method used.
+- Supported acquisition date.
+- Evidence or workpaper reference.
+- Reviewer name, role, review status, and attestation.
+
+Gainz does not allow a draft note alone to close missing basis. **Apply CPA Resolution To Calculations** requires a CPA-reviewed filing position and cited evidence. Gainz then creates an identified basis-adjustment acquisition lot for the unresolved quantity, links it only to the exact sale under review, refreshes Form 8949 output, and preserves the adjustment and workpaper IDs in the save and audit packet.
+
+Disposition-date fair market value may support proceeds or amount realized. It is not automatically acquisition basis. If a professional directs a conservative `$0` basis treatment because records remain unavailable, that is stored as a CPA-reviewed basis method; Gainz does not infer it from a send or holdings difference.
 
 ## Short-Term vs Long-Term
 
@@ -68,6 +89,8 @@ Gainz treats send and receive rows as classification questions. The **Reconcile*
 - A receive without a matching send may indicate a buy from another exchange, income, rewards, gift, or a transfer from an unimported wallet.
 - Classification changes should be based on records, not on making the reconciliation number look better.
 
+Gainz never converts the earliest sends, a quantity inferred from current holdings, or a group of sends automatically. To record a disposition, select one exact send row, choose the documented event, enter supported proceeds or amount realized, and cite the source row, valuation source, or CPA workpaper. Gainz replaces only that selected send and then applies FIFO to available supported acquisition lots. If basis is still missing, the exact sale remains in the CPA resolution queue.
+
 ## Loss Review
 
 Gainz can mark a lot for loss review when source records show an asset may be lost, stolen, abandoned, or otherwise no longer owned. This is a documentation step, not a filing conclusion.
@@ -83,6 +106,7 @@ An audit packet is a documentation bundle. Gainz can generate one with:
 - Holdings reconciliation.
 - Current holdings lots.
 - Import warnings.
+- CPA resolution workpapers showing event, proceeds, basis, evidence, reviewer, and whether the treatment was applied to calculations.
 - Source transaction files that are still available on disk.
 - Manifest and SHA-256 hashes.
 - A short methodology note.

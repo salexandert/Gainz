@@ -272,6 +272,9 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual("1.75", breakdown["summary"]["expected_holdings"])
         self.assertEqual("1.25", breakdown["summary"]["difference"])
         self.assertEqual("1.1", breakdown["summary"]["imported_net"])
+        self.assertTrue(breakdown["summary"]["has_send_rows_to_review"])
+        self.assertNotIn("recommended_disposal_quantity", breakdown["summary"])
+        self.assertIn("does not infer which sends or quantities", breakdown["summary"]["interpretation"])
         self.assertIn("Buys 2 - sells 0.25 = 1.75 BTC", breakdown["summary"]["expected_formula"])
         self.assertIn("Expected 1.75 - declared 0.5 = 1.25 BTC", breakdown["summary"]["difference_formula"])
         self.assertEqual(2, len(breakdown["classification_rows"]))
@@ -1138,22 +1141,99 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertEqual(high_basis_buy.uid, sell.links[0].buy.uid)
         self.assertAlmostEqual(50, sell.links[0].profit_loss)
 
-    def test_convert_sends_to_sells_creates_sell_and_conversion_record(self):
+    def test_convert_selected_send_to_sell_uses_documented_proceeds(self):
         transactions = empty_transactions()
-        send = Send("SOL", 3, datetime.datetime(2024, 1, 1), 50, "wallet")
-        transactions.transactions = [send]
+        selected_send = Send("SOL", 2, datetime.datetime(2024, 1, 1), 50, "wallet-a")
+        untouched_send = Send("SOL", 1, datetime.datetime(2024, 1, 2), 60, "wallet-b")
+        transactions.transactions = [selected_send, untouched_send]
 
-        message = transactions.convert_sends_to_sells("SOL", amount_to_convert=2)
+        sell = transactions.convert_send_to_sell(
+            send_uid=selected_send.uid,
+            proceeds_value=400,
+            event_classification="cash_sale",
+            evidence_reference="CPA workpaper SOL-2024-01",
+        )
 
         sells = [trans for trans in transactions if trans.trans_type == "sell"]
         sends = [trans for trans in transactions if trans.trans_type == "send"]
-        self.assertIn("Recorded 2.0 SOL", message)
-        self.assertIn("taxable disposal", message)
         self.assertEqual(1, len(sells))
         self.assertEqual(1, len(sends))
-        self.assertAlmostEqual(2, sells[0].quantity)
-        self.assertAlmostEqual(1, sends[0].quantity)
+        self.assertEqual(sell.uid, sells[0].uid)
+        self.assertEqual(untouched_send.uid, sends[0].uid)
+        self.assertAlmostEqual(2, sell.quantity)
+        self.assertAlmostEqual(200, sell.usd_spot)
         self.assertEqual(1, len(transactions.conversions))
+        self.assertIn("CPA documented cash_sale", transactions.conversions[0].reason)
+
+    def test_apply_cpa_basis_resolution_links_exact_sale_with_separate_basis(self):
+        transactions = empty_transactions()
+        sell = Sell("BCH", 0.5, datetime.datetime(2024, 2, 1), 1000, "exchange.csv")
+        transactions.transactions = [sell]
+
+        adjustment_buy, link = transactions.apply_cpa_basis_resolution(
+            target_sell_uid=sell.uid,
+            quantity=0.5,
+            acquisition_date="2021-03-15",
+            basis_value=125,
+            proceeds_value=500,
+            basis_method="Documented acquisition cost",
+            evidence_reference="CPA workpaper BCH-2024-01",
+            work_order_item_id="basis-item-1",
+        )
+
+        self.assertEqual(sell.uid, link.sell.uid)
+        self.assertEqual(adjustment_buy.uid, link.buy.uid)
+        self.assertEqual(datetime.datetime(2021, 3, 15), adjustment_buy.time_stamp)
+        self.assertAlmostEqual(500, link.proceeds)
+        self.assertAlmostEqual(125, link.cost_basis)
+        self.assertAlmostEqual(375, link.profit_loss)
+        self.assertEqual(0, sell.unlinked_quantity)
+        self.assertIn("basis-item-1", transactions.conversions[-1].reason)
+
+    def test_apply_cpa_basis_resolution_rejects_partial_sale_quantity(self):
+        transactions = empty_transactions()
+        sell = Sell("BCH", 0.5, datetime.datetime(2024, 2, 1), 1000, "exchange.csv")
+        transactions.transactions = [sell]
+
+        with self.assertRaisesRegex(ValueError, "must match the unresolved quantity"):
+            transactions.apply_cpa_basis_resolution(
+                target_sell_uid=sell.uid,
+                quantity=0.25,
+                acquisition_date="2021-03-15",
+                basis_value=62.50,
+                proceeds_value=500,
+                basis_method="Documented acquisition cost",
+                evidence_reference="CPA workpaper BCH-2024-01",
+                work_order_item_id="basis-item-1",
+            )
+
+        self.assertEqual([], sell.links)
+        self.assertEqual(1, len(transactions.transactions))
+
+    def test_apply_cpa_basis_resolution_uses_proceeds_for_unresolved_quantity(self):
+        transactions = empty_transactions()
+        documented_buy = Buy("BCH", 0.5, datetime.datetime(2021, 1, 1), 200, "exchange.csv")
+        sell = Sell("BCH", 1, datetime.datetime(2024, 2, 1), 800, "exchange.csv")
+        existing_link = sell.link_transaction(documented_buy, 0.5)
+        transactions.transactions = [documented_buy, sell]
+
+        _adjustment_buy, adjustment_link = transactions.apply_cpa_basis_resolution(
+            target_sell_uid=sell.uid,
+            quantity=0.5,
+            acquisition_date="2021-03-15",
+            basis_value=125,
+            proceeds_value=500,
+            basis_method="Documented acquisition cost",
+            evidence_reference="CPA workpaper BCH-2024-01",
+            work_order_item_id="basis-item-1",
+        )
+
+        self.assertAlmostEqual(1000, sell.usd_spot)
+        self.assertAlmostEqual(500, existing_link.proceeds)
+        self.assertAlmostEqual(400, existing_link.profit_loss)
+        self.assertAlmostEqual(500, adjustment_link.proceeds)
+        self.assertAlmostEqual(125, adjustment_link.cost_basis)
+        self.assertEqual(0, sell.unlinked_quantity)
 
     def test_convert_receives_to_buys_creates_buy_and_reduces_receive(self):
         transactions = empty_transactions()

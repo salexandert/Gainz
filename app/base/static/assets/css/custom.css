@@ -1695,6 +1695,118 @@
     gap: 8px;
 }
 
+.cpa-resolution-workbook {
+    background: #f7fbff;
+    border: 1px solid rgba(43, 108, 176, 0.24);
+    border-left: 4px solid #2b6cb0;
+    border-radius: 8px;
+    margin: 14px 0;
+    padding: 16px;
+}
+
+.cpa-resolution-heading {
+    align-items: flex-start;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+}
+
+.cpa-resolution-heading h3 {
+    font-size: 20px;
+    margin: 2px 0 8px;
+}
+
+.cpa-resolution-workbook > p {
+    color: #34495e;
+    line-height: 1.5;
+}
+
+.cpa-resolution-warning {
+    background: #fff7e6;
+    border: 1px solid rgba(181, 123, 0, 0.24);
+    border-radius: 6px;
+    color: #5d4200;
+    margin: 10px 0 14px;
+    padding: 10px 12px;
+}
+
+.cpa-resolution-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cpa-resolution-grid .form-group {
+    margin-bottom: 0;
+}
+
+.cpa-resolution-grid label {
+    color: #252422;
+    font-weight: 700;
+}
+
+.cpa-resolution-span-two {
+    grid-column: 1 / -1;
+}
+
+.cpa-resolution-attestation {
+    align-items: flex-start;
+    background: #fff;
+    border: 1px solid rgba(43, 108, 176, 0.18);
+    border-radius: 6px;
+    color: #252422;
+    display: flex;
+    gap: 10px;
+    line-height: 1.45;
+    margin: 14px 0 0;
+    padding: 10px 12px;
+}
+
+.cpa-resolution-attestation input {
+    flex: 0 0 auto;
+    margin-top: 4px;
+}
+
+.cpa-exact-send-review {
+    margin: 20px 0 28px;
+    padding: 18px;
+    border: 1px solid #d8e1e8;
+    border-left: 4px solid #2b6cb0;
+    background: #f8fafc;
+}
+
+.cpa-exact-send-review h6 {
+    margin-top: 0;
+}
+
+.cpa-exact-send-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0 18px;
+}
+
+.cpa-exact-send-span-two {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 767px) {
+    .cpa-resolution-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .cpa-resolution-span-two {
+        grid-column: auto;
+    }
+
+    .cpa-exact-send-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .cpa-exact-send-span-two {
+        grid-column: auto;
+    }
+}
+
 .guided-review-notes-details {
     border-top: 1px solid rgba(0, 0, 0, 0.08);
     margin-top: 12px;

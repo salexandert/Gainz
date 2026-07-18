@@ -12,9 +12,19 @@ import json
 from werkzeug.utils import secure_filename
 from flask import jsonify
 from conversion import Conversion
+import math
 
 from wtforms.fields import DateTimeLocalField
 from utils import *
+
+
+CPA_DISPOSITION_TYPES = {
+    "cash_sale": "sale for cash",
+    "crypto_exchange": "exchange for another digital asset",
+    "goods_or_services": "payment for goods or services",
+    "fee": "digital asset used to pay a fee",
+    "other_disposition": "other documented disposition",
+}
 
 
 def _holdings_stats_rows(stats_table_data):
@@ -166,7 +176,7 @@ def _bulk_holdings_from_payload(payload):
     return holdings, None
 
 
-@blueprint.route('/', methods=['POST', 'GET'])
+@blueprint.route('/', methods=['GET'])
 @login_required
 def holdings_accounting():
     transactions = current_app.config['transactions']
@@ -176,19 +186,6 @@ def holdings_accounting():
         holdings_mode = "declare" if guided_mode else "full"
 
     stats_table_data = get_stats_table_data(transactions)
-
-    if request.method == "POST":
-        # print(request.json)
-
-        asset = request.json['asset'][0]
-        holdings = float(request.json['quantity'])
-
-        transactions.convert_sends_to_sells(asset=asset, current_holdings=holdings)
-
-        transactions.save(description="Recorded documented sends as taxable disposals")
-
-        return jsonify("Recorded documented sends as taxable disposals for review.")
-
 
     return render_template(
         'holdings_accounting.html',
@@ -325,38 +322,85 @@ def difference_breakdown():
 @blueprint.route('/sends_to_sells', methods=['POST'])
 @login_required
 def sends_to_sells():
-
     transactions = current_app.config['transactions']
     payload = request.get_json(silent=True) or {}
     asset = _request_asset(payload)
-
-    try:
-        amount_to_convert = float(payload.get('quantity') or 0)
-    except (TypeError, ValueError):
-        amount_to_convert = 0
+    send_uid = str(payload.get("send_uid") or "").strip()
+    event_classification = str(payload.get("event_classification") or "").strip()
+    evidence_reference = str(payload.get("evidence_reference") or "").strip()
 
     if not asset:
-        return jsonify({"message": "Select an asset before classifying documented sends."}), 400
+        return jsonify({"message": "Select an asset before recording a disposition."}), 400
 
-    if amount_to_convert <= 0:
-        return jsonify({"message": "Enter a quantity greater than 0 before classifying documented sends."}), 400
+    if not send_uid:
+        return jsonify({"message": "Select the exact send row supported by the source records."}), 400
+
+    if event_classification not in CPA_DISPOSITION_TYPES:
+        return jsonify({"message": "Choose the documented sale, exchange, payment, fee, or other disposition type."}), 400
+
+    proceeds_text = str(payload.get("proceeds_value") or "").strip()
+    if not proceeds_text:
+        return jsonify({"message": "Enter the supported proceeds or amount realized in U.S. dollars."}), 400
+
+    try:
+        proceeds_value = float(proceeds_text)
+    except (TypeError, ValueError):
+        proceeds_value = float("nan")
+
+    if not math.isfinite(proceeds_value) or proceeds_value < 0:
+        return jsonify({
+            "message": (
+                "Enter supported proceeds or amount realized of $0 or more. "
+                "Disposition-date market value belongs here, not in acquisition basis."
+            )
+        }), 400
+
+    if not evidence_reference:
+        return jsonify({"message": "Cite the source row, valuation source, or CPA workpaper."}), 400
+
+    selected_send = next(
+        (
+            trans
+            for trans in transactions
+            if trans.uid == send_uid and trans.trans_type == "send"
+        ),
+        None,
+    )
+    if selected_send is None:
+        return jsonify({"message": "The selected send could not be found. Refresh and select it again."}), 400
+    if selected_send.symbol != asset:
+        return jsonify({"message": "The selected send does not match the selected asset."}), 400
 
     links_before = len(transactions.links)
-    result_str = transactions.convert_sends_to_sells(asset=asset, amount_to_convert=amount_to_convert)
+    try:
+        sell = transactions.convert_send_to_sell(
+            send_uid=send_uid,
+            proceeds_value=proceeds_value,
+            event_classification=CPA_DISPOSITION_TYPES[event_classification],
+            evidence_reference=evidence_reference,
+        )
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+
     failures = []
 
     if payload.get("auto_link", True):
         failures = transactions.auto_link(asset=asset, algo="fifo")
 
     links_created = max(len(transactions.links) - links_before, 0)
-    transactions.save(description="Recorded documented sends as taxable disposals and ran FIFO")
+    transactions.save(description=f"Recorded documented {asset} send as disposition and ran FIFO")
+
+    result_str = (
+        f"Recorded the selected {format_quantity(sell.quantity)} {asset} send as a documented "
+        f"{CPA_DISPOSITION_TYPES[event_classification]} with ${proceeds_value:,.2f} of proceeds."
+    )
 
     if links_created:
         result_str = f"{result_str} FIFO linked {links_created} basis lot(s)."
 
     if failures:
         result_str = (
-            f"{result_str} {len(failures)} sale record(s) still need basis review."
+            f"{result_str} {len(failures)} sale record(s) still need acquisition-basis review."
         )
 
     return jsonify(

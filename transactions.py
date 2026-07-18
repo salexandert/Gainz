@@ -1,6 +1,8 @@
 import os
 import zipfile
 import hashlib
+import datetime
+import math
 from openpyxl import load_workbook
 from openpyxl.styles import Font
 import pandas as pd
@@ -54,6 +56,28 @@ WORK_ORDER_REVIEW_COLUMNS = [
     "decision",
     "note",
     "cpa_question",
+    "reviewer_name",
+    "reviewer_role",
+    "event_classification",
+    "proceeds_method",
+    "proceeds_value",
+    "basis_method",
+    "basis_value",
+    "evidence_reference",
+    "resolution_status",
+    "professional_attestation",
+    "blocker_type",
+    "asset",
+    "year",
+    "date",
+    "quantity",
+    "transaction_quantity",
+    "source_file",
+    "suspected_issue",
+    "target_transaction_uid",
+    "acquisition_date",
+    "calculation_applied",
+    "adjustment_transaction_uid",
     "updated_at",
 ]
 
@@ -682,13 +706,85 @@ class Transactions:
 
         return None
 
-    def set_work_order_review(self, item_id, decision="", note="", cpa_question=""):
+    def set_work_order_review(
+        self,
+        item_id,
+        decision="",
+        note="",
+        cpa_question="",
+        reviewer_name=None,
+        reviewer_role=None,
+        event_classification=None,
+        proceeds_method=None,
+        proceeds_value=None,
+        basis_method=None,
+        basis_value=None,
+        evidence_reference=None,
+        resolution_status=None,
+        professional_attestation=None,
+        blocker_type=None,
+        asset=None,
+        year=None,
+        date=None,
+        quantity=None,
+        transaction_quantity=None,
+        source_file=None,
+        suspected_issue=None,
+        target_transaction_uid=None,
+        acquisition_date=None,
+        calculation_applied=None,
+        adjustment_transaction_uid=None,
+    ):
         item_id = str(item_id or "")
+        existing = self.get_work_order_review(item_id) or {}
+
+        def preserved_value(value, field):
+            if value is None:
+                return str(existing.get(field) or "").strip()
+            return str(value or "").strip()
+
         record = {
             "item_id": item_id,
             "decision": str(decision or "").strip(),
             "note": str(note or "").strip(),
             "cpa_question": str(cpa_question or "").strip(),
+            "reviewer_name": preserved_value(reviewer_name, "reviewer_name"),
+            "reviewer_role": preserved_value(reviewer_role, "reviewer_role"),
+            "event_classification": preserved_value(event_classification, "event_classification"),
+            "proceeds_method": preserved_value(proceeds_method, "proceeds_method"),
+            "proceeds_value": preserved_value(proceeds_value, "proceeds_value"),
+            "basis_method": preserved_value(basis_method, "basis_method"),
+            "basis_value": preserved_value(basis_value, "basis_value"),
+            "evidence_reference": preserved_value(evidence_reference, "evidence_reference"),
+            "resolution_status": preserved_value(resolution_status, "resolution_status"),
+            "professional_attestation": preserved_value(
+                professional_attestation,
+                "professional_attestation",
+            ),
+            "blocker_type": preserved_value(blocker_type, "blocker_type"),
+            "asset": preserved_value(asset, "asset"),
+            "year": preserved_value(year, "year"),
+            "date": preserved_value(date, "date"),
+            "quantity": preserved_value(quantity, "quantity"),
+            "transaction_quantity": preserved_value(
+                transaction_quantity,
+                "transaction_quantity",
+            ),
+            "source_file": preserved_value(source_file, "source_file"),
+            "suspected_issue": preserved_value(suspected_issue, "suspected_issue"),
+            "target_transaction_uid": preserved_value(
+                target_transaction_uid,
+                "target_transaction_uid",
+            ),
+            "acquisition_date": preserved_value(acquisition_date, "acquisition_date"),
+            "calculation_applied": preserved_value(
+                calculation_applied,
+                "calculation_applied",
+            ),
+            "adjustment_transaction_uid": preserved_value(
+                adjustment_transaction_uid,
+                "adjustment_transaction_uid",
+            ),
             "updated_at": strftime("%Y-%m-%d %H:%M:%S"),
         }
 
@@ -1350,18 +1446,6 @@ class Transactions:
 
         return save_as_filename
 
-    def _conversion_amount(self, asset, current_holdings=None, amount_to_convert=None):
-        if amount_to_convert is not None:
-            return max(float(amount_to_convert), 0.0)
-
-        if current_holdings is None:
-            return 0.0
-
-        bought = sum(trans.quantity for trans in self.transactions if trans.symbol == asset and trans.trans_type == 'buy')
-        sold = sum(trans.quantity for trans in self.transactions if trans.symbol == asset and trans.trans_type == 'sell')
-
-        return max((bought - sold) - float(current_holdings), 0.0)
-
     def _reduce_transaction_quantity(self, trans, quantity):
         remaining = round_decimals_down(trans.quantity - quantity, decimals=9)
         if remaining <= 0.000000001:
@@ -1385,39 +1469,138 @@ class Transactions:
         )
         self.conversions.append(conversion)
 
-    def convert_sends_to_sells(self, asset, current_holdings=None, amount_to_convert=None):
-        amount_remaining = self._conversion_amount(asset, current_holdings=current_holdings, amount_to_convert=amount_to_convert)
-        converted_quantity = 0.0
-        converted_count = 0
+    def convert_send_to_sell(
+        self,
+        send_uid,
+        proceeds_value,
+        event_classification,
+        evidence_reference,
+    ):
+        send = next(
+            (
+                trans
+                for trans in self.transactions
+                if trans.uid == str(send_uid) and trans.trans_type == "send"
+            ),
+            None,
+        )
+        if send is None:
+            raise ValueError("The selected send could not be found. Refresh the review and select it again.")
 
-        sends = [
-            trans for trans in self.transactions
-            if trans.symbol == asset and trans.trans_type == 'send'
-        ]
-        sends.sort(key=lambda x: x.time_stamp)
+        proceeds_value = float(proceeds_value)
+        if not math.isfinite(proceeds_value) or proceeds_value < 0:
+            raise ValueError("Enter supported proceeds or amount realized of $0 or more.")
 
-        for send in sends:
-            if amount_remaining <= 0.000000001:
-                break
+        evidence_reference = str(evidence_reference or "").strip()
+        if not evidence_reference:
+            raise ValueError("Cite the source record, valuation source, or CPA workpaper.")
 
-            quantity = min(send.quantity, amount_remaining)
-            sell = Sell(
-                symbol=send.symbol,
-                quantity=quantity,
-                time_stamp=send.time_stamp,
-                usd_spot=send.usd_spot,
-                source="Gainz App documented taxable disposal",
-            )
+        proceeds_spot = proceeds_value / send.quantity
+        sell = Sell(
+            symbol=send.symbol,
+            quantity=send.quantity,
+            time_stamp=send.time_stamp,
+            usd_spot=proceeds_spot,
+            source=f"Gainz CPA documented disposition from {send.source}",
+        )
+        reason = (
+            f"CPA documented {event_classification}; proceeds ${proceeds_value:.2f}; "
+            f"evidence {evidence_reference}"
+        )
 
-            self.transactions.append(sell)
-            self._record_conversion(send, quantity, 'sell', 'Recorded documented send as taxable disposal')
-            self._reduce_transaction_quantity(send, quantity)
+        self.transactions.append(sell)
+        self._record_conversion(send, send.quantity, "sell", reason)
+        self.transactions.remove(send)
 
-            amount_remaining -= quantity
-            converted_quantity += quantity
-            converted_count += 1
+        return sell
 
-        return f"Recorded {converted_quantity} {asset} from {converted_count} send transaction(s) as taxable disposal transaction(s) for review."
+    def apply_cpa_basis_resolution(
+        self,
+        target_sell_uid,
+        quantity,
+        acquisition_date,
+        basis_value,
+        proceeds_value,
+        basis_method,
+        evidence_reference,
+        work_order_item_id,
+    ):
+        sell = next(
+            (
+                trans
+                for trans in self.transactions
+                if trans.uid == str(target_sell_uid) and trans.trans_type == "sell"
+            ),
+            None,
+        )
+        if sell is None:
+            raise ValueError("The sale under review could not be found. Refresh the review queue.")
+
+        quantity = float(quantity)
+        if (
+            not math.isfinite(quantity)
+            or quantity <= 0
+            or abs(quantity - sell.unlinked_quantity) > 0.000000009
+        ):
+            raise ValueError("The basis quantity must match the unresolved quantity on the selected sale.")
+
+        if isinstance(acquisition_date, datetime.datetime):
+            acquired_at = acquisition_date
+        elif isinstance(acquisition_date, datetime.date):
+            acquired_at = datetime.datetime.combine(acquisition_date, datetime.time.min)
+        else:
+            try:
+                acquired_at = datetime.datetime.fromisoformat(str(acquisition_date or "").strip())
+            except ValueError as exc:
+                raise ValueError("Enter the supported acquisition date.") from exc
+
+        sell_at = sell.time_stamp
+        if getattr(sell_at, "tzinfo", None):
+            sell_at = sell_at.replace(tzinfo=None)
+        if getattr(acquired_at, "tzinfo", None):
+            acquired_at = acquired_at.replace(tzinfo=None)
+        if acquired_at > sell_at:
+            raise ValueError("The acquisition date cannot be after the disposition date.")
+
+        basis_value = float(basis_value)
+        proceeds_value = float(proceeds_value)
+        if not math.isfinite(basis_value):
+            raise ValueError("Enter a finite adjusted basis in U.S. dollars.")
+        if basis_value < 0:
+            raise ValueError("Adjusted basis cannot be negative.")
+        if not math.isfinite(proceeds_value):
+            raise ValueError("Enter finite supported proceeds or amount realized.")
+        if proceeds_value < 0:
+            raise ValueError("Supported proceeds or amount realized must be $0 or more.")
+
+        evidence_reference = str(evidence_reference or "").strip()
+        if not evidence_reference:
+            raise ValueError("Cite the source record or CPA workpaper supporting this resolution.")
+
+        sell.usd_spot = proceeds_value / quantity
+        for existing_link in sell.links:
+            existing_link.link_sell_price = existing_link.quantity * sell.usd_spot
+            existing_link.profit_loss = existing_link.link_sell_price - existing_link.link_buy_price
+        adjustment_buy = Buy(
+            symbol=sell.symbol,
+            quantity=quantity,
+            time_stamp=acquired_at,
+            usd_spot=basis_value / quantity,
+            source=f"Gainz CPA basis adjustment {work_order_item_id}",
+        )
+        self.transactions.append(adjustment_buy)
+        link = sell.link_transaction(adjustment_buy, quantity)
+
+        self._record_conversion(
+            adjustment_buy,
+            quantity,
+            "basis_adjustment",
+            (
+                f"CPA-applied basis resolution ({basis_method}); evidence {evidence_reference}; "
+                f"work order {work_order_item_id}"
+            ),
+        )
+        return adjustment_buy, link
 
     def convert_buys_to_lost(self, asset, amount):
         amount_remaining = max(float(amount), 0.0)

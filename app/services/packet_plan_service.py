@@ -88,6 +88,74 @@ WORK_ORDER_REVIEW_DECISIONS = {
     "sent_to_cpa": "Sent to CPA",
 }
 
+CPA_REVIEWER_ROLES = {
+    "": "Not recorded",
+    "taxpayer": "Taxpayer",
+    "cpa_ea_tax_professional": "CPA, EA, or tax professional",
+    "other_reviewer": "Other reviewer",
+}
+
+CPA_EVENT_CLASSIFICATIONS = {
+    "": "Not determined",
+    "owner_transfer": "Transfer between accounts under the same ownership",
+    "cash_sale": "Sale for cash",
+    "crypto_exchange": "Exchange for another digital asset",
+    "goods_or_services": "Payment for goods or services",
+    "gift_or_donation": "Gift or donation",
+    "fee": "Digital asset used to pay a fee",
+    "other_disposition": "Other documented disposition",
+    "unknown": "Unknown event",
+}
+
+CPA_PROCEEDS_METHODS = {
+    "": "Not determined",
+    "source_reported": "Amount reported by source record or broker form",
+    "disposition_date_fmv": "Fair market value at disposition",
+    "property_received_fmv": "Fair market value of property or services received",
+    "filed_form": "Amount reported on filed Form 8949 or Schedule D",
+    "manual_supported": "Other supported professional determination",
+    "not_applicable": "Not applicable",
+    "unknown": "Unknown proceeds",
+}
+
+CPA_BASIS_METHODS = {
+    "": "Not determined",
+    "imported_fifo": "Linked acquisition records using FIFO",
+    "specific_identification": "Specific identification supported by records",
+    "documented_acquisition_cost": "Documented acquisition cost",
+    "income_fmv_when_received": "FMV when received as income",
+    "fork_airdrop_supported": "Fork or airdrop basis supported by records",
+    "carryover_basis": "Supported carryover basis",
+    "actual_zero_basis": "Asset actually had a zero basis",
+    "unknown_zero_for_review": "CPA-directed conservative $0 basis when records remain unavailable",
+    "unknown": "Unknown basis",
+    "not_applicable": "Not applicable",
+}
+
+CPA_RESOLUTION_STATUSES = {
+    "": "Not set",
+    "draft_research": "Draft - needs research",
+    "prepared_for_cpa": "Prepared for CPA review",
+    "cpa_reviewed_position": "CPA-reviewed filing position",
+    "previously_filed": "Previously filed treatment",
+}
+
+
+def cpa_resolution_choices():
+    def options(values):
+        return [
+            {"value": value, "label": label}
+            for value, label in values.items()
+        ]
+
+    return {
+        "reviewer_roles": options(CPA_REVIEWER_ROLES),
+        "event_classifications": options(CPA_EVENT_CLASSIFICATIONS),
+        "proceeds_methods": options(CPA_PROCEEDS_METHODS),
+        "basis_methods": options(CPA_BASIS_METHODS),
+        "resolution_statuses": options(CPA_RESOLUTION_STATUSES),
+    }
+
 
 def work_order_review_choices():
     return [
@@ -116,7 +184,7 @@ def _work_order_review(transactions, item_id):
 
 
 def _apply_work_order_review(row, transactions=None):
-    item_id = work_order_item_id(
+    item_id = row.get("item_id") or work_order_item_id(
         row.get("blocker_type", ""),
         asset=row.get("asset", ""),
         year=row.get("year", ""),
@@ -133,11 +201,95 @@ def _apply_work_order_review(row, transactions=None):
     row["review_decision_label"] = decision_label
     row["review_note"] = review.get("note", "")
     row["cpa_question"] = review.get("cpa_question", "")
+    row["reviewer_name"] = review.get("reviewer_name", "")
+    row["reviewer_role"] = review.get("reviewer_role", "")
+    row["reviewer_role_label"] = CPA_REVIEWER_ROLES.get(row["reviewer_role"], "")
+    row["event_classification"] = review.get("event_classification", "")
+    row["event_classification_label"] = CPA_EVENT_CLASSIFICATIONS.get(
+        row["event_classification"],
+        "",
+    )
+    row["proceeds_method"] = review.get("proceeds_method", "")
+    row["proceeds_method_label"] = CPA_PROCEEDS_METHODS.get(row["proceeds_method"], "")
+    row["proceeds_value"] = review.get("proceeds_value", "")
+    row["basis_method"] = review.get("basis_method", "")
+    row["basis_method_label"] = CPA_BASIS_METHODS.get(row["basis_method"], "")
+    row["basis_value"] = review.get("basis_value", "")
+    row["evidence_reference"] = review.get("evidence_reference", "")
+    row["resolution_status"] = review.get("resolution_status", "")
+    row["resolution_status_label"] = CPA_RESOLUTION_STATUSES.get(row["resolution_status"], "")
+    row["professional_attestation"] = review.get("professional_attestation", "")
+    for field in (
+        "blocker_type",
+        "asset",
+        "year",
+        "date",
+        "quantity",
+        "transaction_quantity",
+        "source_file",
+        "suspected_issue",
+        "target_transaction_uid",
+    ):
+        row[field] = review.get(field) or row.get(field, "")
+    row["acquisition_date"] = review.get("acquisition_date", "")
+    row["calculation_applied"] = review.get("calculation_applied", "")
+    row["adjustment_transaction_uid"] = review.get("adjustment_transaction_uid", "")
+    row["has_cpa_resolution_details"] = any([
+        row["reviewer_name"],
+        row["reviewer_role"],
+        row["event_classification"],
+        row["proceeds_method"],
+        row["proceeds_value"],
+        row["basis_method"],
+        row["basis_value"],
+        row["evidence_reference"],
+        row["resolution_status"],
+        row["professional_attestation"],
+        row["acquisition_date"],
+        row["calculation_applied"],
+    ])
     row["review_updated_at"] = review.get("updated_at", "")
     if decision_label:
         row["status"] = decision_label
 
     return row
+
+
+def cpa_resolution_workpaper_rows(readiness, transactions):
+    current_rows = {
+        row.get("item_id"): row
+        for row in reconciliation_work_order_rows(readiness, transactions)
+        if row.get("item_id")
+    }
+    rows = []
+    for review in getattr(transactions, "work_order_reviews", []) or []:
+        item_id = str(review.get("item_id") or "")
+        context = dict(current_rows.get(item_id) or {
+            "item_id": item_id,
+            "blocker_type": review.get("blocker_type", ""),
+            "asset": review.get("asset", ""),
+            "year": review.get("year", ""),
+            "date": review.get("date", ""),
+            "quantity": review.get("quantity", ""),
+            "transaction_quantity": review.get("transaction_quantity", ""),
+            "source_file": review.get("source_file", ""),
+            "suspected_issue": review.get("suspected_issue", ""),
+            "target_transaction_uid": review.get("target_transaction_uid", ""),
+            "status": "Applied resolution" if review.get("calculation_applied") else "Documented review",
+        })
+        row = _apply_work_order_review(context, transactions)
+        if row.get("has_cpa_resolution_details"):
+            rows.append(row)
+
+    return sorted(
+        rows,
+        key=lambda row: (
+            str(row.get("year") or ""),
+            str(row.get("asset") or ""),
+            str(row.get("date") or ""),
+            str(row.get("item_id") or ""),
+        ),
+    )
 
 
 def work_order_review_summary(rows):
@@ -162,6 +314,14 @@ def work_order_review_summary(rows):
         "needs_research_count": decisions.count("needs_research"),
         "ignored_for_draft_count": decisions.count("ignored_for_draft"),
         "sent_to_cpa_count": decisions.count("sent_to_cpa"),
+        "cpa_documented_count": len([
+            row for row in actionable_rows
+            if row.get("has_cpa_resolution_details")
+        ]),
+        "cpa_reviewed_position_count": len([
+            row for row in actionable_rows
+            if row.get("resolution_status") == "cpa_reviewed_position"
+        ]),
     }
     summary["is_complete"] = summary["unreviewed_count"] == 0
     return summary
@@ -383,7 +543,19 @@ def _apply_gap_investigator(row):
 def reconciliation_work_order_rows(readiness, transactions=None):
     rows = []
 
-    def add_row(blocker_type, asset="", year="", date="", source_file="", suspected_issue="", next_action="", status="Open"):
+    def add_row(
+        blocker_type,
+        asset="",
+        year="",
+        date="",
+        quantity="",
+        transaction_quantity="",
+        target_transaction_uid="",
+        source_file="",
+        suspected_issue="",
+        next_action="",
+        status="Open",
+    ):
         priority, priority_label = WORK_ORDER_PRIORITIES.get(
             blocker_type,
             (80, "P5 advisory/documentation item"),
@@ -395,6 +567,9 @@ def reconciliation_work_order_rows(readiness, transactions=None):
             "asset": asset,
             "year": year,
             "date": date,
+            "quantity": quantity,
+            "transaction_quantity": transaction_quantity,
+            "target_transaction_uid": target_transaction_uid,
             "source_file": source_file,
             "suspected_issue": suspected_issue,
             "next_action": next_action,
@@ -423,6 +598,9 @@ def reconciliation_work_order_rows(readiness, transactions=None):
             asset=row.get("asset", ""),
             year=str(row.get("date", ""))[:4],
             date=row.get("date", ""),
+            quantity=row.get("unlinked_quantity", ""),
+            transaction_quantity=row.get("quantity", ""),
+            target_transaction_uid=row.get("target_transaction_uid", ""),
             source_file=row.get("source", ""),
             suspected_issue=row.get("message", ""),
             next_action=row.get("note") or "Find earlier acquisition records or leave as needs research with a note.",
@@ -504,10 +682,21 @@ def reconciliation_work_order_markdown(rows):
             f"- Status: {row['status']}",
             f"- Review decision: {row.get('review_decision_label') or 'Not reviewed'}",
             f"- Review note: {row.get('review_note') or 'N/A'}",
+            f"- Reviewer: {row.get('reviewer_name') or 'N/A'} ({row.get('reviewer_role_label') or 'role not recorded'})",
+            f"- Resolution status: {row.get('resolution_status_label') or 'Not set'}",
             f"- Asset: {row['asset'] or 'N/A'}",
             f"- Year: {row['year'] or 'N/A'}",
             f"- Date: {row['date'] or 'N/A'}",
+            f"- Quantity under review: {row.get('quantity') or 'N/A'}",
             f"- Source file: {row['source_file'] or 'N/A'}",
+            f"- Event classification: {row.get('event_classification_label') or 'Not determined'}",
+            f"- Proceeds method: {row.get('proceeds_method_label') or 'Not determined'}",
+            f"- Proceeds value: {row.get('proceeds_value') or 'N/A'}",
+            f"- Basis method: {row.get('basis_method_label') or 'Not determined'}",
+            f"- Basis value: {row.get('basis_value') or 'N/A'}",
+            f"- Acquisition date: {row.get('acquisition_date') or 'N/A'}",
+            f"- Evidence reference: {row.get('evidence_reference') or 'N/A'}",
+            f"- Applied to calculations: {row.get('calculation_applied') or 'No'}",
             f"- Suspected issue: {row['suspected_issue'] or 'Review needed.'}",
             f"- Next action: {row['next_action'] or 'Review source records and document the decision.'}",
             "",
@@ -537,6 +726,17 @@ def unresolved_gap_memo_rows(rows):
             "source_file": row.get("source_file", ""),
             "amount_or_quantity_affected": row.get("suspected_issue", ""),
             "current_decision": row.get("review_decision_label") or "Not reviewed",
+            "resolution_status": row.get("resolution_status_label") or "Not set",
+            "reviewer": " / ".join(_compact_parts([
+                row.get("reviewer_name"),
+                row.get("reviewer_role_label"),
+            ])),
+            "event_classification": row.get("event_classification_label") or "Not determined",
+            "proceeds_method": row.get("proceeds_method_label") or "Not determined",
+            "proceeds_value": row.get("proceeds_value", ""),
+            "basis_method": row.get("basis_method_label") or "Not determined",
+            "basis_value": row.get("basis_value", ""),
+            "evidence_reference": row.get("evidence_reference", ""),
             "user_memory_notes": row.get("review_note", ""),
             "cpa_question": cpa_question,
             "what_is_missing": _list_to_text(row.get("what_gainz_does_not_know")),
@@ -577,6 +777,12 @@ def unknown_gap_memos_markdown(rows):
             f"- Date: {row['date'] or 'N/A'}",
             f"- Source file(s): {row['source_file'] or 'N/A'}",
             f"- Current decision: {row['current_decision']}",
+            f"- Resolution status: {row['resolution_status']}",
+            f"- Reviewer: {row['reviewer'] or 'N/A'}",
+            f"- Event classification: {row['event_classification']}",
+            f"- Proceeds method/value: {row['proceeds_method']} / {row['proceeds_value'] or 'N/A'}",
+            f"- Basis method/value: {row['basis_method']} / {row['basis_value'] or 'N/A'}",
+            f"- Evidence reference: {row['evidence_reference'] or 'N/A'}",
             f"- Amount/quantity affected: {row['amount_or_quantity_affected'] or 'N/A'}",
             "",
             "### What Is Missing",

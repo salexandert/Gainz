@@ -33,6 +33,11 @@
           Choose a review decision before saving this item.
         </div>
         {% endif %}
+        {% if save_error %}
+        <div class="alert alert-warning mt-3" role="alert">
+          <strong>Review not saved.</strong> {{ save_error }}
+        </div>
+        {% endif %}
         <div class="gainz-current-decision mt-3" role="region" aria-label="Current decision">
           <div>
             <span>Current task</span>
@@ -160,14 +165,159 @@
           <div class="alert alert-info" role="note">
             It is valid to choose "I do not know yet." Gainz keeps that as a documented draft blocker instead of forcing certainty.
           </div>
-          <h3>Choose what happened next</h3>
+          {% if item.show_cpa_resolution %}
+          <section class="cpa-resolution-workbook" aria-labelledby="cpa_resolution_heading">
+            <div class="cpa-resolution-heading">
+              <div>
+                <span class="section-kicker">Professional workpaper</span>
+                <h3 id="cpa_resolution_heading">CPA Resolution Worksheet</h3>
+              </div>
+              <span class="gainz-status-badge {% if item.resolution_status == 'cpa_reviewed_position' %}status-verified{% else %}status-needs-review{% endif %}">
+                {{ item.resolution_status_label or "Not set" }}
+              </span>
+            </div>
+            <p>
+              Record the event, amount realized, adjusted basis, and evidence as separate facts. Fair market value at
+              disposition generally supports proceeds or amount realized; it is not acquisition basis.
+            </p>
+            <div class="cpa-resolution-warning" role="note">
+              Draft and research choices document the audit trail without changing calculations. For a missing-basis sale,
+              <strong>Apply CPA Resolution To Calculations</strong> creates an identified basis-adjustment lot, links it to
+              this exact sale, refreshes Form 8949 output, and preserves the cited professional workpaper.
+            </div>
+            <div class="cpa-resolution-grid">
+              <div class="form-group">
+                <label for="guided_review_event_classification">What happened?</label>
+                <select id="guided_review_event_classification" name="event_classification" class="form-control">
+                  {% for option in cpa_resolution_choices.event_classifications %}
+                  <option value="{{ option.value }}" {% if item.event_classification == option.value %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="guided_review_resolution_status">Review status</label>
+                <select id="guided_review_resolution_status" name="resolution_status" class="form-control">
+                  {% for option in cpa_resolution_choices.resolution_statuses %}
+                  <option value="{{ option.value }}" {% if item.resolution_status == option.value %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="guided_review_proceeds_method">Proceeds / amount realized method</label>
+                <select id="guided_review_proceeds_method" name="proceeds_method" class="form-control">
+                  {% for option in cpa_resolution_choices.proceeds_methods %}
+                  <option value="{{ option.value }}" {% if item.proceeds_method == option.value %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="guided_review_proceeds_value">Proceeds / amount realized for unresolved quantity (USD)</label>
+                <input
+                  id="guided_review_proceeds_value"
+                  name="proceeds_value"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  class="form-control"
+                  value="{{ item.proceeds_value }}"
+                  placeholder="0.00"
+                >
+                <small class="form-text text-muted">For a market valuation, multiply the unresolved quantity shown below by the supported disposition-date price.</small>
+              </div>
+              <div class="form-group">
+                <label for="guided_review_basis_method">Adjusted basis method</label>
+                <select id="guided_review_basis_method" name="basis_method" class="form-control">
+                  {% for option in cpa_resolution_choices.basis_methods %}
+                  <option value="{{ option.value }}" {% if item.basis_method == option.value %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="guided_review_basis_value">Adjusted basis for unresolved quantity (USD)</label>
+                <input
+                  id="guided_review_basis_value"
+                  name="basis_value"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  class="form-control"
+                  value="{{ item.basis_value }}"
+                  placeholder="0.00"
+                >
+                <small class="form-text text-muted">Use supported acquisition cost or another supported basis rule, not disposition-date market value.</small>
+              </div>
+              {% if item.blocker_type == 'Missing acquisition basis' %}
+              <div class="form-group">
+                <label for="guided_review_acquisition_date">Supported acquisition date</label>
+                <input
+                  id="guided_review_acquisition_date"
+                  name="acquisition_date"
+                  type="date"
+                  class="form-control"
+                  value="{{ item.acquisition_date }}"
+                >
+                <small class="form-text text-muted">Required before Gainz can apply the basis resolution to Form 8949 calculations.</small>
+              </div>
+              <div class="form-group">
+                <label>Quantity this resolution will link</label>
+                <input type="text" class="form-control" value="{{ item.quantity }} {{ item.asset }}" readonly>
+                <small class="form-text text-muted">Gainz targets sale {{ item.date }} from {{ item.source_file }}.</small>
+              </div>
+              {% endif %}
+              <div class="form-group cpa-resolution-span-two">
+                <label for="guided_review_evidence_reference">Evidence or workpaper reference</label>
+                <input
+                  id="guided_review_evidence_reference"
+                  name="evidence_reference"
+                  type="text"
+                  class="form-control"
+                  value="{{ item.evidence_reference }}"
+                  placeholder="Source file, transaction ID, broker form, filed return, valuation source, or workpaper"
+                >
+              </div>
+              <div class="form-group">
+                <label for="guided_review_reviewer_name">Reviewer name</label>
+                <input
+                  id="guided_review_reviewer_name"
+                  name="reviewer_name"
+                  type="text"
+                  class="form-control"
+                  value="{{ item.reviewer_name }}"
+                  placeholder="Optional until a filing position is approved"
+                >
+              </div>
+              <div class="form-group">
+                <label for="guided_review_reviewer_role">Reviewer role</label>
+                <select id="guided_review_reviewer_role" name="reviewer_role" class="form-control">
+                  {% for option in cpa_resolution_choices.reviewer_roles %}
+                  <option value="{{ option.value }}" {% if item.reviewer_role == option.value %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <label class="cpa-resolution-attestation" for="guided_review_professional_attestation">
+              <input
+                id="guided_review_professional_attestation"
+                name="professional_attestation"
+                type="checkbox"
+                value="yes"
+                {% if item.professional_attestation %}checked{% endif %}
+              >
+              <span>
+                I confirm this treatment is supported by cited records or documented professional judgment; proceeds
+                and basis were determined separately; and disposition-date market value was not reused as acquisition basis.
+              </span>
+            </label>
+          </section>
+          {% endif %}
+          <h3>Choose the resolution outcome</h3>
           <div class="guided-review-actions" role="group" aria-label="Review decisions">
             {% for choice in choices %}
             <button
               type="submit"
               name="decision"
               value="{{ choice.value }}"
-              class="btn {% if item.review_decision == choice.value %}btn-primary{% else %}btn-outline-primary{% endif %}"
+              class="btn {% if item.review_decision == choice.value or (item.blocker_type == 'Missing acquisition basis' and choice.value == 'resolved') %}btn-primary{% else %}btn-outline-primary{% endif %}"
             >
               {{ choice.label }}
             </button>

@@ -1314,6 +1314,7 @@ $(document).ready(function() {
     var holdingsDifferenceTransactionsTable = null;
     var holdingsClassificationReviewTable = null;
     var holdingsCurrentBreakdown = null;
+    var holdingsSelectedSendRow = null;
     var holdingsContext = $('#holdings_page_context');
     var holdingsIsGuided = String(holdingsContext.data('guided-mode')) == '1';
     var holdingsMode = String(holdingsContext.data('holdings-mode') || 'full');
@@ -1760,33 +1761,35 @@ $(document).ready(function() {
 
     function holdingsRenderSendDisposalRecommendation(summary) {
         var asset = summary.asset || (holdingsSelectedAssetRow() || [])[0] || '';
-        var recommendedQuantity = holdingsParseQuantity(summary.recommended_disposal_quantity);
         var sendQuantity = holdingsParseQuantity(summary.send_quantity);
         var difference = holdingsParseQuantity(summary.difference);
 
-        if (!summary.has_send_disposal_recommendation || !recommendedQuantity || recommendedQuantity <= 0) {
+        if (!summary.has_send_rows_to_review) {
             holdingsHideSendDisposalRecommendation();
             return;
         }
 
-        $('#convert_quantity').val(holdingsFormatQuantity(recommendedQuantity));
         $('#holdings_send_disposal_text').text(
             'Gainz found a ' + holdingsFormatQuantity(difference) + ' ' + asset +
             ' review difference and ' + holdingsFormatQuantity(sendQuantity) +
-            ' ' + asset + ' of imported sends. If source records show ' +
-            holdingsFormatQuantity(recommendedQuantity) +
-            ' left your ownership or was sent elsewhere and traded/sold, classify that documented quantity as disposals and run FIFO. Owner transfers should remain transfers.'
+            ' ' + asset + ' of imported sends. Review the exact send rows and record only transactions whose source records show ownership changed. Gainz will not choose sends from this difference. Owner transfers remain transfers.'
         );
         $('#holdings_send_disposal_recommendation').show();
     }
 
     function holdingsClearDifferenceBreakdown() {
         holdingsCurrentBreakdown = null;
+        holdingsSelectedSendRow = null;
         $('#holdings_difference_breakdown').hide();
         $('#holdings_difference_formula').text('Select an asset to see how the difference was calculated.');
         $('#holdings_difference_declared_formula, #holdings_difference_transfer_formula, #holdings_difference_interpretation').text('');
         $('#holdings_difference_transaction_count').text('0 transactions');
         $('#holdings_breakdown_buys, #holdings_breakdown_sells, #holdings_breakdown_sends, #holdings_breakdown_receives, #holdings_breakdown_imported_net').text('--');
+        $('#exact_send_selection').text('Select a Send row to begin.');
+        $('#exact_send_event_classification').val('').prop('disabled', true);
+        $('#exact_send_proceeds_value, #exact_send_evidence_reference').val('').prop('disabled', true);
+        $('#record_exact_send_disposition_button').prop('disabled', true);
+        $('#exact_send_disposition_message').hide().text('');
         holdingsHideSendDisposalRecommendation();
 
         if (holdingsClassificationReviewTable) {
@@ -1921,7 +1924,7 @@ $(document).ready(function() {
         var difference = context.difference;
         var declaredHoldings = context.declaredHoldings;
         var tolerance = 0.00000001;
-        var actionButtons = $('#holdings_run_fifo_button, #holdings_leave_basis_unresolved_button, #sends_to_sells_button, #classify_sends_fifo_button, #buys_to_lost_button');
+        var actionButtons = $('#holdings_run_fifo_button, #holdings_leave_basis_unresolved_button, #buys_to_lost_button');
 
         actionButtons
             .prop('disabled', true)
@@ -1961,11 +1964,10 @@ $(document).ready(function() {
             $('#holdings_leave_basis_unresolved_button').prop('disabled', false).show();
             $('#holdings_leave_basis_unresolved_button').text('Leave Holdings Gap As Needs Research');
             if (difference > 0) {
-                $('#sends_to_sells_button, #classify_sends_fifo_button').prop('disabled', false).show();
                 $('#holdings_contextual_action_hint')
                     .removeClass('alert-success alert-light alert-info')
                     .addClass('alert-warning')
-                    .text('Imported buys/sells imply more than you declared. Review sends or missing disposals; only classify documented sends when records support it.');
+                    .text('Imported buys/sells imply more than you declared. Review exact send rows or missing disposals; Gainz will not choose transactions from the quantity difference.');
             } else {
                 $('#buys_to_lost_button').prop('disabled', false).show();
                 $('#holdings_contextual_action_hint')
@@ -2158,7 +2160,7 @@ $(document).ready(function() {
         } else if (difference > 0) {
             $('#holdings_next_action').text('The calculated net from imported buys and sells is higher than declared ' + asset + '. Review source records for missing disposals, transfers, losses, or other activity before using generated reports.');
             $('#convert_quantity').val(holdingsFormatQuantity(difference));
-            $('#convert_text').text('If source records show selected sends left your ownership or were sent elsewhere and traded/sold, classify only the documented quantity as disposals. Owner transfers should stay as transfers.');
+            $('#convert_text').text('Review exact send rows. Record a disposition only when source evidence shows ownership changed; Gainz will not infer a send or quantity from this difference. Owner transfers should stay as transfers.');
             holdingsSetBadge('Needs Review');
         } else {
             $('#holdings_next_action').text('Declared holdings are higher than imported buys and sells currently explain. Review missing acquisitions, income, gifts, transfers, or other records that may need basis support.');
@@ -2222,8 +2224,36 @@ $(document).ready(function() {
 
                     return '<span class="gainz-status-badge ' + className + '">' + status + '</span>';
                 }
+            },
+            {
+                "targets": 9,
+                "visible": false,
+                "searchable": false
             }
         ],
+        select: {
+            style: 'single'
+        },
+    });
+
+    $('#holdings_classification_review_datatable tbody').on('click', 'tr', function() {
+        var row = holdingsClassificationReviewTable.row(this).data();
+        holdingsSelectedSendRow = row && String(row[1] || '').toLowerCase() == 'send' ? row : null;
+
+        if (!holdingsSelectedSendRow) {
+            $('#exact_send_selection').text('Select a Send row. Receive rows cannot be recorded as dispositions here.');
+            $('#exact_send_event_classification, #exact_send_proceeds_value, #exact_send_evidence_reference, #record_exact_send_disposition_button').prop('disabled', true);
+            return;
+        }
+
+        var proceeds = holdingsParseQuantity(holdingsSelectedSendRow[3]);
+        $('#exact_send_selection').text(
+            'Selected ' + holdingsSelectedSendRow[0] + ': ' + holdingsSelectedSendRow[2] + ' ' +
+            ((holdingsSelectedAssetRow() || [])[0] || '') + ' from ' + holdingsSelectedSendRow[4] + '.'
+        );
+        $('#exact_send_proceeds_value').val(proceeds !== null && proceeds >= 0 ? proceeds.toFixed(2) : '');
+        $('#exact_send_event_classification, #exact_send_proceeds_value, #exact_send_evidence_reference, #record_exact_send_disposition_button').prop('disabled', false);
+        $('#exact_send_disposition_message').hide().text('');
     });
 
     holdingsDifferenceTransactionsTable = $('#holdings_difference_transactions_datatable').DataTable({
@@ -2909,16 +2939,27 @@ $(document).ready(function() {
         holdingsLeaveBasisUnresolved($(this).data('decision') || 'needs_research');
     });
 
-    function holdingsSaveDocumentedSendClassification(rowData, asset, quantity) {
-        $('#sends_to_sells_button, #classify_sends_fifo_button').prop('disabled', true).text('Classifying...');
-        $('#holdings_save_message').hide().text('');
+    $('#open_exact_send_review_button').click(function() {
+        var panel = $('#exact_send_disposition_review');
+        panel.closest('details').prop('open', true);
+        holdingsScrollTo('#exact_send_disposition_review');
+    });
+
+    function holdingsSaveExactSendDisposition(rowData, asset) {
+        var button = $('#record_exact_send_disposition_button');
+        var messagePanel = $('#exact_send_disposition_message');
+        button.prop('disabled', true).text('Recording...');
+        messagePanel.hide().text('');
 
         $.ajax({
             type: "POST",
             url: "/holdings_accounting/sends_to_sells",
             data: JSON.stringify({
-                'quantity': quantity,
                 'asset': rowData,
+                'send_uid': holdingsSelectedSendRow ? holdingsSelectedSendRow[9] : '',
+                'event_classification': $('#exact_send_event_classification').val(),
+                'proceeds_value': $('#exact_send_proceeds_value').val(),
+                'evidence_reference': $('#exact_send_evidence_reference').val(),
                 'auto_link': true
               }),
             dataType: "json",
@@ -2931,64 +2972,62 @@ $(document).ready(function() {
                 holdingsRenderSelection(updatedRow || rowData);
                 holdingsRenderDifferenceBreakdown(data['difference_breakdown']);
                 holdingsLoadPrecheck(updatedRow || rowData);
+                holdingsSelectedSendRow = null;
 
-                var message = data['message'] || 'Documented sends classified for review.';
+                var message = data['message'] || 'The selected send was recorded as a documented disposition.';
                 if (data['auto_link_failures'] && data['auto_link_failures'].length > 0) {
                     message += ' Remaining basis review: ' + data['auto_link_failures'].map(function(failure) {
                         return failure.asset + ' ' + failure.unlinked_quantity + ' unlinked';
                     }).join('; ') + '.';
-                    $('#holdings_save_message')
-                        .removeClass('alert-success')
-                        .addClass('alert-warning');
+                    messagePanel.removeClass('alert-success alert-danger').addClass('alert-warning');
                 } else {
-                    $('#holdings_save_message')
-                        .removeClass('alert-warning')
-                        .addClass('alert-success');
+                    messagePanel.removeClass('alert-warning alert-danger').addClass('alert-success');
                 }
-                $('#holdings_save_message').text(message).show();
-                holdingsScrollTo('#holdings_save_message');
+                messagePanel.text(message).show();
+                $('#exact_send_selection').text('Select another exact Send row only if its source records support a disposition.');
+                $('#exact_send_event_classification').val('').prop('disabled', true);
+                $('#exact_send_proceeds_value, #exact_send_evidence_reference').val('').prop('disabled', true);
+                holdingsScrollTo('#exact_send_disposition_message');
             },
             error: function (xhr) {
-                var message = 'Documented sends could not be classified. Review the selected asset and quantity, then try again.';
+                var message = 'The selected send could not be recorded. Review the event, proceeds, and evidence.';
                 if (xhr.responseJSON && xhr.responseJSON.message) {
                     message = xhr.responseJSON.message;
                 }
-                alert(message);
+                messagePanel.removeClass('alert-success alert-warning').addClass('alert-danger').text(message).show();
             },
             complete: function () {
-                $('#sends_to_sells_button').prop('disabled', false).text('Classify Documented Sends as Disposals');
-                $('#classify_sends_fifo_button').prop('disabled', false).text('Classify Documented Sends And Recalculate FIFO');
+                button.prop('disabled', !holdingsSelectedSendRow).text('Record Selected Send As Disposition');
             },
         });
     }
 
-    function holdingsClassifyDocumentedSends() {
+    function holdingsRecordExactSendDisposition() {
         var rowData = holdingsSelectedAssetRow();
-        var quantity = $('#convert_quantity').val();
         var asset = rowData ? rowData[0] : null;
 
-        if (!rowData) {
-            alert("Select an asset first.");
+        if (!rowData || !holdingsSelectedSendRow) {
+            $('#exact_send_disposition_message').removeClass('alert-success alert-warning').addClass('alert-danger').text('Select the exact Send row first.').show();
             return;
         }
 
-        if (!quantity || (holdingsParseQuantity(quantity) || 0) <= 0) {
-            alert("Enter the documented send quantity to classify.");
+        if (!$('#exact_send_event_classification').val() || !$('#exact_send_proceeds_value').val() || !$('#exact_send_evidence_reference').val().trim()) {
+            $('#exact_send_disposition_message').removeClass('alert-success alert-warning').addClass('alert-danger').text('Choose the event, enter supported proceeds, and cite the evidence.').show();
             return;
         }
 
         holdingsShowActionConfirm(
-            'Classify documented sends?',
-            'Classify ' + quantity + ' ' + asset + ' of documented sends as disposals and recalculate FIFO basis? Owner transfers should remain transfers.',
-            'Classify And Link',
+            'Record this exact send as a disposition?',
+            'Gainz will replace only the selected ' + holdingsSelectedSendRow[2] + ' ' + asset + ' send with a disposition, use the entered value as proceeds, then link supported acquisition lots with FIFO. It will not use that value as basis.',
+            'Record And Recalculate',
             function() {
-                holdingsSaveDocumentedSendClassification(rowData, asset, quantity);
+                holdingsSaveExactSendDisposition(rowData, asset);
             }
         );
     }
 
-    $("#sends_to_sells_button, #classify_sends_fifo_button").click(function(){
-        holdingsClassifyDocumentedSends();
+    $('#record_exact_send_disposition_button').click(function() {
+        holdingsRecordExactSendDisposition();
     });
 
     $("#receives_to_buys_button").click(function(){

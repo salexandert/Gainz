@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from . import blueprint
@@ -13,7 +14,13 @@ from utils import *
 from app.services.export_service import ExportService
 from app.services.audit_packet_service import AuditPacketService
 from app.services.packet_plan_service import (
+    CPA_BASIS_METHODS,
+    CPA_EVENT_CLASSIFICATIONS,
+    CPA_PROCEEDS_METHODS,
+    CPA_RESOLUTION_STATUSES,
+    CPA_REVIEWER_ROLES,
     WORK_ORDER_REVIEW_DECISIONS,
+    cpa_resolution_choices,
     get_packet_preview,
     reconciliation_work_order_rows,
     work_order_review_choices,
@@ -74,6 +81,211 @@ def _output_dir_for_location(default_folder, create=False):
 
 def _truthy_payload_value(value):
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _optional_money(value, label):
+    text = str(value or "").strip().replace("$", "").replace(",", "")
+    if not text:
+        return "", ""
+
+    try:
+        amount = Decimal(text)
+    except InvalidOperation:
+        return "", f"Enter a valid {label} in U.S. dollars."
+
+    if not amount.is_finite():
+        return "", f"Enter a finite {label} in U.S. dollars."
+
+    if amount < 0:
+        return "", f"{label.capitalize()} cannot be negative."
+
+    return f"{amount:.2f}", ""
+
+
+def _cpa_resolution_details(source):
+    proceeds_value, proceeds_error = _optional_money(
+        source.get("proceeds_value"),
+        "proceeds or amount realized for the unresolved quantity",
+    )
+    basis_value, basis_error = _optional_money(
+        source.get("basis_value"),
+        "total adjusted basis",
+    )
+    error = proceeds_error or basis_error
+
+    details = {
+        "reviewer_name": str(source.get("reviewer_name") or "").strip(),
+        "reviewer_role": str(source.get("reviewer_role") or "").strip(),
+        "event_classification": str(source.get("event_classification") or "").strip(),
+        "proceeds_method": str(source.get("proceeds_method") or "").strip(),
+        "proceeds_value": proceeds_value,
+        "basis_method": str(source.get("basis_method") or "").strip(),
+        "basis_value": basis_value,
+        "evidence_reference": str(source.get("evidence_reference") or "").strip(),
+        "resolution_status": str(source.get("resolution_status") or "").strip(),
+        "acquisition_date": str(source.get("acquisition_date") or "").strip(),
+        "professional_attestation": (
+            "Yes" if _truthy_payload_value(source.get("professional_attestation")) else ""
+        ),
+    }
+    return details, error
+
+
+def _validate_cpa_resolution(item, decision, details, note=""):
+    choice_sets = (
+        ("reviewer_role", CPA_REVIEWER_ROLES, "reviewer role"),
+        ("event_classification", CPA_EVENT_CLASSIFICATIONS, "event classification"),
+        ("proceeds_method", CPA_PROCEEDS_METHODS, "proceeds method"),
+        ("basis_method", CPA_BASIS_METHODS, "basis method"),
+        ("resolution_status", CPA_RESOLUTION_STATUSES, "resolution status"),
+    )
+    for field, allowed, label in choice_sets:
+        if details[field] not in allowed:
+            return f"Choose a valid {label}."
+
+    if decision == "keep_owner_transfer":
+        details["event_classification"] = "owner_transfer"
+        details["proceeds_method"] = details["proceeds_method"] or "not_applicable"
+        details["basis_method"] = details["basis_method"] or "not_applicable"
+        if not details["evidence_reference"] and not note:
+            return "Add the wallet/account evidence or a note supporting the owner-transfer decision."
+
+    if decision == "classify_documented_disposal":
+        if details["event_classification"] in {"", "unknown", "owner_transfer"}:
+            return "Choose the documented sale, exchange, payment, fee, gift, or other disposition type."
+        if details["proceeds_method"] in {"", "unknown", "not_applicable"}:
+            return "Choose how proceeds or amount realized for the unresolved quantity were determined."
+        if not details["proceeds_value"]:
+            return "Enter supported proceeds or amount realized for the unresolved quantity in U.S. dollars."
+        if not details["evidence_reference"] and not note:
+            return "Cite the source record, valuation source, workpaper, or other evidence for this disposition."
+        details["resolution_status"] = details["resolution_status"] or "prepared_for_cpa"
+
+    if decision == "zero_basis_cpa_review":
+        if details["event_classification"] in {"", "unknown", "owner_transfer"}:
+            return "Confirm the documented disposition type before considering an unknown-basis treatment."
+        if details["proceeds_method"] in {"", "unknown", "not_applicable"}:
+            return "Choose how proceeds or amount realized for the unresolved quantity were determined."
+        if not details["proceeds_value"]:
+            return "Enter supported proceeds or amount realized for the unresolved quantity in U.S. dollars."
+        if not details["evidence_reference"] and not note:
+            return "Cite the records supporting the disposition and valuation."
+        details["basis_method"] = "unknown_zero_for_review"
+        details["basis_value"] = "0.00"
+        details["resolution_status"] = "prepared_for_cpa"
+
+    if decision == "fork_airdrop_basis":
+        details["basis_method"] = details["basis_method"] or "fork_airdrop_supported"
+        if not details["evidence_reference"] and not note:
+            return "Cite the fork, airdrop, income, or acquisition evidence supporting this treatment."
+
+    if decision == "already_in_filed_totals":
+        details["resolution_status"] = details["resolution_status"] or "previously_filed"
+        if not details["evidence_reference"]:
+            return "Cite the filed Form 8949, Schedule D, return, or CPA workpaper."
+
+    if decision in {"needs_research", "ignored_for_draft"}:
+        details["resolution_status"] = details["resolution_status"] or "draft_research"
+
+    if decision == "sent_to_cpa":
+        details["resolution_status"] = details["resolution_status"] or "prepared_for_cpa"
+
+    if details["resolution_status"] == "cpa_reviewed_position":
+        if details["reviewer_role"] != "cpa_ea_tax_professional":
+            return "A CPA-reviewed filing position requires the CPA, EA, or tax professional reviewer role."
+        if not details["reviewer_name"]:
+            return "Enter the reviewing professional's name."
+        if not details["professional_attestation"]:
+            return "Confirm the professional-review statement before recording a filing position."
+        if not details["evidence_reference"]:
+            return "Cite the evidence or workpaper supporting the filing position."
+        if details["event_classification"] in {"", "unknown"}:
+            return "Choose the event classification supporting the filing position."
+        if details["event_classification"] not in {"owner_transfer", "gift_or_donation"}:
+            if details["proceeds_method"] in {"", "unknown", "not_applicable"} or not details["proceeds_value"]:
+                return "Record supported proceeds or amount realized for this filing position."
+            if details["basis_method"] in {"", "unknown", "not_applicable"}:
+                return "Record the CPA-approved adjusted-basis method."
+            if details["basis_method"] != "actual_zero_basis" and not details["basis_value"]:
+                if details["basis_method"] != "unknown_zero_for_review":
+                    return "Enter the supported total adjusted basis."
+
+    if decision == "resolved" and item.get("blocker_type") == "Missing acquisition basis":
+        if details["resolution_status"] != "cpa_reviewed_position":
+            return "Choose CPA-reviewed filing position before applying this resolution to calculations."
+        if details["event_classification"] not in {
+            "cash_sale",
+            "crypto_exchange",
+            "goods_or_services",
+            "fee",
+            "other_disposition",
+        }:
+            return "Choose the documented taxable disposition type for this sale."
+        if details["basis_method"] in {
+            "",
+            "unknown",
+            "not_applicable",
+            "imported_fifo",
+            "specific_identification",
+        }:
+            return (
+                "Choose the CPA-approved basis adjustment method. Import or link actual lots instead "
+                "when using FIFO or specific identification."
+            )
+        if details["basis_method"] in {"actual_zero_basis", "unknown_zero_for_review"}:
+            details["basis_value"] = "0.00"
+        elif not details["basis_value"]:
+            return "Enter the adjusted basis for the unresolved quantity."
+        if not details["acquisition_date"]:
+            return "Enter the supported acquisition date used for Form 8949 reporting."
+        try:
+            datetime.date.fromisoformat(details["acquisition_date"])
+        except ValueError:
+            return "Enter a valid acquisition date."
+        if not item.get("target_transaction_uid"):
+            return "Gainz cannot identify the exact sale row. Refresh the review queue before applying the resolution."
+
+    return ""
+
+
+def _work_order_context_fields(item):
+    return {
+        field: item.get(field, "")
+        for field in (
+            "blocker_type",
+            "asset",
+            "year",
+            "date",
+            "quantity",
+            "transaction_quantity",
+            "source_file",
+            "suspected_issue",
+            "target_transaction_uid",
+        )
+    }
+
+
+def _apply_cpa_calculation_resolution(transactions, item, item_id, decision, details):
+    if decision != "resolved" or item.get("blocker_type") != "Missing acquisition basis":
+        return ""
+
+    try:
+        adjustment_buy, _link = transactions.apply_cpa_basis_resolution(
+            target_sell_uid=item.get("target_transaction_uid"),
+            quantity=item.get("quantity"),
+            acquisition_date=details.get("acquisition_date"),
+            basis_value=details.get("basis_value"),
+            proceeds_value=details.get("proceeds_value"),
+            basis_method=CPA_BASIS_METHODS.get(details.get("basis_method"), details.get("basis_method")),
+            evidence_reference=details.get("evidence_reference"),
+            work_order_item_id=item_id,
+        )
+    except (TypeError, ValueError) as exc:
+        return str(exc)
+
+    details["calculation_applied"] = "Yes"
+    details["adjustment_transaction_uid"] = adjustment_buy.uid
+    return ""
 
 
 def _draft_acknowledged():
@@ -296,10 +508,10 @@ def _professional_review_options(row):
                 ),
             ),
             (
-                "Treat unknown basis conservatively",
+                "Apply a CPA-reviewed basis adjustment",
                 (
-                    "If records cannot be reconstructed, document a conservative CPA-reviewed path such as treating proceeds "
-                    "as fully taxable with $0 basis unless the CPA adjusts."
+                    "When records cannot be reconstructed, the CPA can document a supported acquisition date, proceeds, "
+                    "basis treatment, and workpaper. Gainz can then apply that exact resolution to the sale and Form 8949 output."
                 ),
             ),
             (
@@ -456,9 +668,9 @@ def _review_queue_choices_for_item(row):
             "import_missing_records": f"Import missing {asset} acquisition records",
             "fork_airdrop_basis": f"This {asset} came from a fork/airdrop",
             "already_in_filed_totals": "Already included in filed tax totals",
-            "zero_basis_cpa_review": "Treat unknown basis as $0 for CPA review",
+            "zero_basis_cpa_review": "Document conservative $0 basis for CPA review",
             "sent_to_cpa": f"Send this {asset} gap to CPA",
-            "resolved": "Already resolved",
+            "resolved": "Apply CPA Resolution To Calculations",
         },
         "Holdings explanation needed": {
             "import_missing_records": "I will import missing records",
@@ -517,6 +729,27 @@ def _review_queue_context(transactions, item_id=""):
         current["review_summary"] = _work_order_item_summary(current)
         current["professional_review_options"] = _professional_review_options(current)
         current["tax_cross_check"] = _tax_cross_check_for_item(transactions, current)
+        current["show_cpa_resolution"] = current.get("blocker_type") in {
+            "Missing acquisition basis",
+            "Holdings explanation needed",
+        }
+        if current.get("blocker_type") == "Missing acquisition basis":
+            target_sell = next(
+                (
+                    trans
+                    for trans in transactions
+                    if trans.uid == current.get("target_transaction_uid")
+                    and trans.trans_type == "sell"
+                ),
+                None,
+            )
+            if target_sell is not None:
+                unresolved_quantity = float(current.get("quantity") or 0)
+                current["source_proceeds_value"] = f"{target_sell.usd_spot * unresolved_quantity:.2f}"
+                if not current.get("proceeds_value"):
+                    current["proceeds_value"] = current["source_proceeds_value"]
+                if not current.get("proceeds_method"):
+                    current["proceeds_method"] = "source_reported"
         choices = _review_queue_choices_for_item(current)
         current["allowed_outcomes"] = [choice["label"] for choice in choices]
     else:
@@ -531,6 +764,7 @@ def _review_queue_context(transactions, item_id=""):
         "reviewed_count": len(rows) - len(unreviewed),
         "next_item_id": next_item.get("item_id") if next_item else "",
         "choices": choices,
+        "cpa_resolution_choices": cpa_resolution_choices(),
     }
 
 
@@ -666,10 +900,11 @@ def index():
 def work_order_review():
     transactions = current_app.config['transactions']
     payload = request.get_json(silent=True) or {}
-    item_id = str(payload.get("item_id") or request.form.get("item_id") or "").strip()
-    decision = str(payload.get("decision") or request.form.get("decision") or "").strip()
-    note = str(payload.get("note") or request.form.get("note") or "").strip()
-    cpa_question = str(payload.get("cpa_question") or request.form.get("cpa_question") or "").strip()
+    source = payload if request.is_json else request.form
+    item_id = str(source.get("item_id") or "").strip()
+    decision = str(source.get("decision") or "").strip()
+    note = str(source.get("note") or "").strip()
+    cpa_question = str(source.get("cpa_question") or "").strip()
 
     if not item_id:
         if request.is_json:
@@ -681,11 +916,35 @@ def work_order_review():
             return jsonify({"message": "Choose a valid work order review state."}), 400
         return redirect(url_for('export_blueprint.index', work_order_reviewed=0))
 
+    details, detail_error = _cpa_resolution_details(source)
+    item = next(
+        (row for row in _work_order_rows(transactions) if row.get("item_id") == item_id),
+        None,
+    )
+    if item is None:
+        if request.is_json:
+            return jsonify({"message": "The work order item is no longer open. Refresh before saving."}), 409
+        return redirect(url_for('export_blueprint.index', work_order_reviewed=0))
+    validation_error = detail_error or _validate_cpa_resolution(item or {}, decision, details, note=note)
+    validation_error = validation_error or _apply_cpa_calculation_resolution(
+        transactions,
+        item,
+        item_id,
+        decision,
+        details,
+    )
+    if validation_error:
+        if request.is_json:
+            return jsonify({"message": validation_error}), 400
+        return redirect(url_for('export_blueprint.index', work_order_reviewed=0))
+
     transactions.set_work_order_review(
         item_id,
         decision=decision,
         note=note,
         cpa_question=cpa_question,
+        **_work_order_context_fields(item),
+        **details,
     )
     transactions.save(description=f"Updated work order item: {WORK_ORDER_REVIEW_DECISIONS[decision]}")
 
@@ -719,11 +978,35 @@ def review_queue_save():
     if not item_id or decision not in WORK_ORDER_REVIEW_DECISIONS:
         return redirect(url_for('export_blueprint.review_queue', guided=1, item_id=item_id, saved=0))
 
+    details, detail_error = _cpa_resolution_details(request.form)
+    item = next(
+        (row for row in _work_order_rows(transactions) if row.get("item_id") == item_id),
+        None,
+    )
+    if item is None:
+        context = _review_queue_context(transactions)
+        context["save_error"] = "That review item is no longer open. Continue with the next item."
+        return render_template("review_queue.html", **context), 409
+    validation_error = detail_error or _validate_cpa_resolution(item or {}, decision, details, note=note)
+    validation_error = validation_error or _apply_cpa_calculation_resolution(
+        transactions,
+        item,
+        item_id,
+        decision,
+        details,
+    )
+    if validation_error:
+        context = _review_queue_context(transactions, item_id=item_id)
+        context["save_error"] = validation_error
+        return render_template("review_queue.html", **context), 400
+
     transactions.set_work_order_review(
         item_id,
         decision=decision,
         note=note,
         cpa_question=cpa_question,
+        **_work_order_context_fields(item),
+        **details,
     )
     transactions.save(description=f"Updated review queue item: {WORK_ORDER_REVIEW_DECISIONS[decision]}")
 

@@ -2,7 +2,7 @@
 
 Gainz is a local, offline crypto accounting workbench for people who want to reconcile exchange CSVs without uploading financial history to a cloud tax service.
 
-It helps import transactions, link sells to buys, estimate cost basis, review unresolved sends/receives, and export Excel reports for documentation or CPA review.
+It helps import transactions, link dispositions to acquisition lots, review unresolved sends/receives, apply documented CPA resolutions to exact sales, and export Excel reports and workpapers for professional review.
 
 Gainz is best understood as **private offline crypto tax reconciliation**. It does not try to be a hosted tax service. It helps you turn messy exchange exports into traceable basis links, Form 8949-style rows, current holdings reconciliation, and a documentation packet you can review with a qualified tax professional without uploading your transaction history.
 
@@ -11,6 +11,8 @@ Gainz is best understood as **private offline crypto tax reconciliation**. It do
 - Private offline workflow: runs locally on your machine without requiring a hosted account or transaction-history upload.
 - Privacy-oriented: imported files, saved revisions, reports, and audit packets stay on your machine unless you choose to share exports.
 - Reconciliation-focused: designed to help explain messy crypto history, not just produce a final number.
+- CPA resolution workflow: records proceeds and basis separately, requires evidence and professional attestation for applied missing-basis treatments, then updates the exact sale, Form 8949 rows, readiness, and packet workpaper together.
+- No inferred disposals: Gainz does not convert sends based on age, holdings differences, or an assumed quantity. A specific send must be selected and supported before it can become a disposition.
 - Spreadsheet-friendly: exports Excel reports, Form 8949-style sheets, transaction history, and audit packets.
 
 ## What Gainz Is Not
@@ -98,7 +100,7 @@ From a source checkout, you can reset the local password with `python .\scripts\
 5. Continue to **Reconcile** after the source files for the review pass are loaded.
 6. Declare current holdings in **Reconcile** before deeper basis work unless Guided Reconciliation points somewhere else.
 7. Review import warnings, source overlaps, and transfer questions that affect the reconciliation.
-8. Let Gainz apply default FIFO basis links automatically; use **Auto Link** only when you intentionally want to recalculate or compare another supported method.
+8. Let Gainz apply default FIFO basis links automatically. If acquisition records still cannot be found, use the Guided Review Queue CPA Resolution Worksheet to record and apply a supported professional treatment to the exact sale.
 9. Open **Tax Evidence**, build the year-by-year tax evidence inventory, and confirm or mark suggested filed totals for research.
 10. Open **Reports & Export**, then use **Start guided review** to work unresolved items one at a time.
 11. Review packet preview, generate the workbook or audit packet, then use the packet success screen to copy the packet path, open the output folder, and review the first files.
@@ -128,7 +130,7 @@ A good demo run is:
 11. Review the audit packet preview, then generate the workbook or draft audit packet.
 12. Use the packet success screen to copy the packet path or CPA summary, open the packet folder, and review `README_FIRST.md`, `PACKET_STATUS.md`, and `FOR_CPAS.md`.
 
-The audit packet includes root `README_FIRST.md`, `PACKET_STATUS.md`, `FOR_CPAS.md`, `CPA_HANDOFF.md`, and `PRIVACY_AND_EVIDENCE_HANDLING.md` files, the Excel workbook with a visible packet status sheet, Form 8949 detail CSVs, Form 8949 totals, tax filing review, tax evidence inventory, suggested filed totals, reconciliation work order CSV/Markdown, unknown gap memo CSV/Markdown, holdings reconciliation, current holdings lots, active and preserved import-warning decisions, missing-basis review, source-overlap review, copied transaction source files when available, tax evidence references, explicitly selected tax evidence copies, hashes, and a methodology memo.
+The audit packet includes root `README_FIRST.md`, `PACKET_STATUS.md`, `FOR_CPAS.md`, `CPA_HANDOFF.md`, and `PRIVACY_AND_EVIDENCE_HANDLING.md` files, the Excel workbook with a visible packet status sheet, Form 8949 detail CSVs, Form 8949 totals, tax filing review, tax evidence inventory, suggested filed totals, reconciliation work order CSV/Markdown, CPA resolution workpapers, unknown gap memo CSV/Markdown, holdings reconciliation, current holdings lots, active and preserved import-warning decisions, missing-basis review, source-overlap review, copied transaction source files when available, tax evidence references, explicitly selected tax evidence copies, hashes, and a methodology memo.
 
 ## Documentation
 

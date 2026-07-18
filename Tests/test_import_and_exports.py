@@ -24,7 +24,11 @@ from app.import_transactions.routes import (
 from app.services.audit_packet_service import AuditPacketService
 from app.services.import_service import ImportService
 from app.services.import_warning_service import import_warning_review_rows
-from app.services.packet_plan_service import get_packet_preview, reconciliation_work_order_rows
+from app.services.packet_plan_service import (
+    cpa_resolution_workpaper_rows,
+    get_packet_preview,
+    reconciliation_work_order_rows,
+)
 from app_version import APP_VERSION
 from transaction import Buy, Sell, Send
 from transactions import Transactions
@@ -1118,7 +1122,7 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertIsNone(sheet["B2"].value.tzinfo)
             self.assertIsNone(sheet["C2"].value.tzinfo)
 
-    def test_holdings_classifies_documented_sends_and_runs_fifo(self):
+    def test_holdings_classifies_selected_documented_send_and_runs_fifo(self):
         transactions = empty_transactions()
         buy = Buy("BTC", 2, datetime.datetime(2024, 1, 1), 100, "demo")
         send = Send("BTC", 1, datetime.datetime(2024, 6, 1), 200, "wallet")
@@ -1140,7 +1144,10 @@ class ImportAndExportTests(unittest.TestCase):
                     "/holdings_accounting/sends_to_sells",
                     json={
                         "asset": ["BTC"],
-                        "quantity": "1",
+                        "send_uid": send.uid,
+                        "event_classification": "cash_sale",
+                        "proceeds_value": "200",
+                        "evidence_reference": "Exchange statement row 42",
                         "auto_link": True,
                     },
                 )
@@ -1150,13 +1157,48 @@ class ImportAndExportTests(unittest.TestCase):
             sells = [trans for trans in transactions if trans.trans_type == "sell"]
             sends = [trans for trans in transactions if trans.trans_type == "send"]
 
-            self.assertIn("taxable disposal", payload["message"])
+            self.assertIn("documented sale for cash", payload["message"])
             self.assertEqual(1, payload["links_created"])
             self.assertEqual([], payload["auto_link_failures"])
             self.assertEqual(1, len(sells))
             self.assertEqual(0, len(sends))
             self.assertEqual(1, len(sells[0].links))
             self.assertEqual("0", payload["difference_breakdown"]["summary"]["difference"])
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_holdings_rejects_quantity_based_send_inference(self):
+        transactions = empty_transactions()
+        send = Send("BTC", 1, datetime.datetime(2024, 6, 1), 200, "wallet")
+        transactions.transactions = [send]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class RouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(RouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/holdings_accounting/sends_to_sells",
+                    json={
+                        "asset": ["BTC"],
+                        "quantity": "1",
+                        "auto_link": True,
+                    },
+                )
+
+            self.assertEqual(400, response.status_code)
+            self.assertIn("Select the exact send row", response.get_json()["message"])
+            self.assertEqual([send], transactions.transactions)
+            self.assertEqual([], transactions.conversions)
 
             with app.app_context():
                 db.drop_all()
@@ -1792,6 +1834,9 @@ class ImportAndExportTests(unittest.TestCase):
 
     def test_export_route_saves_work_order_review_state(self):
         transactions = empty_transactions()
+        transactions.transactions = [
+            Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "source.csv")
+        ]
 
         with tempfile.TemporaryDirectory() as temp_dir:
             class ExportRouteTestConfig(config_dict["Debug"]):
@@ -1803,11 +1848,19 @@ class ImportAndExportTests(unittest.TestCase):
             app = create_app(ExportRouteTestConfig, selenium=True)
             app.config["transactions"] = transactions
 
+            readiness = get_audit_readiness_summary(transactions)
+            work_items = [
+                row for row in reconciliation_work_order_rows(readiness, transactions)
+                if row.get("blocker_type") != "No open blockers"
+            ]
+            self.assertTrue(work_items)
+            item_id = work_items[0]["item_id"]
+
             with app.test_client() as client:
                 response = client.post(
                     "/export/work_order_review",
                     json={
-                        "item_id": "work-item-1",
+                        "item_id": item_id,
                         "decision": "sent_to_cpa",
                         "note": "Asked CPA to review this item.",
                         "cpa_question": "Should this remain unresolved for CPA review?",
@@ -1815,7 +1868,7 @@ class ImportAndExportTests(unittest.TestCase):
                 )
 
             self.assertEqual(200, response.status_code)
-            record = transactions.get_work_order_review("work-item-1")
+            record = transactions.get_work_order_review(item_id)
             self.assertIsNotNone(record)
             self.assertEqual("sent_to_cpa", record["decision"])
             self.assertEqual("Asked CPA to review this item.", record["note"])
@@ -1868,7 +1921,7 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertIn(b"/export/?guided=1", response.data)
             response_text = response.data.decode("utf-8")
             self.assertLess(
-                response_text.index("Choose what happened next"),
+                response_text.index("Choose the resolution outcome"),
                 response_text.index("Gap Investigator"),
             )
 
@@ -1936,14 +1989,157 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertIn(b"Import missing BCH acquisition records", response.data)
             self.assertIn(b"This BCH came from a fork/airdrop", response.data)
             self.assertIn(b"Already included in filed tax totals", response.data)
-            self.assertIn(b"Treat unknown basis as $0 for CPA review", response.data)
+            self.assertIn(b"Document conservative $0 basis for CPA review", response.data)
             self.assertIn(b"Send this BCH gap to CPA", response.data)
             self.assertIn(b"CPA review options", response.data)
             self.assertIn(b"Reconstruct basis from records", response.data)
             self.assertIn(b"Correct source classification", response.data)
-            self.assertIn(b"Treat unknown basis conservatively", response.data)
+            self.assertIn(b"CPA-directed conservative $0 basis", response.data)
             self.assertNotIn(b"Keep as owner transfer", response.data)
             self.assertNotIn(b"Decide what to do with this work order item", response.data)
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_cpa_resolution_reaches_ready_form_8949_and_packet_workpaper(self):
+        transactions = empty_transactions()
+        sell = Sell("BCH", 0.5, datetime.datetime(2024, 2, 1), 1000, "exchange.csv")
+        transactions.transactions = [sell]
+        transactions.set_holdings("BCH", 0)
+        transactions.set_tax_year_record(
+            2024,
+            reported_proceeds=500,
+            reported_cost_basis=125,
+            reported_gain_loss=375,
+            tax_paid=50,
+            filing_status="Filed",
+            evidence_reference="2024 filed Form 8949 and payment record",
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class ExportRouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(ExportRouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            before = get_audit_readiness_summary(transactions)
+            missing_basis_item = next(
+                row
+                for row in reconciliation_work_order_rows(before, transactions)
+                if row.get("blocker_type") == "Missing acquisition basis"
+            )
+            self.assertEqual(sell.uid, missing_basis_item["target_transaction_uid"])
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/export/review_queue/save",
+                    data={
+                        "item_id": missing_basis_item["item_id"],
+                        "decision": "resolved",
+                        "event_classification": "cash_sale",
+                        "proceeds_method": "source_reported",
+                        "proceeds_value": "500",
+                        "basis_method": "documented_acquisition_cost",
+                        "basis_value": "125",
+                        "acquisition_date": "2021-03-15",
+                        "evidence_reference": "CPA workpaper BCH-2024-01",
+                        "resolution_status": "cpa_reviewed_position",
+                        "reviewer_name": "Jamie Reviewer",
+                        "reviewer_role": "cpa_ea_tax_professional",
+                        "professional_attestation": "yes",
+                        "note": "Acquisition cost reconstructed from exchange statements.",
+                    },
+                )
+
+            self.assertEqual(302, response.status_code)
+            form_rows = get_form_8949_report_rows(transactions)
+            self.assertEqual(1, len(form_rows))
+            self.assertAlmostEqual(500, form_rows[0]["proceeds"])
+            self.assertAlmostEqual(125, form_rows[0]["cost_basis"])
+            self.assertAlmostEqual(375, form_rows[0]["gain_loss"])
+            self.assertEqual(sell.uid, form_rows[0]["sell_uid"])
+
+            after = get_audit_readiness_summary(transactions)
+            self.assertEqual([], after["missing_records"]["basis"])
+            self.assertTrue(after["is_ready"])
+            self.assertEqual("Ready for review", after["status"])
+
+            workpapers = cpa_resolution_workpaper_rows(after, transactions)
+            self.assertEqual(1, len(workpapers))
+            self.assertEqual("Yes", workpapers[0]["calculation_applied"])
+            self.assertEqual("CPA-reviewed filing position", workpapers[0]["resolution_status_label"])
+            self.assertEqual("500.00", workpapers[0]["proceeds_value"])
+            self.assertEqual("125.00", workpapers[0]["basis_value"])
+
+            packet_dir = AuditPacketService(
+                str(Path(temp_dir) / "packets"),
+                str(Path(temp_dir) / "exports"),
+            ).create_packet(transactions)
+            workpaper_path = Path(packet_dir) / "01_reports" / "cpa_resolution_workpapers.csv"
+            self.assertTrue(workpaper_path.exists())
+            with workpaper_path.open("r", encoding="utf-8-sig", newline="") as handle:
+                packet_rows = list(csv.DictReader(handle))
+            self.assertEqual(1, len(packet_rows))
+            self.assertEqual("Yes", packet_rows[0]["calculation_applied"])
+            self.assertEqual(sell.uid, packet_rows[0]["target_transaction_uid"])
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_cpa_resolution_cannot_apply_without_professional_attestation(self):
+        transactions = empty_transactions()
+        sell = Sell("BCH", 0.5, datetime.datetime(2024, 2, 1), 1000, "exchange.csv")
+        transactions.transactions = [sell]
+        transactions.set_holdings("BCH", 0)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class ExportRouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(ExportRouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+            readiness = get_audit_readiness_summary(transactions)
+            item = next(
+                row
+                for row in reconciliation_work_order_rows(readiness, transactions)
+                if row.get("blocker_type") == "Missing acquisition basis"
+            )
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/export/review_queue/save",
+                    data={
+                        "item_id": item["item_id"],
+                        "decision": "resolved",
+                        "event_classification": "cash_sale",
+                        "proceeds_method": "source_reported",
+                        "proceeds_value": "500",
+                        "basis_method": "documented_acquisition_cost",
+                        "basis_value": "125",
+                        "acquisition_date": "2021-03-15",
+                        "evidence_reference": "CPA workpaper BCH-2024-01",
+                        "resolution_status": "cpa_reviewed_position",
+                        "reviewer_name": "Jamie Reviewer",
+                        "reviewer_role": "cpa_ea_tax_professional",
+                    },
+                )
+
+            self.assertEqual(400, response.status_code)
+            self.assertIn(b"Confirm the professional-review statement", response.data)
+            self.assertEqual([], sell.links)
+            self.assertEqual([sell], transactions.transactions)
+            self.assertIsNone(transactions.get_work_order_review(item["item_id"]))
 
             with app.app_context():
                 db.drop_all()

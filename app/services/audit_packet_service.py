@@ -15,6 +15,7 @@ from app.services.tax_evidence_service import (
 )
 from app.services.tax_total_extraction_service import get_suggested_filed_totals
 from app.services.packet_plan_service import (
+    cpa_resolution_workpaper_rows,
     reconciliation_work_order_markdown,
     reconciliation_work_order_rows,
     tax_evidence_packet_counts,
@@ -121,8 +122,9 @@ class AuditPacketService:
         self._write_import_warnings(packet_dir, transactions)
         self._write_source_overlap_review(packet_dir, transactions)
         self._write_reconciliation_work_order(packet_dir, readiness, transactions)
+        self._write_cpa_resolution_workpapers(packet_dir, readiness, transactions)
         self._write_unknown_gap_memos(packet_dir, readiness, transactions)
-        self._write_packet_status_files(packet_dir, readiness, manifest_rows)
+        self._write_packet_status_files(packet_dir, readiness, manifest_rows, transactions)
         self._write_cpa_handoff(packet_dir, readiness, manifest_rows, transactions)
         self._write_for_cpas(packet_dir, readiness, manifest_rows, transactions)
         self._write_privacy_and_evidence_handling(packet_dir, manifest_rows)
@@ -198,7 +200,7 @@ class AuditPacketService:
             ]),
         }
 
-    def _write_packet_status_files(self, packet_dir, readiness, manifest_rows):
+    def _write_packet_status_files(self, packet_dir, readiness, manifest_rows, transactions):
         counts = self._manifest_evidence_counts(manifest_rows)
         status = "FILING-READY REVIEW PACKET" if readiness["is_ready"] else "DRAFT - NOT FILING READY"
         status_lines = [
@@ -227,6 +229,15 @@ class AuditPacketService:
         status_lines.extend(["", "## Open Warnings", ""])
         status_lines.extend([f"- {warning}" for warning in readiness.get("warnings", [])] or ["- None"])
         work_order_summary = readiness.get("work_order_review_summary") or {}
+        cpa_workpapers = cpa_resolution_workpaper_rows(readiness, transactions)
+        cpa_reviewed_positions = [
+            row for row in cpa_workpapers
+            if row.get("resolution_status") == "cpa_reviewed_position"
+        ]
+        applied_positions = [
+            row for row in cpa_workpapers
+            if row.get("calculation_applied")
+        ]
         status_lines.extend([
             "",
             "## Work Order Review Decisions",
@@ -245,6 +256,9 @@ class AuditPacketService:
             f"- Needs research: {work_order_summary.get('needs_research_count', 0)}",
             f"- Leave unresolved for draft only: {work_order_summary.get('ignored_for_draft_count', 0)}",
             f"- Sent to CPA: {work_order_summary.get('sent_to_cpa_count', 0)}",
+            f"- Items with CPA resolution details: {len(cpa_workpapers)}",
+            f"- CPA-reviewed filing positions: {len(cpa_reviewed_positions)}",
+            f"- CPA resolutions applied to calculations: {len(applied_positions)}",
         ])
         status_lines.extend([
             "",
@@ -358,11 +372,12 @@ class AuditPacketService:
             "",
             "1. `PACKET_STATUS.md` for readiness, blockers, warnings, and evidence counts.",
             "2. `01_reports/reconciliation_work_order.csv` for the itemized unresolved work queue.",
-            "3. `01_reports/unknown_gap_memos.md` for documented unknowns, user notes, candidate explanations, and CPA questions.",
-            "4. `01_reports/tax_filing_alignment.csv` for calculated totals compared with user-entered filed totals.",
-            "5. `01_reports/form_8949_totals.csv` and the Form 8949 detail CSVs for proceeds, basis, and gain/loss.",
-            "6. `01_reports/holdings_reconciliation.csv` and `01_reports/current_holdings_lots.csv` for holdings explanation.",
-            "7. `03_manifests/evidence_manifest.csv` for copied files, reference-only evidence, missing paths, and hashes.",
+            "3. `01_reports/cpa_resolution_workpapers.csv` for separately documented event, proceeds, basis, evidence, and reviewer fields.",
+            "4. `01_reports/unknown_gap_memos.md` for documented unknowns, user notes, candidate explanations, and CPA questions.",
+            "5. `01_reports/tax_filing_alignment.csv` for calculated totals compared with user-entered filed totals.",
+            "6. `01_reports/form_8949_totals.csv` and the Form 8949 detail CSVs for proceeds, basis, and gain/loss.",
+            "7. `01_reports/holdings_reconciliation.csv` and `01_reports/current_holdings_lots.csv` for holdings explanation.",
+            "8. `03_manifests/evidence_manifest.csv` for copied files, reference-only evidence, missing paths, and hashes.",
             "",
             "## Evidence Handling",
             "",
@@ -380,6 +395,7 @@ class AuditPacketService:
             "- Whether imported CSVs represent complete exchange, wallet, and brokerage history for the reviewed years.",
             "- Whether the user's filed totals and payment evidence align with generated Gainz totals.",
             "- Whether unresolved blockers make this packet draft-only.",
+            "- Whether a disposition-date valuation supports proceeds or amount realized; it should not be reused as acquisition basis.",
             "",
             "## Questions For The Taxpayer",
             "",
@@ -888,6 +904,7 @@ class AuditPacketService:
             "asset",
             "year",
             "date",
+            "quantity",
             "source_file",
             "suspected_issue",
             "next_action",
@@ -896,6 +913,21 @@ class AuditPacketService:
             "review_decision_label",
             "review_note",
             "cpa_question",
+            "reviewer_name",
+            "reviewer_role",
+            "reviewer_role_label",
+            "event_classification",
+            "event_classification_label",
+            "proceeds_method",
+            "proceeds_method_label",
+            "proceeds_value",
+            "basis_method",
+            "basis_method_label",
+            "basis_value",
+            "evidence_reference",
+            "resolution_status",
+            "resolution_status_label",
+            "professional_attestation",
             "review_updated_at",
             "what_gainz_knows",
             "what_gainz_does_not_know",
@@ -924,6 +956,42 @@ class AuditPacketService:
             encoding="utf-8",
         )
 
+    def _write_cpa_resolution_workpapers(self, packet_dir, readiness, transactions):
+        rows = cpa_resolution_workpaper_rows(readiness, transactions)
+        fieldnames = [
+            "item_id",
+            "blocker_type",
+            "asset",
+            "year",
+            "date",
+            "quantity",
+            "transaction_quantity",
+            "source_file",
+            "review_decision_label",
+            "resolution_status_label",
+            "reviewer_name",
+            "reviewer_role_label",
+            "event_classification_label",
+            "proceeds_method_label",
+            "proceeds_value",
+            "basis_method_label",
+            "basis_value",
+            "acquisition_date",
+            "evidence_reference",
+            "professional_attestation",
+            "calculation_applied",
+            "target_transaction_uid",
+            "adjustment_transaction_uid",
+            "review_note",
+            "cpa_question",
+            "review_updated_at",
+        ]
+        with open(packet_dir / "01_reports" / "cpa_resolution_workpapers.csv", "w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({field: row.get(field, "") for field in fieldnames})
+
     def _write_unknown_gap_memos(self, packet_dir, readiness, transactions):
         rows = reconciliation_work_order_rows(readiness, transactions)
         memo_rows = unresolved_gap_memo_rows(rows)
@@ -936,6 +1004,14 @@ class AuditPacketService:
             "source_file",
             "amount_or_quantity_affected",
             "current_decision",
+            "resolution_status",
+            "reviewer",
+            "event_classification",
+            "proceeds_method",
+            "proceeds_value",
+            "basis_method",
+            "basis_value",
+            "evidence_reference",
             "user_memory_notes",
             "cpa_question",
             "what_is_missing",

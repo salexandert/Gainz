@@ -99,9 +99,9 @@ demo_data/coinbase_convert_sample.csv
 
 Return to **Dashboard** after importing and follow the highlighted current stage.
 
-For most new imports, Gainz sends you to **Reconcile** first because current holdings tell Gainz whether imported buys and sells explain what you actually still hold.
+For most new imports, Gainz sends you to **Declare Holdings** first because current holdings tell Gainz whether imported buys and sells explain what you actually still hold.
 
-On **Reconcile**:
+On **Declare Holdings**:
 
 1. Select an asset row.
 2. Enter the amount you currently hold across wallets and exchanges.
@@ -153,7 +153,7 @@ Gainz applies default FIFO basis links automatically when matching earlier acqui
 
 For a simple first review pass, use the automatic FIFO result. FIFO links sales to the oldest available acquisition lots first, then creates Form 8949-style rows from those links.
 
-Repeat for assets with unlinked sales. If a sale still needs earlier basis and you do not have the source records yet, return to **Reconcile**, choose **Leave Missing Basis As Needs Research**, and add a note. Gainz keeps exports draft/not filing-ready while showing that the missing basis is a known research item.
+Repeat for assets with unlinked sales. If a sale still needs earlier basis, open **Reconcile**, then use the Guided Review Queue. A research note keeps the packet draft. To fully resolve the item, a CPA, EA, or tax professional records the event, proceeds, adjusted basis, acquisition date, evidence reference, and professional attestation in the CPA Resolution Worksheet, then chooses **Apply CPA Resolution To Calculations**. Gainz links the exact sale, refreshes Form 8949 output, and preserves the applied workpaper.
 
 Use **Stats & Charts** as an advanced inspection page when you need deeper asset-level details, current-lot estimates, sales rows, Form 8949 rows, or charts. It is useful for analysis, but Dashboard and Reports & Export are the main workflow guides.
 
@@ -196,18 +196,18 @@ The guided queue shows one unresolved item at a time. The decision fields and bu
 - A link to the related page.
 - Gap Investigator details: what Gainz knows, what Gainz does not know, likely explanations, evidence to look for, and plain-language questions.
 
-Choose the review decision that matches what you found:
+Choose the review decision that matches what you found. Draft/research decisions document uncertainty but do not clear the underlying calculation blocker:
 
-- `Resolved`
+- `Apply CPA Resolution To Calculations` for an evidence-supported, professionally reviewed missing-basis position.
 - `Import missing records`
 - `Classify documented send as disposal`
 - `Keep as owner transfer`
-- `Document unknown basis`
+- `Document conservative $0 basis for CPA review` as a draft workpaper choice, or select that basis method inside a CPA-reviewed worksheet before applying it.
 - `Needs research`
 - `Leave unresolved for draft only`
 - `Sent to CPA`
 
-It is valid to choose an unresolved state when you do not know yet. Gainz keeps the item as a draft blocker and documents the uncertainty instead of forcing a guess.
+It is valid to choose an unresolved state when you do not know yet. Gainz keeps the item as a draft blocker and documents the uncertainty instead of forcing a guess. It does not treat a send as a sale, or disposition-date market value as acquisition basis, simply to make the numbers reconcile.
 
 Add user memory notes, files checked, and a CPA or future-research question when helpful. After saving, Gainz moves to the next open item. These decisions are saved into the reconciliation work order, dashboard readiness state, generated audit packet files, and the unknown gap memo outputs.
 
@@ -274,6 +274,7 @@ The audit packet includes:
 - Tax evidence inventory CSV and JSON.
 - Suggested filed totals CSV and JSON.
 - Reconciliation work order CSV and Markdown.
+- CPA resolution workpaper CSV with the event, proceeds, basis, acquisition date, evidence, reviewer, attestation, target sale ID, adjustment lot ID, and calculation-applied status.
 - Unknown gap memo CSV and Markdown for unresolved items documented as research or CPA questions.
 - Holdings reconciliation CSV.
 - Current holdings lots CSV.

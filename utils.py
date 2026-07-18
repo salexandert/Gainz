@@ -615,6 +615,7 @@ def get_missing_basis_review_rows(transactions):
         note_text = _basis_review_note_text(transactions, asset)
         rows.append({
             "asset": asset,
+            "target_transaction_uid": transaction.uid,
             "date": _format_report_datetime(transaction.time_stamp),
             "quantity": format_quantity(transaction.quantity),
             "unlinked_quantity": format_quantity(unlinked_quantity),
@@ -2253,6 +2254,7 @@ def _holdings_classification_review_rows(asset_transactions):
             question,
             clues,
             next_action,
+            trans.uid,
         ])
 
     return rows
@@ -2270,13 +2272,12 @@ def _holdings_reconciliation_interpretation(reconciliation):
 
     if difference > 0:
         if reconciliation["send_quantity"] > 0:
-            recommended_quantity = min(difference, reconciliation["send_quantity"])
             return (
                 f"The calculated net from imported buys and sells is higher than declared holdings by "
                 f"{format_quantity(difference)} {asset}. Imported sends total "
-                f"{format_quantity(reconciliation['send_quantity'])} {asset}. If source records show "
-                f"{format_quantity(recommended_quantity)} {asset} of those sends left your ownership or were sent elsewhere "
-                "and traded, classify only the documented quantity as disposals. Owner transfers should remain transfers."
+                f"{format_quantity(reconciliation['send_quantity'])} {asset}. Review each exact send and record a "
+                "disposition only when source records show ownership changed. Gainz does not infer which sends or "
+                "quantities are disposals from this difference. Owner transfers should remain transfers."
             )
 
         return (
@@ -2387,17 +2388,12 @@ def get_holdings_difference_breakdown(transactions, asset):
             f"{format_quantity(reconciliation['difference'])} {asset} review difference vs declared holdings."
         )
 
-    recommended_disposal_quantity = None
-    if (
+    has_send_rows_to_review = (
         declared_holdings is not None
         and reconciliation["difference"] is not None
         and reconciliation["difference"] > 0.00000001
         and reconciliation["send_quantity"] > 0.00000001
-    ):
-        recommended_disposal_quantity = min(
-            reconciliation["difference"],
-            reconciliation["send_quantity"],
-        )
+    )
 
     return {
         "summary": {
@@ -2418,12 +2414,7 @@ def get_holdings_difference_breakdown(transactions, asset):
                 if reconciliation["difference"] is not None
                 else "N/A"
             ),
-            "recommended_disposal_quantity": (
-                format_quantity(recommended_disposal_quantity)
-                if recommended_disposal_quantity is not None
-                else "N/A"
-            ),
-            "has_send_disposal_recommendation": recommended_disposal_quantity is not None,
+            "has_send_rows_to_review": has_send_rows_to_review,
             "status": reconciliation["status"],
             "basis_review_status": (_basis_review_note(transactions, asset) or {}).get("status", ""),
             "basis_review_note": (_basis_review_note(transactions, asset) or {}).get("note", ""),
