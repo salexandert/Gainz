@@ -3,7 +3,16 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
-$python = if ($env:PYTHON) { $env:PYTHON } else { "python" }
+$projectPython = Join-Path $repoRoot "venv\Scripts\python.exe"
+$python = if ($env:PYTHON) {
+    $env:PYTHON
+}
+elseif (Test-Path -LiteralPath $projectPython) {
+    $projectPython
+}
+else {
+    "python"
+}
 $version = (Get-Content -LiteralPath (Join-Path $repoRoot "VERSION") -Raw).Trim()
 $distDir = Join-Path $repoRoot "dist"
 $packageName = "Gainz-Windows-v$version"
@@ -48,7 +57,15 @@ if (-not (Test-Path -LiteralPath $iconPath)) {
     --hidden-import app.stats.routes `
     launcher.py
 
+if ($LASTEXITCODE -ne 0) {
+    throw "PyInstaller failed with exit code $LASTEXITCODE. No release package was created."
+}
+
 $exePath = Join-Path $distDir "Gainz.exe"
+if (-not (Test-Path -LiteralPath $exePath)) {
+    throw "PyInstaller completed without creating the expected executable: $exePath"
+}
+
 if ($env:GAINZ_WINDOWS_PFX_BASE64) {
     if (-not $env:GAINZ_WINDOWS_PFX_PASSWORD) {
         throw "GAINZ_WINDOWS_PFX_BASE64 was provided without GAINZ_WINDOWS_PFX_PASSWORD."

@@ -25,6 +25,11 @@ SENSITIVE_TEXT_MARKERS = (
     "transactions_2025.csv",
 )
 
+PUBLIC_CSV_PREFIXES = (
+    "demo_data/",
+    "Tests/fixtures/",
+)
+
 
 def tracked_files():
     result = subprocess.run(
@@ -46,11 +51,12 @@ def test_private_runtime_paths_are_not_tracked():
     assert offenders == []
 
 
-def test_only_demo_csvs_are_tracked():
+def test_only_public_synthetic_csvs_are_tracked():
     offenders = [
         path
         for path in tracked_files()
-        if path.lower().endswith(".csv") and not path.startswith("demo_data/")
+        if path.lower().endswith(".csv")
+        and not path.startswith(PUBLIC_CSV_PREFIXES)
     ]
 
     assert offenders == []
@@ -59,6 +65,7 @@ def test_only_demo_csvs_are_tracked():
 def test_public_text_files_do_not_reference_private_local_data():
     searchable_suffixes = {
         ".cfg",
+        ".csv",
         ".css",
         ".html",
         ".js",
