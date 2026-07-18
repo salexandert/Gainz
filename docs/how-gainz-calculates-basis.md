@@ -57,13 +57,26 @@ When acquisition records cannot be imported directly, the Guided Review Queue pr
 - Event classification.
 - Proceeds or amount realized for the unresolved quantity and the method used.
 - Total adjusted basis for the unresolved quantity and the basis method used.
-- Supported acquisition date.
+- Supported acquisition date, or an explicit professional holding-period assumption when the date truly cannot be reconstructed.
 - Evidence or workpaper reference.
 - Reviewer name, role, review status, and attestation.
 
 Gainz does not allow a draft note alone to close missing basis. **Apply CPA Resolution To Calculations** requires a CPA-reviewed filing position and cited evidence. Gainz then creates an identified basis-adjustment acquisition lot for the unresolved quantity, links it only to the exact sale under review, refreshes Form 8949 output, and preserves the adjustment and workpaper IDs in the save and audit packet.
 
-Disposition-date fair market value may support proceeds or amount realized. It is not automatically acquisition basis. If a professional directs a conservative `$0` basis treatment because records remain unavailable, that is stored as a CPA-reviewed basis method; Gainz does not infer it from a send or holdings difference.
+Disposition-date fair market value may support proceeds or amount realized. It is not automatically acquisition basis.
+
+#### Conservative fallback when records truly cannot be reconstructed
+
+For an exact sale with a remaining unsupported quantity, a CPA, EA, or tax professional can choose **Apply conservative $0-basis short-term treatment**. Gainz then:
+
+1. Keeps any documented basis already linked to the sale.
+2. Uses supported proceeds or amount realized for only the unresolved quantity.
+3. Applies `$0` adjusted basis to only that unresolved quantity.
+4. Classifies that calculation row as short-term.
+5. Leaves the unknown acquisition date blank in generated report rows rather than inventing a date.
+6. Saves the reviewer, attestation, evidence, methods, exact sale ID, adjustment ID, and a disclosure that this treatment may overstate tax.
+
+This is a conservative assumption inside Gainz's capital-gain model, not proof of the missing acquisition history and not a guarantee of the highest tax under every possible set of facts. It requires an identified transaction and professional attestation. Gainz never applies it to all sends, to a quantity inferred from holdings, or without an explicit review decision.
 
 ## Short-Term vs Long-Term
 
@@ -89,7 +102,7 @@ Gainz treats send and receive rows as classification questions. The **Reconcile*
 - A receive without a matching send may indicate a buy from another exchange, income, rewards, gift, or a transfer from an unimported wallet.
 - Classification changes should be based on records, not on making the reconciliation number look better.
 
-Gainz never converts the earliest sends, a quantity inferred from current holdings, or a group of sends automatically. To record a disposition, select one exact send row, choose the documented event, enter supported proceeds or amount realized, and cite the source row, valuation source, or CPA workpaper. Gainz replaces only that selected send and then applies FIFO to available supported acquisition lots. If basis is still missing, the exact sale remains in the CPA resolution queue.
+Gainz never converts the earliest sends, a quantity inferred from current holdings, or a group of sends automatically. To record a disposition, select one exact send row, choose the documented event, enter supported proceeds or amount realized, and cite the source row, valuation source, or CPA workpaper. Gainz replaces only that selected send and then applies FIFO to available supported acquisition lots. If the event itself remains unknown, a professional may explicitly treat that exact send as a taxable disposition for conservative review. Gainz still uses documented FIFO basis first; the CPA-directed `$0`-basis short-term fallback can apply only to any quantity that remains unsupported.
 
 ## Loss Review
 
@@ -102,6 +115,7 @@ Loss treatment depends on the facts. The [Taxpayer Advocate Service digital asse
 An audit packet is a documentation bundle. Gainz can generate one with:
 
 - Exported Excel report.
+- A `CPA Resolution Workpapers` workbook sheet that separates professional assumptions from imported transaction facts.
 - Linked Form 8949 detail and totals.
 - Holdings reconciliation.
 - Current holdings lots.

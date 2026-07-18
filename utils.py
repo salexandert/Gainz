@@ -162,11 +162,35 @@ def get_taxable_links(transactions, asset=None, date_range=None):
     )
 
 
+def _cpa_adjustment_review(transactions, buy_uid):
+    buy_uid = str(buy_uid or "")
+    if not buy_uid:
+        return {}
+
+    return next(
+        (
+            review
+            for review in getattr(transactions, "work_order_reviews", []) or []
+            if str(review.get("adjustment_transaction_uid") or "") == buy_uid
+        ),
+        {},
+    )
+
+
 def get_form_8949_report_rows(transactions, asset=None, date_range=None, term=None):
     rows = []
 
     for link in get_taxable_links(transactions, asset=asset, date_range=date_range):
-        link_term = "long" if is_long_term_link(link) else "short"
+        adjustment_review = _cpa_adjustment_review(
+            transactions,
+            getattr(link.buy, "uid", ""),
+        )
+        is_conservative_short_term = (
+            adjustment_review.get("acquisition_date_method") == "cpa_conservative_short_term"
+        )
+        link_term = "short" if is_conservative_short_term else (
+            "long" if is_long_term_link(link) else "short"
+        )
         if term and link_term != term:
             continue
 
@@ -178,7 +202,7 @@ def get_form_8949_report_rows(transactions, asset=None, date_range=None, term=No
 
         rows.append({
             "description": f"Crypto {link.symbol}",
-            "date_acquired": link.buy.time_stamp,
+            "date_acquired": "" if is_conservative_short_term else link.buy.time_stamp,
             "date_sold": link.sell.time_stamp,
             "proceeds": proceeds,
             "cost_basis": cost_basis,
@@ -191,6 +215,8 @@ def get_form_8949_report_rows(transactions, asset=None, date_range=None, term=No
             "buy_uid": getattr(link.buy, "uid", ""),
             "sell_uid": getattr(link.sell, "uid", ""),
             "year": link.sell.time_stamp.year,
+            "acquisition_date_method": adjustment_review.get("acquisition_date_method", ""),
+            "assumption_disclosure": adjustment_review.get("assumption_disclosure", ""),
         })
 
     return rows
@@ -510,7 +536,17 @@ def get_sales_report_rows(transactions, asset=None, date_range=None):
             else:
                 short_count += 1
 
-        if len(links) == 1:
+        conservative_links = [
+            link
+            for link in links
+            if _cpa_adjustment_review(
+                transactions,
+                getattr(link.buy, "uid", ""),
+            ).get("acquisition_date_method") == "cpa_conservative_short_term"
+        ]
+        if len(links) == 1 and conservative_links:
+            acquired = ""
+        elif len(links) == 1:
             acquired = links[0].buy.time_stamp
         elif long_count and short_count:
             acquired = "Multiple Dates Long and Short"
@@ -532,6 +568,7 @@ def get_sales_report_rows(transactions, asset=None, date_range=None):
             "sell_quantity": sell.quantity,
             "unlinked_quantity": sell.unlinked_quantity,
             "year": sell.time_stamp.year,
+            "contains_conservative_short_term_assumption": bool(conservative_links),
         })
 
     return rows

@@ -14,6 +14,8 @@ from utils import *
 from app.services.export_service import ExportService
 from app.services.audit_packet_service import AuditPacketService
 from app.services.packet_plan_service import (
+    CONSERVATIVE_MAX_GAIN_DISCLOSURE,
+    CPA_ACQUISITION_DATE_METHODS,
     CPA_BASIS_METHODS,
     CPA_EVENT_CLASSIFICATIONS,
     CPA_PROCEEDS_METHODS,
@@ -123,7 +125,9 @@ def _cpa_resolution_details(source):
         "basis_value": basis_value,
         "evidence_reference": str(source.get("evidence_reference") or "").strip(),
         "resolution_status": str(source.get("resolution_status") or "").strip(),
+        "acquisition_date_method": str(source.get("acquisition_date_method") or "").strip(),
         "acquisition_date": str(source.get("acquisition_date") or "").strip(),
+        "assumption_disclosure": str(source.get("assumption_disclosure") or "").strip(),
         "professional_attestation": (
             "Yes" if _truthy_payload_value(source.get("professional_attestation")) else ""
         ),
@@ -138,6 +142,7 @@ def _validate_cpa_resolution(item, decision, details, note=""):
         ("proceeds_method", CPA_PROCEEDS_METHODS, "proceeds method"),
         ("basis_method", CPA_BASIS_METHODS, "basis method"),
         ("resolution_status", CPA_RESOLUTION_STATUSES, "resolution status"),
+        ("acquisition_date_method", CPA_ACQUISITION_DATE_METHODS, "acquisition-date method"),
     )
     for field, allowed, label in choice_sets:
         if details[field] not in allowed:
@@ -173,6 +178,24 @@ def _validate_cpa_resolution(item, decision, details, note=""):
         details["basis_method"] = "unknown_zero_for_review"
         details["basis_value"] = "0.00"
         details["resolution_status"] = "prepared_for_cpa"
+
+    if decision == "conservative_max_gain":
+        if item.get("blocker_type") != "Missing acquisition basis":
+            return "Conservative $0-basis short-term treatment is available only for an identified sale with missing basis."
+        if details["event_classification"] in {"", "unknown", "owner_transfer"}:
+            details["event_classification"] = "conservative_unknown_disposition"
+        if details["proceeds_method"] in {"", "unknown", "not_applicable"}:
+            return "Choose how supported proceeds or amount realized were determined."
+        if not details["proceeds_value"]:
+            return "Enter supported proceeds or amount realized for the unresolved quantity in U.S. dollars."
+        if not details["evidence_reference"] and not note:
+            return "Cite the records checked, valuation source, and CPA workpaper supporting this assumption."
+        details["basis_method"] = "unknown_zero_for_review"
+        details["basis_value"] = "0.00"
+        details["acquisition_date_method"] = "cpa_conservative_short_term"
+        details["acquisition_date"] = ""
+        details["assumption_disclosure"] = CONSERVATIVE_MAX_GAIN_DISCLOSURE
+        details["resolution_status"] = "cpa_reviewed_position"
 
     if decision == "fork_airdrop_basis":
         details["basis_method"] = details["basis_method"] or "fork_airdrop_supported"
@@ -210,7 +233,7 @@ def _validate_cpa_resolution(item, decision, details, note=""):
                 if details["basis_method"] != "unknown_zero_for_review":
                     return "Enter the supported total adjusted basis."
 
-    if decision == "resolved" and item.get("blocker_type") == "Missing acquisition basis":
+    if decision in {"resolved", "conservative_max_gain"} and item.get("blocker_type") == "Missing acquisition basis":
         if details["resolution_status"] != "cpa_reviewed_position":
             return "Choose CPA-reviewed filing position before applying this resolution to calculations."
         if details["event_classification"] not in {
@@ -219,6 +242,7 @@ def _validate_cpa_resolution(item, decision, details, note=""):
             "goods_or_services",
             "fee",
             "other_disposition",
+            "conservative_unknown_disposition",
         }:
             return "Choose the documented taxable disposition type for this sale."
         if details["basis_method"] in {
@@ -236,12 +260,19 @@ def _validate_cpa_resolution(item, decision, details, note=""):
             details["basis_value"] = "0.00"
         elif not details["basis_value"]:
             return "Enter the adjusted basis for the unresolved quantity."
-        if not details["acquisition_date"]:
-            return "Enter the supported acquisition date used for Form 8949 reporting."
-        try:
-            datetime.date.fromisoformat(details["acquisition_date"])
-        except ValueError:
-            return "Enter a valid acquisition date."
+        if details["acquisition_date_method"] == "cpa_conservative_short_term":
+            if details["basis_method"] != "unknown_zero_for_review" or details["basis_value"] != "0.00":
+                return "The conservative short-term assumption must use the CPA-directed $0-basis method."
+            if not details["assumption_disclosure"]:
+                details["assumption_disclosure"] = CONSERVATIVE_MAX_GAIN_DISCLOSURE
+        else:
+            details["acquisition_date_method"] = "documented_date"
+            if not details["acquisition_date"]:
+                return "Enter the supported acquisition date used for Form 8949 reporting."
+            try:
+                datetime.date.fromisoformat(details["acquisition_date"])
+            except ValueError:
+                return "Enter a valid acquisition date."
         if not item.get("target_transaction_uid"):
             return "Gainz cannot identify the exact sale row. Refresh the review queue before applying the resolution."
 
@@ -266,7 +297,7 @@ def _work_order_context_fields(item):
 
 
 def _apply_cpa_calculation_resolution(transactions, item, item_id, decision, details):
-    if decision != "resolved" or item.get("blocker_type") != "Missing acquisition basis":
+    if decision not in {"resolved", "conservative_max_gain"} or item.get("blocker_type") != "Missing acquisition basis":
         return ""
 
     try:
@@ -279,6 +310,7 @@ def _apply_cpa_calculation_resolution(transactions, item, item_id, decision, det
             basis_method=CPA_BASIS_METHODS.get(details.get("basis_method"), details.get("basis_method")),
             evidence_reference=details.get("evidence_reference"),
             work_order_item_id=item_id,
+            acquisition_date_method=details.get("acquisition_date_method") or "documented_date",
         )
     except (TypeError, ValueError):
         current_app.logger.exception("CPA calculation resolution could not be applied")
@@ -618,6 +650,7 @@ def _review_queue_choices_for_item(row):
             "fork_airdrop_basis",
             "already_in_filed_totals",
             "zero_basis_cpa_review",
+            "conservative_max_gain",
             "sent_to_cpa",
             "resolved",
         ],
@@ -673,6 +706,7 @@ def _review_queue_choices_for_item(row):
             "fork_airdrop_basis": f"This {asset} came from a fork/airdrop",
             "already_in_filed_totals": "Already included in filed tax totals",
             "zero_basis_cpa_review": "Document conservative $0 basis for CPA review",
+            "conservative_max_gain": "Apply conservative $0-basis short-term treatment",
             "sent_to_cpa": f"Send this {asset} gap to CPA",
             "resolved": "Apply CPA Resolution To Calculations",
         },
@@ -754,6 +788,8 @@ def _review_queue_context(transactions, item_id=""):
                     current["proceeds_value"] = current["source_proceeds_value"]
                 if not current.get("proceeds_method"):
                     current["proceeds_method"] = "source_reported"
+                if not current.get("acquisition_date_method"):
+                    current["acquisition_date_method"] = "documented_date"
         choices = _review_queue_choices_for_item(current)
         current["allowed_outcomes"] = [choice["label"] for choice in choices]
     else:

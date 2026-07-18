@@ -185,6 +185,17 @@
               <strong>Apply CPA Resolution To Calculations</strong> creates an identified basis-adjustment lot, links it to
               this exact sale, refreshes Form 8949 output, and preserves the cited professional workpaper.
             </div>
+            {% if item.blocker_type == 'Missing acquisition basis' %}
+            <div class="cpa-resolution-conservative" role="note">
+              <strong>Worst-case fallback when acquisition records truly cannot be found</strong>
+              <p>
+                A reviewing CPA, EA, or tax professional can apply supported proceeds with $0 adjusted basis and a
+                short-term holding-period assumption to this exact unresolved quantity. Gainz leaves the unknown
+                acquisition date blank in reports and records that the treatment may overstate tax. This is a documented
+                professional assumption, not a recovered transaction fact.
+              </p>
+            </div>
+            {% endif %}
             <div class="cpa-resolution-grid">
               <div class="form-group">
                 <label for="guided_review_event_classification">What happened?</label>
@@ -248,6 +259,15 @@
               </div>
               {% if item.blocker_type == 'Missing acquisition basis' %}
               <div class="form-group">
+                <label for="guided_review_acquisition_date_method">Acquisition-date / holding-period method</label>
+                <select id="guided_review_acquisition_date_method" name="acquisition_date_method" class="form-control">
+                  {% for option in cpa_resolution_choices.acquisition_date_methods %}
+                  <option value="{{ option.value }}" {% if item.acquisition_date_method == option.value %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+                <small class="form-text text-muted">Use the conservative option only when the acquisition date cannot be reconstructed and the reviewing professional approves short-term treatment.</small>
+              </div>
+              <div class="form-group">
                 <label for="guided_review_acquisition_date">Supported acquisition date</label>
                 <input
                   id="guided_review_acquisition_date"
@@ -256,7 +276,7 @@
                   class="form-control"
                   value="{{ item.acquisition_date }}"
                 >
-                <small class="form-text text-muted">Required before Gainz can apply the basis resolution to Form 8949 calculations.</small>
+                <small class="form-text text-muted">Required for a documented-date resolution. Leave blank for the CPA-directed short-term assumption.</small>
               </div>
               <div class="form-group">
                 <label>Quantity this resolution will link</label>
@@ -305,7 +325,8 @@
               >
               <span>
                 I confirm this treatment is supported by cited records or documented professional judgment; proceeds
-                and basis were determined separately; and disposition-date market value was not reused as acquisition basis.
+                and basis were determined separately; disposition-date market value was not reused as acquisition basis;
+                and any conservative short-term/$0-basis treatment is an explicit assumption that may overstate tax.
               </span>
             </label>
           </section>
@@ -317,7 +338,7 @@
               type="submit"
               name="decision"
               value="{{ choice.value }}"
-              class="btn {% if item.review_decision == choice.value or (item.blocker_type == 'Missing acquisition basis' and choice.value == 'resolved') %}btn-primary{% else %}btn-outline-primary{% endif %}"
+              class="btn {% if item.review_decision == choice.value or (item.blocker_type == 'Missing acquisition basis' and choice.value == 'resolved') %}btn-primary{% elif choice.value == 'conservative_max_gain' %}btn-warning{% else %}btn-outline-primary{% endif %}"
             >
               {{ choice.label }}
             </button>

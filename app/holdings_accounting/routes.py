@@ -16,6 +16,12 @@ import math
 
 from wtforms.fields import DateTimeLocalField
 from utils import *
+from app.services.packet_plan_service import (
+    CONSERVATIVE_MAX_GAIN_DISCLOSURE,
+    CPA_PROCEEDS_METHODS,
+    reconciliation_work_order_rows,
+    work_order_item_id,
+)
 
 
 CPA_DISPOSITION_TYPES = {
@@ -24,6 +30,7 @@ CPA_DISPOSITION_TYPES = {
     "goods_or_services": "payment for goods or services",
     "fee": "digital asset used to pay a fee",
     "other_disposition": "other documented disposition",
+    "conservative_unknown_disposition": "unresolved event treated as a taxable disposition for conservative review",
 }
 
 
@@ -328,6 +335,14 @@ def sends_to_sells():
     send_uid = str(payload.get("send_uid") or "").strip()
     event_classification = str(payload.get("event_classification") or "").strip()
     evidence_reference = str(payload.get("evidence_reference") or "").strip()
+    conservative_max_gain = str(payload.get("conservative_max_gain") or "").strip().lower() in {
+        "1", "true", "yes", "on",
+    }
+    proceeds_method = str(payload.get("proceeds_method") or "").strip()
+    reviewer_name = str(payload.get("reviewer_name") or "").strip()
+    professional_attestation = str(payload.get("professional_attestation") or "").strip().lower() in {
+        "1", "true", "yes", "on",
+    }
 
     if not asset:
         return jsonify({"message": "Select an asset before recording a disposition."}), 400
@@ -337,6 +352,11 @@ def sends_to_sells():
 
     if event_classification not in CPA_DISPOSITION_TYPES:
         return jsonify({"message": "Choose the documented sale, exchange, payment, fee, or other disposition type."}), 400
+
+    if event_classification == "conservative_unknown_disposition" and not conservative_max_gain:
+        return jsonify({
+            "message": "The unresolved-event classification requires the CPA conservative fallback acknowledgement."
+        }), 400
 
     proceeds_text = str(payload.get("proceeds_value") or "").strip()
     if not proceeds_text:
@@ -357,6 +377,17 @@ def sends_to_sells():
 
     if not evidence_reference:
         return jsonify({"message": "Cite the source row, valuation source, or CPA workpaper."}), 400
+
+
+    if conservative_max_gain:
+        if proceeds_method not in CPA_PROCEEDS_METHODS or proceeds_method in {"", "unknown", "not_applicable"}:
+            return jsonify({"message": "Choose how the reviewing professional determined proceeds or amount realized."}), 400
+        if not reviewer_name:
+            return jsonify({"message": "Enter the CPA, EA, or reviewing tax professional's name."}), 400
+        if not professional_attestation:
+            return jsonify({
+                "message": "Confirm the professional conservative-treatment statement before applying the fallback."
+            }), 400
 
     selected_send = next(
         (
@@ -386,17 +417,122 @@ def sends_to_sells():
 
     if payload.get("auto_link", True):
         failures = transactions.auto_link(asset=asset, algo="fifo")
+    fifo_links_created = max(len(transactions.links) - links_before, 0)
+
+    conservative_quantity = float(sell.unlinked_quantity)
+    conservative_applied = False
+    if conservative_max_gain and conservative_quantity > 0.000000009:
+        readiness = get_audit_readiness_summary(transactions)
+        work_order_item = next(
+            (
+                row
+                for row in reconciliation_work_order_rows(readiness, transactions)
+                if row.get("blocker_type") == "Missing acquisition basis"
+                and row.get("target_transaction_uid") == sell.uid
+            ),
+            None,
+        )
+        if work_order_item is None:
+            sale_date = sell.time_stamp.strftime("%Y-%m-%d %H:%M:%S")
+            suspected_issue = (
+                f"{asset} disposition on {sale_date} needs {format_quantity(conservative_quantity)} {asset} "
+                "of acquisition basis."
+            )
+            work_order_item = {
+                "item_id": work_order_item_id(
+                    "Missing acquisition basis",
+                    asset=asset,
+                    year=sell.time_stamp.year,
+                    date=sale_date,
+                    source_file=str(sell.source or ""),
+                    suspected_issue=suspected_issue,
+                ),
+                "blocker_type": "Missing acquisition basis",
+                "asset": asset,
+                "year": str(sell.time_stamp.year),
+                "date": sale_date,
+                "quantity": format_quantity(conservative_quantity),
+                "transaction_quantity": format_quantity(sell.quantity),
+                "source_file": str(sell.source or ""),
+                "suspected_issue": suspected_issue,
+            }
+
+        try:
+            adjustment_buy, _link = transactions.apply_cpa_basis_resolution(
+                target_sell_uid=sell.uid,
+                quantity=conservative_quantity,
+                acquisition_date="",
+                basis_value=0,
+                proceeds_value=sell.usd_spot * conservative_quantity,
+                basis_method="CPA-directed conservative $0 basis when records remain unavailable",
+                evidence_reference=evidence_reference,
+                work_order_item_id=work_order_item["item_id"],
+                acquisition_date_method="cpa_conservative_short_term",
+            )
+        except (TypeError, ValueError) as exc:
+            current_app.logger.exception("Conservative send resolution could not be applied")
+            return jsonify({"message": str(exc)}), 400
+
+        transactions.set_work_order_review(
+            work_order_item["item_id"],
+            decision="conservative_max_gain",
+            note=(
+                "Exact send was treated as a taxable disposition under a CPA-directed conservative fallback. "
+                "Documented basis lots were linked first; only the remaining unresolved quantity received $0 basis."
+            ),
+            reviewer_name=reviewer_name,
+            reviewer_role="cpa_ea_tax_professional",
+            event_classification=event_classification,
+            proceeds_method=proceeds_method,
+            proceeds_value=f"{sell.usd_spot * conservative_quantity:.2f}",
+            basis_method="unknown_zero_for_review",
+            basis_value="0.00",
+            evidence_reference=evidence_reference,
+            resolution_status="cpa_reviewed_position",
+            professional_attestation="Yes",
+            blocker_type=work_order_item.get("blocker_type"),
+            asset=work_order_item.get("asset"),
+            year=work_order_item.get("year"),
+            date=work_order_item.get("date"),
+            quantity=work_order_item.get("quantity"),
+            transaction_quantity=work_order_item.get("transaction_quantity"),
+            source_file=work_order_item.get("source_file"),
+            suspected_issue=work_order_item.get("suspected_issue"),
+            target_transaction_uid=sell.uid,
+            acquisition_date_method="cpa_conservative_short_term",
+            acquisition_date="",
+            assumption_disclosure=CONSERVATIVE_MAX_GAIN_DISCLOSURE,
+            calculation_applied="Yes",
+            adjustment_transaction_uid=adjustment_buy.uid,
+        )
+        failures = transactions.auto_link(asset=asset, algo="fifo")
+        conservative_applied = True
 
     links_created = max(len(transactions.links) - links_before, 0)
-    transactions.save(description=f"Recorded documented {asset} send as disposition and ran FIFO")
+    save_description = f"Recorded documented {asset} send as disposition and ran FIFO"
+    if conservative_applied:
+        save_description = f"Applied CPA conservative disposition and missing-basis resolution for {asset}"
+    transactions.save(description=save_description)
 
     result_str = (
         f"Recorded the selected {format_quantity(sell.quantity)} {asset} send as a documented "
         f"{CPA_DISPOSITION_TYPES[event_classification]} with ${proceeds_value:,.2f} of proceeds."
     )
 
-    if links_created:
-        result_str = f"{result_str} FIFO linked {links_created} basis lot(s)."
+    if fifo_links_created:
+        result_str = f"{result_str} FIFO linked {fifo_links_created} documented basis lot(s)."
+
+    if conservative_applied:
+        result_str = (
+            f"{result_str} For the remaining {format_quantity(conservative_quantity)} {asset}, Gainz applied the "
+            "CPA-directed $0-basis short-term assumption. The acquisition date remains unknown, the report row "
+            "leaves it blank, and the packet records that this may overstate tax."
+        )
+    elif conservative_max_gain:
+        result_str = (
+            f"{result_str} Existing acquisition records fully supported the basis, so Gainz did not replace "
+            "documented basis with the conservative $0-basis fallback."
+        )
 
     if failures:
         result_str = (

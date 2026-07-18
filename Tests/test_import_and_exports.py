@@ -1205,6 +1205,161 @@ class ImportAndExportTests(unittest.TestCase):
                 db.session.remove()
                 db.engine.dispose()
 
+    def test_holdings_can_apply_professional_conservative_fallback_to_exact_send(self):
+        transactions = empty_transactions()
+        send = Send("BTC", 0.5, datetime.datetime(2024, 6, 1), 1000, "wallet.csv")
+        transactions.transactions = [send]
+        transactions.set_holdings("BTC", 0)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class RouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(RouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/holdings_accounting/sends_to_sells",
+                    json={
+                        "asset": ["BTC"],
+                        "send_uid": send.uid,
+                        "event_classification": "conservative_unknown_disposition",
+                        "proceeds_method": "disposition_date_fmv",
+                        "proceeds_value": "500",
+                        "evidence_reference": "Wallet row 17; price workpaper BTC-2024-06-01",
+                        "reviewer_name": "Jamie Reviewer, CPA",
+                        "conservative_max_gain": True,
+                        "professional_attestation": True,
+                        "auto_link": True,
+                    },
+                )
+
+            self.assertEqual(200, response.status_code)
+            payload = response.get_json()
+            self.assertIn("$0-basis short-term assumption", payload["message"])
+            self.assertEqual([], [row for row in transactions if row.trans_type == "send"])
+
+            form_rows = get_form_8949_report_rows(transactions)
+            self.assertEqual(1, len(form_rows))
+            self.assertEqual("short", form_rows[0]["term"])
+            self.assertEqual("", form_rows[0]["date_acquired"])
+            self.assertAlmostEqual(500, form_rows[0]["proceeds"])
+            self.assertAlmostEqual(0, form_rows[0]["cost_basis"])
+            self.assertAlmostEqual(500, form_rows[0]["gain_loss"])
+            self.assertEqual("cpa_conservative_short_term", form_rows[0]["acquisition_date_method"])
+
+            review = next(
+                row
+                for row in transactions.work_order_reviews
+                if row.get("decision") == "conservative_max_gain"
+            )
+            self.assertEqual("cpa_reviewed_position", review["resolution_status"])
+            self.assertEqual("unknown_zero_for_review", review["basis_method"])
+            self.assertEqual("Yes", review["calculation_applied"])
+            self.assertIn("may overstate tax", review["assumption_disclosure"])
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_holdings_conservative_fallback_requires_professional_attestation_before_mutation(self):
+        transactions = empty_transactions()
+        send = Send("BTC", 0.5, datetime.datetime(2024, 6, 1), 1000, "wallet.csv")
+        transactions.transactions = [send]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class RouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(RouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/holdings_accounting/sends_to_sells",
+                    json={
+                        "asset": ["BTC"],
+                        "send_uid": send.uid,
+                        "event_classification": "conservative_unknown_disposition",
+                        "proceeds_method": "disposition_date_fmv",
+                        "proceeds_value": "500",
+                        "evidence_reference": "Wallet row 17",
+                        "reviewer_name": "Jamie Reviewer, CPA",
+                        "conservative_max_gain": True,
+                    },
+                )
+
+            self.assertEqual(400, response.status_code)
+            self.assertIn("Confirm the professional", response.get_json()["message"])
+            self.assertEqual([send], transactions.transactions)
+            self.assertEqual([], transactions.conversions)
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_holdings_conservative_fallback_preserves_documented_fifo_basis(self):
+        transactions = empty_transactions()
+        buy = Buy("BTC", 0.2, datetime.datetime(2024, 1, 1), 100, "exchange.csv")
+        send = Send("BTC", 0.5, datetime.datetime(2024, 6, 1), 1000, "wallet.csv")
+        transactions.transactions = [buy, send]
+        transactions.set_holdings("BTC", 0)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class RouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(RouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/holdings_accounting/sends_to_sells",
+                    json={
+                        "asset": ["BTC"],
+                        "send_uid": send.uid,
+                        "event_classification": "conservative_unknown_disposition",
+                        "proceeds_method": "disposition_date_fmv",
+                        "proceeds_value": "500",
+                        "evidence_reference": "Wallet row 17; price workpaper BTC-2024-06-01",
+                        "reviewer_name": "Jamie Reviewer, CPA",
+                        "conservative_max_gain": True,
+                        "professional_attestation": True,
+                        "auto_link": True,
+                    },
+                )
+
+            self.assertEqual(200, response.status_code)
+            rows = get_form_8949_report_rows(transactions)
+            self.assertEqual(2, len(rows))
+            documented = next(row for row in rows if row["buy_uid"] == buy.uid)
+            conservative = next(
+                row for row in rows
+                if row["acquisition_date_method"] == "cpa_conservative_short_term"
+            )
+            self.assertAlmostEqual(0.2, documented["quantity"])
+            self.assertAlmostEqual(20, documented["cost_basis"])
+            self.assertAlmostEqual(0.3, conservative["quantity"])
+            self.assertAlmostEqual(0, conservative["cost_basis"])
+            self.assertAlmostEqual(500, sum(row["proceeds"] for row in rows))
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
     def test_auto_link_asset_normalizes_whitespace_all_time_year(self):
         transactions = empty_transactions()
         transactions.transactions = [
@@ -2140,6 +2295,98 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertEqual([], sell.links)
             self.assertEqual([sell], transactions.transactions)
             self.assertIsNone(transactions.get_work_order_review(item["item_id"]))
+
+            with app.app_context():
+                db.drop_all()
+                db.session.remove()
+                db.engine.dispose()
+
+    def test_cpa_conservative_max_gain_resolution_is_short_term_zero_basis_and_disclosed(self):
+        transactions = empty_transactions()
+        sell = Sell("BCH", 0.5, datetime.datetime(2024, 2, 1), 1000, "exchange.csv")
+        transactions.transactions = [sell]
+        transactions.set_holdings("BCH", 0)
+        transactions.set_tax_year_record(
+            2024,
+            reported_proceeds=500,
+            reported_cost_basis=0,
+            reported_gain_loss=500,
+            tax_paid=100,
+            filing_status="Filed",
+            evidence_reference="2024 filed Form 8949 and payment record",
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class ExportRouteTestConfig(config_dict["Debug"]):
+                TESTING = True
+                WTF_CSRF_ENABLED = False
+                INSTANCE_PATH = temp_dir
+                SQLALCHEMY_DATABASE_URI = f"sqlite:///{temp_dir}/test.db"
+
+            app = create_app(ExportRouteTestConfig, selenium=True)
+            app.config["transactions"] = transactions
+            readiness = get_audit_readiness_summary(transactions)
+            item = next(
+                row
+                for row in reconciliation_work_order_rows(readiness, transactions)
+                if row.get("blocker_type") == "Missing acquisition basis"
+            )
+
+            with app.test_client() as client:
+                response = client.post(
+                    "/export/review_queue/save",
+                    data={
+                        "item_id": item["item_id"],
+                        "decision": "conservative_max_gain",
+                        "proceeds_method": "source_reported",
+                        "proceeds_value": "500",
+                        "evidence_reference": "Records searched; CPA workpaper BCH-2024-unknown-basis",
+                        "reviewer_name": "Jamie Reviewer",
+                        "reviewer_role": "cpa_ea_tax_professional",
+                        "professional_attestation": "yes",
+                    },
+                )
+
+            self.assertEqual(302, response.status_code)
+            form_rows = get_form_8949_report_rows(transactions)
+            self.assertEqual(1, len(form_rows))
+            self.assertEqual("short", form_rows[0]["term"])
+            self.assertEqual("", form_rows[0]["date_acquired"])
+            self.assertAlmostEqual(500, form_rows[0]["proceeds"])
+            self.assertAlmostEqual(0, form_rows[0]["cost_basis"])
+            self.assertAlmostEqual(500, form_rows[0]["gain_loss"])
+
+            after = get_audit_readiness_summary(transactions)
+            self.assertEqual([], after["missing_records"]["basis"])
+            self.assertTrue(after["is_ready"])
+
+            workpapers = cpa_resolution_workpaper_rows(after, transactions)
+            self.assertEqual(1, len(workpapers))
+            self.assertEqual("Apply conservative $0-basis short-term treatment", workpapers[0]["review_decision_label"])
+            self.assertEqual("Unknown date - CPA-directed short-term assumption", workpapers[0]["acquisition_date_method_label"])
+            self.assertEqual("", workpapers[0]["acquisition_date"])
+            self.assertIn("may overstate tax", workpapers[0]["assumption_disclosure"])
+
+            packet_dir = AuditPacketService(
+                str(Path(temp_dir) / "packets"),
+                str(Path(temp_dir) / "exports"),
+            ).create_packet(transactions)
+            with (Path(packet_dir) / "01_reports" / "cpa_resolution_workpapers.csv").open(
+                "r",
+                encoding="utf-8-sig",
+                newline="",
+            ) as handle:
+                packet_rows = list(csv.DictReader(handle))
+            self.assertEqual("cpa_conservative_short_term", packet_rows[0]["acquisition_date_method"])
+            self.assertIn("may overstate tax", packet_rows[0]["assumption_disclosure"])
+            workbook_path = next((Path(packet_dir) / "01_reports").glob("*.xlsx"))
+            workbook = load_workbook(workbook_path, data_only=False)
+            workpaper_sheet = workbook["CPA Resolution Workpapers"]
+            self.assertEqual("Apply conservative $0-basis short-term treatment", workpaper_sheet["B5"].value)
+            self.assertEqual("Unknown date - CPA-directed short-term assumption", workpaper_sheet["N5"].value)
+            self.assertIsNone(workpaper_sheet["O5"].value)
+            self.assertIn("may overstate tax", workpaper_sheet["P5"].value)
+            workbook.close()
 
             with app.app_context():
                 db.drop_all()

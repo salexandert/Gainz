@@ -75,7 +75,9 @@ WORK_ORDER_REVIEW_COLUMNS = [
     "source_file",
     "suspected_issue",
     "target_transaction_uid",
+    "acquisition_date_method",
     "acquisition_date",
+    "assumption_disclosure",
     "calculation_applied",
     "adjustment_transaction_uid",
     "updated_at",
@@ -731,7 +733,9 @@ class Transactions:
         source_file=None,
         suspected_issue=None,
         target_transaction_uid=None,
+        acquisition_date_method=None,
         acquisition_date=None,
+        assumption_disclosure=None,
         calculation_applied=None,
         adjustment_transaction_uid=None,
     ):
@@ -776,7 +780,15 @@ class Transactions:
                 target_transaction_uid,
                 "target_transaction_uid",
             ),
+            "acquisition_date_method": preserved_value(
+                acquisition_date_method,
+                "acquisition_date_method",
+            ),
             "acquisition_date": preserved_value(acquisition_date, "acquisition_date"),
+            "assumption_disclosure": preserved_value(
+                assumption_disclosure,
+                "assumption_disclosure",
+            ),
             "calculation_applied": preserved_value(
                 calculation_applied,
                 "calculation_applied",
@@ -1046,6 +1058,78 @@ class Transactions:
         sheet.column_dimensions["A"].width = 28
         sheet.column_dimensions["B"].width = 110
 
+    def _write_cpa_resolution_sheet(self, workbook):
+        from app.services.packet_plan_service import (
+            CPA_ACQUISITION_DATE_METHODS,
+            CPA_BASIS_METHODS,
+            CPA_EVENT_CLASSIFICATIONS,
+            CPA_PROCEEDS_METHODS,
+            CPA_RESOLUTION_STATUSES,
+            CPA_REVIEWER_ROLES,
+            WORK_ORDER_REVIEW_DECISIONS,
+        )
+
+        sheet = workbook.create_sheet("CPA Resolution Workpapers", 1)
+        sheet["A1"] = "CPA Resolution Workpapers"
+        sheet["A1"].font = Font(bold=True, size=16)
+        sheet["A2"] = (
+            "These rows preserve professional assumptions and evidence separately from imported transaction facts. "
+            "A blank acquisition date paired with the conservative short-term method means the date was not recovered."
+        )
+
+        columns = [
+            ("item_id", "Item ID"),
+            ("decision", "Decision"),
+            ("asset", "Asset"),
+            ("date", "Disposition Date"),
+            ("quantity", "Quantity"),
+            ("reviewer_name", "Reviewer"),
+            ("reviewer_role", "Reviewer Role"),
+            ("resolution_status", "Resolution Status"),
+            ("event_classification", "Event Classification"),
+            ("proceeds_method", "Proceeds Method"),
+            ("proceeds_value", "Proceeds / Amount Realized"),
+            ("basis_method", "Basis Method"),
+            ("basis_value", "Adjusted Basis"),
+            ("acquisition_date_method", "Acquisition-Date Method"),
+            ("acquisition_date", "Acquisition Date"),
+            ("assumption_disclosure", "Assumption Disclosure"),
+            ("evidence_reference", "Evidence / Workpaper"),
+            ("professional_attestation", "Professional Attestation"),
+            ("calculation_applied", "Applied To Calculations"),
+            ("target_transaction_uid", "Target Sale ID"),
+            ("adjustment_transaction_uid", "Adjustment Lot ID"),
+        ]
+        for column_index, (_field, label) in enumerate(columns, start=1):
+            cell = sheet.cell(row=4, column=column_index, value=label)
+            cell.font = Font(bold=True)
+
+        label_maps = {
+            "decision": WORK_ORDER_REVIEW_DECISIONS,
+            "reviewer_role": CPA_REVIEWER_ROLES,
+            "resolution_status": CPA_RESOLUTION_STATUSES,
+            "event_classification": CPA_EVENT_CLASSIFICATIONS,
+            "proceeds_method": CPA_PROCEEDS_METHODS,
+            "basis_method": CPA_BASIS_METHODS,
+            "acquisition_date_method": CPA_ACQUISITION_DATE_METHODS,
+        }
+        reviews = [
+            review
+            for review in getattr(self, "work_order_reviews", []) or []
+            if review.get("calculation_applied") or review.get("resolution_status")
+        ]
+        for row_index, review in enumerate(reviews, start=5):
+            for column_index, (field, _label) in enumerate(columns, start=1):
+                value = review.get(field, "")
+                if field in label_maps:
+                    value = label_maps[field].get(value, value)
+                sheet.cell(row=row_index, column=column_index, value=value)
+
+        for column_index in range(1, len(columns) + 1):
+            sheet.column_dimensions[chr(64 + column_index)].width = 22
+        sheet.column_dimensions["P"].width = 80
+        sheet.column_dimensions["Q"].width = 45
+
     def export_to_excel(self, asset=None, date_range=None, by_year=True, output_dir=None, readiness=None):
 
         # Idea to programatically create Excel Links, Fancy ;-)
@@ -1058,6 +1142,7 @@ class Transactions:
         # Template to use
         workbook = load_workbook(filename=_resource_file('Gainz_Export_Template-DO_NOT_MODIFY.xlsx'))
         self._write_export_status_sheet(workbook, readiness=readiness)
+        self._write_cpa_resolution_sheet(workbook)
         c_sheet = workbook['Conversions']
         l_sheet = workbook['Gains']
         a_sheet = workbook['All Transactions']
@@ -1524,6 +1609,7 @@ class Transactions:
         basis_method,
         evidence_reference,
         work_order_item_id,
+        acquisition_date_method="documented_date",
     ):
         sell = next(
             (
@@ -1544,23 +1630,30 @@ class Transactions:
         ):
             raise ValueError("The basis quantity must match the unresolved quantity on the selected sale.")
 
-        if isinstance(acquisition_date, datetime.datetime):
-            acquired_at = acquisition_date
-        elif isinstance(acquisition_date, datetime.date):
-            acquired_at = datetime.datetime.combine(acquisition_date, datetime.time.min)
-        else:
-            try:
-                acquired_at = datetime.datetime.fromisoformat(str(acquisition_date or "").strip())
-            except ValueError as exc:
-                raise ValueError("Enter the supported acquisition date.") from exc
-
         sell_at = sell.time_stamp
         if getattr(sell_at, "tzinfo", None):
             sell_at = sell_at.replace(tzinfo=None)
-        if getattr(acquired_at, "tzinfo", None):
-            acquired_at = acquired_at.replace(tzinfo=None)
-        if acquired_at > sell_at:
-            raise ValueError("The acquisition date cannot be after the disposition date.")
+
+        acquisition_date_method = str(acquisition_date_method or "documented_date").strip()
+        if acquisition_date_method == "cpa_conservative_short_term":
+            acquired_at = sell_at
+        else:
+            if acquisition_date_method != "documented_date":
+                raise ValueError("Choose a supported acquisition-date method.")
+            if isinstance(acquisition_date, datetime.datetime):
+                acquired_at = acquisition_date
+            elif isinstance(acquisition_date, datetime.date):
+                acquired_at = datetime.datetime.combine(acquisition_date, datetime.time.min)
+            else:
+                try:
+                    acquired_at = datetime.datetime.fromisoformat(str(acquisition_date or "").strip())
+                except ValueError as exc:
+                    raise ValueError("Enter the supported acquisition date.") from exc
+
+            if getattr(acquired_at, "tzinfo", None):
+                acquired_at = acquired_at.replace(tzinfo=None)
+            if acquired_at > sell_at:
+                raise ValueError("The acquisition date cannot be after the disposition date.")
 
         basis_value = float(basis_value)
         proceeds_value = float(proceeds_value)
@@ -1568,6 +1661,8 @@ class Transactions:
             raise ValueError("Enter a finite adjusted basis in U.S. dollars.")
         if basis_value < 0:
             raise ValueError("Adjusted basis cannot be negative.")
+        if acquisition_date_method == "cpa_conservative_short_term" and abs(basis_value) > 0.000000001:
+            raise ValueError("The conservative short-term assumption requires $0 adjusted basis.")
         if not math.isfinite(proceeds_value):
             raise ValueError("Enter finite supported proceeds or amount realized.")
         if proceeds_value < 0:
@@ -1597,7 +1692,7 @@ class Transactions:
             "basis_adjustment",
             (
                 f"CPA-applied basis resolution ({basis_method}); evidence {evidence_reference}; "
-                f"work order {work_order_item_id}"
+                f"acquisition-date method {acquisition_date_method}; work order {work_order_item_id}"
             ),
         )
         return adjustment_buy, link

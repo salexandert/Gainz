@@ -425,6 +425,7 @@
                       <option value="goods_or_services">Payment for goods or services</option>
                       <option value="fee">Digital asset used to pay a fee</option>
                       <option value="other_disposition">Other documented disposition</option>
+                      <option value="conservative_unknown_disposition">Event unresolved - conservative taxable disposition</option>
                     </select>
                   </div>
                   <div class="form-group">
@@ -437,6 +438,41 @@
                     <input id="exact_send_evidence_reference" type="text" class="form-control" placeholder="Source row, transaction ID, valuation source, or CPA workpaper" disabled>
                   </div>
                 </div>
+                <details class="cpa-exact-send-conservative">
+                  <summary>CPA worst-case fallback when records cannot resolve this send</summary>
+                  <div class="cpa-exact-send-conservative-body">
+                    <p>
+                      Gainz will first use any documented FIFO basis it can link. For only the remaining unresolved
+                      quantity, a CPA, EA, or tax professional may direct Gainz to use $0 basis and short-term treatment.
+                      The acquisition date stays blank in reports, and the workpaper states that this may overstate tax.
+                    </p>
+                    <div class="cpa-exact-send-grid">
+                      <div class="form-group">
+                        <label for="exact_send_proceeds_method">How proceeds were determined</label>
+                        <select id="exact_send_proceeds_method" class="form-control" disabled>
+                          <option value="">Choose method</option>
+                          <option value="source_reported">Source record or broker form</option>
+                          <option value="disposition_date_fmv">Fair market value at disposition</option>
+                          <option value="property_received_fmv">FMV of property or services received</option>
+                          <option value="filed_form">Filed Form 8949 or Schedule D</option>
+                          <option value="manual_supported">Other supported professional determination</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label for="exact_send_reviewer_name">Reviewing professional</label>
+                        <input id="exact_send_reviewer_name" type="text" class="form-control" placeholder="CPA, EA, or tax professional name" disabled>
+                      </div>
+                    </div>
+                    <label class="cpa-resolution-attestation" for="exact_send_conservative_max_gain">
+                      <input id="exact_send_conservative_max_gain" type="checkbox" value="yes" disabled>
+                      <span>
+                        Apply the CPA-directed conservative fallback if basis remains missing. I confirm this exact send
+                        is being treated as a taxable disposition for the Gainz calculation; supported proceeds and basis
+                        were determined separately; and $0-basis short-term treatment may overstate tax.
+                      </span>
+                    </label>
+                  </div>
+                </details>
                 <button type="button" id="record_exact_send_disposition_button" class="btn btn-primary" disabled>
                   Record Selected Send As Disposition
                 </button>

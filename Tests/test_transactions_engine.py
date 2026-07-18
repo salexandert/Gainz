@@ -25,6 +25,7 @@ from transactions import Transactions
 from utils import (
     get_audit_readiness_summary,
     get_current_holdings_lot_table_data,
+    get_form_8949_report_rows,
     get_holdings_difference_breakdown,
     get_multi_asset_holdings_reconciliation_table_data,
     get_stats_table_data_range,
@@ -835,9 +836,11 @@ class TransactionsEngineTests(unittest.TestCase):
             ]
             transactions.set_work_order_review(
                 "abc123",
-                decision="sent_to_cpa",
-                note="Asked CPA to review missing basis.",
+                decision="conservative_max_gain",
+                note="CPA approved the conservative fallback.",
                 cpa_question="Can this be supported by older exchange records?",
+                acquisition_date_method="cpa_conservative_short_term",
+                assumption_disclosure="This may overstate tax.",
             )
 
             try:
@@ -849,12 +852,14 @@ class TransactionsEngineTests(unittest.TestCase):
 
         record = loaded.get_work_order_review("abc123")
         self.assertIsNotNone(record)
-        self.assertEqual("sent_to_cpa", record["decision"])
-        self.assertEqual("Asked CPA to review missing basis.", record["note"])
+        self.assertEqual("conservative_max_gain", record["decision"])
+        self.assertEqual("CPA approved the conservative fallback.", record["note"])
         self.assertEqual(
             "Can this be supported by older exchange records?",
             record["cpa_question"],
         )
+        self.assertEqual("cpa_conservative_short_term", record["acquisition_date_method"])
+        self.assertEqual("This may overstate tax.", record["assumption_disclosure"])
 
     def test_review_decisions_round_trip_through_save_file(self):
         original_basedir = transactions_module.basedir
@@ -1234,6 +1239,57 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertAlmostEqual(500, adjustment_link.proceeds)
         self.assertAlmostEqual(125, adjustment_link.cost_basis)
         self.assertEqual(0, sell.unlinked_quantity)
+
+    def test_apply_cpa_basis_resolution_supports_disclosed_short_term_zero_basis_assumption(self):
+        transactions = empty_transactions()
+        sell = Sell("BTC", 0.25, datetime.datetime(2024, 6, 1), 2000, "exchange.csv")
+        transactions.transactions = [sell]
+
+        adjustment_buy, link = transactions.apply_cpa_basis_resolution(
+            target_sell_uid=sell.uid,
+            quantity=0.25,
+            acquisition_date="",
+            basis_value=0,
+            proceeds_value=500,
+            basis_method="CPA-directed conservative $0 basis",
+            evidence_reference="CPA workpaper BTC-unknown-basis",
+            work_order_item_id="btc-unknown-basis",
+            acquisition_date_method="cpa_conservative_short_term",
+        )
+        transactions.set_work_order_review(
+            "btc-unknown-basis",
+            decision="conservative_max_gain",
+            acquisition_date_method="cpa_conservative_short_term",
+            assumption_disclosure="This may overstate tax.",
+            calculation_applied="Yes",
+            adjustment_transaction_uid=adjustment_buy.uid,
+        )
+
+        self.assertEqual(sell.time_stamp, adjustment_buy.time_stamp)
+        self.assertAlmostEqual(0, link.cost_basis)
+        self.assertAlmostEqual(500, link.proceeds)
+        rows = get_form_8949_report_rows(transactions)
+        self.assertEqual("short", rows[0]["term"])
+        self.assertEqual("", rows[0]["date_acquired"])
+        self.assertEqual("cpa_conservative_short_term", rows[0]["acquisition_date_method"])
+
+    def test_conservative_short_term_resolution_rejects_nonzero_basis(self):
+        transactions = empty_transactions()
+        sell = Sell("BTC", 0.25, datetime.datetime(2024, 6, 1), 2000, "exchange.csv")
+        transactions.transactions = [sell]
+
+        with self.assertRaisesRegex(ValueError, "requires \\$0 adjusted basis"):
+            transactions.apply_cpa_basis_resolution(
+                target_sell_uid=sell.uid,
+                quantity=0.25,
+                acquisition_date="",
+                basis_value=1,
+                proceeds_value=500,
+                basis_method="CPA-directed conservative $0 basis",
+                evidence_reference="CPA workpaper BTC-unknown-basis",
+                work_order_item_id="btc-unknown-basis",
+                acquisition_date_method="cpa_conservative_short_term",
+            )
 
     def test_convert_receives_to_buys_creates_buy_and_reduces_receive(self):
         transactions = empty_transactions()

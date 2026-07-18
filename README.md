@@ -100,7 +100,7 @@ From a source checkout, you can reset the local password with `python .\scripts\
 5. Continue to **Reconcile** after the source files for the review pass are loaded.
 6. Declare current holdings in **Reconcile** before deeper basis work unless Guided Reconciliation points somewhere else.
 7. Review import warnings, source overlaps, and transfer questions that affect the reconciliation.
-8. Let Gainz apply default FIFO basis links automatically. If acquisition records still cannot be found, use the Guided Review Queue CPA Resolution Worksheet to record and apply a supported professional treatment to the exact sale.
+8. Let Gainz apply default FIFO basis links automatically. If acquisition records still cannot be found, use the Guided Review Queue CPA Resolution Worksheet to record and apply a supported professional treatment to the exact sale. A CPA, EA, or tax professional may explicitly apply the conservative `$0`-basis short-term fallback to only the unresolved quantity; Gainz leaves the unknown acquisition date blank and records that the assumption may overstate tax.
 9. Open **Tax Evidence**, build the year-by-year tax evidence inventory, and confirm or mark suggested filed totals for research.
 10. Open **Reports & Export**, then use **Start guided review** to work unresolved items one at a time.
 11. Review packet preview, generate the workbook or audit packet, then use the packet success screen to copy the packet path, open the output folder, and review the first files.

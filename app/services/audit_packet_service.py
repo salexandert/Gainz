@@ -238,6 +238,10 @@ class AuditPacketService:
             row for row in cpa_workpapers
             if row.get("calculation_applied")
         ]
+        conservative_positions = [
+            row for row in cpa_workpapers
+            if row.get("review_decision") == "conservative_max_gain"
+        ]
         status_lines.extend([
             "",
             "## Work Order Review Decisions",
@@ -253,6 +257,7 @@ class AuditPacketService:
             f"- Fork/airdrop acquisition: {work_order_summary.get('fork_airdrop_basis_count', 0)}",
             f"- Already included in filed tax totals: {work_order_summary.get('already_in_filed_totals_count', 0)}",
             f"- Treat unknown basis as $0 for CPA review: {work_order_summary.get('zero_basis_cpa_review_count', 0)}",
+            f"- Conservative $0-basis short-term calculations applied: {len(conservative_positions)}",
             f"- Needs research: {work_order_summary.get('needs_research_count', 0)}",
             f"- Leave unresolved for draft only: {work_order_summary.get('ignored_for_draft_count', 0)}",
             f"- Sent to CPA: {work_order_summary.get('sent_to_cpa_count', 0)}",
@@ -924,6 +929,9 @@ class AuditPacketService:
             "basis_method",
             "basis_method_label",
             "basis_value",
+            "acquisition_date_method",
+            "acquisition_date_method_label",
+            "assumption_disclosure",
             "evidence_reference",
             "resolution_status",
             "resolution_status_label",
@@ -976,7 +984,10 @@ class AuditPacketService:
             "proceeds_value",
             "basis_method_label",
             "basis_value",
+            "acquisition_date_method",
+            "acquisition_date_method_label",
             "acquisition_date",
+            "assumption_disclosure",
             "evidence_reference",
             "professional_attestation",
             "calculation_applied",

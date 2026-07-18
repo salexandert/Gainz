@@ -83,6 +83,7 @@ WORK_ORDER_REVIEW_DECISIONS = {
     "fork_airdrop_basis": "Fork/airdrop acquisition",
     "already_in_filed_totals": "Already included in filed tax totals",
     "zero_basis_cpa_review": "Treat unknown basis as $0 for CPA review",
+    "conservative_max_gain": "Apply conservative $0-basis short-term treatment",
     "needs_research": "Needs research",
     "ignored_for_draft": "Leave unresolved for draft only",
     "sent_to_cpa": "Sent to CPA",
@@ -104,6 +105,7 @@ CPA_EVENT_CLASSIFICATIONS = {
     "gift_or_donation": "Gift or donation",
     "fee": "Digital asset used to pay a fee",
     "other_disposition": "Other documented disposition",
+    "conservative_unknown_disposition": "Unresolved event treated as a taxable disposition for conservative review",
     "unknown": "Unknown event",
 }
 
@@ -140,6 +142,20 @@ CPA_RESOLUTION_STATUSES = {
     "previously_filed": "Previously filed treatment",
 }
 
+CPA_ACQUISITION_DATE_METHODS = {
+    "": "Not determined",
+    "documented_date": "Documented acquisition date",
+    "cpa_conservative_short_term": "Unknown date - CPA-directed short-term assumption",
+}
+
+CONSERVATIVE_MAX_GAIN_DISCLOSURE = (
+    "Gainz could not reconstruct the acquisition history for this exact quantity. At the direction "
+    "of the reviewing tax professional, Gainz used supported proceeds, $0 adjusted basis, and a "
+    "short-term holding-period assumption for its capital-gain calculation. The acquisition date "
+    "remains unknown and is left blank in report rows. This treatment may overstate tax and does "
+    "not establish what actually happened."
+)
+
 
 def cpa_resolution_choices():
     def options(values):
@@ -154,6 +170,7 @@ def cpa_resolution_choices():
         "proceeds_methods": options(CPA_PROCEEDS_METHODS),
         "basis_methods": options(CPA_BASIS_METHODS),
         "resolution_statuses": options(CPA_RESOLUTION_STATUSES),
+        "acquisition_date_methods": options(CPA_ACQUISITION_DATE_METHODS),
     }
 
 
@@ -215,6 +232,12 @@ def _apply_work_order_review(row, transactions=None):
     row["basis_method"] = review.get("basis_method", "")
     row["basis_method_label"] = CPA_BASIS_METHODS.get(row["basis_method"], "")
     row["basis_value"] = review.get("basis_value", "")
+    row["acquisition_date_method"] = review.get("acquisition_date_method", "")
+    row["acquisition_date_method_label"] = CPA_ACQUISITION_DATE_METHODS.get(
+        row["acquisition_date_method"],
+        "",
+    )
+    row["assumption_disclosure"] = review.get("assumption_disclosure", "")
     row["evidence_reference"] = review.get("evidence_reference", "")
     row["resolution_status"] = review.get("resolution_status", "")
     row["resolution_status_label"] = CPA_RESOLUTION_STATUSES.get(row["resolution_status"], "")
@@ -242,6 +265,8 @@ def _apply_work_order_review(row, transactions=None):
         row["proceeds_value"],
         row["basis_method"],
         row["basis_value"],
+        row["acquisition_date_method"],
+        row["assumption_disclosure"],
         row["evidence_reference"],
         row["resolution_status"],
         row["professional_attestation"],
@@ -311,6 +336,7 @@ def work_order_review_summary(rows):
         "fork_airdrop_basis_count": decisions.count("fork_airdrop_basis"),
         "already_in_filed_totals_count": decisions.count("already_in_filed_totals"),
         "zero_basis_cpa_review_count": decisions.count("zero_basis_cpa_review"),
+        "conservative_max_gain_count": decisions.count("conservative_max_gain"),
         "needs_research_count": decisions.count("needs_research"),
         "ignored_for_draft_count": decisions.count("ignored_for_draft"),
         "sent_to_cpa_count": decisions.count("sent_to_cpa"),
@@ -694,7 +720,9 @@ def reconciliation_work_order_markdown(rows):
             f"- Proceeds value: {row.get('proceeds_value') or 'N/A'}",
             f"- Basis method: {row.get('basis_method_label') or 'Not determined'}",
             f"- Basis value: {row.get('basis_value') or 'N/A'}",
+            f"- Acquisition-date method: {row.get('acquisition_date_method_label') or 'Not determined'}",
             f"- Acquisition date: {row.get('acquisition_date') or 'N/A'}",
+            f"- Conservative assumption disclosure: {row.get('assumption_disclosure') or 'N/A'}",
             f"- Evidence reference: {row.get('evidence_reference') or 'N/A'}",
             f"- Applied to calculations: {row.get('calculation_applied') or 'No'}",
             f"- Suspected issue: {row['suspected_issue'] or 'Review needed.'}",
@@ -713,7 +741,7 @@ def unresolved_gap_memo_rows(rows):
     for row in rows:
         if row.get("blocker_type") == "No open blockers":
             continue
-        if row.get("review_decision") == "resolved":
+        if row.get("review_decision") == "resolved" or row.get("calculation_applied"):
             continue
 
         cpa_question = row.get("cpa_question") or row.get("suggested_cpa_question") or ""

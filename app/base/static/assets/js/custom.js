@@ -1788,6 +1788,8 @@ $(document).ready(function() {
         $('#exact_send_selection').text('Select a Send row to begin.');
         $('#exact_send_event_classification').val('').prop('disabled', true);
         $('#exact_send_proceeds_value, #exact_send_evidence_reference').val('').prop('disabled', true);
+        $('#exact_send_proceeds_method, #exact_send_reviewer_name').val('').prop('disabled', true);
+        $('#exact_send_conservative_max_gain').prop('checked', false).prop('disabled', true);
         $('#record_exact_send_disposition_button').prop('disabled', true);
         $('#exact_send_disposition_message').hide().text('');
         holdingsHideSendDisposalRecommendation();
@@ -2242,7 +2244,7 @@ $(document).ready(function() {
 
         if (!holdingsSelectedSendRow) {
             $('#exact_send_selection').text('Select a Send row. Receive rows cannot be recorded as dispositions here.');
-            $('#exact_send_event_classification, #exact_send_proceeds_value, #exact_send_evidence_reference, #record_exact_send_disposition_button').prop('disabled', true);
+            $('#exact_send_event_classification, #exact_send_proceeds_value, #exact_send_evidence_reference, #exact_send_proceeds_method, #exact_send_reviewer_name, #exact_send_conservative_max_gain, #record_exact_send_disposition_button').prop('disabled', true);
             return;
         }
 
@@ -2252,8 +2254,16 @@ $(document).ready(function() {
             ((holdingsSelectedAssetRow() || [])[0] || '') + ' from ' + holdingsSelectedSendRow[4] + '.'
         );
         $('#exact_send_proceeds_value').val(proceeds !== null && proceeds >= 0 ? proceeds.toFixed(2) : '');
-        $('#exact_send_event_classification, #exact_send_proceeds_value, #exact_send_evidence_reference, #record_exact_send_disposition_button').prop('disabled', false);
+        $('#exact_send_proceeds_method').val('source_reported');
+        $('#exact_send_event_classification, #exact_send_proceeds_value, #exact_send_evidence_reference, #exact_send_proceeds_method, #exact_send_reviewer_name, #exact_send_conservative_max_gain, #record_exact_send_disposition_button').prop('disabled', false);
         $('#exact_send_disposition_message').hide().text('');
+    });
+
+    $('#exact_send_event_classification').on('change', function() {
+        if ($(this).val() === 'conservative_unknown_disposition') {
+            $('#exact_send_conservative_max_gain').prop('checked', true);
+            $('.cpa-exact-send-conservative').prop('open', true);
+        }
     });
 
     holdingsDifferenceTransactionsTable = $('#holdings_difference_transactions_datatable').DataTable({
@@ -2960,6 +2970,10 @@ $(document).ready(function() {
                 'event_classification': $('#exact_send_event_classification').val(),
                 'proceeds_value': $('#exact_send_proceeds_value').val(),
                 'evidence_reference': $('#exact_send_evidence_reference').val(),
+                'proceeds_method': $('#exact_send_proceeds_method').val(),
+                'reviewer_name': $('#exact_send_reviewer_name').val(),
+                'conservative_max_gain': $('#exact_send_conservative_max_gain').is(':checked'),
+                'professional_attestation': $('#exact_send_conservative_max_gain').is(':checked'),
                 'auto_link': true
               }),
             dataType: "json",
@@ -2987,6 +3001,8 @@ $(document).ready(function() {
                 $('#exact_send_selection').text('Select another exact Send row only if its source records support a disposition.');
                 $('#exact_send_event_classification').val('').prop('disabled', true);
                 $('#exact_send_proceeds_value, #exact_send_evidence_reference').val('').prop('disabled', true);
+                $('#exact_send_proceeds_method, #exact_send_reviewer_name').val('').prop('disabled', true);
+                $('#exact_send_conservative_max_gain').prop('checked', false).prop('disabled', true);
                 holdingsScrollTo('#exact_send_disposition_message');
             },
             error: function (xhr) {
@@ -3016,9 +3032,15 @@ $(document).ready(function() {
             return;
         }
 
+        var conservativeFallback = $('#exact_send_conservative_max_gain').is(':checked');
+        if (conservativeFallback && (!$('#exact_send_proceeds_method').val() || !$('#exact_send_reviewer_name').val().trim())) {
+            $('#exact_send_disposition_message').removeClass('alert-success alert-warning').addClass('alert-danger').text('For the conservative fallback, choose the proceeds method and enter the reviewing professional.').show();
+            return;
+        }
+
         holdingsShowActionConfirm(
             'Record this exact send as a disposition?',
-            'Gainz will replace only the selected ' + holdingsSelectedSendRow[2] + ' ' + asset + ' send with a disposition, use the entered value as proceeds, then link supported acquisition lots with FIFO. It will not use that value as basis.',
+            'Gainz will replace only the selected ' + holdingsSelectedSendRow[2] + ' ' + asset + ' send with a disposition and link supported acquisition lots with FIFO. ' + (conservativeFallback ? 'If basis still remains missing, Gainz will apply the CPA-directed $0-basis short-term assumption only to that unresolved quantity and record that it may overstate tax.' : 'It will not use disposition value as acquisition basis.'),
             'Record And Recalculate',
             function() {
                 holdingsSaveExactSendDisposition(rowData, asset);

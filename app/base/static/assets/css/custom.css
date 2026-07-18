@@ -1730,6 +1730,20 @@
     padding: 10px 12px;
 }
 
+.cpa-resolution-conservative {
+    background: #fffdf5;
+    border: 1px solid #d8a82e;
+    border-left: 4px solid #b7791f;
+    border-radius: 6px;
+    color: #4a370d;
+    margin: 10px 0 14px;
+    padding: 12px;
+}
+
+.cpa-resolution-conservative p {
+    margin: 6px 0 0;
+}
+
 .cpa-resolution-grid {
     display: grid;
     gap: 12px;
@@ -1777,6 +1791,23 @@
 
 .cpa-exact-send-review h6 {
     margin-top: 0;
+}
+
+.cpa-exact-send-conservative {
+    background: #fffdf5;
+    border: 1px solid #d8a82e;
+    margin: 14px 0;
+    padding: 12px;
+}
+
+.cpa-exact-send-conservative summary {
+    color: #4a370d;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.cpa-exact-send-conservative-body {
+    margin-top: 12px;
 }
 
 .cpa-exact-send-grid {
