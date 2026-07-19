@@ -48,6 +48,8 @@ class ImportService:
             }
 
         analysis = self.analyze_import_file(file_path)
+        if analysis.get("detected_format") == "coinbase_raw":
+            return self._native_preview_required_result(file_path, analysis)
         if review_columns:
             return self._mapping_required_result(
                 file_path,
@@ -82,8 +84,16 @@ class ImportService:
             "imported_count": imported_count,
             "skipped_count": skipped_count,
             "warnings": getattr(transactions, "last_import_result", {}).get("warnings", []),
+            "skipped_rows": getattr(transactions, "last_import_result", {}).get("skipped_rows", []),
+            "integrity_checks": getattr(transactions, "last_import_result", {}).get("integrity_checks", []),
+            "import_receipts": getattr(transactions, "last_import_result", {}).get("import_receipts", []),
+            "input_reliability_failed": getattr(transactions, "last_import_result", {}).get(
+                "input_reliability_failed",
+                False,
+            ),
             "header_row_used": analysis["header_row"],
             "data_start_row_used": analysis["data_start_row"],
+            "import_preview": analysis.get("import_preview", {}),
         }
 
     def import_mapped_file(self, file_path, transactions, header_row, column_mapping, data_start_row=None):
@@ -110,9 +120,26 @@ class ImportService:
             "imported_count": imported_count,
             "skipped_count": skipped_count,
             "warnings": getattr(transactions, "last_import_result", {}).get("warnings", []),
+            "skipped_rows": getattr(transactions, "last_import_result", {}).get("skipped_rows", []),
+            "integrity_checks": getattr(transactions, "last_import_result", {}).get("integrity_checks", []),
+            "import_receipts": getattr(transactions, "last_import_result", {}).get("import_receipts", []),
+            "input_reliability_failed": getattr(transactions, "last_import_result", {}).get(
+                "input_reliability_failed",
+                False,
+            ),
             "header_row_used": int(header_row or 1),
             "data_start_row_used": analysis["data_start_row"],
+            "import_preview": analysis.get("import_preview", {}),
         }
+
+    def import_native_file(self, file_path, transactions, header_row=1, data_start_row=None):
+        return self.import_mapped_file(
+            file_path,
+            transactions,
+            header_row=header_row,
+            column_mapping={},
+            data_start_row=data_start_row,
+        )
 
     def analyze_import_file(self, file_path, header_row=None, column_mapping=None, data_start_row=None):
         if not str(file_path).lower().endswith(".csv"):
@@ -209,4 +236,17 @@ class ImportService:
             ],
             "mapping_required": True,
             "mapping": analysis,
+        }
+
+    def _native_preview_required_result(self, file_path, analysis):
+        return {
+            "file_path": file_path,
+            "imported_count": 0,
+            "skipped_count": 0,
+            "warnings": [],
+            "native_preview_required": True,
+            "detected_format": analysis.get("detected_format"),
+            "header_row": analysis.get("header_row", 1),
+            "data_start_row": analysis.get("data_start_row", 2),
+            "import_preview": analysis.get("import_preview", {}),
         }

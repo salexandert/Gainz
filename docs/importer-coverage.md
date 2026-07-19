@@ -10,6 +10,7 @@ The **Import > Confirm Imported Values** step shows what Gainz understood. The s
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Cash App | Native | Yes | `Amount` | `Fee` and currency | `Net Amount`; buy fees increase total cost and sale fees reduce proceeds | Source row and transaction ID | Review zero-dollar withdrawals as transfer/classification questions. |
 | Coinbase retail | Native | Yes | `Subtotal` | `Fees and/or Spread` and price currency | `Total (inclusive of fees and/or spread)` | Source row, ID, and notes | Source gross, fee, and total must reconcile within tolerance or output remains under review. |
+| Coinbase official raw dual-leg export | Native with required preview | Both acquired and disposed quantities | Disposed-leg `Proceeds (excl. fees and/or spread) (USD)` | Included in the source-reported basis/proceeds fields when Coinbase does not provide a separate fee column | Acquired-leg `Cost Basis (incl. fees and/or spread) (USD)` and disposed-leg proceeds remain separate | Source row, transaction ID, notes, and acquired/disposed leg | Gainz shows source-row count, resulting legs, per-asset/type quantities, basis, proceeds, warnings, and skipped rows before commit. Fiat-only or unsupported rows remain unimported with a receipt. |
 | Coinbase Convert | Native split into disposal and acquisition rows | Yes, both assets | Conversion subtotal | Preserved on the disposal side | Disposal net is preserved | Both rows retain the source row, ID, and note | When a fee exists, the acquired side remains an economic warning because Gainz will not silently choose how that fee affects acquired-asset basis. |
 | Coinbase Pro / GDAX fills | Native | `size` | `total`, with price fallback | `fee` and `price/fee/total unit` | Buy fee increases cost; sale fee reduces proceeds | Source row and trade ID | A non-USD fee is preserved but blocks readiness until a supported USD value is supplied. |
 | Kraken trade export | Advanced Import / Column Mapping | Map `vol` | Map `cost` | Map `fee` and quote currency | Derived from mapped gross and fee | Source row; map `txid` as transaction ID | Kraken is a tested mapping template, not a native auto-detected parser. Confirm the header and every mapped economic field. |
@@ -23,6 +24,14 @@ The **Import > Confirm Imported Values** step shows what Gainz understood. The s
 - Fees are included exactly once in Form 8949-style calculations.
 - A crypto-denominated fee is retained with its source currency. Gainz does not invent a USD conversion; the row remains a review blocker.
 - A derived value is labeled as calculated. Gainz does not describe a proportional allocation as directly source-reported.
+
+## Input Integrity Gate
+
+- Gainz reads CSV cells as source text before converting quantities or money. Small decimal quantities and scientific notation must resolve to the same value.
+- When a source provides quantity, unit price, and total USD value, Gainz compares `quantity x price` with the source total using a documented tolerance.
+- A material disagreement is an **input reliability blocker**, not an ordinary warning. Gainz suppresses Form 8949 and year-level calculated comparisons until the source is corrected or re-imported.
+- Every imported, transformed, duplicate, unsupported, or skipped row receives a source-row receipt with file hash, row number, source transaction ID, interpreted quantity, outcome, and reason. The receipt is saved in revisions and exported as `01_reports/import_row_receipts.csv`.
+- For Coinbase dual-leg rows, Gainz preserves the common source transaction ID and labels each resulting transaction as the acquired or disposed leg.
 
 ## Release-Gate Fixtures
 

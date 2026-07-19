@@ -53,7 +53,19 @@ FIELD_KEYWORDS = {
     ),
 }
 
-HIGH_VALUE_TYPES = {"form_8949", "schedule_d", "crypto_workbook", "payment_receipt"}
+HIGH_CONFIDENCE_TYPES = {"filed_return", "form_8949", "schedule_d", "crypto_workbook"}
+REVIEWABLE_TOTAL_TYPES = set(HIGH_CONFIDENCE_TYPES)
+GENERATED_OUTPUT_TERMS = {
+    "audit packet",
+    "cpa handoff",
+    "gainz product review",
+    "inventory",
+    "manifest",
+    "packet status",
+    "readme first",
+    "reconciliation work order",
+    "suggested filed totals",
+}
 
 
 def _empty_candidate(record):
@@ -80,7 +92,9 @@ def _empty_candidate(record):
         "combined_suggestions_count": 1,
         "duplicate_count": 1,
         "_conflict_counts": {},
+        "_has_conflicts": False,
         "matched_fields": [],
+        "field_provenance": {},
     }
 
 
@@ -135,6 +149,11 @@ def _merge_candidate_value(candidate, field, value, source_note):
     if value is None:
         return
 
+    provenance = candidate.setdefault("field_provenance", {}).setdefault(field, [])
+    source_note = str(source_note or "source value").strip()
+    if source_note and source_note not in provenance:
+        provenance.append(source_note)
+
     current = candidate.get(field)
     if current is None:
         candidate[field] = value
@@ -145,8 +164,8 @@ def _merge_candidate_value(candidate, field, value, source_note):
         return
 
     conflict_counts = candidate.setdefault("_conflict_counts", {})
-    conflict_label = str(source_note or field.replace("_", " ")).strip()
-    conflict_counts[conflict_label] = conflict_counts.get(conflict_label, 1) + 1
+    conflict_counts[field] = conflict_counts.get(field, 1) + 1
+    candidate["_has_conflicts"] = True
 
 
 def _finalize_candidate_notes(candidate):
@@ -156,17 +175,31 @@ def _finalize_candidate_notes(candidate):
         if note and note not in notes:
             notes.append(note)
 
-    for label, count in sorted(candidate.get("_conflict_counts", {}).items()):
+    for field, count in sorted(candidate.get("_conflict_counts", {}).items()):
+        label = field.replace("_", " ")
         notes.append(f"Multiple {label} values found ({count} candidates); review source.")
 
     candidate["notes"] = "; ".join(notes)
+    candidate["_has_conflicts"] = bool(candidate.get("_conflict_counts"))
     candidate.pop("_conflict_counts", None)
+
+
+def _allowed_fields_for_candidate(candidate):
+    evidence_type = str(candidate.get("evidence_type") or "other")
+    if evidence_type in {"payment_receipt", "account_transcript"}:
+        return {"tax_paid"}
+    if evidence_type in REVIEWABLE_TOTAL_TYPES:
+        return {"reported_proceeds", "reported_cost_basis", "reported_gain_loss", "tax_paid"}
+    return set()
 
 
 def _scan_rows_for_totals(rows, candidate):
     year = candidate.get("year")
+    allowed_fields = _allowed_fields_for_candidate(candidate)
+    if not allowed_fields:
+        return
     header_indices = {}
-    for row in rows:
+    for row_number, row in enumerate(rows, start=1):
         if not row:
             continue
 
@@ -174,6 +207,8 @@ def _scan_rows_for_totals(rows, candidate):
         detected_indices = {}
         for index, cell_text in enumerate(normalized_cells):
             for field, keywords in FIELD_KEYWORDS.items():
+                if field not in allowed_fields:
+                    continue
                 if any(keyword in cell_text for keyword in keywords):
                     detected_indices[field] = index
 
@@ -184,7 +219,12 @@ def _scan_rows_for_totals(rows, candidate):
         if header_indices and _row_year_matches(row, year):
             for field, index in header_indices.items():
                 if index < len(row):
-                    _merge_candidate_value(candidate, field, _parse_money(row[index]), field.replace("_", " "))
+                    _merge_candidate_value(
+                        candidate,
+                        field,
+                        _parse_money(row[index]),
+                        f"row {row_number}: {field.replace('_', ' ')} column",
+                    )
 
         if not _row_year_matches(row, year):
             continue
@@ -195,9 +235,11 @@ def _scan_rows_for_totals(rows, candidate):
             continue
 
         for field, keywords in FIELD_KEYWORDS.items():
+            if field not in allowed_fields:
+                continue
             if any(keyword in row_text for keyword in keywords):
                 matched_keyword = next((kw for kw in keywords if kw in row_text), field)
-                _merge_candidate_value(candidate, field, row_numbers[-1], matched_keyword)
+                _merge_candidate_value(candidate, field, row_numbers[-1], f"row {row_number}: {matched_keyword}")
 
 
 def _read_csv_rows(path):
@@ -265,12 +307,25 @@ def _apply_confidence(candidate):
     if totals_complete:
         expected = round(candidate["reported_proceeds"] - candidate["reported_cost_basis"], 2)
         reported = round(candidate["reported_gain_loss"], 2)
-        gain_consistent = abs(expected - reported) <= max(2.0, abs(reported) * 0.02)
+        gain_consistent = abs(expected - reported) <= max(0.02, abs(reported) * 0.005)
 
-    if totals_complete and gain_consistent:
+    nonzero_totals = [
+        round(float(candidate.get(field) or 0), 2)
+        for field in ("reported_proceeds", "reported_cost_basis", "reported_gain_loss")
+    ]
+    suspicious_equal_totals = totals_complete and nonzero_totals[0] != 0 and len(set(nonzero_totals)) == 1
+    has_conflicts = bool(candidate.get("_has_conflicts"))
+
+    if (
+        totals_complete
+        and gain_consistent
+        and not suspicious_equal_totals
+        and not has_conflicts
+        and evidence_type in HIGH_CONFIDENCE_TYPES
+    ):
         candidate["confidence"] = "High"
         candidate["confidence_class"] = "status-verified"
-    elif len(matched) >= 2 and evidence_type in HIGH_VALUE_TYPES:
+    elif len(matched) >= 2 and evidence_type in REVIEWABLE_TOTAL_TYPES and not suspicious_equal_totals:
         candidate["confidence"] = "Medium"
         candidate["confidence_class"] = "status-unlinked-sales"
     elif len(matched) >= 1:
@@ -290,6 +345,13 @@ def _candidate_from_record(record):
     path = str(record.get("evidence_path") or "")
     if not path or not os.path.exists(path):
         candidate["notes"] = "Evidence path is not available on disk."
+        return None
+
+    searchable_name = _normalize_text(f"{Path(path).name} {record.get('evidence_label') or ''}")
+    if any(term in searchable_name for term in GENERATED_OUTPUT_TERMS):
+        return None
+    allowed_evidence_types = REVIEWABLE_TOTAL_TYPES | {"payment_receipt", "account_transcript"}
+    if str(record.get("evidence_type") or "") not in allowed_evidence_types:
         return None
 
     suffix = Path(path).suffix.lower()
@@ -381,6 +443,7 @@ def _merge_candidate_group(candidates):
             continue
         merged[field] = values[0]
         if len(values) > 1:
+            merged["_has_conflicts"] = True
             label = field.replace("_", " ")
             notes.append(
                 f"Multiple {label} values found across duplicate evidence rows "
@@ -406,6 +469,15 @@ def _merge_candidate_group(candidates):
         merged["evidence_id"] = evidence_ids[0]
     elif evidence_ids:
         merged["evidence_id"] = "; ".join(evidence_ids)
+
+    merged_provenance = {}
+    for candidate in candidates:
+        for field, sources in (candidate.get("field_provenance") or {}).items():
+            target = merged_provenance.setdefault(field, [])
+            for source in sources:
+                if source not in target:
+                    target.append(source)
+    merged["field_provenance"] = merged_provenance
 
     if "Similar suggestions were combined for this source." not in notes:
         notes.append("Similar suggestions were combined for this source.")

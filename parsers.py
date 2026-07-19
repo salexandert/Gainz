@@ -1,15 +1,29 @@
 # This module will handle parsing-related functions.
 
 import csv
+import hashlib
 import logging
 import pandas as pd
 import os
 import re
+from decimal import Decimal, InvalidOperation
 from openpyxl import load_workbook
 from date_parsing import parse_gainz_datetime
 from transaction import Buy, Sell, Send, Receive
 
 parsers_logger = logging.getLogger('parsers')
+
+NUMERIC_RE = re.compile(r'[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?')
+INPUT_RELIABILITY_BLOCKER_PREFIX = "INPUT RELIABILITY BLOCKER:"
+
+COINBASE_RAW_COLUMNS = {
+    'asset acquired',
+    'quantity acquired bought received etc',
+    'cost basis incl fees and or spread usd',
+    'asset disposed sold sent etc',
+    'quantity disposed',
+    'proceeds excl fees and or spread usd',
+}
 
 COLUMN_ALIASES = {
     'date': [
@@ -221,11 +235,19 @@ def parse_quantity_value(value):
     if pd.isna(value):
         return 0.0
 
-    match = re.search(r'-?\d+(?:\.\d+)?', str(value).replace(',', ''))
+    text = str(value).replace(',', '').strip()
+    match = NUMERIC_RE.search(text)
     if not match:
         return 0.0
 
-    return float(match.group(0))
+    try:
+        parsed = Decimal(match.group(0))
+    except InvalidOperation:
+        return 0.0
+
+    if text.startswith('(') and text.endswith(')'):
+        parsed = -abs(parsed)
+    return float(parsed)
 
 
 def parse_money_value(value):
@@ -236,11 +258,18 @@ def parse_money_value(value):
     if text in ('', 'nan'):
         return 0.0
 
-    match = re.search(r'-?\d+(?:\.\d+)?', text)
+    match = NUMERIC_RE.search(text)
     if not match:
         return 0.0
 
-    return float(match.group(0))
+    try:
+        parsed = Decimal(match.group(0))
+    except InvalidOperation:
+        return 0.0
+
+    if str(value).strip().startswith('(') and str(value).strip().endswith(')'):
+        parsed = -abs(parsed)
+    return float(parsed)
 
 
 def normalize_column_name(value):
@@ -458,13 +487,30 @@ def analyze_csv_import(file_path, header_row=None, column_mapping=None, data_sta
     columns = read_csv_columns(file_path, header_row=header_row)
     status = get_import_column_status(columns, column_mapping=column_mapping)
     detected_format = detect_csv_format(file_path, header_row=header_row)
-    if detected_format == 'gdax':
+    if detected_format in {'gdax', 'coinbase_raw'}:
         status = {
             **status,
             'can_import': True,
             'has_pricing': True,
             'missing_required': [],
         }
+
+    import_preview = {}
+    if detected_format == 'coinbase_raw':
+        raw_df = pd.read_csv(
+            file_path,
+            skiprows=max(int(header_row or 1) - 1, 0),
+            dtype=str,
+            keep_default_na=False,
+        )
+        raw_df['__gainz_source_row__'] = range(
+            data_start_row,
+            data_start_row + len(raw_df),
+        )
+        import_preview = summarize_standard_import_rows(
+            transform_coinbase_raw_to_standard(raw_df)
+        )
+        import_preview['source_rows'] = int(len(raw_df))
 
     return {
         'can_import': status['can_import'],
@@ -482,6 +528,7 @@ def analyze_csv_import(file_path, header_row=None, column_mapping=None, data_sta
             header_row=header_row,
             data_start_row=data_start_row,
         ),
+        'import_preview': import_preview,
     }
 
 
@@ -544,6 +591,266 @@ def derive_asset_price(row, column_lookup, quantity):
     return 0.0
 
 
+def _normalized_column_lookup(columns):
+    return {normalize_column_name(column): column for column in columns}
+
+
+def _coinbase_raw_value(row, columns, *names, default=''):
+    for name in names:
+        column = columns.get(normalize_column_name(name))
+        if column is None:
+            continue
+        value = row.get(column, default)
+        if not pd.isna(value):
+            return value
+    return default
+
+
+def _coinbase_raw_leg(
+    row,
+    columns,
+    *,
+    asset,
+    quantity,
+    transaction_type,
+    usd_total,
+    economic_source,
+    source_leg,
+    source_quantity,
+):
+    asset = normalize_asset_symbol(asset)
+    quantity = abs(parse_quantity_value(quantity))
+    usd_total = abs(parse_money_value(usd_total))
+    source_row = row.get('__gainz_source_row__')
+    source_transaction_id = _coinbase_raw_value(
+        row,
+        columns,
+        'transaction id',
+        'id',
+        'transaction identifier',
+    )
+    source_notes = _coinbase_raw_value(
+        row,
+        columns,
+        'notes',
+        'description',
+        'transaction type',
+    )
+    warning = ''
+    if transaction_type in {'Buy', 'Sell'} and not usd_total:
+        warning = (
+            f"Official Coinbase raw {source_leg} leg has no source-reported USD "
+            f"{economic_source.lower()}. Review the source row before relying on tax totals."
+        )
+
+    return {
+        'Asset Type': asset,
+        'Transaction Type': transaction_type,
+        'Asset Amount': quantity,
+        'Date': _coinbase_raw_value(
+            row,
+            columns,
+            'timestamp',
+            'date',
+            'transaction date',
+            'date and time',
+        ),
+        'Asset Price': usd_total / quantity if quantity else 0.0,
+        'Gross USD': usd_total,
+        'Fee USD': 0.0,
+        'Source Fee Amount': None,
+        'Fee Currency': 'USD',
+        'Net USD': usd_total,
+        'Economic Source': f"Coinbase raw {economic_source}",
+        'Economic Warning': warning,
+        'Source Row': source_row,
+        'Source Transaction ID': source_transaction_id,
+        'Source Notes': source_notes,
+        'Source Quantity': str(source_quantity or '').strip(),
+        'Source USD': usd_total,
+        'Implied USD': usd_total,
+        'Value Variance USD': 0.0,
+        'Value Tolerance USD': 0.0,
+        'Input Reliability': 'PASSED_SOURCE_TOTAL' if usd_total else 'NOT_CHECKED',
+        'Source Leg': source_leg,
+    }
+
+
+def transform_coinbase_raw_to_standard(df):
+    """Split Coinbase's current raw dual-leg rows without conflating either leg."""
+    rows = []
+    columns = _normalized_column_lookup(df.columns)
+
+    for _, row in df.iterrows():
+        raw_type = normalize_column_name(
+            _coinbase_raw_value(row, columns, 'transaction type', 'type')
+        )
+        acquired_asset = normalize_asset_symbol(
+            _coinbase_raw_value(row, columns, 'asset acquired')
+        )
+        acquired_quantity_source = _coinbase_raw_value(
+            row,
+            columns,
+            'quantity acquired bought received etc',
+            'quantity acquired',
+        )
+        acquired_quantity = parse_quantity_value(acquired_quantity_source)
+        acquired_basis = parse_money_value(
+            _coinbase_raw_value(
+                row,
+                columns,
+                'cost basis incl fees and or spread usd',
+                'cost basis usd',
+            )
+        )
+        disposed_asset = normalize_asset_symbol(
+            _coinbase_raw_value(row, columns, 'asset disposed sold sent etc', 'asset disposed')
+        )
+        disposed_quantity_source = _coinbase_raw_value(row, columns, 'quantity disposed')
+        disposed_quantity = parse_quantity_value(disposed_quantity_source)
+        disposed_proceeds = parse_money_value(
+            _coinbase_raw_value(
+                row,
+                columns,
+                'proceeds excl fees and or spread usd',
+                'proceeds usd',
+            )
+        )
+
+        has_acquired_crypto = (
+            bool(acquired_asset)
+            and acquired_asset not in FIAT_ASSET_SYMBOLS
+            and abs(acquired_quantity) > 0
+        )
+        has_disposed_crypto = (
+            bool(disposed_asset)
+            and disposed_asset not in FIAT_ASSET_SYMBOLS
+            and abs(disposed_quantity) > 0
+        )
+
+        if has_disposed_crypto:
+            is_transfer = any(term in raw_type for term in ('send', 'sent', 'withdraw', 'transfer'))
+            disposed_type = 'Send' if is_transfer and not abs(disposed_proceeds) else 'Sell'
+            rows.append(_coinbase_raw_leg(
+                row,
+                columns,
+                asset=disposed_asset,
+                quantity=disposed_quantity,
+                transaction_type=disposed_type,
+                usd_total=disposed_proceeds,
+                economic_source='proceeds excluding fees/spread',
+                source_leg='disposed',
+                source_quantity=disposed_quantity_source,
+            ))
+
+        if has_acquired_crypto:
+            is_receive = any(
+                term in raw_type
+                for term in ('receive', 'received', 'deposit', 'reward', 'earn', 'airdrop', 'staking')
+            )
+            acquired_type = 'Receive' if is_receive and not abs(acquired_basis) else 'Buy'
+            rows.append(_coinbase_raw_leg(
+                row,
+                columns,
+                asset=acquired_asset,
+                quantity=acquired_quantity,
+                transaction_type=acquired_type,
+                usd_total=acquired_basis,
+                economic_source='cost basis including fees/spread',
+                source_leg='acquired',
+                source_quantity=acquired_quantity_source,
+            ))
+
+        if not has_disposed_crypto and not has_acquired_crypto:
+            rows.append({
+                'Asset Type': '',
+                'Transaction Type': raw_type or 'Unsupported',
+                'Asset Amount': 0,
+                'Date': _coinbase_raw_value(
+                    row,
+                    columns,
+                    'timestamp',
+                    'date',
+                    'transaction date',
+                    'date and time',
+                ),
+                'Asset Price': 0,
+                'Gross USD': 0,
+                'Fee USD': 0,
+                'Source Fee Amount': None,
+                'Fee Currency': 'USD',
+                'Net USD': 0,
+                'Economic Source': 'Coinbase raw source row',
+                'Economic Warning': '',
+                'Source Row': row.get('__gainz_source_row__'),
+                'Source Transaction ID': _coinbase_raw_value(
+                    row,
+                    columns,
+                    'transaction id',
+                    'id',
+                    'transaction identifier',
+                ),
+                'Source Notes': _coinbase_raw_value(row, columns, 'notes', 'description'),
+                'Source Quantity': '',
+                'Source USD': None,
+                'Implied USD': None,
+                'Value Variance USD': None,
+                'Value Tolerance USD': None,
+                'Input Reliability': 'SKIPPED',
+                'Source Leg': 'none',
+                'Skip Reason': 'No supported crypto acquisition or disposal leg was present.',
+            })
+
+    return pd.DataFrame(rows)
+
+
+def summarize_standard_import_rows(trans_df):
+    if trans_df is None or trans_df.empty:
+        return {
+            'output_rows': 0,
+            'row_counts_by_type': {},
+            'quantity_totals_by_asset_and_type': {},
+            'source_reported_proceeds': 0.0,
+            'source_reported_basis': 0.0,
+            'warning_count': 0,
+            'skipped_source_rows': 0,
+        }
+
+    counts = {}
+    quantities = {}
+    proceeds = 0.0
+    basis = 0.0
+    warning_count = 0
+    skipped_source_rows = 0
+    for _, row in trans_df.iterrows():
+        skip_reason = row.get('Skip Reason')
+        if not pd.isna(skip_reason) and str(skip_reason or '').strip():
+            skipped_source_rows += 1
+            continue
+        transaction_type = str(row.get('Transaction Type') or '')
+        asset = str(row.get('Asset Type') or '')
+        quantity = abs(parse_quantity_value(row.get('Asset Amount')))
+        counts[transaction_type] = counts.get(transaction_type, 0) + 1
+        key = f"{asset}:{transaction_type}"
+        quantities[key] = quantities.get(key, 0.0) + quantity
+        if transaction_type == 'Sell':
+            proceeds += abs(parse_money_value(row.get('Gross USD')))
+        if transaction_type == 'Buy':
+            basis += abs(parse_money_value(row.get('Net USD')))
+        if str(row.get('Economic Warning') or '').strip():
+            warning_count += 1
+
+    return {
+        'output_rows': int(len(trans_df) - skipped_source_rows),
+        'row_counts_by_type': counts,
+        'quantity_totals_by_asset_and_type': quantities,
+        'source_reported_proceeds': proceeds,
+        'source_reported_basis': basis,
+        'warning_count': warning_count,
+        'skipped_source_rows': skipped_source_rows,
+    }
+
+
 def _optional_money_field(row, column_lookup, field):
     column = column_lookup.get(field)
     if column is None:
@@ -554,6 +861,61 @@ def _optional_money_field(row, column_lookup, field):
         return None
 
     return abs(parse_money_value(value))
+
+
+def _append_warning(existing, message):
+    existing = str(existing or '').strip()
+    message = str(message or '').strip()
+    if not existing:
+        return message
+    if not message:
+        return existing
+    return f"{existing} {message}"
+
+
+def _file_sha256(path):
+    digest = hashlib.sha256()
+    with open(path, 'rb') as source_file:
+        for chunk in iter(lambda: source_file.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _value_consistency_check(source_usd, implied_usd):
+    if source_usd in (None, 0) or implied_usd in (None, 0):
+        return {
+            'status': 'NOT_CHECKED',
+            'variance': None,
+            'tolerance': None,
+            'warning': '',
+        }
+
+    source_usd = abs(float(source_usd))
+    implied_usd = abs(float(implied_usd))
+    variance = abs(implied_usd - source_usd)
+    # A 10%/$1 tolerance accommodates ordinary spread and rounding while still
+    # stopping unit/exponent errors before they enter basis calculations.
+    tolerance = max(1.0, source_usd * 0.10)
+    if variance <= tolerance:
+        return {
+            'status': 'PASSED',
+            'variance': variance,
+            'tolerance': tolerance,
+            'warning': '',
+        }
+
+    warning = (
+        f"{INPUT_RELIABILITY_BLOCKER_PREFIX} source USD value ${source_usd:,.2f} "
+        f"does not agree with quantity x unit price (${implied_usd:,.2f}); "
+        f"variance ${variance:,.2f} exceeds the ${tolerance:,.2f} tolerance. "
+        "Correct the source mapping before relying on FIFO or tax totals."
+    )
+    return {
+        'status': 'BLOCKING',
+        'variance': variance,
+        'tolerance': tolerance,
+        'warning': warning,
+    }
 
 
 def _standard_economics(row, column_lookup, quantity, transaction_type, profile='generic'):
@@ -637,6 +999,9 @@ def _standard_economics(row, column_lookup, quantity, transaction_type, profile=
             )
 
     asset_price = direct_price or (gross / abs(quantity) if quantity else 0.0)
+    implied_usd = direct_price * abs(quantity) if direct_price and quantity else None
+    consistency = _value_consistency_check(gross, implied_usd)
+    warning = _append_warning(warning, consistency['warning'])
     return {
         'Asset Price': asset_price,
         'Gross USD': gross,
@@ -646,6 +1011,11 @@ def _standard_economics(row, column_lookup, quantity, transaction_type, profile=
         'Net USD': net,
         'Economic Source': ', '.join(dict.fromkeys(source_parts)) or 'spot price',
         'Economic Warning': warning,
+        'Source USD': gross,
+        'Implied USD': implied_usd,
+        'Value Variance USD': consistency['variance'],
+        'Value Tolerance USD': consistency['tolerance'],
+        'Input Reliability': consistency['status'],
     }
 
 
@@ -668,6 +1038,7 @@ def _standard_row_from_lookup(row, column_lookup, profile='generic'):
         'Source Row': row.get('__gainz_source_row__'),
         'Source Transaction ID': get_row_value(row, column_lookup, 'transaction_id', ''),
         'Source Notes': get_row_value(row, column_lookup, 'notes', ''),
+        'Source Quantity': str(get_row_value(row, column_lookup, 'asset_amount', '') or '').strip(),
     }
     standard_row.update(economics)
     return standard_row
@@ -725,6 +1096,9 @@ def detect_csv_format(file_path, header_row=1):
         column_lookup = build_column_lookup(header)
         normalized_headers = {normalize_column_name(header_name) for header_name in header}
         filename_hint = normalize_column_name(os.path.basename(file_path))
+
+        if COINBASE_RAW_COLUMNS.issubset(normalized_headers):
+            return 'coinbase_raw'
 
         common_fields = ['date', 'transaction_type', 'asset_type', 'asset_amount', 'asset_price']
         cash_app_markers = {'transaction id', 'net amount', 'asset type', 'asset amount'}
@@ -1026,7 +1400,15 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
         # Read the CSV file
         header_row = int(header_row or 1)
         data_start_row = int(data_start_row or (header_row + 1))
-        raw_df = pd.read_csv(file_path, skiprows=max(header_row - 1, 0))
+        # Keep the source cell text intact. In particular, pandas must not turn a
+        # small decimal quantity into a float whose string form loses the source
+        # representation used by the import receipt.
+        raw_df = pd.read_csv(
+            file_path,
+            skiprows=max(header_row - 1, 0),
+            dtype=str,
+            keep_default_na=False,
+        )
         rows_to_skip = max(data_start_row - header_row - 1, 0)
         if rows_to_skip:
             raw_df = raw_df.iloc[rows_to_skip:].reset_index(drop=True)
@@ -1039,6 +1421,8 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
             trans_df = transform_cashapp_to_standard(raw_df)
         elif csv_format == 'coinbase':
             trans_df = transform_coinbase_to_standard(raw_df)
+        elif csv_format == 'coinbase_raw':
+            trans_df = transform_coinbase_raw_to_standard(raw_df)
         elif csv_format == 'gdax':
             trans_df = transform_gdax_to_standard(raw_df)
         else:
@@ -1068,6 +1452,8 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
         transactions_added = False
         imported_count = 0
         skipped_count = 0
+        skipped_rows = []
+        integrity_checks = []
 
         for row_number, (_, row) in enumerate(trans_df.iterrows(), start=data_start_row):
             try:
@@ -1075,6 +1461,26 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
                 if pd.isna(source_row_number):
                     source_row_number = row_number
                 source_row_number = int(source_row_number)
+                raw_skip_reason = row.get('Skip Reason', '')
+                explicit_skip_reason = (
+                    '' if pd.isna(raw_skip_reason) else str(raw_skip_reason or '').strip()
+                )
+                if explicit_skip_reason:
+                    warning = (
+                        f"Skipped row {source_row_number} from {os.path.basename(file_path)}: "
+                        f"{explicit_skip_reason}"
+                    )
+                    import_warnings.append(warning)
+                    skipped_count += 1
+                    skipped_rows.append({
+                        'source_row': source_row_number,
+                        'source_transaction_id': str(row.get('Source Transaction ID', '') or ''),
+                        'transaction_type': str(row.get('Transaction Type', '') or ''),
+                        'asset': str(row.get('Asset Type', '') or ''),
+                        'reason': explicit_skip_reason,
+                        'affects_calculations': False,
+                    })
+                    continue
                 symbol = normalize_asset_symbol(row['Asset Type'])
                 if not symbol or symbol in FIAT_ASSET_SYMBOLS:
                     warning = (
@@ -1083,6 +1489,15 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
                     )
                     print(f"Warning: {warning}")
                     import_warnings.append(warning)
+                    skipped_count += 1
+                    skipped_rows.append({
+                        'source_row': source_row_number,
+                        'source_transaction_id': str(row.get('Source Transaction ID', '') or ''),
+                        'transaction_type': str(row.get('Transaction Type', '') or ''),
+                        'asset': str(row.get('Asset Type', '') or ''),
+                        'reason': 'Missing or non-crypto asset.',
+                        'affects_calculations': False,
+                    })
                     continue
 
                 quantity = parse_quantity_value(row['Asset Amount'])
@@ -1114,6 +1529,15 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
                     )
                     print(f"Warning: {warning}")
                     import_warnings.append(warning)
+                    skipped_count += 1
+                    skipped_rows.append({
+                        'source_row': source_row_number,
+                        'source_transaction_id': str(row.get('Source Transaction ID', '') or ''),
+                        'transaction_type': str(row.get('Transaction Type', '') or ''),
+                        'asset': symbol,
+                        'reason': f"Unrecognized transaction type: {row['Transaction Type']}",
+                        'affects_calculations': True,
+                    })
                     continue
 
                 temp_trans.set_economics(
@@ -1129,7 +1553,38 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
                     economics_source=row.get('Economic Source', ''),
                     economics_warning=row.get('Economic Warning', ''),
                     source_notes=row.get('Source Notes', ''),
+                    source_quantity_text=row.get('Source Quantity', ''),
+                    source_usd_total=(
+                        None if pd.isna(row.get('Source USD')) else row.get('Source USD')
+                    ),
+                    implied_usd_total=(
+                        None if pd.isna(row.get('Implied USD')) else row.get('Implied USD')
+                    ),
+                    value_variance_usd=(
+                        None if pd.isna(row.get('Value Variance USD')) else row.get('Value Variance USD')
+                    ),
+                    value_tolerance_usd=(
+                        None if pd.isna(row.get('Value Tolerance USD')) else row.get('Value Tolerance USD')
+                    ),
+                    input_reliability_status=row.get('Input Reliability', 'NOT_CHECKED'),
+                    source_leg=row.get('Source Leg', ''),
                 )
+
+                integrity_check = {
+                    'source_row': source_row_number,
+                    'source_transaction_id': temp_trans.source_transaction_id,
+                    'asset': symbol,
+                    'transaction_type': temp_trans.trans_type,
+                    'source_quantity': temp_trans.source_quantity_text,
+                    'interpreted_quantity': quantity,
+                    'source_usd': temp_trans.source_usd_total,
+                    'implied_usd': temp_trans.implied_usd_total,
+                    'variance_usd': temp_trans.value_variance_usd,
+                    'tolerance_usd': temp_trans.value_tolerance_usd,
+                    'status': temp_trans.input_reliability_status,
+                    'outcome': 'Pending',
+                }
+                integrity_checks.append(integrity_check)
 
                 if temp_trans.economics_warning:
                     import_warnings.append(
@@ -1150,10 +1605,20 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
                     logger = logging.getLogger('parsers')
                     logger.info(f"Skipping duplicate transaction: {symbol} {quantity} {time_stamp}")
                     skipped_count += 1
+                    skipped_rows.append({
+                        'source_row': source_row_number,
+                        'source_transaction_id': temp_trans.source_transaction_id,
+                        'transaction_type': temp_trans.trans_type,
+                        'asset': symbol,
+                        'reason': 'Duplicate or companion-source activity already imported.',
+                        'affects_calculations': False,
+                    })
+                    integrity_check['outcome'] = 'Skipped'
                 else:
                     transactions.transactions.append(temp_trans)
                     transactions_added = True
                     imported_count += 1
+                    integrity_check['outcome'] = 'Imported'
             except KeyError:
                 warning = (
                     f"Skipped row {source_row_number if 'source_row_number' in locals() else row_number} from {os.path.basename(file_path)}: "
@@ -1161,6 +1626,15 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
                 )
                 parsers_logger.exception("Import row is missing a required column.")
                 import_warnings.append(warning)
+                skipped_count += 1
+                skipped_rows.append({
+                    'source_row': source_row_number if 'source_row_number' in locals() else row_number,
+                    'source_transaction_id': '',
+                    'transaction_type': '',
+                    'asset': '',
+                    'reason': 'Missing one of the required import columns.',
+                    'affects_calculations': True,
+                })
                 continue
             except Exception:
                 warning = (
@@ -1170,15 +1644,75 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
                 )
                 parsers_logger.exception("Import row could not be parsed.")
                 import_warnings.append(warning)
+                skipped_count += 1
+                skipped_rows.append({
+                    'source_row': source_row_number if 'source_row_number' in locals() else row_number,
+                    'source_transaction_id': '',
+                    'transaction_type': '',
+                    'asset': '',
+                    'reason': 'Could not parse date, transaction type, asset quantity, or USD value.',
+                    'affects_calculations': True,
+                })
                 continue
 
         existing_warnings = getattr(transactions, 'import_warnings', [])
         transactions.import_warnings = existing_warnings + import_warnings
+        source_hash = _file_sha256(file_path)
+        import_receipts = []
+        for check in integrity_checks:
+            if check.get('outcome') != 'Imported':
+                continue
+            import_receipts.append({
+                'source': file_path,
+                'source_sha256': source_hash,
+                'source_row': check.get('source_row'),
+                'source_transaction_id': check.get('source_transaction_id', ''),
+                'original_type': check.get('transaction_type', ''),
+                'asset': check.get('asset', ''),
+                'source_quantity': check.get('source_quantity', ''),
+                'interpreted_quantity': check.get('interpreted_quantity', ''),
+                'outcome': 'Imported',
+                'reason': (
+                    'Input reliability check failed; downstream tax totals are suppressed.'
+                    if check.get('status') == 'BLOCKING'
+                    else 'Imported and retained for calculations.'
+                ),
+                'affects_calculations': True,
+                'input_reliability_status': check.get('status', ''),
+            })
+        for skipped in skipped_rows:
+            import_receipts.append({
+                'source': file_path,
+                'source_sha256': source_hash,
+                'source_row': skipped.get('source_row'),
+                'source_transaction_id': skipped.get('source_transaction_id', ''),
+                'original_type': skipped.get('transaction_type', ''),
+                'asset': skipped.get('asset', ''),
+                'source_quantity': '',
+                'interpreted_quantity': '',
+                'outcome': 'Skipped',
+                'reason': skipped.get('reason', ''),
+                'affects_calculations': bool(skipped.get('affects_calculations')),
+                'input_reliability_status': 'SKIPPED',
+            })
+        existing_receipts = [
+            receipt
+            for receipt in getattr(transactions, 'import_receipts', []) or []
+            if str(receipt.get('source') or '') != str(file_path)
+        ]
+        transactions.import_receipts = existing_receipts + import_receipts
+
         transactions.last_import_result = {
             "file_path": file_path,
             "imported_count": imported_count,
             "skipped_count": skipped_count,
             "warnings": import_warnings,
+            "skipped_rows": skipped_rows,
+            "integrity_checks": integrity_checks,
+            "import_receipts": import_receipts,
+            "input_reliability_failed": any(
+                row.get('status') == 'BLOCKING' for row in integrity_checks
+            ),
         }
 
           # Save transactions if any were added

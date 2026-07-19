@@ -154,6 +154,8 @@ def get_import_economics_rows(transactions):
             "transaction_type": transaction.trans_type,
             "asset": transaction.symbol,
             "quantity": transaction.quantity,
+            "source_quantity": getattr(transaction, "source_quantity_text", ""),
+            "interpreted_quantity": transaction.quantity,
             "usd_spot": transaction.usd_spot,
             "gross_usd": transaction.gross_usd_total,
             "fee_usd": _transaction_fee(transaction),
@@ -162,6 +164,16 @@ def get_import_economics_rows(transactions):
             "net_tax_usd": transaction.tax_usd_total,
             "economic_source": getattr(transaction, "economics_source", "spot_price"),
             "economic_warning": getattr(transaction, "economics_warning", ""),
+            "source_usd": getattr(transaction, "source_usd_total", None),
+            "implied_usd": getattr(transaction, "implied_usd_total", None),
+            "value_variance_usd": getattr(transaction, "value_variance_usd", None),
+            "value_tolerance_usd": getattr(transaction, "value_tolerance_usd", None),
+            "input_reliability_status": getattr(
+                transaction,
+                "input_reliability_status",
+                "NOT_CHECKED",
+            ),
+            "source_leg": getattr(transaction, "source_leg", ""),
             "source_notes": getattr(transaction, "source_notes", ""),
         })
     return rows
@@ -359,6 +371,12 @@ def _tax_record_needs_research(record):
     return bool(record and "research" in str(record.get("filing_status") or "").lower())
 
 
+def _is_open_unfiled_tax_year(year, record):
+    filing_status = str((record or {}).get("filing_status") or "").strip().lower()
+    explicitly_filed = any(term in filing_status for term in ("filed", "amended", "accepted"))
+    return int(year) >= datetime.datetime.now().year and not explicitly_filed
+
+
 def _record_has_confirmed_filed_totals(record):
     return _record_has_reported_totals(record) and not _tax_record_needs_research(record)
 
@@ -427,6 +445,10 @@ def _display_money_or_blank(value):
 
 def get_tax_filing_alignment_summary(transactions, tolerance=1.0):
     totals_by_year = get_form_8949_totals_by_year(transactions)
+    reliability_failed = any(
+        str(row.get("input_reliability_status") or "").upper() == "BLOCKING"
+        for row in get_import_economics_rows(transactions)
+    )
     records_by_year = {
         int(record["year"]): record
         for record in getattr(transactions, "tax_year_records", []) or []
@@ -440,11 +462,30 @@ def get_tax_filing_alignment_summary(transactions, tolerance=1.0):
         record = records_by_year.get(year)
         sell_counts = _year_sell_review_counts(transactions, year)
         differences = {
-            "proceeds": _money_difference(calculated["proceeds"], record.get("reported_proceeds") if record else None),
-            "cost basis": _money_difference(calculated["cost_basis"], record.get("reported_cost_basis") if record else None),
-            "gain/loss": _money_difference(calculated["gain_loss"], record.get("reported_gain_loss") if record else None),
+            "proceeds": None if reliability_failed else _money_difference(calculated["proceeds"], record.get("reported_proceeds") if record else None),
+            "cost basis": None if reliability_failed else _money_difference(calculated["cost_basis"], record.get("reported_cost_basis") if record else None),
+            "gain/loss": None if reliability_failed else _money_difference(calculated["gain_loss"], record.get("reported_gain_loss") if record else None),
         }
-        status = _tax_alignment_status(record, differences, sell_counts, tolerance)
+        if reliability_failed:
+            status = {
+                "status": "Inputs not reliable",
+                "status_class": "status-needs-review",
+                "next_action": (
+                    "Correct source rows that failed quantity/value consistency checks before "
+                    "comparing Gainz calculations with filed totals."
+                ),
+            }
+        elif _is_open_unfiled_tax_year(year, record):
+            status = {
+                "status": "Open tax year - filing not due",
+                "status_class": "status-verified",
+                "next_action": (
+                    f"{year}: continue reconciling current activity; filed totals are not required "
+                    "until this tax year is filed."
+                ),
+            }
+        else:
+            status = _tax_alignment_status(record, differences, sell_counts, tolerance)
 
         rows.append({
             "year": year,
@@ -455,9 +496,9 @@ def get_tax_filing_alignment_summary(transactions, tolerance=1.0):
             "sell_count": sell_counts["sell_count"],
             "unlinked_sell_count": sell_counts["unlinked_sell_count"],
             "unlinked_quantity": format_quantity(sell_counts["unlinked_quantity"]),
-            "calculated_proceeds": calculated["proceeds"],
-            "calculated_cost_basis": calculated["cost_basis"],
-            "calculated_gain_loss": calculated["gain_loss"],
+            "calculated_proceeds": None if reliability_failed else calculated["proceeds"],
+            "calculated_cost_basis": None if reliability_failed else calculated["cost_basis"],
+            "calculated_gain_loss": None if reliability_failed else calculated["gain_loss"],
             "reported_proceeds": record.get("reported_proceeds") if record else None,
             "reported_cost_basis": record.get("reported_cost_basis") if record else None,
             "reported_gain_loss": record.get("reported_gain_loss") if record else None,
@@ -469,9 +510,9 @@ def get_tax_filing_alignment_summary(transactions, tolerance=1.0):
             "difference_proceeds": differences["proceeds"],
             "difference_cost_basis": differences["cost basis"],
             "difference_gain_loss": differences["gain/loss"],
-            "calculated_proceeds_display": currency(calculated["proceeds"]),
-            "calculated_cost_basis_display": currency(calculated["cost_basis"]),
-            "calculated_gain_loss_display": currency(calculated["gain_loss"]),
+            "calculated_proceeds_display": "Suppressed" if reliability_failed else currency(calculated["proceeds"]),
+            "calculated_cost_basis_display": "Suppressed" if reliability_failed else currency(calculated["cost_basis"]),
+            "calculated_gain_loss_display": "Suppressed" if reliability_failed else currency(calculated["gain_loss"]),
             "reported_proceeds_display": _display_money_or_blank(record.get("reported_proceeds") if record else None),
             "reported_cost_basis_display": _display_money_or_blank(record.get("reported_cost_basis") if record else None),
             "reported_gain_loss_display": _display_money_or_blank(record.get("reported_gain_loss") if record else None),
@@ -487,18 +528,19 @@ def get_tax_filing_alignment_summary(transactions, tolerance=1.0):
     for row in rows:
         status_counts[row["status"]] = status_counts.get(row["status"], 0) + 1
 
+    nonblocking_statuses = {"Aligned", "Open tax year - filing not due"}
     if not rows:
         overall_status = "No years to review"
         overall_status_class = "status-verified"
         next_action = "Import and link sell activity, then record filed totals for each year you want to compare."
-    elif all(row["status"] == "Aligned" for row in rows):
+    elif all(row["status"] in nonblocking_statuses for row in rows):
         overall_status = "Aligned"
         overall_status_class = "status-verified"
         next_action = "Generate an audit packet and keep official filing/payment records with it."
     else:
         overall_status = "Needs review"
         overall_status_class = "status-needs-review"
-        next_action = next(row["next_action"] for row in rows if row["status"] != "Aligned")
+        next_action = next(row["next_action"] for row in rows if row["status"] not in nonblocking_statuses)
 
     return {
         "overall_status": overall_status,
@@ -510,7 +552,7 @@ def get_tax_filing_alignment_summary(transactions, tolerance=1.0):
         "metrics": {
             "years": len(rows),
             "aligned_years": status_counts.get("Aligned", 0),
-            "years_needing_review": len([row for row in rows if row["status"] != "Aligned"]),
+            "years_needing_review": len([row for row in rows if row["status"] not in nonblocking_statuses]),
             "declared_years": len([
                 row
                 for row in rows
@@ -996,6 +1038,7 @@ def _missing_basis_summary_rows(missing_basis_rows):
 
 def _audit_readiness_groups(
     transactions,
+    input_reliability_rows,
     missing_basis_rows,
     assets_needing_holdings,
     assets_with_mismatches,
@@ -1024,6 +1067,22 @@ def _audit_readiness_groups(
             "No source transactions are loaded yet. Import exchange CSVs, try demo data, or add known manual rows.",
             "Open import",
             "/import_transactions/?guided=1",
+        ))
+
+    if input_reliability_rows:
+        groups.append(_readiness_group(
+            "input_reliability",
+            "Source import integrity",
+            len(input_reliability_rows),
+            "Inputs not reliable",
+            "status-needs-review",
+            (
+                f"{_count_label(len(input_reliability_rows), 'imported row')} failed the "
+                "quantity/value consistency check. Correct or re-import the source before "
+                "reviewing holdings, FIFO, or tax totals."
+            ),
+            "Review failed rows",
+            "/import_transactions/?guided=1#import_economics_confirmation",
         ))
 
     holdings_assets = sorted(set(assets_needing_holdings + assets_with_mismatches))
@@ -1285,9 +1344,15 @@ def get_audit_readiness_summary(transactions):
     import_warnings = getattr(transactions, "import_warnings", []) or []
     warning_rows = _import_warning_review_rows(import_warnings, transactions=transactions)
     unresolved_warning_rows = _unresolved_import_warning_rows(transactions)
+    import_economics_rows = get_import_economics_rows(transactions)
+    input_reliability_rows = [
+        row for row in import_economics_rows
+        if str(row.get("input_reliability_status") or "").upper() == "BLOCKING"
+    ]
     economics_warning_rows = [
-        row for row in get_import_economics_rows(transactions)
+        row for row in import_economics_rows
         if str(row.get("economic_warning") or "").strip()
+        and str(row.get("input_reliability_status") or "").upper() != "BLOCKING"
     ]
     missing_basis_rows = get_missing_basis_review_rows(transactions)
     source_overlap_rows = _source_overlap_rows(transactions)
@@ -1324,6 +1389,12 @@ def get_audit_readiness_summary(transactions):
 
     if len(getattr(transactions, "transactions", [])) == 0:
         blockers.append("Import transactions before generating an audit packet.")
+
+    if input_reliability_rows:
+        blockers.append(
+            f"Inputs not reliable: {_count_label(len(input_reliability_rows), 'source row')} "
+            "failed quantity/value consistency checks. Tax totals are suppressed until corrected."
+        )
 
     if assets_needing_holdings:
         blockers.append(
@@ -1375,6 +1446,7 @@ def get_audit_readiness_summary(transactions):
 
     blocker_groups = _audit_readiness_groups(
         transactions,
+        input_reliability_rows,
         missing_basis_rows,
         assets_needing_holdings,
         assets_with_mismatches,
@@ -1388,7 +1460,11 @@ def get_audit_readiness_summary(transactions):
     primary_action = _primary_readiness_action(blocker_groups, is_ready)
     summary_text = _readiness_summary_text(blocker_groups, blockers, warnings, is_ready)
 
-    if blockers:
+    if input_reliability_rows:
+        status = "Inputs not reliable"
+        status_class = "status-needs-review"
+        next_action = primary_action["detail"]
+    elif blockers:
         status = "Not ready"
         status_class = "status-needs-review"
         next_action = primary_action["detail"]
@@ -1438,6 +1514,7 @@ def get_audit_readiness_summary(transactions):
         "import_warning_rows": warning_rows,
         "unresolved_import_warning_rows": unresolved_warning_rows,
         "missing_records": {
+            "input_reliability": input_reliability_rows,
             "basis": missing_basis_rows,
             "basis_summary": _missing_basis_summary_rows(missing_basis_rows),
             "current_holdings": _missing_current_holdings_records(holdings_rows),
@@ -1466,9 +1543,21 @@ def get_audit_readiness_summary(transactions):
             "tax_evidence_years_needing_review": tax_evidence_inventory["metrics"]["years_needing_review"],
             "tax_evidence_items": tax_evidence_inventory["metrics"]["evidence_items"],
             "form_8949_rows": form_8949_totals["total"]["rows"],
-            "form_8949_proceeds": currency(form_8949_totals["total"]["proceeds"]),
-            "form_8949_cost_basis": currency(form_8949_totals["total"]["cost_basis"]),
-            "form_8949_gain_loss": currency(form_8949_totals["total"]["gain_loss"]),
+            "form_8949_proceeds": (
+                "Suppressed" if input_reliability_rows else currency(form_8949_totals["total"]["proceeds"])
+            ),
+            "form_8949_cost_basis": (
+                "Suppressed" if input_reliability_rows else currency(form_8949_totals["total"]["cost_basis"])
+            ),
+            "form_8949_gain_loss": (
+                "Suppressed" if input_reliability_rows else currency(form_8949_totals["total"]["gain_loss"])
+            ),
+            "input_reliability_failures": len(input_reliability_rows),
+        },
+        "input_reliability": {
+            "passed": len(input_reliability_rows) == 0,
+            "failed_rows": input_reliability_rows,
+            "calculated_totals_suppressed": bool(input_reliability_rows),
         },
         "form_8949_totals": form_8949_totals,
         "packet_includes": [

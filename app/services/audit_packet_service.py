@@ -3,8 +3,11 @@ import hashlib
 import json
 import os
 import shutil
+import uuid
 from datetime import datetime
 from pathlib import Path
+
+from openpyxl import load_workbook
 
 from app.services.export_service import ExportService
 from app.services.import_warning_service import import_warning_audit_rows
@@ -40,6 +43,37 @@ from utils import (
 
 
 class AuditPacketService:
+    PACKET_CONTRACT_VERSION = "1.0"
+    REQUIRED_ROOT_FILES = {
+        "README_FIRST.md",
+        "PACKET_STATUS.md",
+        "CPA_HANDOFF.md",
+        "FOR_CPAS.md",
+        "PRIVACY_AND_EVIDENCE_HANDLING.md",
+    }
+    REQUIRED_REPORT_FILES = {
+        "import_economics.csv",
+        "holdings_reconciliation.csv",
+        "import_warnings.csv",
+        "import_row_receipts.csv",
+        "missing_basis_review.csv",
+        "reconciliation_work_order.csv",
+        "reconciliation_work_order.md",
+        "unknown_gap_memos.csv",
+        "unknown_gap_memos.md",
+    }
+    REQUIRED_MANIFEST_FILES = {
+        "evidence_manifest.csv",
+        "packet_inventory.csv",
+        "SHA256SUMS.txt",
+        "audit_packet_summary.json",
+    }
+    REQUIRED_WORKBOOK_SHEETS = {
+        "Packet Status",
+        "Import Economics",
+        "Professional Workpapers",
+    }
+
     def __init__(self, packet_root, export_folder):
         self.packet_root = Path(packet_root)
         self.export_folder = export_folder
@@ -48,7 +82,22 @@ class AuditPacketService:
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         readiness = get_audit_readiness_summary(transactions)
         packet_prefix = "gainz_audit_packet" if readiness["is_ready"] else "gainz_audit_packet_DRAFT"
-        packet_dir = self.packet_root / f"{packet_prefix}_{timestamp}"
+        self.packet_root.mkdir(parents=True, exist_ok=True)
+        packet_dir = self._unique_packet_path(self.packet_root / f"{packet_prefix}_{timestamp}")
+        staging_dir = self.packet_root / f".{packet_dir.name}.building-{uuid.uuid4().hex[:8]}"
+
+        try:
+            self._build_packet(transactions, staging_dir, readiness)
+            self._validate_packet_contract(staging_dir, readiness)
+            staging_dir.replace(packet_dir)
+        except Exception as exc:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            self._write_failure_receipt(packet_dir.name, exc)
+            raise
+
+        return str(packet_dir)
+
+    def _build_packet(self, transactions, packet_dir, readiness):
         packet_dir.mkdir(parents=True, exist_ok=False)
 
         for folder in (
@@ -124,6 +173,7 @@ class AuditPacketService:
         self._write_suggested_filed_totals(packet_dir, transactions)
         self._write_holdings_reports(packet_dir, transactions)
         self._write_import_warnings(packet_dir, transactions)
+        self._write_import_row_receipts(packet_dir, transactions)
         self._write_source_overlap_review(packet_dir, transactions)
         self._write_reconciliation_work_order(packet_dir, readiness, transactions)
         self._write_cpa_resolution_workpapers(packet_dir, readiness, transactions)
@@ -133,10 +183,74 @@ class AuditPacketService:
         self._write_for_cpas(packet_dir, readiness, manifest_rows, transactions)
         self._write_privacy_and_evidence_handling(packet_dir, manifest_rows)
         self._write_manifest(packet_dir, manifest_rows)
-        self._write_inventory(packet_dir)
         self._write_summary(packet_dir, manifest_rows, transactions)
+        self._write_inventory(packet_dir)
 
         return str(packet_dir)
+
+    def _unique_packet_path(self, candidate):
+        if not candidate.exists():
+            return candidate
+
+        index = 2
+        while True:
+            alternate = candidate.with_name(f"{candidate.name}_{index}")
+            if not alternate.exists():
+                return alternate
+            index += 1
+
+    def _write_failure_receipt(self, intended_packet_name, exc):
+        receipt = self.packet_root / f"FAILED_INCOMPLETE_{intended_packet_name}.txt"
+        receipt.write_text(
+            "\n".join([
+                "Gainz audit packet generation failed.",
+                "No normal-looking packet folder was published.",
+                f"Intended packet: {intended_packet_name}",
+                f"Error type: {type(exc).__name__}",
+                "Review the Gainz application log, correct the issue, and generate again.",
+                "",
+            ]),
+            encoding="utf-8",
+        )
+
+    def _validate_packet_contract(self, packet_dir, readiness):
+        missing = []
+        for filename in sorted(self.REQUIRED_ROOT_FILES):
+            if not (packet_dir / filename).is_file():
+                missing.append(filename)
+        for filename in sorted(self.REQUIRED_REPORT_FILES):
+            if not (packet_dir / "01_reports" / filename).is_file():
+                missing.append(f"01_reports/{filename}")
+        for filename in sorted(self.REQUIRED_MANIFEST_FILES):
+            if not (packet_dir / "03_manifests" / filename).is_file():
+                missing.append(f"03_manifests/{filename}")
+
+        workbooks = list((packet_dir / "01_reports").glob("*.xlsx"))
+        if len(workbooks) != 1:
+            missing.append(f"exactly one generated workbook (found {len(workbooks)})")
+        else:
+            workbook = load_workbook(workbooks[0], read_only=True, data_only=True)
+            try:
+                missing_sheets = self.REQUIRED_WORKBOOK_SHEETS - set(workbook.sheetnames)
+                missing.extend(f"workbook sheet: {sheet}" for sheet in sorted(missing_sheets))
+            finally:
+                workbook.close()
+
+        reliability_failed = not (readiness.get("input_reliability") or {}).get("passed", True)
+        if reliability_failed:
+            if not (packet_dir / "01_reports" / "FORM_8949_SUPPRESSED.md").is_file():
+                missing.append("01_reports/FORM_8949_SUPPRESSED.md")
+        else:
+            for filename in (
+                "form_8949_short_term.csv",
+                "form_8949_long_term.csv",
+                "form_8949_totals.csv",
+            ):
+                if not (packet_dir / "01_reports" / filename).is_file():
+                    missing.append(f"01_reports/{filename}")
+
+        if missing:
+            raise ValueError("Audit packet contract failed; missing: " + ", ".join(missing))
 
     def _write_draft_not_ready_memo(self, packet_dir, readiness):
         lines = [
@@ -215,6 +329,7 @@ class AuditPacketService:
         status_lines = [
             "# Gainz Packet Status",
             "",
+            f"Packet contract version: {self.PACKET_CONTRACT_VERSION}",
             f"Status: {status}",
             f"Readiness: {readiness['status']}",
             f"Summary: {readiness['summary']}",
@@ -620,6 +735,30 @@ class AuditPacketService:
             writer.writerows(rows)
 
     def _write_tax_reports(self, packet_dir, transactions):
+        readiness = get_audit_readiness_summary(transactions)
+        reliability = readiness.get("input_reliability") or {"passed": True}
+        if not reliability.get("passed", True):
+            (packet_dir / "01_reports" / "FORM_8949_SUPPRESSED.md").write_text(
+                "\n".join([
+                    "# Form 8949 Totals Suppressed",
+                    "",
+                    "Gainz found source import rows that failed quantity/value consistency checks.",
+                    "No Form 8949 detail or totals are published in this packet because downstream calculations are not reliable.",
+                    "Correct or re-import the failed source rows, then regenerate the packet.",
+                    "",
+                ]),
+                encoding="utf-8",
+            )
+            (packet_dir / "03_manifests" / "form_8949_totals.json").write_text(
+                json.dumps({
+                    "suppressed": True,
+                    "status": "UNRELIABLE_SOURCE_IMPORT",
+                    "failed_rows": reliability.get("failed_rows", []),
+                }, indent=2, default=str),
+                encoding="utf-8",
+            )
+            return
+
         all_rows = get_form_8949_report_rows(transactions)
         for term in ("short", "long"):
             self._write_form_8949_detail(
@@ -659,6 +798,8 @@ class AuditPacketService:
             "transaction_type",
             "asset",
             "quantity",
+            "source_quantity",
+            "interpreted_quantity",
             "usd_spot",
             "gross_usd",
             "fee_usd",
@@ -667,6 +808,12 @@ class AuditPacketService:
             "net_tax_usd",
             "economic_source",
             "economic_warning",
+            "source_usd",
+            "implied_usd",
+            "value_variance_usd",
+            "value_tolerance_usd",
+            "input_reliability_status",
+            "source_leg",
             "source_notes",
         ]
         with open(packet_dir / "01_reports" / "import_economics.csv", "w", newline="", encoding="utf-8") as file:
@@ -675,7 +822,10 @@ class AuditPacketService:
             for row in rows:
                 output = dict(row)
                 output["date"] = self._format_datetime(row.get("date"))
-                for field in ("usd_spot", "gross_usd", "fee_usd", "net_tax_usd"):
+                for field in (
+                    "usd_spot", "gross_usd", "fee_usd", "net_tax_usd", "source_usd",
+                    "implied_usd", "value_variance_usd", "value_tolerance_usd",
+                ):
                     value = row.get(field)
                     output[field] = "" if value is None else f"{float(value):.2f}"
                 source_fee_amount = row.get("source_fee_amount")
@@ -713,13 +863,13 @@ class AuditPacketService:
                     "year": row["year"],
                     "status": row["status"],
                     "calculated_rows": row["calculated_rows"],
-                    "calculated_proceeds": f"{row['calculated_proceeds']:.2f}",
+                    "calculated_proceeds": self._format_optional_money(row["calculated_proceeds"]),
                     "reported_proceeds": self._format_optional_money(row["reported_proceeds"]),
                     "difference_proceeds": self._format_optional_money(row["difference_proceeds"]),
-                    "calculated_cost_basis": f"{row['calculated_cost_basis']:.2f}",
+                    "calculated_cost_basis": self._format_optional_money(row["calculated_cost_basis"]),
                     "reported_cost_basis": self._format_optional_money(row["reported_cost_basis"]),
                     "difference_cost_basis": self._format_optional_money(row["difference_cost_basis"]),
-                    "calculated_gain_loss": f"{row['calculated_gain_loss']:.2f}",
+                    "calculated_gain_loss": self._format_optional_money(row["calculated_gain_loss"]),
                     "reported_gain_loss": self._format_optional_money(row["reported_gain_loss"]),
                     "difference_gain_loss": self._format_optional_money(row["difference_gain_loss"]),
                     "tax_paid": self._format_optional_money(row["tax_paid"]),
@@ -813,6 +963,7 @@ class AuditPacketService:
             "tax_paid",
             "combined_suggestions_count",
             "matched_fields",
+            "field_provenance",
             "notes",
         ]
         with open(packet_dir / "01_reports" / "suggested_filed_totals.csv", "w", newline="", encoding="utf-8") as file:
@@ -830,6 +981,7 @@ class AuditPacketService:
                     "tax_paid": self._format_optional_money(row.get("tax_paid")),
                     "combined_suggestions_count": row.get("combined_suggestions_count", 1),
                     "matched_fields": ", ".join(row.get("matched_fields", [])),
+                    "field_provenance": json.dumps(row.get("field_provenance", {}), sort_keys=True),
                     "notes": row.get("notes", ""),
                 })
 
@@ -951,10 +1103,41 @@ class AuditPacketService:
         with open(packet_dir / "01_reports" / "missing_basis_review.csv", "w", newline="", encoding="utf-8") as file:
             writer = csv.DictWriter(
                 file,
-                fieldnames=["asset", "date", "quantity", "unlinked_quantity", "source", "status", "message", "note"],
+                fieldnames=[
+                    "asset",
+                    "target_transaction_uid",
+                    "date",
+                    "quantity",
+                    "unlinked_quantity",
+                    "source",
+                    "status",
+                    "message",
+                    "note",
+                ],
+                extrasaction="ignore",
             )
             writer.writeheader()
             writer.writerows(get_missing_basis_review_rows(transactions))
+
+    def _write_import_row_receipts(self, packet_dir, transactions):
+        fieldnames = [
+            "source",
+            "source_sha256",
+            "source_row",
+            "source_transaction_id",
+            "original_type",
+            "asset",
+            "source_quantity",
+            "interpreted_quantity",
+            "outcome",
+            "reason",
+            "affects_calculations",
+            "input_reliability_status",
+        ]
+        with open(packet_dir / "01_reports" / "import_row_receipts.csv", "w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames, extrasaction="ignore")
+            writer.writeheader()
+            writer.writerows(getattr(transactions, "import_receipts", []) or [])
 
     def _write_source_overlap_review(self, packet_dir, transactions):
         with open(packet_dir / "01_reports" / "source_overlap_review.csv", "w", newline="", encoding="utf-8") as file:
@@ -1172,15 +1355,24 @@ class AuditPacketService:
         missing_sources = len([row for row in manifest_rows if row["status"] == "MISSING"])
         form_8949_totals = get_form_8949_totals(transactions)
         readiness = get_audit_readiness_summary(transactions)
+        reliability_failed = not (readiness.get("input_reliability") or {}).get("passed", True)
         evidence_counts = tax_evidence_packet_counts(transactions)
         summary = {
+            "packet_contract_version": self.PACKET_CONTRACT_VERSION,
             "created_at": datetime.now().isoformat(timespec="seconds"),
             "packet_path": str(packet_dir),
             "copied_source_files": copied_sources,
             "missing_source_files": missing_sources,
             "tax_evidence_packet_counts": evidence_counts,
             "manifest_entries": len(manifest_rows),
-            "form_8949_totals": form_8949_totals,
+            "form_8949_totals": (
+                {
+                    "suppressed": True,
+                    "status": "UNRELIABLE_SOURCE_IMPORT",
+                }
+                if reliability_failed
+                else form_8949_totals
+            ),
             "tax_filing_alignment": get_tax_filing_alignment_summary(transactions),
             "tax_evidence_inventory": get_tax_evidence_inventory_summary(transactions),
             "suggested_filed_totals": get_suggested_filed_totals(transactions),
@@ -1198,9 +1390,10 @@ class AuditPacketService:
             "work_order_review_summary": readiness.get("work_order_review_summary", {}),
             "reconciliation_work_order_rows": reconciliation_work_order_rows(readiness, transactions),
             "material_assumptions": material_assumption_rows(transactions),
+            "input_reliability": readiness.get("input_reliability", {}),
         }
         (packet_dir / "03_manifests" / "audit_packet_summary.json").write_text(
-            json.dumps(summary, indent=2),
+            json.dumps(summary, indent=2, default=str),
             encoding="utf-8",
         )
 

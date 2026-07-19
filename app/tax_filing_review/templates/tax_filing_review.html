@@ -221,6 +221,14 @@
                 <td>
                   <strong>{{ candidate.source_label }}</strong><br>
                   <span class="text-muted">{{ candidate.evidence_type_label }}</span>
+                  {% if candidate.field_provenance %}
+                  <details class="mt-1">
+                    <summary>Show extracted field sources</summary>
+                    {% for field, sources in candidate.field_provenance.items() %}
+                    <small class="d-block"><strong>{{ field|replace('_', ' ')|title }}:</strong> {{ sources|join(', ') }}</small>
+                    {% endfor %}
+                  </details>
+                  {% endif %}
                 </td>
                 <td><span class="gainz-status-badge {{ candidate.confidence_class }}">{{ candidate.confidence }}</span></td>
                 {% set candidate_is_ambiguous = candidate.confidence != 'High' or (candidate.combined_suggestions_count or 1) > 1 %}

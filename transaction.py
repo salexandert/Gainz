@@ -54,6 +54,13 @@ class Transaction:
         self.economics_source = "spot_price"
         self.economics_warning = ""
         self.source_notes = ""
+        self.source_quantity_text = ""
+        self.source_usd_total = None
+        self.implied_usd_total = None
+        self.value_variance_usd = None
+        self.value_tolerance_usd = None
+        self.input_reliability_status = "NOT_CHECKED"
+        self.source_leg = ""
 
     @property
     def fee(self):
@@ -85,6 +92,13 @@ class Transaction:
         economics_source="",
         economics_warning="",
         source_notes="",
+        source_quantity_text="",
+        source_usd_total=None,
+        implied_usd_total=None,
+        value_variance_usd=None,
+        value_tolerance_usd=None,
+        input_reliability_status="NOT_CHECKED",
+        source_leg="",
     ):
         """Attach the source row's preserved economic values to this transaction."""
         if fee not in (None, ""):
@@ -100,6 +114,16 @@ class Transaction:
         self.economics_source = self._optional_text(economics_source, "spot_price")
         self.economics_warning = self._optional_text(economics_warning)
         self.source_notes = self._optional_text(source_notes)
+        self.source_quantity_text = self._optional_text(source_quantity_text)
+        self.source_usd_total = self._optional_float(source_usd_total)
+        self.implied_usd_total = self._optional_float(implied_usd_total)
+        self.value_variance_usd = self._optional_float(value_variance_usd)
+        self.value_tolerance_usd = self._optional_float(value_tolerance_usd)
+        self.input_reliability_status = self._optional_text(
+            input_reliability_status,
+            "NOT_CHECKED",
+        ).upper()
+        self.source_leg = self._optional_text(source_leg)
 
     @staticmethod
     def _optional_float(value):

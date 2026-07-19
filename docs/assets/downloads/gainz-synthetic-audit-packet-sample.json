@@ -1,5 +1,5 @@
 {
-  "version": "0.2.48",
+  "version": "0.2.49",
   "generated_date": "2026-07-18",
   "sha256": "b7ad00a904f22ec1f7d4b062654c6aca6a1cca28db0ad9b9b264f65b224fbcdf",
   "scenario": "Synthetic partial-basis BCH sale with a fee-inclusive Coinbase import, documented FIFO basis first, and an exact professional-directed conservative treatment for the unsupported remainder.",

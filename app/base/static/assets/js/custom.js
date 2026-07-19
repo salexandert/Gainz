@@ -9,6 +9,12 @@ function gainzFormatImportResult(result, fileName) {
 
     message += " from " + sourceName + ".";
     message += " Skipped " + (result.skipped_count || 0) + " row(s).";
+    if (result.skipped_rows && result.skipped_rows.length) {
+        var skippedSummary = result.skipped_rows.slice(0, 3).map(function(row) {
+            return "row " + (row.source_row || "N/A") + ": " + (row.reason || "not imported");
+        }).join("; ");
+        message += " Skipped details: " + skippedSummary + (result.skipped_rows.length > 3 ? "; see the import receipt for more." : ".");
+    }
 
     if (result.header_row_used && result.header_row_used > 1) {
         message += " Used header row " + result.header_row_used + ".";
@@ -70,8 +76,83 @@ function gainzShowImportResult(result, fileName, alertClass) {
         gainzRenderDataSources(result.data_summary);
         gainzUpdateImportContinuePanel(result.data_summary);
         gainzUpdateImportCurrentDecision(result.data_summary);
+        gainzUpdateImportReceipts(result.data_summary);
     }
     gainzFocusImportStatus("#import_upload_result");
+}
+
+function gainzUpdateImportReceipts(summary) {
+    var details = $("#import_receipts_details");
+    var tbody = $("#import_receipts_rows");
+    if (!summary || details.length === 0 || tbody.length === 0) {
+        return;
+    }
+    var rows = summary.import_receipts || [];
+    $("#import_receipt_count").text(summary.import_receipt_count || rows.length || 0);
+    tbody.empty();
+    rows.forEach(function(row) {
+        var source = String(row.source || "").replace(/\\/g, "/").split("/").pop() || "Unknown source";
+        tbody.append(
+            $("<tr></tr>")
+                .append($("<td></td>").text(source))
+                .append($("<td></td>").text(row.source_row || "N/A"))
+                .append($("<td></td>").text(row.source_transaction_id || ""))
+                .append($("<td></td>").text(row.original_type || ""))
+                .append($("<td></td>").text(row.asset || ""))
+                .append($("<td></td>").text(row.source_quantity || ""))
+                .append($("<td></td>").text(row.interpreted_quantity || ""))
+                .append($("<td></td>").text(row.outcome || ""))
+                .append($("<td></td>").text(row.reason || ""))
+        );
+    });
+    details.toggle((summary.import_receipt_count || rows.length || 0) > 0);
+}
+
+function gainzRenderNativeImportPreview(result, fileName) {
+    var preview = result.import_preview || {};
+    var panel = $("#native_import_preview");
+    var summary = $("#native_import_preview_summary").empty();
+    var metrics = [
+        ["Source rows", preview.source_rows || 0],
+        ["Resulting transaction legs", preview.output_rows || 0],
+        ["Source rows left unimported", preview.skipped_source_rows || 0],
+        ["Source-reported proceeds", gainzImportMoney(preview.source_reported_proceeds)],
+        ["Source-reported basis", gainzImportMoney(preview.source_reported_basis)],
+        ["Rows needing review", preview.warning_count || 0]
+    ];
+    metrics.forEach(function(metric) {
+        summary.append(
+            $("<div></div>").addClass("gainz-summary-item")
+                .append($("<span></span>").text(metric[0]))
+                .append($("<strong></strong>").text(metric[1]))
+        );
+    });
+
+    var quantityRows = preview.quantity_totals_by_asset_and_type || {};
+    var table = $('<table class="table table-sm table-striped table-bordered"></table>');
+    table.append("<thead><tr><th>Asset</th><th>Resulting type</th><th>Total quantity</th></tr></thead>");
+    var tbody = $("<tbody></tbody>");
+    Object.keys(quantityRows).sort().forEach(function(key) {
+        var parts = key.split(":");
+        tbody.append(
+            $("<tr></tr>")
+                .append($("<td></td>").text(parts[0] || ""))
+                .append($("<td></td>").text(parts.slice(1).join(":") || ""))
+                .append($("<td></td>").text(quantityRows[key]))
+        );
+    });
+    table.append(tbody);
+    $("#native_import_preview_quantities").empty().append(table);
+    panel.data("header-row", result.header_row || 1);
+    panel.data("data-start-row", result.data_start_row || 2);
+    panel.show();
+    $("#import_column_mapper").hide();
+    $("#import_upload_result")
+        .removeClass("alert-danger alert-warning")
+        .addClass("alert-info")
+        .text("Review " + (fileName || "the Coinbase raw file") + " below before importing.")
+        .show();
+    gainzFocusImportStatus("#native_import_preview");
 }
 
 function gainzConfirmDialog(options) {
@@ -152,7 +233,8 @@ function gainzUpdateImportContinuePanel(summary) {
 
     var transactionCount = summary.transaction_count || 0;
     var unresolvedWarnings = summary.unresolved_import_warning_count || 0;
-    var canContinue = transactionCount > 0 && unresolvedWarnings === 0;
+    var integrityFailures = summary.input_reliability_failure_count || 0;
+    var canContinue = transactionCount > 0 && unresolvedWarnings === 0 && integrityFailures === 0;
     var action = panel.find(".import-continue-action");
     var message = panel.find(".import-continue-message");
     var heading = panel.find("strong").first();
@@ -163,11 +245,21 @@ function gainzUpdateImportContinuePanel(summary) {
 
     if (transactionCount > 0) {
         heading.text(canContinue ? "Import data is ready for the next step." : "Import data is loaded, but review is still needed.");
-        message.text(
-            canContinue
-                ? "Continue when you have loaded the source files you want included in this review pass."
-                : "Review " + unresolvedWarnings + " unresolved import warning" + (unresolvedWarnings == 1 ? "" : "s") + " before moving to Declare Holdings."
-        );
+        if (canContinue) {
+            message.text("Continue when you have loaded the source files you want included in this review pass.");
+        } else if (integrityFailures > 0) {
+            message.text(
+                "Correct or re-import " + integrityFailures + " source row" +
+                (integrityFailures === 1 ? "" : "s") +
+                " that failed quantity/value consistency checks before continuing."
+            );
+        } else {
+            message.text(
+                "Review " + unresolvedWarnings + " unresolved import warning" +
+                (unresolvedWarnings === 1 ? "" : "s") +
+                " before moving to Declare Holdings."
+            );
+        }
         action.toggle(canContinue);
         panel.show();
     } else {
@@ -190,6 +282,7 @@ function gainzUpdateImportEconomics(summary) {
     var rows = summary.import_economics_rows || [];
     $("#import_economics_count").text(summary.import_economics_count || 0);
     $("#import_economics_warning_count").text(summary.import_economics_warning_count || 0);
+    $("#input_reliability_failure_count").text(summary.input_reliability_failure_count || 0);
     tbody.empty();
     rows.forEach(function(row) {
         var sourceCell = $("<td></td>").text(row.source_file || "Manual / Unknown");
@@ -200,14 +293,30 @@ function gainzUpdateImportEconomics(summary) {
                 $('<small class="gainz-import-economics-warning"></small>').text(row.economic_warning)
             );
         }
+        var reliability = String(row.input_reliability_status || "PASS").toUpperCase();
+        var integrityCell = $("<td></td>").append(
+            $("<span></span>")
+                .addClass("gainz-status-badge " + (reliability === "BLOCKING" ? "status-needs-review" : "status-verified"))
+                .text(reliability.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, function(letter) { return letter.toUpperCase(); }))
+        );
+        if (row.implied_usd !== null && row.implied_usd !== undefined && row.source_usd !== null && row.source_usd !== undefined) {
+            integrityCell.append("<br>").append(
+                $("<small></small>").text(
+                    "Source " + gainzImportMoney(row.source_usd) +
+                    "; quantity x price " + gainzImportMoney(row.implied_usd)
+                )
+            );
+        }
         $("<tr></tr>")
             .append($("<td></td>").text(row.source_row || "N/A"))
             .append($("<td></td>").text(row.transaction_type || ""))
             .append($("<td></td>").text((row.quantity || 0) + " " + (row.asset || "")))
+            .append($("<td></td>").text(row.source_quantity || row.quantity || 0))
             .append($("<td></td>").text(gainzImportMoney(row.gross_usd)))
             .append($("<td></td>").text(gainzImportMoney(row.fee_usd) + " " + (row.fee_currency || "USD")))
             .append($("<td></td>").append($("<strong></strong>").text(row.total_label || "Net USD value")).append("<br>").append(document.createTextNode(gainzImportMoney(row.net_tax_usd))))
             .append(sourceCell)
+            .append(integrityCell)
             .appendTo(tbody);
     });
     panel.toggle((summary.transaction_count || 0) > 0);
@@ -1114,6 +1223,10 @@ if (window.Dropzone) {
                     gainzShowColumnReviewResult(result);
                     return;
                 }
+                if (result.native_preview_required) {
+                    gainzRenderNativeImportPreview(result, file.name || "official Coinbase raw CSV");
+                    return;
+                }
 
                 $("#import_column_mapper").hide();
                 gainzShowImportResult(result, file.name || "uploaded file");
@@ -1190,6 +1303,38 @@ $(document).ready(function () {
             event.preventDefault();
             $("#upload_exchange_csv").trigger("click");
         }
+    });
+
+    $("#cancel_native_import_button").on("click", function() {
+        $("#native_import_preview").hide();
+        $("#import_upload_result")
+            .removeClass("alert-danger alert-warning")
+            .addClass("alert-info")
+            .text("The Coinbase file remains unimported. Upload it again when you are ready to review and confirm it.")
+            .show();
+    });
+
+    $("#confirm_native_import_button").on("click", function() {
+        var button = $(this);
+        var panel = $("#native_import_preview");
+        button.prop("disabled", true).text("Importing...");
+        $.ajax({
+            url: panel.data("confirm-url"),
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({
+                header_row: panel.data("header-row") || 1,
+                data_start_row: panel.data("data-start-row") || 2
+            })
+        }).done(function(result) {
+            panel.hide();
+            gainzShowImportResult(result, result.filename || "official Coinbase raw CSV");
+        }).fail(function(xhr) {
+            var message = (xhr.responseJSON && xhr.responseJSON.error) || "The Coinbase raw import could not be completed.";
+            $("#import_upload_result").removeClass("alert-info").addClass("alert-danger").text(message).show();
+        }).always(function() {
+            button.prop("disabled", false).text("Import These Coinbase Rows");
+        });
     });
 
     $(document).on("click", 'a[href^="#"]', function () {

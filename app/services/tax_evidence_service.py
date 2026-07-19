@@ -1,6 +1,7 @@
 import os
 import re
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 
 
@@ -11,6 +12,7 @@ TAX_EVIDENCE_TYPES = {
     "form_8949": "Form 8949",
     "schedule_d": "Schedule D",
     "payment_receipt": "Payment receipt",
+    "account_transcript": "Tax account transcript",
     "crypto_workbook": "Crypto workbook",
     "broker_form": "Broker form",
     "transaction_csv": "Transaction CSV",
@@ -25,6 +27,7 @@ TAX_EVIDENCE_TYPE_CHOICES = [
     ("form_8949", TAX_EVIDENCE_TYPES["form_8949"]),
     ("schedule_d", TAX_EVIDENCE_TYPES["schedule_d"]),
     ("payment_receipt", TAX_EVIDENCE_TYPES["payment_receipt"]),
+    ("account_transcript", TAX_EVIDENCE_TYPES["account_transcript"]),
     ("crypto_workbook", TAX_EVIDENCE_TYPES["crypto_workbook"]),
     ("broker_form", TAX_EVIDENCE_TYPES["broker_form"]),
     ("transaction_csv", TAX_EVIDENCE_TYPES["transaction_csv"]),
@@ -68,9 +71,15 @@ def classify_tax_evidence(reference="", notes="", selected_type="auto"):
 
     text = _normalized_text(Path(str(reference or "")).name, reference, notes)
 
+    suffix = Path(str(reference or "")).suffix.lower()
+
     if any(term in text for term in ("estimate", "estimated", "draft", "projection")):
         return "estimate"
-    if any(term in text for term in ("payment", "receipt", "confirmation", "eftps", "direct pay", "paid", "refund")):
+    if any(term in text for term in ("account transcript", "record of account", "tax transcript")):
+        return "account_transcript"
+    if any(term in text for term in ("workbook", "worksheet", "crypto tax", "crypto taxes", "cointracker", "koinly", "taxbit", "spreadsheet")):
+        return "crypto_workbook"
+    if any(term in text for term in ("payment receipt", "payment confirmation", "eftps", "direct pay", "irs payment", "amount paid")):
         return "payment_receipt"
     if "8949" in text:
         return "form_8949"
@@ -80,15 +89,13 @@ def classify_tax_evidence(reference="", notes="", selected_type="auto"):
         return "broker_form"
     if any(term in text for term in ("zero", "not applicable", "no crypto", "none reported", "n a")):
         return "zero_confirmation"
-    if any(term in text for term in ("workbook", "worksheet", "crypto tax", "crypto taxes", "cointracker", "koinly", "taxbit", "spreadsheet")):
-        return "crypto_workbook"
     if any(term in text for term in ("transaction", "transactions", "coinbase", "cash app", "cashapp", "exchange export")):
         return "transaction_csv"
     if any(term in text for term in ("1040", "return", "filed", "tax return")):
         return "filed_return"
-    if str(reference or "").lower().endswith(".csv"):
+    if suffix == ".csv":
         return "transaction_csv"
-    if str(reference or "").lower().endswith((".xlsx", ".xls")):
+    if suffix in (".xlsx", ".xls"):
         return "crypto_workbook"
 
     return "other"
@@ -175,6 +182,8 @@ def _needs_for_status(year, status, records, tax_record):
         return f"{year}: review the source evidence and enter filed totals only after they are confirmed from official filing records."
     if status == "Not applicable / zero confirmed":
         return "Keep the zero/not-applicable confirmation with the year record."
+    if status == "Open tax year - filing not due":
+        return f"{year}: continue reconciling current activity; filed-return totals are not required until this tax year is filed."
     if status == "Return found, crypto totals not found":
         return f"{year}: confirm no crypto was reported, or upload/record Form 8949, Schedule D, or filed crypto totals."
     if status == "Workbook totals found, filed return missing":
@@ -198,13 +207,23 @@ def _legacy_evidence_records(tax_record):
     text = _normalized_text(reference, notes)
     evidence_types = []
 
-    if any(term in text for term in ("1040", "return", "filed", "tax return")):
+    if any(term in text for term in ("1040", "tax return", "filed return", "filed form 8949")):
         evidence_types.append("filed_return")
-    if any(term in text for term in ("payment", "receipt", "confirmation", "eftps", "direct pay", "paid", "refund")):
+    if any(term in text for term in (
+        "payment record",
+        "payment receipt",
+        "payment confirmation",
+        "eftps",
+        "direct pay",
+        "irs payment",
+        "amount paid",
+    )):
         evidence_types.append("payment_receipt")
+    if any(term in text for term in ("account transcript", "record of account", "tax transcript")):
+        evidence_types.append("account_transcript")
     if "8949" in text:
         evidence_types.append("form_8949")
-    if "schedule d" in text or "sched d" in text or "scheduled" in text:
+    if "schedule d" in text or "sched d" in text:
         evidence_types.append("schedule_d")
     if any(term in text for term in ("workbook", "worksheet", "crypto tax", "crypto taxes")):
         evidence_types.append("crypto_workbook")
@@ -228,13 +247,19 @@ def _legacy_evidence_records(tax_record):
 
 def _year_inventory_status(year, calculated, tax_record, records, alignment_row):
     has_filed_return = _has_evidence(records, "filed_return")
-    has_payment = _has_evidence(records, "payment_receipt")
+    has_account_transcript = _has_evidence(records, "account_transcript")
+    has_payment = _has_evidence(records, "payment_receipt") or has_account_transcript
     has_workbook = _has_evidence(records, "crypto_workbook")
     has_estimate = _has_evidence(records, "estimate")
     has_zero_confirmation = _has_evidence(records, "zero_confirmation")
     has_filing_detail = _has_evidence(records, "form_8949", "schedule_d", "broker_form")
     has_totals = _record_has_confirmed_totals(tax_record)
     has_payment_record = bool(tax_record and tax_record.get("tax_paid") is not None)
+
+    filing_status = str((tax_record or {}).get("filing_status") or "").strip().lower()
+    explicitly_filed = any(term in filing_status for term in ("filed", "amended", "accepted"))
+    if int(year) >= datetime.now().year and not explicitly_filed:
+        return "Open tax year - filing not due", "status-verified"
 
     if _tax_record_needs_research(tax_record):
         return "Needs research", "status-needs-review"
@@ -262,6 +287,10 @@ def get_tax_evidence_inventory_summary(transactions, alignment=None):
     from utils import currency, get_form_8949_totals_by_year
 
     totals_by_year = get_form_8949_totals_by_year(transactions)
+    reliability_failed = any(
+        str(getattr(transaction, "input_reliability_status", "") or "").upper() == "BLOCKING"
+        for transaction in getattr(transactions, "transactions", []) or []
+    )
     tax_records_by_year = {
         int(record["year"]): record
         for record in getattr(transactions, "tax_year_records", []) or []
@@ -292,21 +321,30 @@ def get_tax_evidence_inventory_summary(transactions, alignment=None):
             records,
             alignment_rows.get(year),
         )
+        if reliability_failed:
+            status = "Inputs not reliable"
+            status_class = "status-needs-review"
+            next_action = (
+                "Correct source rows that failed quantity/value consistency checks before "
+                "reviewing calculated totals against tax evidence."
+            )
+        else:
+            next_action = _needs_for_status(year, status, records, tax_record)
         rows.append({
             "year": year,
             "calculated_rows": calculated["rows"],
-            "calculated_totals": (
+            "calculated_totals": "Suppressed until source input integrity is restored" if reliability_failed else (
                 f"{currency(calculated['gain_loss'])} gain/loss from "
                 f"{currency(calculated['proceeds'])} proceeds and {currency(calculated['cost_basis'])} basis"
             ),
             "filed_return_evidence": _evidence_labels(records, {"filed_return"}),
-            "payment_evidence": _evidence_labels(records, {"payment_receipt"}),
+            "payment_evidence": _evidence_labels(records, {"payment_receipt", "account_transcript"}),
             "crypto_total_evidence": _evidence_labels(records, {"form_8949", "schedule_d", "crypto_workbook", "broker_form", "estimate"}),
             "status": status,
             "status_class": status_class,
-            "next_action": _needs_for_status(year, status, records, tax_record),
+            "next_action": next_action,
             "what_gainz_found": _found_summary(records, tax_record, calculated["rows"]),
-            "what_gainz_needs": _needs_for_status(year, status, records, tax_record),
+            "what_gainz_needs": next_action,
             "evidence_count": len(records),
         })
 
@@ -317,7 +355,7 @@ def get_tax_evidence_inventory_summary(transactions, alignment=None):
     review_rows = [
         row
         for row in rows
-        if row["status"] not in ("Ready", "Not applicable / zero confirmed")
+        if row["status"] not in ("Ready", "Not applicable / zero confirmed", "Open tax year - filing not due")
     ]
     evidence_records = []
     for record in getattr(transactions, "tax_evidence_records", []) or []:

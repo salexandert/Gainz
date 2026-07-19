@@ -31,6 +31,18 @@ DEFAULT_EVIDENCE_SCAN_EXCLUDE_FOLDERS = [
     "exports",
     "audit_packets",
     "uploads",
+    "screenshots",
+    "renders",
+]
+DEFAULT_EVIDENCE_SCAN_EXCLUDE_FILES = [
+    "*manifest*",
+    "*inventory*",
+    "*packet_status*",
+    "*readme_first*",
+    "*reconciliation_work_order*",
+    "*suggested_filed_totals*",
+    "gainz_*review*",
+    "gainz_*validation*",
 ]
 EVIDENCE_SCAN_PRESETS = {
     "crypto_tax_evidence": {
@@ -238,6 +250,14 @@ def _default_excluded_scan_folder(path):
             if fnmatch(normalized_part, pattern.lower()):
                 return pattern
     return ""
+
+
+def _default_excluded_scan_file(path):
+    normalized_name = Path(path).name.strip().lower()
+    return next(
+        (pattern for pattern in DEFAULT_EVIDENCE_SCAN_EXCLUDE_FILES if fnmatch(normalized_name, pattern.lower())),
+        "",
+    )
 
 
 def _save_uploaded_evidence(file_storage):
@@ -508,6 +528,8 @@ def scan_tax_evidence_folder():
         excluded_folder = _default_excluded_scan_folder(path)
         if excluded_folder:
             skipped_default_folders.add(excluded_folder)
+            continue
+        if _default_excluded_scan_file(path):
             continue
         if not path.is_file() or path.suffix.lower() not in extension_filters:
             continue

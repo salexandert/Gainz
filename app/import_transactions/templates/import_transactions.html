@@ -14,7 +14,8 @@
 {% set first_import_warning = data_summary.unresolved_import_warning_rows[0] if data_summary.unresolved_import_warning_rows else none %}
 {% set first_import_decision_option = first_import_warning.decision_options[0] if first_import_warning and first_import_warning.decision_options else none %}
 {% set source_overlap_count = data_summary.source_overlaps|default([])|length %}
-{% set can_continue_import = imported_count and unresolved_warning_count == 0 %}
+{% set input_reliability_failure_count = data_summary.input_reliability_failure_count|default(0) %}
+{% set can_continue_import = imported_count and unresolved_warning_count == 0 and input_reliability_failure_count == 0 %}
 
 <!-- Page Description and Instructions -->
 <div class="row">
@@ -326,6 +327,7 @@
             <div class="gainz-import-economics-counts" aria-label="Imported value summary">
               <span><strong id="import_economics_count">{{ data_summary.import_economics_count }}</strong> imported rows</span>
               <span><strong id="import_economics_warning_count">{{ data_summary.import_economics_warning_count }}</strong> economic warning{% if data_summary.import_economics_warning_count != 1 %}s{% endif %}</span>
+              <span><strong id="input_reliability_failure_count">{{ input_reliability_failure_count }}</strong> blocking integrity failure{% if input_reliability_failure_count != 1 %}s{% endif %}</span>
             </div>
           </div>
           <div class="table-responsive">
@@ -335,10 +337,12 @@
                   <th>Source row</th>
                   <th>Type</th>
                   <th>Asset / quantity</th>
+                  <th>Source quantity</th>
                   <th>Gross USD</th>
                   <th>Fee</th>
                   <th>Total cost / net proceeds</th>
                   <th>Source</th>
+                  <th>Integrity</th>
                 </tr>
               </thead>
               <tbody id="import_economics_confirmation_rows">
@@ -347,6 +351,7 @@
                   <td>{{ row.source_row }}</td>
                   <td>{{ row.transaction_type|title }}</td>
                   <td>{{ row.quantity }} {{ row.asset }}</td>
+                  <td>{{ row.source_quantity or row.quantity }}</td>
                   <td>${{ '%.2f'|format(row.gross_usd|float) }}</td>
                   <td>${{ '%.2f'|format(row.fee_usd|float) }} {{ row.fee_currency }}</td>
                   <td><strong>{{ row.total_label }}</strong><br>${{ '%.2f'|format(row.net_tax_usd|float) }}</td>
@@ -357,12 +362,20 @@
                     <small class="gainz-import-economics-warning">{{ row.economic_warning }}</small>
                     {% endif %}
                   </td>
+                  <td>
+                    <span class="gainz-status-badge {% if row.input_reliability_status == 'BLOCKING' %}status-needs-review{% else %}status-verified{% endif %}">
+                      {{ row.input_reliability_status|replace('_', ' ')|title }}
+                    </span>
+                    {% if row.implied_usd is not none and row.source_usd is not none %}
+                    <small>Source ${{ '%.2f'|format(row.source_usd|float) }}; quantity x price ${{ '%.2f'|format(row.implied_usd|float) }}</small>
+                    {% endif %}
+                  </td>
                 </tr>
                 {% endfor %}
               </tbody>
             </table>
           </div>
-          <p class="text-muted mb-0">Showing up to 12 recent rows. The workbook and audit packet include the complete Import Economics report.</p>
+          <p class="text-muted mb-0">Showing up to 12 recent rows. A blocking integrity failure must be corrected before FIFO, holdings reconciliation, or tax totals can be trusted.</p>
         </section>
         <div
           id="import_continue_panel"
@@ -375,6 +388,8 @@
             <p class="mb-0 import-continue-message">
               {% if can_continue_import %}
               Continue when you have loaded the source files you want included in this review pass.
+              {% elif input_reliability_failure_count %}
+              Correct or re-import {{ input_reliability_failure_count }} source row{% if input_reliability_failure_count != 1 %}s{% endif %} that failed quantity/value consistency checks before continuing.
               {% else %}
               Review {{ unresolved_warning_count }} unresolved import warning{% if unresolved_warning_count != 1 %}s{% endif %} before moving to Declare Holdings.
               {% endif %}
@@ -407,6 +422,22 @@
           </p>
         </div>
         <form id="upload_csv_form" action="{{ import_form_url }}" class="dropzone" aria-label="Upload exchange CSV drop zone"></form>
+        <section
+          id="native_import_preview"
+          class="gainz-import-economics-confirmation mt-4"
+          data-confirm-url="{{ url_for('import_transactions_blueprint.confirm_native_import') }}"
+          style="display: none;"
+          aria-labelledby="native_import_preview_heading"
+        >
+          <h2 id="native_import_preview_heading" class="gainz-section-title">Review Official Coinbase Raw Import</h2>
+          <p>Gainz recognized Coinbase's dual-leg raw schema. Review how source rows will be split before anything is added.</p>
+          <div id="native_import_preview_summary" class="gainz-summary-grid"></div>
+          <div id="native_import_preview_quantities" class="table-responsive mt-3"></div>
+          <div class="mt-3">
+            <button type="button" id="confirm_native_import_button" class="btn btn-primary btn-round">Import These Coinbase Rows</button>
+            <button type="button" id="cancel_native_import_button" class="btn btn-outline-secondary btn-round">Leave File Unimported</button>
+          </div>
+        </section>
         <details id="advanced-import" class="gainz-import-secondary-details mt-3">
           <summary>Column review options</summary>
           <div class="gainz-import-detail-body">
@@ -509,6 +540,35 @@
             </div>
           </section>
         </div>
+        <details id="import_receipts_details" class="mt-3" {% if not data_summary.import_receipt_count %}style="display: none;"{% endif %}>
+          <summary>Show import row receipt (<span id="import_receipt_count">{{ data_summary.import_receipt_count|default(0) }}</span>)</summary>
+          <p class="text-muted mt-2">This receipt identifies imported and skipped rows. The audit packet includes the full receipt with the source-file SHA-256 hash.</p>
+          <div class="table-responsive">
+            <table class="table table-sm table-striped table-bordered">
+              <thead>
+                <tr>
+                  <th>Source</th><th>Row</th><th>Transaction ID</th><th>Type</th><th>Asset</th>
+                  <th>Source quantity</th><th>Interpreted quantity</th><th>Outcome</th><th>Reason</th>
+                </tr>
+              </thead>
+              <tbody id="import_receipts_rows">
+                {% for receipt in data_summary.import_receipts %}
+                <tr>
+                  <td title="{{ receipt.source }}">{{ receipt.source_name }}</td>
+                  <td>{{ receipt.source_row }}</td>
+                  <td>{{ receipt.source_transaction_id }}</td>
+                  <td>{{ receipt.original_type }}</td>
+                  <td>{{ receipt.asset }}</td>
+                  <td>{{ receipt.source_quantity }}</td>
+                  <td>{{ receipt.interpreted_quantity }}</td>
+                  <td>{{ receipt.outcome }}</td>
+                  <td>{{ receipt.reason }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </details>
       </div>
     </details>
   </div>

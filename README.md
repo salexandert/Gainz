@@ -64,6 +64,7 @@ Gainz currently includes parsers or workflows for:
 
 - Cash App CSV exports
 - Coinbase CSV exports
+- Coinbase's current official raw dual-leg export, with a required pre-import reconciliation preview
 - Coinbase Pro / GDAX fills
 - Kraken and other custom CSVs through Advanced Import / Column Mapping
 - Batch manual transaction entry for source-backed buys and sells that were not imported from a CSV
@@ -73,6 +74,8 @@ See the [importer coverage and economic-fields matrix](docs/importer-coverage.md
 The Cash App, Coinbase, and generic CSV import path recognizes common header aliases such as `Transaction Date`, `Activity Type`, `Crypto Quantity`, `Token Symbol`, `Spot Price USD`, and `Transaction Value`, so small export format changes are less likely to break imports.
 
 If automatic detection cannot identify the needed columns, Gainz can pause for column review so the user can choose the header row and map the required fields.
+
+Gainz preserves raw quantity text and checks source quantity, unit price, and USD totals for material disagreement. A failed check blocks downstream tax calculations instead of allowing a suspicious row into a trusted-looking result. Imported, transformed, duplicate, unsupported, and skipped rows are retained in a durable import receipt.
 
 See `demo_data/` for small sample files that are safe to use for testing.
 

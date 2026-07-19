@@ -25,6 +25,11 @@ from app.import_transactions.routes import (
 from app.services.audit_packet_service import AuditPacketService
 from app.services.import_service import ImportService
 from app.services.import_warning_service import import_warning_review_rows
+from app.services.tax_evidence_service import (
+    classify_tax_evidence,
+    get_tax_evidence_inventory_summary,
+)
+from app.services.tax_total_extraction_service import get_suggested_filed_totals
 from app.services.packet_plan_service import (
     cpa_resolution_workpaper_rows,
     get_packet_preview,
@@ -38,8 +43,10 @@ from utils import (
     get_form_8949_report_rows,
     get_form_8949_table_data,
     get_form_8949_totals,
+    get_tax_filing_alignment_summary,
 )
 from configs.config import config_dict
+from parsers import analyze_csv_import, import_transactions, parse_quantity_value
 from werkzeug.datastructures import MultiDict
 
 
@@ -56,6 +63,7 @@ def empty_transactions():
     transactions.tax_year_records = []
     transactions.tax_evidence_records = []
     transactions.work_order_reviews = []
+    transactions.import_receipts = []
     transactions.view = ""
     transactions.transactions = []
     transactions.saved_descriptions = []
@@ -104,6 +112,9 @@ def import_template_context(**overrides):
             "import_economics_count": 0,
             "import_economics_warning_count": 0,
             "import_economics_rows": [],
+            "input_reliability_failure_count": 0,
+            "import_receipt_count": 0,
+            "import_receipts": [],
             "type_counts": {
                 "buy": 0,
                 "sell": 0,
@@ -3439,6 +3450,259 @@ class ImportAndExportTests(unittest.TestCase):
 
                 self.assertEqual(302, post_response.status_code)
                 open_folder.assert_called_once()
+
+    def test_quantity_parser_preserves_scientific_notation(self):
+        self.assertAlmostEqual(0.00002618, parse_quantity_value("0.00002618"), places=12)
+        self.assertAlmostEqual(0.00002618, parse_quantity_value("2.618e-05"), places=12)
+        self.assertAlmostEqual(-0.00002618, parse_quantity_value("(2.618E-05)"), places=12)
+
+    def test_cash_app_tiny_quantities_are_not_enlarged(self):
+        transactions = empty_transactions()
+        source_rows = [
+            ("tiny-1", "2024-01-01 10:00:00 EST", "2.31", "88235.29411765", "0.00002618"),
+            ("tiny-2", "2024-01-02 10:00:00 EST", "7.00", "89640.15879114", "0.00007809"),
+            ("tiny-3", "2024-01-03 10:00:00 EST", "5.54", "97999.29241111", "0.00005653"),
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "cash_app_tiny_quantities.csv"
+            with source.open("w", newline="", encoding="utf-8") as file:
+                writer = csv.writer(file)
+                writer.writerow([
+                    "Transaction ID", "Date", "Transaction Type", "Currency", "Amount",
+                    "Fee", "Net Amount", "Asset Type", "Asset Price", "Asset Amount",
+                    "Status", "Notes",
+                ])
+                for transaction_id, date, amount, price, quantity in source_rows:
+                    writer.writerow([
+                        transaction_id, date, "Bitcoin Buy", "USD", f"(${amount})", "$0",
+                        f"(${amount})", "BTC", f"${price}", quantity, "COMPLETED", "Synthetic tiny buy",
+                    ])
+
+            imported_count, skipped_count = import_transactions(str(source), transactions)
+
+        self.assertEqual(3, imported_count)
+        self.assertEqual(0, skipped_count)
+        self.assertEqual(3, len(transactions.transactions))
+        for transaction, expected in zip(transactions.transactions, (0.00002618, 0.00007809, 0.00005653)):
+            self.assertAlmostEqual(expected, transaction.quantity, places=12)
+            self.assertNotEqual("BLOCKING", transaction.input_reliability_status)
+        self.assertEqual(3, len(transactions.import_receipts))
+        self.assertEqual("0.00002618", transactions.import_receipts[0]["source_quantity"])
+
+    def test_quantity_value_mismatch_blocks_tax_outputs(self):
+        transactions = empty_transactions()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "cash_app_bad_quantity.csv"
+            source.write_text(
+                "Transaction ID,Date,Transaction Type,Currency,Amount,Fee,Net Amount,Asset Type,Asset Price,Asset Amount\n"
+                "bad-1,2024-01-01 10:00:00 EST,Bitcoin Buy,USD,($2.31),$0,($2.31),BTC,$88235.29,2.618\n",
+                encoding="utf-8",
+            )
+            imported_count, _ = import_transactions(str(source), transactions)
+
+        self.assertEqual(1, imported_count)
+        self.assertEqual("BLOCKING", transactions.transactions[0].input_reliability_status)
+        transactions.set_tax_year_record(
+            2024,
+            reported_proceeds=2.31,
+            reported_cost_basis=2.31,
+            reported_gain_loss=0,
+            tax_paid=0,
+            filing_status="Filed",
+            evidence_reference="2024 filed return and payment record",
+        )
+        readiness = get_audit_readiness_summary(transactions)
+        self.assertEqual("Inputs not reliable", readiness["status"])
+        self.assertEqual("Suppressed", readiness["metrics"]["form_8949_proceeds"])
+        self.assertEqual(1, readiness["metrics"]["input_reliability_failures"])
+        self.assertEqual(0, readiness["metrics"]["import_economics_warnings"])
+        alignment = get_tax_filing_alignment_summary(transactions)
+        self.assertEqual("Inputs not reliable", alignment["rows"][0]["status"])
+        self.assertEqual("Suppressed", alignment["rows"][0]["calculated_proceeds_display"])
+
+    def test_coinbase_raw_dual_leg_import_requires_preview_then_preserves_legs(self):
+        transactions = empty_transactions()
+        headers = [
+            "Timestamp",
+            "Transaction Type",
+            "Transaction ID",
+            "Asset Acquired",
+            "Quantity Acquired (Bought, Received, etc)",
+            "Cost Basis (incl. fees and/or spread) (USD)",
+            "Asset Disposed (Sold, Sent, etc)",
+            "Quantity Disposed",
+            "Proceeds (excl. fees and/or spread) (USD)",
+            "Notes",
+        ]
+        rows = [
+            ["2024-01-01 12:00:00 UTC", "Buy", "cb-1", "BTC", "0.05", "2000", "USD", "2000", "0", "Buy BTC"],
+            ["2024-06-01 12:00:00 UTC", "Sell", "cb-2", "USD", "1500", "0", "BTC", "0.025", "1500", "Sell BTC"],
+            ["2024-07-01 12:00:00 UTC", "Convert", "cb-3", "BTC", "0.02", "1000", "ETH", "0.5", "1300", "Convert ETH to BTC"],
+            ["2024-08-01 12:00:00 UTC", "Deposit", "cb-4", "USD", "250", "250", "", "", "0", "Fiat-only row"],
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "Coinbase_raw_transactions.csv"
+            with source.open("w", newline="", encoding="utf-8") as file:
+                writer = csv.writer(file)
+                writer.writerow(headers)
+                writer.writerows(rows)
+
+            analysis = analyze_csv_import(str(source))
+            self.assertEqual("coinbase_raw", analysis["detected_format"])
+            self.assertEqual(4, analysis["import_preview"]["source_rows"])
+            self.assertEqual(4, analysis["import_preview"]["output_rows"])
+            self.assertEqual(1, analysis["import_preview"]["skipped_source_rows"])
+            self.assertEqual(2800.0, analysis["import_preview"]["source_reported_proceeds"])
+            self.assertEqual(3000.0, analysis["import_preview"]["source_reported_basis"])
+
+            preview_result = ImportService(temp_dir).import_upload(FileUpload(source), transactions)
+            self.assertTrue(preview_result["native_preview_required"])
+            self.assertEqual([], transactions.transactions)
+
+            import_result = ImportService(temp_dir).import_native_file(
+                preview_result["file_path"],
+                transactions,
+            )
+
+        self.assertEqual(4, import_result["imported_count"])
+        self.assertEqual(["buy", "sell", "sell", "buy"], [row.trans_type for row in transactions.transactions])
+        self.assertEqual(["acquired", "disposed", "disposed", "acquired"], [row.source_leg for row in transactions.transactions])
+        self.assertEqual(["cb-1", "cb-2", "cb-3", "cb-3"], [row.source_transaction_id for row in transactions.transactions])
+        skipped_receipts = [row for row in transactions.import_receipts if row["outcome"] == "Skipped"]
+        self.assertEqual(1, len(skipped_receipts))
+        self.assertEqual("cb-4", skipped_receipts[0]["source_transaction_id"])
+        self.assertIn("No supported crypto", skipped_receipts[0]["reason"])
+
+    def test_tax_evidence_classification_and_open_year_are_conservative(self):
+        self.assertEqual("crypto_workbook", classify_tax_evidence("Crypto Taxes Paid.csv"))
+        self.assertEqual("account_transcript", classify_tax_evidence("IRS Account Transcript 2024.pdf"))
+
+        transactions = empty_transactions()
+        current_year = datetime.datetime.now().year
+        transactions.set_tax_evidence_record(
+            year=current_year,
+            evidence_type="estimate",
+            evidence_label=f"{current_year} estimate",
+            evidence_path="",
+        )
+        inventory = get_tax_evidence_inventory_summary(transactions)
+        self.assertEqual("Open tax year - filing not due", inventory["rows"][0]["status"])
+        self.assertEqual([], inventory["review_rows"])
+
+    def test_unsafe_equal_extraction_is_low_confidence_and_generated_manifests_are_ignored(self):
+        transactions = empty_transactions()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "2024_crypto_tax_workbook.csv"
+            source.write_text(
+                "Year,Proceeds,Cost Basis,Gain Loss\n2024,0.20,0.20,0.20\n",
+                encoding="utf-8",
+            )
+            manifest = Path(temp_dir) / "2024_audit_packet_manifest.csv"
+            manifest.write_text(
+                "Year,Proceeds,Cost Basis,Gain Loss\n2024,100,40,60\n",
+                encoding="utf-8",
+            )
+            transactions.set_tax_evidence_record(
+                year=2024,
+                evidence_type="crypto_workbook",
+                evidence_label=source.name,
+                evidence_path=str(source),
+            )
+            transactions.set_tax_evidence_record(
+                year=2024,
+                evidence_type="crypto_workbook",
+                evidence_label=manifest.name,
+                evidence_path=str(manifest),
+            )
+
+            suggestions = get_suggested_filed_totals(transactions)
+
+        self.assertEqual(1, len(suggestions))
+        self.assertEqual("Low", suggestions[0]["confidence"])
+        self.assertIn("reported_proceeds", suggestions[0]["field_provenance"])
+
+    def test_packet_handles_target_transaction_uid_and_declares_contract_version(self):
+        transactions = empty_transactions()
+        sell = Sell("BTC", 0.5, datetime.datetime(2024, 6, 1), 30000, "synthetic-source.csv")
+        transactions.transactions = [sell]
+        transactions.set_holdings("BTC", 0)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            packet_path = Path(
+                AuditPacketService(
+                    Path(temp_dir) / "packets",
+                    Path(temp_dir) / "exports",
+                ).create_packet(transactions)
+            )
+            with (packet_path / "01_reports" / "missing_basis_review.csv").open(
+                newline="", encoding="utf-8"
+            ) as file:
+                rows = list(csv.DictReader(file))
+            summary = json.loads(
+                (packet_path / "03_manifests" / "audit_packet_summary.json").read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(sell.uid, rows[0]["target_transaction_uid"])
+        self.assertEqual("1.0", summary["packet_contract_version"])
+
+    def test_packet_failure_is_atomic_and_leaves_only_failure_receipt(self):
+        transactions = empty_transactions()
+        transactions.transactions = [
+            Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "synthetic-source.csv")
+        ]
+        transactions.set_holdings("BTC", 1)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            packet_root = Path(temp_dir) / "packets"
+            service = AuditPacketService(packet_root, Path(temp_dir) / "exports")
+            with patch.object(
+                service,
+                "_write_reconciliation_work_order",
+                side_effect=RuntimeError("synthetic packet failure"),
+            ):
+                with self.assertRaises(RuntimeError):
+                    service.create_packet(transactions)
+
+            published_directories = [path for path in packet_root.iterdir() if path.is_dir()]
+            failure_receipts = list(packet_root.glob("FAILED_INCOMPLETE_*.txt"))
+
+        self.assertEqual([], published_directories)
+        self.assertEqual(1, len(failure_receipts))
+
+    def test_unreliable_inputs_generate_suppression_memo_instead_of_form_8949(self):
+        transactions = empty_transactions()
+        buy = Buy("BTC", 1, datetime.datetime(2024, 1, 1), 100, "synthetic-source.csv")
+        buy.set_economics(
+            gross_usd_total=100,
+            net_usd_total=100,
+            source_quantity_text="0.00001",
+            source_usd_total=100,
+            implied_usd_total=10000000,
+            value_variance_usd=9999900,
+            value_tolerance_usd=10,
+            input_reliability_status="BLOCKING",
+            economics_warning="INPUT RELIABILITY BLOCKER: synthetic mismatch",
+        )
+        transactions.transactions = [buy]
+        transactions.set_holdings("BTC", 1)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            packet_path = Path(
+                AuditPacketService(
+                    Path(temp_dir) / "packets",
+                    Path(temp_dir) / "exports",
+                ).create_packet(transactions)
+            )
+
+            self.assertTrue((packet_path / "01_reports" / "FORM_8949_SUPPRESSED.md").is_file())
+            self.assertFalse((packet_path / "01_reports" / "form_8949_totals.csv").exists())
+            summary = json.loads(
+                (packet_path / "03_manifests" / "audit_packet_summary.json").read_text(encoding="utf-8")
+            )
+
+        self.assertTrue(summary["form_8949_totals"]["suppressed"])
 
 
 if __name__ == "__main__":

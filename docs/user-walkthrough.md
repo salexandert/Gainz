@@ -58,7 +58,11 @@ If you are learning Gainz, click **Try Demo Data**. This loads the bundled synth
 
 Upload one file at a time. After a file is selected, Gainz shows the filename, import progress, and how many rows were imported, skipped, or warned after each upload.
 
+For Coinbase's current official raw export, Gainz pauses before changing the save. Review the source-row count, resulting acquired/disposed legs, quantity totals by asset and type, source-reported proceeds and basis, warnings, and source rows that will remain unimported. Confirm only when that preview matches the export.
+
 After each import, complete **Step 1.3: Confirm Imported Values**. Compare the source row, quantity, gross value, fee, fee currency, and total cost or net proceeds. Gainz keeps economic warnings blocking when a crypto-denominated fee cannot be valued or when source gross, fee, and net values do not reconcile.
+
+If Gainz reports **Inputs not reliable**, stop there. A source quantity, unit price, and USD total materially disagree. Gainz suppresses Form 8949 and year-level calculated comparisons until you inspect the named source row and correct or re-import it. Open **Show import row receipt** to see the source hash, row number, transaction ID, original quantity, interpreted quantity, outcome, and exact reason for every imported or skipped row.
 
 After the imported economics look correct and source warnings have a decision, use **Step 1.4: Continue to Declare Holdings**.
 
@@ -66,6 +70,7 @@ Supported workflows currently include:
 
 - Cash App CSV exports
 - Coinbase CSV exports
+- Coinbase official raw dual-leg exports
 - Coinbase Convert rows
 - Coinbase Pro / GDAX fills
 - Kraken and other custom CSVs through Advanced Import / Column Mapping
@@ -148,6 +153,8 @@ For broad folder scans, use the year, file type, include-keyword, and exclude-ke
 Gainz skips likely app/output folders by default during tax evidence scans, including prior `gainz_audit_packet_*`, `audit_packets`, `exports`, `uploads`, `downloads`, `package`, and `90_Gainz_Product_Review_Archive` folders. This keeps generated packets, downloaded builds, and product-review archives from becoming duplicate evidence. When available, scan a curated year folder such as `01_Tax_Years`.
 
 Review **Confirm Suggested Filed Totals**. When Gainz can read clear values from local CSV, XLSX, or readable PDF evidence, it shows possible filed proceeds, cost basis, gain/loss, and tax-paid values with a confidence label and source file. Confirm, edit, or mark the year as needs research. Suggested totals are not treated as recorded filed totals until you save a review decision.
+
+Gainz extracts suggestions only from supported filing/workbook evidence types and records the source row or field used for each value. Conflicting or suspicious values remain low confidence. Transaction exports, manifests, prior packet outputs, and product-review files are not treated as filed totals. A current open tax year without an explicit filed/amended/accepted status is labeled **Open tax year - filing not due**, not as a missing filing.
 
 Use **Import Filed Totals from CSV** when you already have a year-by-year filed-total CSV. Gainz reports the actual number of rows imported and skipped. If a CSV only contains three years, Gainz imports three years and leaves the other evidence years visible for review.
 

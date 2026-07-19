@@ -266,6 +266,12 @@ def _data_source_summary(transactions):
         if len(economics_rows) >= 12:
             break
 
+    import_receipts = []
+    for receipt in list(getattr(transactions, "import_receipts", []) or [])[-25:]:
+        display_receipt = dict(receipt)
+        display_receipt["source_name"] = os.path.basename(str(receipt.get("source") or "")) or "Unknown source"
+        import_receipts.append(display_receipt)
+
     return {
         "transaction_count": len(getattr(transactions, "transactions", [])),
         "asset_count": len(getattr(transactions, "assets", set())),
@@ -290,6 +296,13 @@ def _data_source_summary(transactions):
             for row in all_economics_rows
             if str(row.get("economic_warning") or "").strip()
         ),
+        "input_reliability_failure_count": sum(
+            1
+            for row in all_economics_rows
+            if str(row.get("input_reliability_status") or "").upper() == "BLOCKING"
+        ),
+        "import_receipts": import_receipts,
+        "import_receipt_count": len(getattr(transactions, "import_receipts", []) or []),
         "import_economics_rows": economics_rows,
     }
 
@@ -392,6 +405,11 @@ def _remove_data_source(transactions, source):
         if str(getattr(conversion, "source", "") or "") != source
     ]
     clear_import_warnings_for_source(transactions, source)
+    transactions.import_receipts = [
+        receipt
+        for receipt in getattr(transactions, "import_receipts", []) or []
+        if str(receipt.get("source") or "") != str(source)
+    ]
 
     return {
         "removed_count": len(removed_transactions),
@@ -426,7 +444,7 @@ def import_wizard():
                     )
                 except Exception:
                     return _import_error_response("uploaded CSV")
-                if result.get("mapping_required"):
+                if result.get("mapping_required") or result.get("native_preview_required"):
                     session["pending_import_file_path"] = result["file_path"]
                 else:
                     result = _ensure_fifo_after_data_change(
@@ -566,6 +584,30 @@ def mapped_import():
             "mapped import",
         )
 
+    return jsonify(_public_import_response(transactions, result))
+
+
+@blueprint.route('/confirm_native_import', methods=['POST'])
+@login_required
+def confirm_native_import():
+    file_path = session.get("pending_import_file_path")
+    if not file_path or not os.path.exists(file_path):
+        return jsonify({"error": "Upload the official Coinbase raw CSV before confirming import."}), 400
+
+    data = request.get_json(silent=True) or {}
+    transactions = current_app.config['transactions']
+    try:
+        result = ImportService(current_app.config['UPLOAD_FOLDER']).import_native_file(
+            file_path,
+            transactions,
+            header_row=data.get("header_row") or 1,
+            data_start_row=data.get("data_start_row"),
+        )
+    except Exception:
+        return _import_error_response("official Coinbase raw CSV")
+
+    session.pop("pending_import_file_path", None)
+    result = _ensure_fifo_after_data_change(transactions, result, "official Coinbase raw import")
     return jsonify(_public_import_response(transactions, result))
 
 
