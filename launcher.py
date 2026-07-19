@@ -9,7 +9,7 @@ from tkinter import messagebox, ttk
 from urllib.request import urlopen
 
 from app_version import APP_VERSION
-from password_reset import DOCUMENTED_RESET_PHRASE, reset_admin_password
+from password_reset import reset_local_login
 from port_guard import require_port_available
 from single_instance import SingleInstanceLock
 
@@ -105,10 +105,6 @@ def support_url():
     return os.environ.get("GAINZ_SUPPORT_URL", DEFAULT_SUPPORT_URL)
 
 
-def credentials_file_path(base_dir=None):
-    return os.path.join(base_dir or app_base_dir(), "instance", "first_run_credentials.txt")
-
-
 def wait_for_lock_info(instance_lock, timeout=3):
     deadline = time.time() + timeout
     info = instance_lock.read_info()
@@ -170,7 +166,6 @@ class GainzLauncher(tk.Tk):
         )
         self.heading_text = tk.StringVar(value=f"Gainz {APP_VERSION} is starting")
         self.url_text = tk.StringVar(value=self.url)
-        self.credentials_path = credentials_file_path()
         self.credentials_text = tk.StringVar(value=self.credentials_message())
 
         self.build_ui()
@@ -178,10 +173,10 @@ class GainzLauncher(tk.Tk):
         self.after(250, self.check_startup)
 
     def credentials_message(self):
-        if os.path.exists(getattr(self, "credentials_path", "")):
-            return f"First-run credentials, when needed, are saved at:\n{self.credentials_path}"
-
-        return "First run: create a local admin account in the browser. No Gainz account data leaves this computer."
+        return (
+            "Local login: create your username and password in the browser on first run. "
+            "No Gainz account data leaves this computer."
+        )
 
     def build_ui(self):
         title = ttk.Label(self, textvariable=self.heading_text, font=("Segoe UI", 16, "bold"))
@@ -207,11 +202,6 @@ class GainzLauncher(tk.Tk):
         credentials_frame.pack(fill="x", pady=(12, 0))
         credentials = ttk.Label(credentials_frame, textvariable=self.credentials_text, wraplength=350)
         credentials.pack(side="left", fill="x", expand=True, anchor="w")
-        ttk.Button(
-            credentials_frame,
-            text="Copy Credentials File Path",
-            command=self.copy_credentials_path,
-        ).pack(side="right", padx=(8, 0), anchor="n")
 
         button_frame = ttk.Frame(self)
         button_frame.pack(fill="x", side="bottom", pady=(18, 0))
@@ -265,47 +255,42 @@ class GainzLauncher(tk.Tk):
         self.clipboard_append(self.url)
         self.status.set("Link copied. Gainz is running.")
 
-    def copy_credentials_path(self):
-        self.clipboard_clear()
-        self.clipboard_append(self.credentials_path)
-        self.status.set("Password path copied.")
-
     def open_support(self):
         webbrowser.open(self.support_url)
 
     def reset_password(self):
         confirmed = messagebox.askyesno(
             APP_NAME,
-            "Reset the local admin password to the temporary default?\n\n"
-            "This only changes the Gainz browser login. It does not encrypt or "
-            "protect local CSV, XLSX, save, export, or audit packet files.",
+            "Reset the local Gainz login?\n\n"
+            "Gainz will remove the current browser-login account and ask you to "
+            "choose a new username and password at the next login.\n\n"
+            "Transactions, saves, imports, exports, and audit packets will remain in place.",
         )
         if not confirmed:
             return
 
         try:
-            result = reset_admin_password(password=DOCUMENTED_RESET_PHRASE)
+            result = reset_local_login()
         except Exception as exc:
             messagebox.showerror(
                 APP_NAME,
-                "Gainz could not reset the local password.\n\n"
+                "Gainz could not reset the local login.\n\n"
                 f"{exc}\n\n"
                 "Close Gainz first if the local database is busy, then try again.",
             )
             return
 
-        action = "created" if result.created else "reset"
         self.credentials_text.set(
-            f"Local admin password {action}. Username: {result.username}. "
-            "Sign in with the temporary reset password, then change it from the gear menu."
+            "Local login reset. Open or reload Gainz to choose a new username and password."
         )
         messagebox.showinfo(
             APP_NAME,
-            f"Gainz local admin password {action}.\n\n"
-            f"Username: {result.username}\n"
-            f"Temporary password: {DOCUMENTED_RESET_PHRASE}\n\n"
-            "Sign in locally, then use the gear menu > Change Password.",
+            "Gainz local login reset.\n\n"
+            f"Local login accounts removed: {result.accounts_removed}\n\n"
+            "Open or reload Gainz. The login page will ask you to choose a new "
+            "username and password. No temporary password was created.",
         )
+        webbrowser.open(f"{self.url}/login")
 
     def close_app(self):
         self.instance_lock.release()

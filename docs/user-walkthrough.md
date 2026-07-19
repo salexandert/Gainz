@@ -22,7 +22,7 @@ http://127.0.0.1:5000/
 
 On first run, Gainz asks you to create a local admin account in the browser. The password is hashed into the local database and is not written to a plaintext credentials file.
 
-If you forget the local password, use **Reset Password** in the launcher. The local password gates the browser UI; it does not encrypt imported CSVs, XLSX saves, exports, or audit packets. See [Reset Your Local Gainz Password]({{ '/guides/local-password-reset/' | relative_url }}).
+If you forget the local password, use **Reset Password** in the launcher. Gainz returns to the first-run account setup screen and asks you to choose new local credentials; no temporary password is created. The local password gates the browser UI but does not encrypt imported CSVs, XLSX saves, exports, or audit packets. See [Reset Your Local Gainz Login]({{ '/guides/local-password-reset/' | relative_url }}).
 
 ## 2. Use Guided Reconciliation
 

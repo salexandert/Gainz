@@ -11,10 +11,11 @@ from app import create_app
 from app.base.models import User, is_local_admin
 from app.extensions import db
 from configs.config import config_dict
-from launcher import credentials_file_path, find_available_port, health_url, server_url
+from launcher import find_available_port, health_url, server_url
 from launcher import GAINZ_ICON_FILE, GAINZ_PNG_ICON_FILE
 from launcher import launcher_icon_path, launcher_png_icon_path
-from password_reset import DOCUMENTED_RESET_PHRASE, reset_admin_password
+from local_login import login_setup_required
+from password_reset import reset_local_login
 from port_guard import require_port_available
 from runtime_paths import data_dir, resource_dir
 from single_instance import SingleInstanceLock
@@ -75,11 +76,11 @@ class LauncherStartupTests(unittest.TestCase):
         self.assertEqual("http://127.0.0.1:5000", server_url(5000))
         self.assertEqual("http://127.0.0.1:5000/healthz", health_url(5000))
 
-    def test_launcher_credentials_path_points_to_instance_file(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            expected_path = Path(temp_dir) / "instance" / "first_run_credentials.txt"
+    def test_launcher_does_not_advertise_plaintext_credentials_file(self):
+        launcher_text = Path("launcher.py").read_text(encoding="utf-8")
 
-            self.assertEqual(str(expected_path), credentials_file_path(temp_dir))
+        self.assertNotIn("first_run_credentials.txt", launcher_text)
+        self.assertNotIn("Copy Credentials File Path", launcher_text)
 
     def test_launcher_icon_assets_are_available(self):
         ico_path = Path(launcher_icon_path())
@@ -238,7 +239,7 @@ class LauncherStartupTests(unittest.TestCase):
                 db.session.remove()
                 db.engine.dispose()
 
-    def test_password_reset_updates_custom_first_local_admin(self):
+    def test_password_reset_returns_custom_local_admin_to_setup(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             class PasswordResetCustomAdminConfig(config_dict["Debug"]):
                 TESTING = True
@@ -259,20 +260,19 @@ class LauncherStartupTests(unittest.TestCase):
                 db.session.remove()
                 db.engine.dispose()
 
-            result = reset_admin_password(
-                password=DOCUMENTED_RESET_PHRASE,
-                config_class=PasswordResetCustomAdminConfig,
-            )
+            result = reset_local_login(config_class=PasswordResetCustomAdminConfig)
 
-            self.assertFalse(result.created)
-            self.assertEqual("local-owner", result.username)
+            self.assertEqual(1, result.accounts_removed)
+            self.assertTrue(login_setup_required(temp_dir))
 
             verify_app = create_app(PasswordResetCustomAdminConfig, selenium=True)
+            with verify_app.test_client() as client:
+                response = client.get("/login")
+                self.assertEqual(200, response.status_code)
+                self.assertIn(b"Create Local Admin", response.data)
+
             with verify_app.app_context():
-                user = User.query.filter_by(username="local-owner").first()
-                self.assertIsNotNone(user)
-                self.assertTrue(user.checkpw(DOCUMENTED_RESET_PHRASE))
-                self.assertFalse(user.checkpw("old-password"))
+                self.assertEqual(0, User.query.count())
                 db.drop_all()
                 db.session.remove()
                 db.engine.dispose()
@@ -371,7 +371,7 @@ class LauncherStartupTests(unittest.TestCase):
                 db.session.remove()
                 db.engine.dispose()
 
-    def test_password_reset_updates_existing_local_admin(self):
+    def test_password_reset_removes_all_local_login_accounts(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             class PasswordResetTestConfig(config_dict["Debug"]):
                 TESTING = True
@@ -389,28 +389,22 @@ class LauncherStartupTests(unittest.TestCase):
             with app.app_context():
                 db.create_all()
                 User(username="admin", email="admin@local.gainz", password="old-password").add_to_db()
+                User(username="reviewer", email="reviewer@local.gainz", password="old-password").add_to_db()
                 db.session.remove()
                 db.engine.dispose()
 
-            result = reset_admin_password(
-                password=DOCUMENTED_RESET_PHRASE,
-                config_class=PasswordResetTestConfig,
-            )
+            result = reset_local_login(config_class=PasswordResetTestConfig)
 
-            self.assertFalse(result.created)
-            self.assertEqual("admin", result.username)
+            self.assertEqual(2, result.accounts_removed)
 
             verify_app = create_app(PasswordResetTestConfig, selenium=True)
             with verify_app.app_context():
-                user = User.query.filter_by(username="admin").first()
-                self.assertIsNotNone(user)
-                self.assertTrue(user.checkpw(DOCUMENTED_RESET_PHRASE))
-                self.assertFalse(user.checkpw("old-password"))
+                self.assertEqual(0, User.query.count())
                 db.drop_all()
                 db.session.remove()
                 db.engine.dispose()
 
-    def test_password_reset_creates_missing_local_admin(self):
+    def test_password_reset_suppresses_configured_password_until_setup(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             class PasswordResetCreateConfig(config_dict["Debug"]):
                 TESTING = True
@@ -420,22 +414,35 @@ class LauncherStartupTests(unittest.TestCase):
                 ADMIN = {
                     "username": "admin",
                     "email": "admin@local.gainz",
-                    "password": "",
+                    "password": "configured-password",
                 }
 
-            result = reset_admin_password(
-                password=DOCUMENTED_RESET_PHRASE,
-                config_class=PasswordResetCreateConfig,
-            )
+            result = reset_local_login(config_class=PasswordResetCreateConfig)
 
-            self.assertTrue(result.created)
-            self.assertEqual("admin", result.username)
+            self.assertEqual(0, result.accounts_removed)
+            self.assertTrue(login_setup_required(temp_dir))
 
             verify_app = create_app(PasswordResetCreateConfig, selenium=True)
+            with verify_app.test_client() as client:
+                response = client.get("/login")
+                self.assertEqual(200, response.status_code)
+                self.assertIn(b"Create Local Admin", response.data)
+
+                response = client.post(
+                    "/login",
+                    data={
+                        "username": "new-owner",
+                        "password": "new-local-password",
+                        "create_account": "1",
+                    },
+                )
+                self.assertEqual(302, response.status_code)
+
+            self.assertFalse(login_setup_required(temp_dir))
             with verify_app.app_context():
-                user = User.query.filter_by(username="admin").first()
+                user = User.query.filter_by(username="new-owner").first()
                 self.assertIsNotNone(user)
-                self.assertTrue(user.checkpw(DOCUMENTED_RESET_PHRASE))
+                self.assertTrue(user.checkpw("new-local-password"))
                 db.drop_all()
                 db.session.remove()
                 db.engine.dispose()

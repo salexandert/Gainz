@@ -92,9 +92,9 @@ Unzip the package and open `Gainz.exe` on Windows or `Gainz.app` on macOS. The l
 
 On first run, Gainz asks you to create a local admin account in the browser. The password is hashed into the local database and is not written to a plaintext credentials file.
 
-If you forget the local password, click **Reset Password** in the launcher. It resets the configured local admin account to the temporary password `gainz-local-reset` so you can sign in and set a new password from the gear menu.
+If you forget the local password, click **Reset Password** in the launcher. Gainz removes only the local browser-login account and returns to the first-run setup screen, where you choose a new username and password. No temporary password is created.
 
-The Gainz password gates the local browser UI. It does not encrypt imported CSVs, XLSX saves, exports, or audit packets, which remain normal local files. See [Reset your local Gainz password](docs/guides/local-password-reset.md).
+The Gainz password gates the local browser UI. It does not encrypt imported CSVs, XLSX saves, exports, or audit packets, which remain normal local files. See [Reset your local Gainz login](docs/guides/local-password-reset.md).
 
 Windows may show a Microsoft Defender SmartScreen warning. Before continuing, verify that you downloaded Gainz from the official website or GitHub Releases and compare the SHA-256 checksum. See [Windows SmartScreen Warning For Gainz](docs/guides/windows-smartscreen.md).
 
@@ -115,7 +115,7 @@ Open:
 http://127.0.0.1:5000/
 ```
 
-From a source checkout, you can reset the local password with `python .\scripts\reset_admin_password.py` or by double-clicking `reset_password.bat`.
+From a source checkout, you can return to local account setup with `python .\scripts\reset_admin_password.py` or by double-clicking `reset_password.bat`. Transactions, saves, evidence, exports, and audit packets remain in place.
 
 ## Common Workflow
 
@@ -178,7 +178,7 @@ The audit packet includes root `README_FIRST.md`, `PACKET_STATUS.md`, `FOR_CPAS.
 - [What to give your CPA checklist](docs/guides/crypto-cpa-checklist.md)
 - [Coinbase missing cost basis troubleshooting](docs/guides/coinbase-missing-cost-basis.md)
 - [Current holdings reconciliation explainer](docs/guides/current-holdings-reconciliation.md)
-- [Reset your local Gainz password](docs/guides/local-password-reset.md)
+- [Reset your local Gainz login](docs/guides/local-password-reset.md)
 - [Support Gainz](docs/donations.md)
 
 ## Screenshots And Wiki

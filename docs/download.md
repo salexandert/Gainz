@@ -59,7 +59,7 @@ The launcher should make it clear that Gainz is running locally. Expect a small 
 ![Gainz home after first run]({{ '/assets/screenshots/gainz-home.png' | relative_url }})
 {: .screenshot-frame }
 
-If you forget the local password, use **Reset Password** in the launcher. This resets the local admin account to a temporary password so you can sign in and change it from the gear menu. See [Reset Your Local Gainz Password]({{ '/guides/local-password-reset/' | relative_url }}).
+If you forget the local password, use **Reset Password** in the launcher. Gainz returns to local account setup so you can choose a new username and password; it does not create a temporary password or remove transaction data. See [Reset Your Local Gainz Login]({{ '/guides/local-password-reset/' | relative_url }}).
 
 ## First Run On macOS
 
@@ -69,7 +69,7 @@ If you forget the local password, use **Reset Password** in the launcher. This r
 4. Click **Open Gainz** in the launcher.
 5. On first run, create a local admin account in the browser.
 
-If you forget the local password, use **Reset Password** in the launcher. This resets the local admin account to a temporary password so you can sign in and change it from the gear menu.
+If you forget the local password, use **Reset Password** in the launcher. Gainz returns to local account setup so you can choose a new username and password without removing transaction data.
 
 ## Verify The Download
 

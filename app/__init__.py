@@ -2,11 +2,12 @@ from flask import Flask, redirect, request, url_for
 from flask_login import current_user
 from .extensions import db, login_manager
 from importlib import import_module
-from .base.models import User, is_local_admin
+from .base.models import User, is_local_admin, local_admin_user
 from os import path
 import logging
 from transactions import Transactions
 from app_version import APP_VERSION
+from local_login import login_setup_required
 
 
 def register_extensions(app):
@@ -49,8 +50,9 @@ def configure_database(app):
         if not hasattr(app, 'db_initialized'):
             db.create_all()
             admin_username = app.config['ADMIN']['username']
-            user = User.query.filter_by(username=admin_username).first()
-            if user is None and app.config['ADMIN'].get('password'):
+            user = local_admin_user(admin_username)
+            setup_required = login_setup_required(app.config['INSTANCE_PATH'])
+            if user is None and app.config['ADMIN'].get('password') and not setup_required:
                 admin_config = dict(app.config['ADMIN'])
                 User(**admin_config).add_to_db()
             elif user is None:

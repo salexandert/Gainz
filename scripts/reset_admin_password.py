@@ -1,4 +1,3 @@
-import argparse
 import os
 import sys
 from pathlib import Path
@@ -7,40 +6,28 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from password_reset import DOCUMENTED_RESET_PHRASE, reset_admin_password  # noqa: E402
+from password_reset import reset_local_login  # noqa: E402
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Reset the local Gainz admin password."
-    )
-    parser.add_argument(
-        "--password",
-        default=DOCUMENTED_RESET_PHRASE,
-        help="Temporary password to set. Defaults to the documented local reset password.",
-    )
-    args = parser.parse_args()
-
     os.chdir(REPO_ROOT)
 
     try:
-        result = reset_admin_password(password=args.password)
+        result = reset_local_login()
     except Exception as exc:
-        print(f"Could not reset the Gainz password: {exc}")
+        print(f"Could not reset the Gainz local login: {exc}")
         print("Close Gainz first if the local database is busy, then try again.")
         return 1
 
-    action = "created" if result.created else "reset"
-    print(f"Gainz local admin password {action}.")
-    print(f"Username: {result.username}")
-    if args.password == DOCUMENTED_RESET_PHRASE:
-        print("Temporary password set to the documented local reset password.")
-    else:
-        print("Temporary password set to the value provided on the command line.")
+    print("Gainz local login reset.")
+    print(f"Local login accounts removed: {result.accounts_removed}")
     print("")
-    print("Sign in locally, then use the gear menu > Change Password.")
+    print("Start or reload Gainz and open the login page.")
+    print("Gainz will ask you to choose a new local username and password.")
+    print("No temporary or default password was created.")
+    print("")
     print(
-        "This only changes the Gainz browser login. It does not encrypt or "
+        "This only resets the Gainz browser login. It does not delete, encrypt, or "
         "protect local CSV, XLSX, save, export, or audit packet files."
     )
     return 0

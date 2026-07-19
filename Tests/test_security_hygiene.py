@@ -38,8 +38,9 @@ def test_tax_evidence_scan_uses_location_tokens_not_raw_folder_paths():
     assert 'name="scan_location"' in template_text
 
 
-def test_password_reset_script_does_not_echo_password_value():
+def test_password_reset_script_does_not_create_or_echo_temporary_password():
     text = _read("scripts/reset_admin_password.py")
 
-    assert "Temporary password: {args.password}" not in text
-    assert "print(args.password)" not in text
+    assert "--password" not in text
+    assert "gainz-local-reset" not in text
+    assert "No temporary or default password was created." in text

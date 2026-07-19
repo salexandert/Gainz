@@ -12,6 +12,7 @@ from ..extensions import db, login_manager
 from . import blueprint
 from .forms import LoginForm, CreateAccountForm
 from .models import User
+from local_login import clear_login_setup_requirement
 
 LOCAL_ADMIN_EMAIL = "admin@local.gainz"
 SAFE_LOGIN_REDIRECTS = (
@@ -108,6 +109,12 @@ def login():
             else:
                 user = User(username=username, email=LOCAL_ADMIN_EMAIL, password=password)
                 user.add_to_db()
+                try:
+                    clear_login_setup_requirement(current_app.config['INSTANCE_PATH'])
+                except OSError:
+                    current_app.logger.warning(
+                        'Local account was created, but the login setup marker could not be removed.'
+                    )
                 login_user(user)
                 return _redirect_to_safe_login_next()
 
