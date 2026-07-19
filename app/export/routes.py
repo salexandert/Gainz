@@ -796,7 +796,6 @@ def _review_queue_choices_for_item(row):
             "import_missing_records",
             "fork_airdrop_basis",
             "already_in_filed_totals",
-            "zero_basis_cpa_review",
             "conservative_max_gain",
             "sent_to_cpa",
             "resolved",
@@ -852,8 +851,7 @@ def _review_queue_choices_for_item(row):
             "import_missing_records": f"Import missing {asset} acquisition records",
             "fork_airdrop_basis": f"This {asset} came from a fork/airdrop",
             "already_in_filed_totals": "Already included in filed tax totals",
-            "zero_basis_cpa_review": "Document conservative $0 basis for CPA review",
-            "conservative_max_gain": "Apply conservative $0-basis short-term treatment",
+            "conservative_max_gain": "Use $0 basis for a conservative full-proceeds gain",
             "sent_to_cpa": f"Send this {asset} gap to CPA",
             "resolved": "Apply Professional-Directed Treatment",
         },
@@ -1253,7 +1251,31 @@ def work_order_review():
 @login_required
 def review_queue():
     transactions = current_app.config['transactions']
-    context = _review_queue_context(transactions, item_id=request.args.get("item_id", ""))
+    item_id = str(request.args.get("item_id") or "").strip()
+    requested_asset = str(request.args.get("asset") or "").strip().upper()
+    requested_decision = str(request.args.get("decision") or "").strip()
+
+    if not item_id and requested_asset:
+        matching_item = next(
+            (
+                row
+                for row in _work_order_rows(transactions)
+                if row.get("blocker_type") == "Missing acquisition basis"
+                and str(row.get("asset") or "").strip().upper() == requested_asset
+                and not row.get("review_decision")
+            ),
+            None,
+        )
+        item_id = matching_item.get("item_id", "") if matching_item else ""
+
+    if requested_decision == "conservative_max_gain" and item_id:
+        context = _resolution_form_context(
+            transactions,
+            item_id,
+            requested_decision,
+        )
+    else:
+        context = _review_queue_context(transactions, item_id=item_id)
     return render_template("review_queue.html", **context)
 
 

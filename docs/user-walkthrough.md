@@ -159,7 +159,7 @@ For a simple first review pass, use the automatic FIFO result. FIFO links sales 
 
 Repeat for assets with unlinked sales. If a sale still needs earlier basis, open **Reconcile**, then use the Guided Review Queue. A research note keeps the packet draft. To apply a professional-directed treatment, first select one mutually exclusive treatment, then record the event, proceeds, adjusted basis, acquisition-date method, evidence reference, named professional direction, and attestation in the Professional Resolution Worksheet. Review the exact before/after Form 8949 impact and explicitly apply it. Gainz links only the unresolved quantity of the exact sale, refreshes output, preserves a calculation receipt, and provides a reversal action.
 
-If acquisition records truly cannot be reconstructed, the professional can choose **Apply conservative $0-basis short-term treatment**. Gainz uses documented basis first, then treats only the remaining unsupported quantity as short-term gain with `$0` basis, leaves the unknown acquisition date blank in report rows, and records that the assumption may overstate tax. This action is never automatic and cannot be applied to an inferred group of sends.
+If acquisition records truly cannot be reconstructed, the professional can choose **Use $0 basis for a conservative full-proceeds gain**. Gainz uses documented basis first, then treats only the remaining unsupported quantity as short-term gain with `$0` basis, leaves the unknown acquisition date blank in report rows, and records that the assumption may overstate tax. This action is never automatic and cannot be applied to an inferred group of sends. It is not proof of the missing history or a guarantee of the maximum possible tax liability.
 
 ![Gainz professional treatment calculation preview]({{ '/assets/screenshots/gainz-professional-resolution-preview.png' | relative_url }})
 {: .screenshot-frame }
@@ -208,11 +208,11 @@ The guided queue shows one unresolved item at a time. The decision fields and bu
 Choose the review decision that matches what you found. Draft/research decisions document uncertainty but do not clear the underlying calculation blocker:
 
 - `Apply Professional-Directed Treatment` for an evidence-supported missing-basis position whose professional direction the user has recorded.
-- `Apply conservative $0-basis short-term treatment` for an exact unsupported quantity when a CPA, EA, or tax professional directs that capital-gain assumption and the user records the direction and attestation.
+- `Use $0 basis for a conservative full-proceeds gain` for an exact unsupported quantity when a CPA, EA, or tax professional directs that capital-gain assumption and the user records the direction and attestation.
 - `Import missing records`
 - `Classify documented send as disposal`
 - `Keep as owner transfer`
-- `Document conservative $0 basis for professional review` as a draft workpaper choice, or record professional direction in the worksheet, review the calculation impact, and explicitly apply it. Gainz does not verify the reviewer's identity or credentials, and applied resolutions remain reversible.
+- `Document $0-basis assumption for professional review` as a draft workpaper choice, or record professional direction in the worksheet, review the calculation impact, and explicitly apply it. Gainz does not verify the reviewer's identity or credentials, and applied resolutions remain reversible.
 - `Needs research`
 - `Leave unresolved for draft only`
 - `Sent to CPA`

@@ -1555,6 +1555,7 @@ $(document).ready(function() {
             fork_airdrop_basis: 'Fork/airdrop acquisition needs support',
             already_in_filed_totals: 'Already included in filed tax totals',
             zero_basis_cpa_review: 'Unknown basis treated as $0 for CPA review',
+            conservative_max_gain: 'Review conservative full-proceeds gain using $0 basis',
             sent_to_cpa: 'Sent to CPA',
             needs_research: 'Needs user research'
         };
@@ -1567,6 +1568,7 @@ $(document).ready(function() {
             fork_airdrop_basis: asset + ' may have come from a fork or airdrop; basis treatment needs source support or CPA review.',
             already_in_filed_totals: asset + ' gap may already be reflected in filed tax totals; compare against filed Form 8949/Schedule D or CPA workpapers.',
             zero_basis_cpa_review: 'Unknown ' + asset + ' basis is documented for conservative CPA review; draft reports should not claim unproven basis.',
+            conservative_max_gain: 'Open the exact unresolved ' + asset + ' sale, review the full-proceeds/$0-basis impact, and record professional direction before applying it.',
             sent_to_cpa: 'User will ask a CPA to review this ' + asset + ' missing basis gap.',
             needs_research: 'User will investigate source records later.'
         };
@@ -1589,6 +1591,8 @@ $(document).ready(function() {
                 button.text('This ' + asset + ' came from a fork/airdrop');
             } else if (decision == 'sent_to_cpa') {
                 button.text('Send this ' + asset + ' gap to CPA');
+            } else if (decision == 'conservative_max_gain') {
+                button.text('Review conservative full-proceeds gain using $0 basis');
             }
         });
     }
@@ -3049,7 +3053,21 @@ $(document).ready(function() {
     });
 
     $('.missing-basis-decision-button').click(function() {
-        holdingsLeaveBasisUnresolved($(this).data('decision') || 'needs_research');
+        var decision = $(this).data('decision') || 'needs_research';
+        var rowData = holdingsSelectedAssetRow();
+        var asset = rowData ? rowData[0] : '';
+        if (decision == 'conservative_max_gain') {
+            if (!asset) {
+                alert('Select an asset first.');
+                return;
+            }
+            window.location.assign(
+                '/export/review_queue?guided=1&asset=' + encodeURIComponent(asset) +
+                '&decision=conservative_max_gain'
+            );
+            return;
+        }
+        holdingsLeaveBasisUnresolved(decision);
     });
 
     $('#open_exact_send_review_button').click(function() {

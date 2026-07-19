@@ -82,7 +82,7 @@ Disposition-date fair market value may support proceeds or amount realized. It i
 
 #### Conservative fallback when records truly cannot be reconstructed
 
-For an exact sale with a remaining unsupported quantity, a CPA, EA, or tax professional can choose **Apply conservative $0-basis short-term treatment**. Gainz then:
+For an exact sale with a remaining unsupported quantity, a CPA, EA, or tax professional can choose **Use $0 basis for a conservative full-proceeds gain**. Gainz then:
 
 1. Keeps any documented basis already linked to the sale.
 2. Uses supported proceeds or amount realized for only the unresolved quantity.
@@ -91,7 +91,7 @@ For an exact sale with a remaining unsupported quantity, a CPA, EA, or tax profe
 5. Leaves the unknown acquisition date blank in generated report rows rather than inventing a date.
 6. Saves the reviewer, attestation, evidence, methods, exact sale ID, adjustment ID, and a disclosure that this treatment may overstate tax.
 
-This is a conservative assumption inside Gainz's capital-gain model, not proof of the missing acquisition history and not a guarantee of the highest tax under every possible set of facts. It requires an identified transaction and professional attestation. Gainz never applies it to all sends, to a quantity inferred from holdings, or without an explicit review decision.
+This is a conservative assumption inside Gainz's capital-gain model, not proof of the missing acquisition history and not a guarantee of the highest federal, state, or local tax under every possible set of facts. It requires an identified transaction, a before-and-after calculation preview, and professional attestation. Gainz never applies it to all sends, to a quantity inferred from holdings, or without an explicit review decision.
 
 ## Short-Term vs Long-Term
 

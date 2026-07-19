@@ -620,7 +620,7 @@ class TransactionsEngineTests(unittest.TestCase):
         self.assertIn("Missing acquisition before sale.", rows[0]["likely_explanations"])
         self.assertTrue(rows[0]["evidence_to_look_for"])
         self.assertTrue(rows[0]["plain_language_questions"])
-        self.assertIn("Treat unknown basis as $0 for CPA review", rows[0]["allowed_outcomes"])
+        self.assertIn("Document $0-basis assumption for professional review", rows[0]["allowed_outcomes"])
         self.assertIn("basis", rows[0]["suggested_cpa_question"].lower())
 
     def test_reconciliation_work_order_applies_saved_review_state(self):
@@ -707,7 +707,7 @@ class TransactionsEngineTests(unittest.TestCase):
         reviewed_memos = unresolved_gap_memo_rows(reviewed_rows)
         memo_text = unknown_gap_memos_markdown(reviewed_rows)
 
-        self.assertEqual("Treat unknown basis as $0 for CPA review", reviewed_memos[0]["current_decision"])
+        self.assertEqual("Document $0-basis assumption for professional review", reviewed_memos[0]["current_decision"])
         self.assertEqual(
             "Unknown basis treated conservatively for CPA review.",
             reviewed_memos[0]["user_memory_notes"],

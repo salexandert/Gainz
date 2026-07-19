@@ -265,7 +265,7 @@ class AuditPacketService:
             f"- Document unknown basis: {work_order_summary.get('document_unknown_basis_count', 0)}",
             f"- Fork/airdrop acquisition: {work_order_summary.get('fork_airdrop_basis_count', 0)}",
             f"- Already included in filed tax totals: {work_order_summary.get('already_in_filed_totals_count', 0)}",
-            f"- Treat unknown basis as $0 for CPA review: {work_order_summary.get('zero_basis_cpa_review_count', 0)}",
+            f"- $0-basis assumptions documented for professional review: {work_order_summary.get('zero_basis_cpa_review_count', 0)}",
             f"- Conservative $0-basis short-term calculations applied: {len(conservative_positions)}",
             f"- Needs research: {work_order_summary.get('needs_research_count', 0)}",
             f"- Leave unresolved for draft only: {work_order_summary.get('ignored_for_draft_count', 0)}",

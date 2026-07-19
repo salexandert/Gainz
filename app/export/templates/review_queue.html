@@ -242,6 +242,15 @@
               Record the event, amount realized, adjusted basis, and evidence as separate facts. Fair market value at
               disposition generally supports proceeds or amount realized; it is not acquisition basis.
             </p>
+            {% if selected_decision == 'conservative_max_gain' %}
+            <div class="alert alert-warning" role="note">
+              <strong>Conservative unknown-basis assumption.</strong>
+              Gainz will preserve supported fees and net proceeds, use $0 adjusted basis for only the unresolved
+              quantity, and use a short-term holding-period assumption. This generally makes the unresolved net
+              proceeds taxable gain. It may overstate tax, does not establish the missing history, and is not a
+              guarantee of the maximum possible federal, state, or local tax liability.
+            </div>
+            {% endif %}
             <div class="cpa-resolution-warning" role="note">
               Draft and research choices document the audit trail without changing calculations. For a missing-basis sale,
               Gainz first previews the exact effect. Applying the confirmed treatment then creates an identified

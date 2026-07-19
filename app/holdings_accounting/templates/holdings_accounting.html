@@ -585,8 +585,15 @@
               <button type="button" class="btn btn-outline-primary missing-basis-decision-button" data-decision="import_missing_records">Import missing acquisition records</button>
               <button type="button" class="btn btn-outline-primary missing-basis-decision-button" data-decision="fork_airdrop_basis">This asset came from a fork/airdrop</button>
               <button type="button" class="btn btn-outline-primary missing-basis-decision-button" data-decision="already_in_filed_totals">Already included in filed tax totals</button>
-              <button type="button" class="btn btn-primary missing-basis-decision-button" data-decision="zero_basis_cpa_review">Treat unknown basis as $0 for CPA review</button>
+              <button type="button" class="btn btn-primary missing-basis-decision-button" data-decision="conservative_max_gain">Review conservative full-proceeds gain using $0 basis</button>
               <button type="button" class="btn btn-outline-primary missing-basis-decision-button" data-decision="sent_to_cpa">Send this gap to CPA</button>
+            </div>
+            <div class="alert alert-warning mt-3 mb-0" role="note">
+              <strong>What the conservative option does:</strong>
+              Gainz opens the exact unresolved sale for a before-and-after review. If a qualified professional directs
+              the treatment, Gainz can use supported net proceeds, $0 basis, and a short-term assumption for only the
+              unsupported quantity. This generally treats those proceeds as gain, but it does not prove the missing
+              history or guarantee the maximum possible tax liability.
             </div>
           </div>
           <div id="activity_classification_tools">

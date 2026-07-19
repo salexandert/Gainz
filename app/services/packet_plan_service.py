@@ -166,8 +166,8 @@ WORK_ORDER_REVIEW_DECISIONS = {
     "document_unknown_basis": "Document unknown basis",
     "fork_airdrop_basis": "Fork/airdrop acquisition",
     "already_in_filed_totals": "Already included in filed tax totals",
-    "zero_basis_cpa_review": "Treat unknown basis as $0 for CPA review",
-    "conservative_max_gain": "Apply conservative $0-basis short-term treatment",
+    "zero_basis_cpa_review": "Document $0-basis assumption for professional review",
+    "conservative_max_gain": "Use $0 basis for a conservative full-proceeds gain",
     "needs_research": "Needs research",
     "ignored_for_draft": "Leave unresolved for draft only",
     "sent_to_cpa": "Sent to CPA",
@@ -237,8 +237,10 @@ CONSERVATIVE_MAX_GAIN_DISCLOSURE = (
     "Gainz could not reconstruct the acquisition history for this exact quantity. The user recorded "
     "professional direction to use supported proceeds, $0 adjusted basis, and a "
     "short-term holding-period assumption for its capital-gain calculation. The acquisition date "
-    "remains unknown and is left blank in report rows. This treatment may overstate tax and does "
-    "not establish what actually happened. Gainz does not verify the reviewer's identity or credentials."
+    "remains unknown and is left blank in report rows. This generally treats all supported net proceeds "
+    "for the unresolved quantity as gain. It may overstate tax, does not establish what actually happened, "
+    "and is not a guarantee of the maximum possible federal, state, or local tax liability. Gainz does not "
+    "verify the reviewer's identity or credentials."
 )
 
 

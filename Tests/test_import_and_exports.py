@@ -348,6 +348,9 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("Current gap", reconcile_page)
         self.assertIn("Advanced gap details", reconcile_page)
         self.assertIn("Open Declare Holdings", reconcile_page)
+        self.assertIn("Review conservative full-proceeds gain using $0 basis", reconcile_page)
+        self.assertIn("What the conservative option does", reconcile_page)
+        self.assertIn("does not prove the missing", reconcile_page)
         self.assertNotIn("Save Declared Holdings", reconcile_page)
         self.assertNotIn("Save 0 Holdings", reconcile_page)
         self.assertIn("Reconciliation gaps complete", complete_reconcile_page)
@@ -359,6 +362,7 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertIn("What a holdings gap means", custom_js)
         self.assertIn("Leave Holdings Gap As Needs Research", custom_js)
         self.assertIn("Reconciliation gaps complete", custom_js)
+        self.assertIn("decision=conservative_max_gain", custom_js)
 
     def test_import_page_renders_import_warning_workflow(self):
         app = create_app(config_dict["Debug"], selenium=True)
@@ -2453,6 +2457,9 @@ class ImportAndExportTests(unittest.TestCase):
 
             with app.test_client() as client:
                 response = client.get("/export/review_queue?guided=1")
+                conservative_response = client.get(
+                    "/export/review_queue?guided=1&asset=BCH&decision=conservative_max_gain"
+                )
 
             self.assertEqual(200, response.status_code)
             self.assertIn(b"Resolve BCH missing cost basis", response.data)
@@ -2461,7 +2468,7 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertIn(b"Import missing BCH acquisition records", response.data)
             self.assertIn(b"This BCH came from a fork/airdrop", response.data)
             self.assertIn(b"Already included in filed tax totals", response.data)
-            self.assertIn(b"Document conservative $0 basis for CPA review", response.data)
+            self.assertIn(b"Use $0 basis for a conservative full-proceeds gain", response.data)
             self.assertIn(b"Send this BCH gap to CPA", response.data)
             self.assertIn(b"CPA review options", response.data)
             self.assertIn(b"Reconstruct basis from records", response.data)
@@ -2469,6 +2476,11 @@ class ImportAndExportTests(unittest.TestCase):
             self.assertIn(b"Apply a professionally directed basis adjustment", response.data)
             self.assertNotIn(b"Keep as owner transfer", response.data)
             self.assertNotIn(b"Decide what to do with this work order item", response.data)
+            self.assertEqual(200, conservative_response.status_code)
+            self.assertIn(b"Professional Resolution Worksheet", conservative_response.data)
+            self.assertIn(b"Conservative unknown-basis assumption", conservative_response.data)
+            self.assertIn(b"generally makes the unresolved net", conservative_response.data)
+            self.assertIn(b"name=\"decision\" value=\"conservative_max_gain\"", conservative_response.data)
 
             with app.app_context():
                 db.drop_all()
@@ -2877,7 +2889,7 @@ class ImportAndExportTests(unittest.TestCase):
 
             workpapers = cpa_resolution_workpaper_rows(after, transactions)
             self.assertEqual(1, len(workpapers))
-            self.assertEqual("Apply conservative $0-basis short-term treatment", workpapers[0]["review_decision_label"])
+            self.assertEqual("Use $0 basis for a conservative full-proceeds gain", workpapers[0]["review_decision_label"])
             self.assertEqual("Unknown date - recorded short-term assumption", workpapers[0]["acquisition_date_method_label"])
             self.assertEqual("", workpapers[0]["acquisition_date"])
             self.assertIn("may overstate tax", workpapers[0]["assumption_disclosure"])
@@ -2897,7 +2909,7 @@ class ImportAndExportTests(unittest.TestCase):
             workbook_path = next((Path(packet_dir) / "01_reports").glob("*.xlsx"))
             workbook = load_workbook(workbook_path, data_only=False)
             workpaper_sheet = workbook["Professional Workpapers"]
-            self.assertEqual("Apply conservative $0-basis short-term treatment", workpaper_sheet["B5"].value)
+            self.assertEqual("Use $0 basis for a conservative full-proceeds gain", workpaper_sheet["B5"].value)
             self.assertEqual("Unknown date - recorded short-term assumption", workpaper_sheet["N5"].value)
             self.assertIsNone(workpaper_sheet["O5"].value)
             self.assertIn("may overstate tax", workpaper_sheet["P5"].value)
