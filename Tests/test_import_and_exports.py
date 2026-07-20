@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from dateutil.parser import UnknownTimezoneWarning
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 
 from app import create_app
 from app.extensions import db
@@ -28,6 +28,7 @@ from app.services.import_warning_service import import_warning_review_rows
 from app.services.tax_evidence_service import (
     classify_tax_evidence,
     get_tax_evidence_inventory_summary,
+    infer_tax_evidence_years_from_file,
 )
 from app.services.tax_total_extraction_service import get_suggested_filed_totals
 from app.services.packet_plan_service import (
@@ -43,6 +44,7 @@ from utils import (
     get_form_8949_report_rows,
     get_form_8949_table_data,
     get_form_8949_totals,
+    get_import_economics_rows,
     get_tax_filing_alignment_summary,
 )
 from configs.config import config_dict
@@ -3575,6 +3577,235 @@ class ImportAndExportTests(unittest.TestCase):
         self.assertEqual("cb-4", skipped_receipts[0]["source_transaction_id"])
         self.assertIn("No supported crypto", skipped_receipts[0]["reason"])
 
+    def test_current_coinbase_raw_date_and_time_preview_payload_commits_atomically(self):
+        transactions = empty_transactions()
+        headers = [
+            "Transaction ID",
+            "Transaction Type",
+            "Date & time",
+            "Asset Acquired",
+            "Quantity Acquired (Bought, Received, etc)",
+            "Cost Basis (incl. fees and/or spread) (USD)",
+            "Data Source",
+            "Asset Disposed (Sold, Sent, etc)",
+            "Quantity Disposed",
+            "Proceeds (excl. fees and/or spread) (USD)",
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "coinbase_current_raw.csv"
+            with source.open("w", newline="", encoding="utf-8") as file:
+                writer = csv.writer(file)
+                writer.writerow(headers)
+                writer.writerow([
+                    "raw-1", "Buy", "2024-01-02 03:04:05 UTC", "BTC", "0.01",
+                    "425.50", "Coinbase", "USD", "425.50", "0",
+                ])
+
+            service = ImportService(temp_dir)
+            preview = service.import_upload(FileUpload(source), transactions)
+            result = service.import_native_payload(
+                preview["_prepared_payload_path"],
+                transactions,
+            )
+
+        self.assertTrue(preview["native_preview_required"])
+        self.assertEqual(1, preview["import_preview"]["output_rows"])
+        self.assertEqual(1, result["imported_count"])
+        self.assertTrue(result["transactional_commit"])
+        self.assertEqual("raw-1", transactions.transactions[0].source_transaction_id)
+        self.assertEqual(datetime.datetime(2024, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc), transactions.transactions[0].time_stamp)
+        self.assertEqual(1, len(transactions.saved_descriptions))
+
+    def test_native_ledger_live_import_preserves_wallet_direction_and_crypto_fee(self):
+        transactions = empty_transactions()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "ledger_live_operations.csv"
+            with source.open("w", newline="", encoding="utf-8") as file:
+                writer = csv.writer(file)
+                writer.writerow([
+                    "Operation Date", "Currency Ticker", "Operation Type", "Operation Amount",
+                    "Operation Fees", "Operation Hash", "Account Name", "Account xpub",
+                ])
+                writer.writerow([
+                    "2024-01-01T12:00:00Z", "BTC", "IN", "0.5", "0", "ledger-in", "BTC wallet", "synthetic-xpub",
+                ])
+                writer.writerow([
+                    "2024-02-01T12:00:00Z", "BTC", "OUT", "-0.1", "0.00002", "ledger-out", "BTC wallet", "synthetic-xpub",
+                ])
+
+            service = ImportService(temp_dir)
+            preview = service.import_upload(FileUpload(source), transactions)
+            result = service.import_native_payload(
+                preview["_prepared_payload_path"],
+                transactions,
+            )
+
+        self.assertEqual("ledger_live", preview["detected_format"])
+        self.assertEqual({"Receive": 1, "Send": 1}, preview["import_preview"]["row_counts_by_type"])
+        self.assertEqual(2, result["imported_count"])
+        self.assertEqual(["receive", "send"], [row.trans_type for row in transactions.transactions])
+        outgoing = transactions.transactions[1]
+        self.assertEqual("BTC", outgoing.fee_currency)
+        self.assertAlmostEqual(0.00002, outgoing.source_fee_amount, places=10)
+        self.assertIsNone(outgoing.fee)
+        self.assertEqual("PASSED_WALLET_MOVEMENT", outgoing.input_reliability_status)
+        self.assertEqual([], result["warnings"])
+
+    def test_cash_app_withdrawal_integrity_uses_net_value_and_preserves_equation(self):
+        transactions = empty_transactions()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "cash_app_withdrawal_equation.csv"
+            source.write_text(
+                "Transaction ID,Date,Transaction Type,Currency,Amount,Fee,Net Amount,Asset Type,Asset Price,Asset Amount,Status,Notes\n"
+                "send-1,2024-01-01 10:00:00 EST,Bitcoin Withdrawal,USD,($105.00),($5.00),($100.00),BTC,$10000.00,0.01,COMPLETED,Synthetic withdrawal\n",
+                encoding="utf-8",
+            )
+            result = ImportService(temp_dir)._transactional_import(str(source), transactions)
+
+        self.assertEqual(1, result["imported_count"])
+        transaction = transactions.transactions[0]
+        self.assertEqual("send", transaction.trans_type)
+        self.assertEqual(105.0, transaction.gross_usd_total)
+        self.assertEqual(5.0, transaction.fee)
+        self.assertEqual(100.0, transaction.net_usd_total)
+        self.assertEqual(100.0, transaction.source_usd_total)
+        self.assertEqual("PASSED", transaction.input_reliability_status)
+        self.assertNotIn("INPUT RELIABILITY BLOCKER", transaction.economics_warning)
+        self.assertEqual(100.0, get_import_economics_rows(transactions)[0]["net_tax_usd"])
+
+    def test_failed_native_commit_rolls_back_without_persistent_row_warnings(self):
+        transactions = empty_transactions()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "coinbase_bad_commit.csv"
+            source.write_text(
+                "Transaction ID,Transaction Type,Date & time,Asset Acquired,Quantity Acquired (Bought; Received; etc),Cost Basis (incl. fees and/or spread) (USD),Data Source,Asset Disposed (Sold; Sent; etc),Quantity Disposed,Proceeds (excl. fees and/or spread) (USD)\n"
+                "bad-date,Buy,not-a-date,BTC,0.01,100,Coinbase,USD,100,0\n",
+                encoding="utf-8",
+            )
+            # Semicolon punctuation normalizes to the same official header names.
+            service = ImportService(temp_dir)
+            preview = service.import_upload(FileUpload(source), transactions)
+            result = service.import_native_payload(
+                preview["_prepared_payload_path"],
+                transactions,
+            )
+
+        self.assertTrue(result["source_failure"])
+        self.assertTrue(result["rollback_complete"])
+        self.assertEqual(0, result["persistent_warnings_added"])
+        self.assertEqual([], transactions.transactions)
+        self.assertEqual([], transactions.import_warnings)
+        self.assertEqual([], transactions.import_receipts)
+        self.assertEqual([], transactions.saved_descriptions)
+
+    def test_failed_mapped_import_rolls_back_without_persistent_row_warnings(self):
+        transactions = empty_transactions()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "mapped_wallet.csv"
+            source.write_text(
+                "When,Direction,Coin,Units,USD Value\n"
+                "2024-01-01T00:00:00Z,UNKNOWN,BTC,0.1,100\n",
+                encoding="utf-8",
+            )
+            result = ImportService(temp_dir).import_mapped_file(
+                str(source),
+                transactions,
+                header_row=1,
+                column_mapping={
+                    "date": "When",
+                    "transaction_type": "Direction",
+                    "asset_type": "Coin",
+                    "asset_amount": "Units",
+                    "fiat_amount": "USD Value",
+                },
+            )
+
+        self.assertTrue(result["source_failure"])
+        self.assertTrue(result["rollback_complete"])
+        self.assertEqual(0, result["persistent_warnings_added"])
+        self.assertEqual([], transactions.transactions)
+        self.assertEqual([], transactions.import_warnings)
+        self.assertEqual([], transactions.import_receipts)
+        self.assertEqual([], transactions.saved_descriptions)
+
+    def test_coinbase_readable_total_is_authoritative_and_fee_sign_does_not_warn(self):
+        transactions = empty_transactions()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "coinbase_readable.csv"
+            source.write_text(
+                "Timestamp,Transaction Type,Asset,Quantity Transacted,Spot Price Currency,"
+                "Spot Price at Transaction,Subtotal,Total (inclusive of fees and/or spread),"
+                "Fees and/or Spread,Notes\n"
+                "2024-01-01T00:00:00Z,Buy,ETH,2,USD,100,200,205,-5,Synthetic buy\n"
+                "2024-06-01T00:00:00Z,Sell,ETH,-0.5,USD,300,150,147,-3,Synthetic sell\n",
+                encoding="utf-8",
+            )
+            result = ImportService(temp_dir).import_upload(FileUpload(source), transactions)
+
+        self.assertEqual(2, result["imported_count"])
+        self.assertEqual([], result["warnings"])
+        buy, sell = transactions.transactions
+        self.assertEqual(200.0, buy.gross_usd_total)
+        self.assertEqual(205.0, buy.net_usd_total)
+        self.assertEqual(205.0, buy.tax_usd_total)
+        self.assertEqual(5.0, buy.fee)
+        self.assertEqual(150.0, sell.gross_usd_total)
+        self.assertEqual(147.0, sell.net_usd_total)
+        self.assertEqual(147.0, sell.tax_usd_total)
+        self.assertEqual(3.0, sell.fee)
+        self.assertIn("Coinbase total inclusive", sell.economics_source)
+
+    def test_unlinked_sale_quantity_never_appears_as_zero_basis_gain(self):
+        transactions = empty_transactions()
+        buy = Buy("BTC", 0.4, datetime.datetime(2024, 1, 1), 100, "synthetic.csv")
+        sell = Sell("BTC", 1.0, datetime.datetime(2024, 6, 1), 200, "synthetic.csv")
+        sell.link_transaction(buy, 0.4)
+        transactions.transactions = [buy, sell]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            export_path = transactions.export_to_excel(output_dir=temp_dir)
+            workbook = load_workbook(export_path, read_only=True, data_only=True)
+            try:
+                gain_sheet = workbook["2024 BTC Gains"]
+                values = [
+                    cell
+                    for row in gain_sheet.iter_rows(values_only=True)
+                    for cell in row
+                ]
+            finally:
+                workbook.close()
+
+        self.assertEqual(1, len(get_form_8949_report_rows(transactions)))
+        self.assertAlmostEqual(0.4, get_form_8949_report_rows(transactions)[0]["quantity"])
+        self.assertNotIn("N/A", values)
+        self.assertEqual(1, values.count(sell.id))
+
+    def test_evidence_content_years_and_account_transcript_semantics(self):
+        transactions = empty_transactions()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workbook_path = Path(temp_dir) / "filed_totals_workbook.xlsx"
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet.append(["Tax Year", "Filed Proceeds", "Generated Date"])
+            sheet.append([2022, 100])
+            sheet.append([2024, 2026, "2026-07-20"])
+            workbook.save(workbook_path)
+
+            detected_years = infer_tax_evidence_years_from_file(workbook_path)
+
+        self.assertEqual([2022, 2024], detected_years)
+        transactions.set_tax_evidence_record(
+            year=2024,
+            evidence_type="account_transcript",
+            evidence_label="2024 IRS Record of Account",
+            evidence_path="",
+        )
+        inventory = get_tax_evidence_inventory_summary(transactions)
+        row = next(item for item in inventory["rows"] if item["year"] == 2024)
+        self.assertEqual("2024 IRS Record of Account", row["filed_return_evidence"])
+        self.assertEqual("Missing", row["payment_evidence"])
+
     def test_tax_evidence_classification_and_open_year_are_conservative(self):
         self.assertEqual("crypto_workbook", classify_tax_evidence("Crypto Taxes Paid.csv"))
         self.assertEqual("account_transcript", classify_tax_evidence("IRS Account Transcript 2024.pdf"))
@@ -3685,8 +3916,10 @@ class ImportAndExportTests(unittest.TestCase):
             input_reliability_status="BLOCKING",
             economics_warning="INPUT RELIABILITY BLOCKER: synthetic mismatch",
         )
-        transactions.transactions = [buy]
-        transactions.set_holdings("BTC", 1)
+        sell = Sell("BTC", 1, datetime.datetime(2024, 6, 1), 150, "synthetic-source.csv")
+        buy.link_transaction(sell, 1)
+        transactions.transactions = [buy, sell]
+        transactions.set_holdings("BTC", 0)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             packet_path = Path(
@@ -3701,8 +3934,29 @@ class ImportAndExportTests(unittest.TestCase):
             summary = json.loads(
                 (packet_path / "03_manifests" / "audit_packet_summary.json").read_text(encoding="utf-8")
             )
+            workbook_path = next((packet_path / "01_reports").glob("*.xlsx"))
+            workbook = load_workbook(workbook_path, read_only=True, data_only=True)
+            try:
+                self.assertIn("Calculations Suppressed", workbook.sheetnames)
+                self.assertFalse(any(name.endswith(" Gains") for name in workbook.sheetnames))
+                self.assertFalse(any(" 8949 " in f" {name} " for name in workbook.sheetnames))
+                self.assertFalse(any(name.endswith(" Sales") for name in workbook.sheetnames))
+            finally:
+                workbook.close()
+            with (packet_path / "03_manifests" / "evidence_manifest.csv").open(
+                newline="", encoding="utf-8"
+            ) as file:
+                generated_rows = [
+                    row for row in csv.DictReader(file) if row["status"] == "GENERATED"
+                ]
+            generated_source_exists = Path(generated_rows[0]["source_path"]).is_file()
 
         self.assertTrue(summary["form_8949_totals"]["suppressed"])
+        self.assertEqual(str(packet_path), summary["packet_path"])
+        self.assertNotIn(".building-", json.dumps(summary))
+        self.assertEqual(1, len(generated_rows))
+        self.assertTrue(generated_source_exists)
+        self.assertNotIn(".building-", generated_rows[0]["source_path"])
 
 
 if __name__ == "__main__":

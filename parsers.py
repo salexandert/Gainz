@@ -25,6 +25,15 @@ COINBASE_RAW_COLUMNS = {
     'proceeds excl fees and or spread usd',
 }
 
+LEDGER_LIVE_COLUMNS = {
+    'operation date',
+    'currency ticker',
+    'operation type',
+    'operation amount',
+    'operation fees',
+    'operation hash',
+}
+
 COLUMN_ALIASES = {
     'date': [
         'date',
@@ -100,6 +109,7 @@ COLUMN_ALIASES = {
     'asset_price': [
         'asset price',
         'price at transaction',
+        'spot price at transaction',
         'price',
         'spot price',
         'spot price usd',
@@ -487,7 +497,7 @@ def analyze_csv_import(file_path, header_row=None, column_mapping=None, data_sta
     columns = read_csv_columns(file_path, header_row=header_row)
     status = get_import_column_status(columns, column_mapping=column_mapping)
     detected_format = detect_csv_format(file_path, header_row=header_row)
-    if detected_format in {'gdax', 'coinbase_raw'}:
+    if detected_format in {'gdax', 'coinbase_raw', 'ledger_live'}:
         status = {
             **status,
             'can_import': True,
@@ -496,7 +506,8 @@ def analyze_csv_import(file_path, header_row=None, column_mapping=None, data_sta
         }
 
     import_preview = {}
-    if detected_format == 'coinbase_raw':
+    normalized_rows = []
+    if detected_format in {'coinbase_raw', 'ledger_live'}:
         raw_df = pd.read_csv(
             file_path,
             skiprows=max(int(header_row or 1) - 1, 0),
@@ -507,10 +518,21 @@ def analyze_csv_import(file_path, header_row=None, column_mapping=None, data_sta
             data_start_row,
             data_start_row + len(raw_df),
         )
-        import_preview = summarize_standard_import_rows(
+        trans_df = (
             transform_coinbase_raw_to_standard(raw_df)
+            if detected_format == 'coinbase_raw'
+            else transform_ledger_live_to_standard(raw_df)
+        )
+        import_preview = summarize_standard_import_rows(
+            trans_df
         )
         import_preview['source_rows'] = int(len(raw_df))
+        import_preview['source_format'] = detected_format
+        normalized_rows = (
+            trans_df.astype(object)
+            .where(pd.notna(trans_df), None)
+            .to_dict(orient='records')
+        )
 
     return {
         'can_import': status['can_import'],
@@ -529,6 +551,9 @@ def analyze_csv_import(file_path, header_row=None, column_mapping=None, data_sta
             data_start_row=data_start_row,
         ),
         'import_preview': import_preview,
+        # Private service data. Routes never return this source-derived payload.
+        '_normalized_rows': normalized_rows,
+        '_source_sha256': _file_sha256(file_path),
     }
 
 
@@ -653,6 +678,7 @@ def _coinbase_raw_leg(
             'timestamp',
             'date',
             'transaction date',
+            'date & time',
             'date and time',
         ),
         'Asset Price': usd_total / quantity if quantity else 0.0,
@@ -772,6 +798,7 @@ def transform_coinbase_raw_to_standard(df):
                     'timestamp',
                     'date',
                     'transaction date',
+                    'date & time',
                     'date and time',
                 ),
                 'Asset Price': 0,
@@ -990,7 +1017,11 @@ def _standard_economics(row, column_lookup, quantity, transaction_type, profile=
             f"Fee amount {source_fee_amount:g} {fee_currency} was preserved but not converted to USD. "
             "Add a supported USD fee value before relying on tax totals."
         )
-    elif source_fee_amount is not None and transaction_type in {'Buy', 'Sell'}:
+    elif (
+        source_fee_amount is not None
+        and transaction_type in {'Buy', 'Sell'}
+        and not (profile == 'coinbase' and total is not None)
+    ):
         expected_net = gross + source_fee_amount if transaction_type == 'Buy' else max(gross - source_fee_amount, 0.0)
         if abs(net - expected_net) > 0.02:
             warning = (
@@ -1000,8 +1031,14 @@ def _standard_economics(row, column_lookup, quantity, transaction_type, profile=
 
     asset_price = direct_price or (gross / abs(quantity) if quantity else 0.0)
     implied_usd = direct_price * abs(quantity) if direct_price and quantity else None
-    consistency = _value_consistency_check(gross, implied_usd)
+    consistency_target = gross
+    if profile == 'cashapp' and transaction_type in {'Send', 'Receive'} and net is not None:
+        consistency_target = net
+        source_parts.append('net value used for wallet-movement integrity check')
+    consistency = _value_consistency_check(consistency_target, implied_usd)
     warning = _append_warning(warning, consistency['warning'])
+    if profile == 'coinbase' and total is not None:
+        source_parts.append('Coinbase total inclusive of fees/spread used as tax value')
     return {
         'Asset Price': asset_price,
         'Gross USD': gross,
@@ -1011,7 +1048,7 @@ def _standard_economics(row, column_lookup, quantity, transaction_type, profile=
         'Net USD': net,
         'Economic Source': ', '.join(dict.fromkeys(source_parts)) or 'spot price',
         'Economic Warning': warning,
-        'Source USD': gross,
+        'Source USD': consistency_target,
         'Implied USD': implied_usd,
         'Value Variance USD': consistency['variance'],
         'Value Tolerance USD': consistency['tolerance'],
@@ -1099,6 +1136,9 @@ def detect_csv_format(file_path, header_row=1):
 
         if COINBASE_RAW_COLUMNS.issubset(normalized_headers):
             return 'coinbase_raw'
+
+        if LEDGER_LIVE_COLUMNS.issubset(normalized_headers):
+            return 'ledger_live'
 
         common_fields = ['date', 'transaction_type', 'asset_type', 'asset_amount', 'asset_price']
         cash_app_markers = {'transaction id', 'net amount', 'asset type', 'asset amount'}
@@ -1326,7 +1366,90 @@ def transform_gdax_to_standard(df):
 
     return pd.DataFrame(rows)
 
-def import_transactions(file_path, transactions, header_row=1, column_mapping=None, data_start_row=None):
+
+def transform_ledger_live_to_standard(df):
+    """Normalize Ledger Live wallet movements without inventing USD economics."""
+    rows = []
+    columns = _normalized_column_lookup(df.columns)
+
+    for _, row in df.iterrows():
+        operation_type = normalize_column_name(
+            _coinbase_raw_value(row, columns, 'operation type')
+        ).upper()
+        transaction_type = {'IN': 'Receive', 'OUT': 'Send'}.get(operation_type)
+        source_row = row.get('__gainz_source_row__')
+        if transaction_type is None:
+            rows.append({
+                'Asset Type': normalize_asset_symbol(
+                    _coinbase_raw_value(row, columns, 'currency ticker')
+                ),
+                'Transaction Type': operation_type or 'Unsupported',
+                'Asset Amount': 0,
+                'Date': _coinbase_raw_value(row, columns, 'operation date'),
+                'Asset Price': 0,
+                'Gross USD': 0,
+                'Fee USD': None,
+                'Source Fee Amount': None,
+                'Fee Currency': '',
+                'Net USD': 0,
+                'Economic Source': 'Ledger Live wallet movement',
+                'Economic Warning': '',
+                'Source Row': source_row,
+                'Source Transaction ID': _coinbase_raw_value(row, columns, 'operation hash'),
+                'Source Notes': _coinbase_raw_value(row, columns, 'account name'),
+                'Source Quantity': '',
+                'Source USD': None,
+                'Implied USD': None,
+                'Value Variance USD': None,
+                'Value Tolerance USD': None,
+                'Input Reliability': 'SKIPPED',
+                'Source Leg': 'wallet_movement',
+                'Skip Reason': f"Unsupported Ledger Live operation type '{operation_type or 'blank'}'.",
+            })
+            continue
+
+        asset = normalize_asset_symbol(
+            _coinbase_raw_value(row, columns, 'currency ticker')
+        )
+        source_quantity = _coinbase_raw_value(row, columns, 'operation amount')
+        source_fee = _coinbase_raw_value(row, columns, 'operation fees')
+        fee_quantity = abs(parse_quantity_value(source_fee))
+        rows.append({
+            'Asset Type': asset,
+            'Transaction Type': transaction_type,
+            'Asset Amount': abs(parse_quantity_value(source_quantity)),
+            'Date': _coinbase_raw_value(row, columns, 'operation date'),
+            'Asset Price': 0,
+            'Gross USD': 0,
+            'Fee USD': None,
+            'Source Fee Amount': fee_quantity if fee_quantity else None,
+            'Fee Currency': asset,
+            'Net USD': 0,
+            'Economic Source': 'Ledger Live wallet movement; no USD value inferred',
+            'Economic Warning': '',
+            'Source Row': source_row,
+            'Source Transaction ID': _coinbase_raw_value(row, columns, 'operation hash'),
+            'Source Notes': _coinbase_raw_value(row, columns, 'account name'),
+            'Source Quantity': str(source_quantity or '').strip(),
+            'Source USD': None,
+            'Implied USD': None,
+            'Value Variance USD': None,
+            'Value Tolerance USD': None,
+            'Input Reliability': 'PASSED_WALLET_MOVEMENT',
+            'Source Leg': 'wallet_movement',
+        })
+
+    return pd.DataFrame(rows)
+
+def import_transactions(
+    file_path,
+    transactions,
+    header_row=1,
+    column_mapping=None,
+    data_start_row=None,
+    prepared_rows=None,
+    prepared_format=None,
+):
     """
     Imports transactions from a given file path and adds them to the Transactions object.
     Prevents duplicate imports by checking for existing transactions with the same attributes.
@@ -1393,8 +1516,8 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
     try:
         import_warnings = []
 
-        # Detect the CSV format
-        csv_format = detect_csv_format(file_path, header_row=header_row)
+        # Detect the CSV format unless a previously reviewed immutable payload is used.
+        csv_format = prepared_format or detect_csv_format(file_path, header_row=header_row)
         parsers_logger.info("Detected CSV format: %s", csv_format)
 
         # Read the CSV file
@@ -1403,32 +1526,37 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
         # Keep the source cell text intact. In particular, pandas must not turn a
         # small decimal quantity into a float whose string form loses the source
         # representation used by the import receipt.
-        raw_df = pd.read_csv(
-            file_path,
-            skiprows=max(header_row - 1, 0),
-            dtype=str,
-            keep_default_na=False,
-        )
-        rows_to_skip = max(data_start_row - header_row - 1, 0)
-        if rows_to_skip:
-            raw_df = raw_df.iloc[rows_to_skip:].reset_index(drop=True)
-        raw_df['__gainz_source_row__'] = range(data_start_row, data_start_row + len(raw_df))
-
-        # Transform to standard format based on detected format
-        if column_mapping:
-            trans_df = transform_generic_to_standard(raw_df, column_mapping=column_mapping)
-        elif csv_format == 'cashapp':
-            trans_df = transform_cashapp_to_standard(raw_df)
-        elif csv_format == 'coinbase':
-            trans_df = transform_coinbase_to_standard(raw_df)
-        elif csv_format == 'coinbase_raw':
-            trans_df = transform_coinbase_raw_to_standard(raw_df)
-        elif csv_format == 'gdax':
-            trans_df = transform_gdax_to_standard(raw_df)
+        if prepared_rows is not None:
+            trans_df = pd.DataFrame(prepared_rows)
         else:
-            trans_df = transform_generic_to_standard(raw_df)
-            if trans_df is raw_df:
-                print("Warning: Unknown CSV format. Attempting to process as-is.")
+            raw_df = pd.read_csv(
+                file_path,
+                skiprows=max(header_row - 1, 0),
+                dtype=str,
+                keep_default_na=False,
+            )
+            rows_to_skip = max(data_start_row - header_row - 1, 0)
+            if rows_to_skip:
+                raw_df = raw_df.iloc[rows_to_skip:].reset_index(drop=True)
+            raw_df['__gainz_source_row__'] = range(data_start_row, data_start_row + len(raw_df))
+
+            # Transform to standard format based on detected format
+            if column_mapping:
+                trans_df = transform_generic_to_standard(raw_df, column_mapping=column_mapping)
+            elif csv_format == 'cashapp':
+                trans_df = transform_cashapp_to_standard(raw_df)
+            elif csv_format == 'coinbase':
+                trans_df = transform_coinbase_to_standard(raw_df)
+            elif csv_format == 'coinbase_raw':
+                trans_df = transform_coinbase_raw_to_standard(raw_df)
+            elif csv_format == 'ledger_live':
+                trans_df = transform_ledger_live_to_standard(raw_df)
+            elif csv_format == 'gdax':
+                trans_df = transform_gdax_to_standard(raw_df)
+            else:
+                trans_df = transform_generic_to_standard(raw_df)
+                if trans_df is raw_df:
+                    print("Warning: Unknown CSV format. Attempting to process as-is.")
 
         missing_standard_columns = STANDARD_IMPORT_COLUMNS - set(trans_df.columns)
         if missing_standard_columns:
@@ -1592,7 +1720,7 @@ def import_transactions(file_path, transactions, header_row=1, column_mapping=No
                         f"{temp_trans.economics_warning}"
                     )
 
-                if usd_spot == 0:
+                if usd_spot == 0 and temp_trans.trans_type in {'buy', 'sell'}:
                     import_warnings.append(
                         f"Imported row {source_row_number} from {os.path.basename(file_path)} with $0 USD spot price. "
                         "Map a USD spot price or total USD value column if this is not intentional."

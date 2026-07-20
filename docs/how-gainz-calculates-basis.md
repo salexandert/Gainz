@@ -63,7 +63,9 @@ $495.00 net proceeds - $25.50 total cost = $469.50 gain
 
 The Import page's **Confirm Imported Values** step and the packet's `01_reports/import_economics.csv` show the source gross value, fee, fee currency, and resulting total cost or net proceeds. If a fee is denominated in crypto or source values do not reconcile, Gainz keeps the output in review status rather than silently guessing a USD fee.
 
-If a sell cannot be fully linked to earlier basis, Gainz reports the unlinked quantity. Unlinked sells are a warning condition, not a final answer.
+If a sell cannot be fully linked to earlier basis, Gainz reports the unlinked quantity. Unlinked sells are a warning condition, not a final answer. Only the supported linked quantity appears in gain and Form 8949 calculations. Gainz does not silently turn the unsupported remainder into a `$0`-basis gain; that requires an exact, explicit professional-directed treatment.
+
+If any imported source fails the input-integrity gate, Gainz suppresses Form 8949 output and every populated Gains or Sales workbook sheet, even when other rows have valid links. The workbook contains a `Calculations Suppressed` sheet until the source is corrected or removed.
 
 ### Professional resolution recorded by the user
 

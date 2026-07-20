@@ -1379,6 +1379,22 @@ class Transactions:
         sheet.column_dimensions["O"].width = 65
         sheet.column_dimensions["P"].width = 55
 
+    def _write_calculation_suppression_sheet(self, workbook):
+        sheet = workbook.create_sheet("Calculations Suppressed", 3)
+        sheet["A1"] = "CALCULATIONS WITHHELD - SOURCE INPUTS NOT RELIABLE"
+        sheet["A1"].font = Font(bold=True, size=16)
+        sheet["A3"] = (
+            "Gainz did not publish Sales, Gains, or Form 8949 calculation rows because at least "
+            "one imported source row failed an input-integrity check. Correct or re-import the "
+            "source data, then generate a new workbook."
+        )
+        sheet["A5"] = (
+            "Diagnostic transaction and import-economics sheets remain available for review. "
+            "No missing-basis disposition is presented as a $0-basis gain unless an exact "
+            "professional resolution was explicitly applied to that transaction and quantity."
+        )
+        sheet.column_dimensions["A"].width = 120
+
     def export_to_excel(self, asset=None, date_range=None, by_year=True, output_dir=None, readiness=None):
 
         # Idea to programatically create Excel Links, Fancy ;-)
@@ -1405,6 +1421,8 @@ class Transactions:
             "input_reliability",
             {"passed": True},
         ).get("passed", True)
+        if input_reliability_failed:
+            self._write_calculation_suppression_sheet(workbook)
         sales_rows = [] if input_reliability_failed else get_sales_report_rows(self)
         years = sorted({row["year"] for row in sales_rows})
 
@@ -1547,11 +1565,12 @@ class Transactions:
             buy_usd_spot_index = column_names.index("Buy Spot USD") + 1
 
             years = set()
-            for link in self.links:
-                if link.symbol != asset:
-                    continue
+            if not input_reliability_failed:
+                for link in self.links:
+                    if link.symbol != asset:
+                        continue
 
-                years.add(link.sell.time_stamp.year)
+                    years.add(link.sell.time_stamp.year)
 
             for year in years:
 
@@ -1613,56 +1632,6 @@ class Transactions:
                     links_sheet.cell(row=row, column=buy_multi_link_index, value=link.buy.multi_link)
 
                     row += 1
-
-                for trans in self.transactions:
-
-                    if trans.symbol != asset:
-                        continue
-
-                    if trans.trans_type != 'sell':
-                        continue
-
-                    if trans.time_stamp.year != year:
-                        continue
-
-                    if trans.unlinked_quantity <= 0.00000001:
-                        continue
-
-                    unresolved_proceeds = trans.prorated_tax_usd(trans.unlinked_quantity)
-                    profit_loss_total += float(unresolved_proceeds)
-
-                    links_sheet.cell(row=row, column=link_symbol_index, value="N/A")
-                    links_sheet.cell(row=row, column=link_id_index, value="N/A")
-                    links_sheet.cell(row=row, column=buy_id_index, value="N/A")
-                    links_sheet.cell(row=row, column=sell_id_index, value=trans.id)
-                    links_sheet.cell(row=row, column=buy_date_index, value="N/A")
-                    links_sheet.cell(row=row, column=buy_quantity_index, value="N/A")
-                    links_sheet.cell(row=row, column=buy_unlinked_index, value="N/A")
-                    links_sheet.cell(row=row, column=buy_usd_spot_index, value="N/A")
-                    links_sheet.cell(row=row, column=buy_usd_total_index, value="N/A")
-                    links_sheet.cell(row=row, column=buy_link_usd_index, value="N/A")
-                    links_sheet.cell(row=row, column=link_quantity_index, value=trans.unlinked_quantity)
-
-                    links_sheet.cell(row=row, column=link_profit_loss_index, value=unresolved_proceeds)
-                    links_sheet.cell(row=row, column=link_profit_loss_index).number_format = '"$"#,##0.00_);[Red]("$"#,##0.00)'
-
-                    links_sheet.cell(row=row, column=sell_link_usd_index, value=unresolved_proceeds)
-                    links_sheet.cell(row=row, column=sell_link_usd_index).number_format = '"$"#,##0.00_-'
-
-                    links_sheet.cell(row=row, column=sell_date_index, value=_excel_datetime(trans.time_stamp))
-                    links_sheet.cell(row=row, column=sell_quantity_index, value=trans.quantity)
-                    links_sheet.cell(row=row, column=sell_unlinked_index, value=trans.unlinked_quantity)
-                    links_sheet.cell(row=row, column=sell_usd_spot_index, value=trans.usd_spot)
-                    links_sheet.cell(row=row, column=sell_usd_spot_index).number_format = '"$"#,##0.00_-'
-
-                    links_sheet.cell(row=row, column=sell_usd_total_index, value=trans.tax_usd_total)
-                    links_sheet.cell(row=row, column=sell_usd_total_index).number_format = '"$"#,##0.00_-'
-
-                    links_sheet.cell(row=row, column=sell_multi_link_index, value="N/A")
-                    links_sheet.cell(row=row, column=buy_multi_link_index, value="N/A")
-
-                    row += 1
-
 
                 row += 2
 

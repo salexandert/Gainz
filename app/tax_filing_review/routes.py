@@ -12,6 +12,7 @@ from app.services.tax_evidence_service import (
     classify_tax_evidence,
     get_tax_evidence_inventory_summary,
     infer_tax_evidence_year,
+    infer_tax_evidence_years_from_file,
     tax_evidence_type_label,
 )
 from app.services.tax_filing_import_service import import_tax_total_records
@@ -228,9 +229,18 @@ def _scan_keyword_filters(form_name, preset_key):
     return deduped
 
 
-def _path_matches_scan_filters(path, years, include_keywords, exclude_keywords):
-    inferred_year = infer_tax_evidence_year(path.name, path.parent.name)
-    if years and inferred_year not in years:
+def _path_matches_scan_filters(
+    path,
+    years,
+    include_keywords,
+    exclude_keywords,
+    detected_years=None,
+):
+    detected_years = set(detected_years or [])
+    inferred_year = _path_year_hint(path)
+    if inferred_year:
+        detected_years.add(inferred_year)
+    if years and not (set(years) & detected_years):
         return False
 
     searchable_text = str(path).lower()
@@ -241,6 +251,18 @@ def _path_matches_scan_filters(path, years, include_keywords, exclude_keywords):
         return False
 
     return True
+
+
+def _path_year_hint(path):
+    inferred_year = infer_tax_evidence_year(path.name)
+    if inferred_year:
+        return inferred_year
+    parent_name = str(path.parent.name or "").strip()
+    if len(parent_name) == 4 and parent_name.isdigit():
+        year = int(parent_name)
+        if 2009 <= year <= 2100:
+            return year
+    return None
 
 
 def _default_excluded_scan_folder(path):
@@ -533,29 +555,42 @@ def scan_tax_evidence_folder():
             continue
         if not path.is_file() or path.suffix.lower() not in extension_filters:
             continue
-        if not _path_matches_scan_filters(path, year_filters, include_keywords, exclude_keywords):
+        content_years = infer_tax_evidence_years_from_file(path)
+        if not _path_matches_scan_filters(
+            path,
+            year_filters,
+            include_keywords,
+            exclude_keywords,
+            detected_years=content_years,
+        ):
             continue
 
         evidence_type = classify_tax_evidence(str(path))
-        record_year = infer_tax_evidence_year(path.name, path.parent.name)
-        if record_year:
-            scanned_years.add(record_year)
-        transactions.set_tax_evidence_record(
-            year=record_year,
-            evidence_type=evidence_type,
-            evidence_label=path.name,
-            evidence_path=str(path),
-            copy_to_packet=copy_scanned_evidence,
-            notes=(
-                (
-                    f"Scanned from local evidence folder using preset: {scan_preset_label}. "
-                    if scan_preset_label
-                    else "Scanned from local evidence folder. "
-                )
-                + "Reference only unless marked for packet copy."
-            ),
-        )
-        added += 1
+        record_years = set(content_years)
+        filename_year = _path_year_hint(path)
+        if filename_year:
+            record_years.add(filename_year)
+        if year_filters:
+            record_years &= year_filters
+        for record_year in sorted(record_years) or [None]:
+            if record_year:
+                scanned_years.add(record_year)
+            transactions.set_tax_evidence_record(
+                year=record_year,
+                evidence_type=evidence_type,
+                evidence_label=path.name,
+                evidence_path=str(path),
+                copy_to_packet=copy_scanned_evidence,
+                notes=(
+                    (
+                        f"Scanned from local evidence folder using preset: {scan_preset_label}. "
+                        if scan_preset_label
+                        else "Scanned from local evidence folder. "
+                    )
+                    + "Reference only unless marked for packet copy."
+                ),
+            )
+            added += 1
 
     if added:
         transactions.save(description=f"Scanned {added} tax evidence item(s)")

@@ -66,6 +66,7 @@ Gainz currently includes parsers or workflows for:
 - Coinbase CSV exports
 - Coinbase's current official raw dual-leg export, with a required pre-import reconciliation preview
 - Coinbase Pro / GDAX fills
+- Ledger Live operations exports, with a required pre-import reconciliation preview
 - Kraken and other custom CSVs through Advanced Import / Column Mapping
 - Batch manual transaction entry for source-backed buys and sells that were not imported from a CSV
 
@@ -75,7 +76,9 @@ The Cash App, Coinbase, and generic CSV import path recognizes common header ali
 
 If automatic detection cannot identify the needed columns, Gainz can pause for column review so the user can choose the header row and map the required fields.
 
-Gainz preserves raw quantity text and checks source quantity, unit price, and USD totals for material disagreement. A failed check blocks downstream tax calculations instead of allowing a suspicious row into a trusted-looking result. Imported, transformed, duplicate, unsupported, and skipped rows are retained in a durable import receipt.
+Gainz preserves raw quantity text and checks source quantity, unit price, and USD totals for material disagreement. Cash App withdrawals are checked against the source net amount after fees, while Coinbase retail uses `Total (inclusive of fees and/or spread)` as the authoritative tax cost or proceeds value. A failed input-integrity check blocks every downstream gain-bearing sheet instead of allowing a suspicious row into a trusted-looking result. Imported, transformed, duplicate, unsupported, and skipped rows are retained in a durable import receipt.
+
+Coinbase official raw and Ledger Live imports use the exact normalized rows shown in their confirmation preview. If confirmation cannot import those rows completely, Gainz rolls back the entire source: no partial transactions, warning flood, save revision, or trusted-looking calculation output is left behind.
 
 See `demo_data/` for small sample files that are safe to use for testing.
 

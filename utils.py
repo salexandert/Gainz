@@ -161,7 +161,10 @@ def get_import_economics_rows(transactions):
             "fee_usd": _transaction_fee(transaction),
             "source_fee_amount": getattr(transaction, "source_fee_amount", None),
             "fee_currency": getattr(transaction, "fee_currency", "USD"),
-            "net_tax_usd": transaction.tax_usd_total,
+            # Keep source net economics visible even for non-taxable wallet movements.
+            # Tax treatment is determined separately; this field must not silently
+            # substitute gross value for a Cash App or exchange-provided net value.
+            "net_tax_usd": transaction.net_usd_total,
             "economic_source": getattr(transaction, "economics_source", "spot_price"),
             "economic_warning": getattr(transaction, "economics_warning", ""),
             "source_usd": getattr(transaction, "source_usd_total", None),
@@ -1542,7 +1545,14 @@ def get_audit_readiness_summary(transactions):
             "source_overlaps": len(source_overlap_rows),
             "tax_evidence_years_needing_review": tax_evidence_inventory["metrics"]["years_needing_review"],
             "tax_evidence_items": tax_evidence_inventory["metrics"]["evidence_items"],
-            "form_8949_rows": form_8949_totals["total"]["rows"],
+            "form_8949_rows": (
+                "Withheld" if input_reliability_rows else form_8949_totals["total"]["rows"]
+            ),
+            "form_8949_rows_label": (
+                "Potential disposition rows withheld"
+                if input_reliability_rows
+                else "8949 Rows"
+            ),
             "form_8949_proceeds": (
                 "Suppressed" if input_reliability_rows else currency(form_8949_totals["total"]["proceeds"])
             ),

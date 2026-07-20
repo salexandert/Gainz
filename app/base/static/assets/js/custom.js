@@ -111,6 +111,14 @@ function gainzUpdateImportReceipts(summary) {
 function gainzRenderNativeImportPreview(result, fileName) {
     var preview = result.import_preview || {};
     var panel = $("#native_import_preview");
+    var sourceFormat = result.detected_format || preview.source_format || "native";
+    var sourceLabel = sourceFormat === "ledger_live" ? "Ledger Live" : "Official Coinbase Raw";
+    $("#native_import_preview_heading").text("Review " + sourceLabel + " Import");
+    $("#native_import_preview_explanation").text(
+        sourceFormat === "ledger_live"
+            ? "Gainz recognized Ledger Live wallet movements. Review IN/OUT directions, asset quantities, and crypto-denominated network fees before importing. No USD value is inferred."
+            : "Gainz recognized Coinbase's dual-leg raw schema. Review how acquired and disposed legs will be split before importing."
+    );
     var summary = $("#native_import_preview_summary").empty();
     var metrics = [
         ["Source rows", preview.source_rows || 0],
@@ -145,12 +153,13 @@ function gainzRenderNativeImportPreview(result, fileName) {
     $("#native_import_preview_quantities").empty().append(table);
     panel.data("header-row", result.header_row || 1);
     panel.data("data-start-row", result.data_start_row || 2);
+    panel.data("source-label", sourceLabel);
     panel.show();
     $("#import_column_mapper").hide();
     $("#import_upload_result")
         .removeClass("alert-danger alert-warning")
         .addClass("alert-info")
-        .text("Review " + (fileName || "the Coinbase raw file") + " below before importing.")
+        .text("Review " + (fileName || sourceLabel + " file") + " below before importing.")
         .show();
     gainzFocusImportStatus("#native_import_preview");
 }
@@ -1305,12 +1314,27 @@ $(document).ready(function () {
         }
     });
 
+    $("label[for='csv_file']").on("keydown", function(event) {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            $("#csv_file").trigger("click");
+        }
+    });
+
+    $("#csv_file").on("change", function() {
+        var fileName = this.files && this.files.length ? this.files[0].name : "";
+        $("#filed_totals_file_status").text(
+            fileName ? "Selected: " + fileName : "No filed totals CSV selected."
+        );
+    });
+
     $("#cancel_native_import_button").on("click", function() {
+        var sourceLabel = $("#native_import_preview").data("source-label") || "native CSV";
         $("#native_import_preview").hide();
         $("#import_upload_result")
             .removeClass("alert-danger alert-warning")
             .addClass("alert-info")
-            .text("The Coinbase file remains unimported. Upload it again when you are ready to review and confirm it.")
+            .text("The " + sourceLabel + " file remains unimported. Upload it again when you are ready to review and confirm it.")
             .show();
     });
 
@@ -1328,12 +1352,12 @@ $(document).ready(function () {
             })
         }).done(function(result) {
             panel.hide();
-            gainzShowImportResult(result, result.filename || "official Coinbase raw CSV");
+            gainzShowImportResult(result, result.filename || "reviewed native CSV");
         }).fail(function(xhr) {
-            var message = (xhr.responseJSON && xhr.responseJSON.error) || "The Coinbase raw import could not be completed.";
+            var message = (xhr.responseJSON && xhr.responseJSON.error) || "The reviewed native import could not be completed.";
             $("#import_upload_result").removeClass("alert-info").addClass("alert-danger").text(message).show();
         }).always(function() {
-            button.prop("disabled", false).text("Import These Coinbase Rows");
+            button.prop("disabled", false).text("Import These Reviewed Rows");
         });
     });
 

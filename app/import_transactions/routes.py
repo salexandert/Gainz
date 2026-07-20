@@ -309,6 +309,8 @@ def _data_source_summary(transactions):
 
 def _public_import_result(result):
     public_result = dict(result or {})
+    for key in [name for name in public_result if str(name).startswith("_")]:
+        public_result.pop(key, None)
     file_path = public_result.pop("file_path", None)
     if file_path and "filename" not in public_result:
         public_result["filename"] = _safe_filename(file_path)
@@ -446,6 +448,14 @@ def import_wizard():
                     return _import_error_response("uploaded CSV")
                 if result.get("mapping_required") or result.get("native_preview_required"):
                     session["pending_import_file_path"] = result["file_path"]
+                    if result.get("_prepared_payload_path"):
+                        old_payload = session.get("pending_import_payload_path")
+                        if old_payload and old_payload != result["_prepared_payload_path"]:
+                            try:
+                                os.remove(old_payload)
+                            except OSError:
+                                pass
+                        session["pending_import_payload_path"] = result["_prepared_payload_path"]
                 else:
                     result = _ensure_fifo_after_data_change(
                         transactions,
@@ -591,23 +601,23 @@ def mapped_import():
 @login_required
 def confirm_native_import():
     file_path = session.get("pending_import_file_path")
-    if not file_path or not os.path.exists(file_path):
-        return jsonify({"error": "Upload the official Coinbase raw CSV before confirming import."}), 400
+    payload_path = session.get("pending_import_payload_path")
+    if not file_path or not os.path.exists(file_path) or not payload_path:
+        return jsonify({"error": "Upload and review the native CSV before confirming import."}), 400
 
     data = request.get_json(silent=True) or {}
     transactions = current_app.config['transactions']
     try:
-        result = ImportService(current_app.config['UPLOAD_FOLDER']).import_native_file(
-            file_path,
+        result = ImportService(current_app.config['UPLOAD_FOLDER']).import_native_payload(
+            payload_path,
             transactions,
-            header_row=data.get("header_row") or 1,
-            data_start_row=data.get("data_start_row"),
         )
     except Exception:
-        return _import_error_response("official Coinbase raw CSV")
+        return _import_error_response("reviewed native CSV")
 
     session.pop("pending_import_file_path", None)
-    result = _ensure_fifo_after_data_change(transactions, result, "official Coinbase raw import")
+    session.pop("pending_import_payload_path", None)
+    result = _ensure_fifo_after_data_change(transactions, result, "native source import")
     return jsonify(_public_import_response(transactions, result))
 
 

@@ -8,11 +8,12 @@ The **Import > Confirm Imported Values** step shows what Gainz understood. The s
 
 | Source workflow | Detection | Quantity | Gross USD | Fee | Net tax value | Source trace | Important limits |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Cash App | Native | Yes | `Amount` | `Fee` and currency | `Net Amount`; buy fees increase total cost and sale fees reduce proceeds | Source row and transaction ID | Review zero-dollar withdrawals as transfer/classification questions. |
-| Coinbase retail | Native | Yes | `Subtotal` | `Fees and/or Spread` and price currency | `Total (inclusive of fees and/or spread)` | Source row, ID, and notes | Source gross, fee, and total must reconcile within tolerance or output remains under review. |
+| Cash App | Native | Yes | `Amount` | `Fee` and currency | `Net Amount`; buy fees increase total cost and sale fees reduce proceeds | Source row and transaction ID | For withdrawals/sends, Gainz compares quantity times asset price with the source net amount after fees and preserves gross, fee, and net separately. Review zero-dollar withdrawals as transfer/classification questions. |
+| Coinbase retail | Native | Yes | `Subtotal` | `Fees and/or Spread` and price currency | `Total (inclusive of fees and/or spread)` is authoritative for tax cost or proceeds | Source row, ID, and notes | Subtotal, fee/spread, and total provenance are preserved. Sign or spread presentation alone does not create a false repair warning. |
 | Coinbase official raw dual-leg export | Native with required preview | Both acquired and disposed quantities | Disposed-leg `Proceeds (excl. fees and/or spread) (USD)` | Included in the source-reported basis/proceeds fields when Coinbase does not provide a separate fee column | Acquired-leg `Cost Basis (incl. fees and/or spread) (USD)` and disposed-leg proceeds remain separate | Source row, transaction ID, notes, and acquired/disposed leg | Gainz shows source-row count, resulting legs, per-asset/type quantities, basis, proceeds, warnings, and skipped rows before commit. Fiat-only or unsupported rows remain unimported with a receipt. |
 | Coinbase Convert | Native split into disposal and acquisition rows | Yes, both assets | Conversion subtotal | Preserved on the disposal side | Disposal net is preserved | Both rows retain the source row, ID, and note | When a fee exists, the acquired side remains an economic warning because Gainz will not silently choose how that fee affects acquired-asset basis. |
 | Coinbase Pro / GDAX fills | Native | `size` | `total`, with price fallback | `fee` and `price/fee/total unit` | Buy fee increases cost; sale fee reduces proceeds | Source row and trade ID | A non-USD fee is preserved but blocks readiness until a supported USD value is supplied. |
+| Ledger Live operations | Native with required preview | `Operation Amount` | Not inferred | `Operation Fees` in the crypto asset named by `Currency Ticker` | Not inferred | Source row, operation hash, account name, and account xpub | `IN` becomes Receive and `OUT` becomes Send. Gainz preserves the crypto-denominated fee and does not invent USD cost, proceeds, or fee value. |
 | Kraken trade export | Advanced Import / Column Mapping | Map `vol` | Map `cost` | Map `fee` and quote currency | Derived from mapped gross and fee | Source row; map `txid` as transaction ID | Kraken is a tested mapping template, not a native auto-detected parser. Confirm the header and every mapped economic field. |
 | Other CSVs | Advanced Import / Column Mapping | Required mapping | Map subtotal, gross value, or spot price | Optional fee and fee-currency mapping | Map net/total when available; otherwise Gainz derives it only when gross and a USD fee are supported | Source row and optional transaction ID/notes | If a fee is crypto-denominated or gross, fee, and net do not reconcile, Gainz preserves the source value and blocks readiness rather than guessing. |
 
@@ -30,12 +31,15 @@ The **Import > Confirm Imported Values** step shows what Gainz understood. The s
 - Gainz reads CSV cells as source text before converting quantities or money. Small decimal quantities and scientific notation must resolve to the same value.
 - When a source provides quantity, unit price, and total USD value, Gainz compares `quantity x price` with the source total using a documented tolerance.
 - A material disagreement is an **input reliability blocker**, not an ordinary warning. Gainz suppresses Form 8949 and year-level calculated comparisons until the source is corrected or re-imported.
+- When input reliability is blocked, Gainz also withholds populated Gains and Sales workbook sheets. A `Calculations Suppressed` sheet explains why; unresolved rows never appear as implicit `$0`-basis gains.
 - Every imported, transformed, duplicate, unsupported, or skipped row receives a source-row receipt with file hash, row number, source transaction ID, interpreted quantity, outcome, and reason. The receipt is saved in revisions and exported as `01_reports/import_row_receipts.csv`.
 - For Coinbase dual-leg rows, Gainz preserves the common source transaction ID and labels each resulting transaction as the acquired or disposed leg.
+- Coinbase official raw and Ledger Live confirmation commits the exact normalized row payload shown in preview. Gainz verifies the source hash and expected result count before saving.
+- A failed native confirmation or a mapped import that produces zero valid transactions is transactional: Gainz restores transactions, warnings, receipts, review decisions, and revision state, then reports one source-level failure.
 
 ## Release-Gate Fixtures
 
-Synthetic golden fixtures cover fee-inclusive round trips for Cash App, Coinbase, Coinbase Pro/GDAX, Coinbase Convert, generic mapped CSVs, and a Kraken mapped template. The partial-basis Coinbase fixture verifies this exact result:
+Synthetic golden fixtures cover fee-inclusive round trips for Cash App, Coinbase, Coinbase Pro/GDAX, Coinbase Convert, Ledger Live IN/OUT operations, generic mapped CSVs, and a Kraken mapped template. The partial-basis Coinbase fixture verifies this exact result:
 
 ```text
 $495.00 net sale proceeds - $25.50 acquisition cost = $469.50 gain

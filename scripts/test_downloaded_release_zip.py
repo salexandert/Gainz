@@ -15,6 +15,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -314,6 +315,69 @@ def assert_synthetic_fee_reports(packet_path):
         raise AssertionError("Professional workpaper did not retain the user-recorded status label.")
 
 
+def workbook_sheet_names(workbook_path):
+    with zipfile.ZipFile(workbook_path) as archive:
+        root = ET.fromstring(archive.read("xl/workbook.xml"))
+    namespace = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    return [
+        sheet.attrib["name"]
+        for sheet in root.findall("main:sheets/main:sheet", namespace)
+    ]
+
+
+def assert_packaged_suppression_contract(opener, base_url, temp_path, output_dir):
+    unreliable_path = temp_path / "cash_app_unreliable_value.csv"
+    unreliable_path.write_text(
+        "Transaction ID,Date,Transaction Type,Currency,Amount,Fee,Net Amount,"
+        "Asset Type,Asset Price,Asset Amount,Status,Notes\n"
+        "unreliable-1,2024-07-01T00:00:00Z,Bitcoin Buy,USD,$100,$0,$100,"
+        "BTC,$10000,0.1,COMPLETED,Synthetic reliability failure\n",
+        encoding="utf-8",
+    )
+    import_payload = read_json_response(
+        post_file(opener, f"{base_url}/import_transactions/", unreliable_path)
+    )
+    if import_payload.get("imported_count") != 1:
+        raise AssertionError(f"Reliability-fixture import failed: {import_payload}")
+    if not import_payload.get("warnings"):
+        raise AssertionError("Reliability-fixture import should produce a blocking warning.")
+
+    packet_payload = assert_post_json_status(
+        opener,
+        f"{base_url}/export/audit_packet",
+        {"output_location": "audit_packets", "draft_acknowledged": True},
+        200,
+    )
+    packet_path = Path(packet_payload["path"])
+    if packet_path.parent != output_dir.resolve():
+        raise AssertionError("Suppression packet used an unexpected output folder.")
+
+    totals_path = packet_path / "03_manifests" / "form_8949_totals.json"
+    totals = json.loads(totals_path.read_text(encoding="utf-8"))
+    if not totals.get("suppressed"):
+        raise AssertionError("Unreliable input did not suppress Form 8949 totals.")
+    if (packet_path / "01_reports" / "form_8949_totals.csv").exists():
+        raise AssertionError("Suppressed packet published Form 8949 totals CSV.")
+
+    workbooks = list((packet_path / "01_reports").glob("*.xlsx"))
+    if len(workbooks) != 1:
+        raise AssertionError(
+            f"Suppression packet contained {len(workbooks)} workbooks; expected 1."
+        )
+    sheet_names = workbook_sheet_names(workbooks[0])
+    if "Calculations Suppressed" not in sheet_names:
+        raise AssertionError("Suppressed workbook is missing Calculations Suppressed sheet.")
+    leaked = [
+        name
+        for name in sheet_names
+        if name.endswith(" Gains") or name.endswith(" Sales") or "8949" in name
+    ]
+    if leaked:
+        raise AssertionError(
+            "Suppressed workbook leaked calculation sheets: " + ", ".join(leaked)
+        )
+
+
 def run_packaged_workflow_smoke(temp_path, expected_version):
     base_url = release_smoke_base_url()
     opener = build_authenticated_opener()
@@ -432,6 +496,16 @@ def run_packaged_workflow_smoke(temp_path, expected_version):
         raise AssertionError("Summary reference-only count did not match packet preview.")
     if summary["tax_evidence_packet_counts"]["missing"] != preview["missing_tax_evidence_count"]:
         raise AssertionError("Summary missing evidence count did not match packet preview.")
+    if ".building-" in summary_path.read_text(encoding="utf-8"):
+        raise AssertionError("Packet summary retained a temporary build path.")
+
+    manifest_path = packet_path / "03_manifests" / "evidence_manifest.csv"
+    for row in read_csv_rows(manifest_path):
+        source_path = row.get("source_path", "")
+        if ".building-" in source_path:
+            raise AssertionError("Packet manifest retained a temporary build path.")
+        if row.get("status") == "GENERATED" and not Path(source_path).is_file():
+            raise AssertionError("Generated workbook manifest path does not exist after publish.")
 
     for_cpas_path = packet_path / "FOR_CPAS.md"
     cpa_handoff_path = packet_path / "CPA_HANDOFF.md"
@@ -455,6 +529,8 @@ def run_packaged_workflow_smoke(temp_path, expected_version):
         raise AssertionError("Privacy handling memo is missing offline/no-upload language.")
     if "Reference only means" not in privacy_handling:
         raise AssertionError("Privacy handling memo is missing reference-only evidence language.")
+
+    assert_packaged_suppression_contract(opener, base_url, temp_path, output_dir)
 
     health_payload = wait_for_healthz(expected_version, timeout=5)
     if health_payload.get("version") != expected_version:

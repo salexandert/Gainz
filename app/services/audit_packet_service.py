@@ -86,19 +86,30 @@ class AuditPacketService:
         packet_dir = self._unique_packet_path(self.packet_root / f"{packet_prefix}_{timestamp}")
         staging_dir = self.packet_root / f".{packet_dir.name}.building-{uuid.uuid4().hex[:8]}"
 
+        published = False
         try:
-            self._build_packet(transactions, staging_dir, readiness)
+            self._build_packet(
+                transactions,
+                staging_dir,
+                readiness,
+                published_packet_dir=packet_dir,
+            )
             self._validate_packet_contract(staging_dir, readiness)
             staging_dir.replace(packet_dir)
+            published = True
+            self._validate_published_packet_paths(packet_dir)
         except Exception as exc:
             shutil.rmtree(staging_dir, ignore_errors=True)
+            if published:
+                shutil.rmtree(packet_dir, ignore_errors=True)
             self._write_failure_receipt(packet_dir.name, exc)
             raise
 
         return str(packet_dir)
 
-    def _build_packet(self, transactions, packet_dir, readiness):
+    def _build_packet(self, transactions, packet_dir, readiness, published_packet_dir=None):
         packet_dir.mkdir(parents=True, exist_ok=False)
+        published_packet_dir = Path(published_packet_dir or packet_dir)
 
         for folder in (
             "00_memos",
@@ -119,16 +130,18 @@ class AuditPacketService:
         report_dest = packet_dir / "01_reports" / Path(report_path).name
         if Path(report_path).resolve() != report_dest.resolve():
             shutil.copy2(report_path, report_dest)
-        manifest_rows.append(
-            self._manifest_row(
-                source_path=report_path,
-                packet_path=report_dest,
-                packet_dir=packet_dir,
-                category="generated_report",
-                role="Gainz Excel export generated for this audit packet",
-                status="GENERATED",
-            )
+        report_manifest_row = self._manifest_row(
+            source_path=report_path,
+            packet_path=report_dest,
+            packet_dir=packet_dir,
+            category="generated_report",
+            role="Gainz Excel export generated for this audit packet",
+            status="GENERATED",
         )
+        report_manifest_row["source_path"] = str(
+            published_packet_dir / "01_reports" / report_dest.name
+        )
+        manifest_rows.append(report_manifest_row)
 
         for source in self._source_paths(transactions):
             source_path = Path(source)
@@ -183,7 +196,12 @@ class AuditPacketService:
         self._write_for_cpas(packet_dir, readiness, manifest_rows, transactions)
         self._write_privacy_and_evidence_handling(packet_dir, manifest_rows)
         self._write_manifest(packet_dir, manifest_rows)
-        self._write_summary(packet_dir, manifest_rows, transactions)
+        self._write_summary(
+            packet_dir,
+            manifest_rows,
+            transactions,
+            published_packet_dir=published_packet_dir,
+        )
         self._write_inventory(packet_dir)
 
         return str(packet_dir)
@@ -233,6 +251,23 @@ class AuditPacketService:
             try:
                 missing_sheets = self.REQUIRED_WORKBOOK_SHEETS - set(workbook.sheetnames)
                 missing.extend(f"workbook sheet: {sheet}" for sheet in sorted(missing_sheets))
+                reliability_failed = not (readiness.get("input_reliability") or {}).get(
+                    "passed",
+                    True,
+                )
+                if reliability_failed:
+                    if "Calculations Suppressed" not in workbook.sheetnames:
+                        missing.append("workbook sheet: Calculations Suppressed")
+                    prohibited = [
+                        name for name in workbook.sheetnames
+                        if name.endswith(" Gains")
+                        or " 8949 " in f" {name} "
+                        or name.endswith(" Sales")
+                    ]
+                    if prohibited:
+                        missing.append(
+                            "suppressed workbook calculation sheets: " + ", ".join(prohibited)
+                        )
             finally:
                 workbook.close()
 
@@ -251,6 +286,33 @@ class AuditPacketService:
 
         if missing:
             raise ValueError("Audit packet contract failed; missing: " + ", ".join(missing))
+
+        for path in packet_dir.rglob("*"):
+            if not path.is_file() or path.suffix.lower() not in {".md", ".json", ".csv", ".txt"}:
+                continue
+            content = path.read_text(encoding="utf-8", errors="replace")
+            if ".building-" in content:
+                raise ValueError(
+                    f"Audit packet contract failed; temporary staging path stored in {path.name}."
+                )
+
+    def _validate_published_packet_paths(self, packet_dir):
+        summary_path = packet_dir / "03_manifests" / "audit_packet_summary.json"
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        if Path(summary.get("packet_path") or "").resolve() != packet_dir.resolve():
+            raise ValueError("Published audit packet summary points to the wrong folder.")
+
+        manifest_path = packet_dir / "03_manifests" / "evidence_manifest.csv"
+        with manifest_path.open(newline="", encoding="utf-8") as file:
+            rows = list(csv.DictReader(file))
+        for row in rows:
+            if row.get("status") != "GENERATED":
+                continue
+            generated_path = Path(row.get("source_path") or "")
+            if not generated_path.is_file():
+                raise ValueError(
+                    f"Published generated-report path does not exist: {generated_path}"
+                )
 
     def _write_draft_not_ready_memo(self, packet_dir, readiness):
         lines = [
@@ -1350,7 +1412,13 @@ class AuditPacketService:
             for row in rows:
                 file.write(f"{row['sha256']}  {row['packet_relative_path'].replace(os.sep, '/')}\n")
 
-    def _write_summary(self, packet_dir, manifest_rows, transactions):
+    def _write_summary(
+        self,
+        packet_dir,
+        manifest_rows,
+        transactions,
+        published_packet_dir=None,
+    ):
         copied_sources = len([row for row in manifest_rows if row["status"] == "COPIED"])
         missing_sources = len([row for row in manifest_rows if row["status"] == "MISSING"])
         form_8949_totals = get_form_8949_totals(transactions)
@@ -1360,7 +1428,7 @@ class AuditPacketService:
         summary = {
             "packet_contract_version": self.PACKET_CONTRACT_VERSION,
             "created_at": datetime.now().isoformat(timespec="seconds"),
-            "packet_path": str(packet_dir),
+            "packet_path": str(Path(published_packet_dir or packet_dir)),
             "copied_source_files": copied_sources,
             "missing_source_files": missing_sources,
             "tax_evidence_packet_counts": evidence_counts,

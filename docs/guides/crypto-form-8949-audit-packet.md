@@ -15,9 +15,9 @@ A Gainz audit packet can include:
 
 - `README_FIRST.md`, `PACKET_STATUS.md`, `FOR_CPAS.md`, `CPA_HANDOFF.md`, and `PRIVACY_AND_EVIDENCE_HANDLING.md` at the packet root.
 - Excel workbook export with a visible packet status sheet.
-- Form 8949 short-term detail CSV.
-- Form 8949 long-term detail CSV.
-- Form 8949 totals CSV and JSON.
+- Form 8949 short-term detail CSV when the input-integrity gate passes.
+- Form 8949 long-term detail CSV when the input-integrity gate passes.
+- Form 8949 totals CSV and JSON when the input-integrity gate passes.
 - Tax filing review CSV and JSON.
 - Tax evidence inventory CSV and JSON.
 - Suggested filed totals CSV and JSON.
@@ -40,7 +40,7 @@ Reference only means the local path or label is listed, but the file is not copi
 
 ## Why Links Come First
 
-Form 8949-style output is generated from links between sale records and earlier buy lots. If a sell is not linked, Gainz marks the packet as not ready for review instead of quietly producing a weak answer.
+Form 8949-style output is generated from links between sale records and earlier buy lots. If a sell is not linked, Gainz marks the packet as not ready for review instead of quietly producing a weak answer. If any source fails input-integrity checks, Gainz withholds Form 8949 and populated Gains/Sales sheets entirely and includes a `Calculations Suppressed` explanation instead.
 
 ## Readiness Signals
 

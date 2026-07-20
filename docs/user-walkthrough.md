@@ -58,11 +58,13 @@ If you are learning Gainz, click **Try Demo Data**. This loads the bundled synth
 
 Upload one file at a time. After a file is selected, Gainz shows the filename, import progress, and how many rows were imported, skipped, or warned after each upload.
 
-For Coinbase's current official raw export, Gainz pauses before changing the save. Review the source-row count, resulting acquired/disposed legs, quantity totals by asset and type, source-reported proceeds and basis, warnings, and source rows that will remain unimported. Confirm only when that preview matches the export.
+For Coinbase's current official raw export, Gainz pauses before changing the save. Review the source-row count, resulting acquired/disposed legs, quantity totals by asset and type, source-reported proceeds and basis, warnings, and source rows that will remain unimported. Ledger Live operations exports use the same required confirmation preview for IN/OUT wallet movements and crypto-denominated fees. Confirm only when the preview matches the source.
+
+Gainz commits the exact normalized rows shown in these native previews. It verifies the source file hash and expected result count at confirmation. If the commit cannot reproduce the preview, Gainz restores the prior data and shows one source-level failure instead of leaving partial transactions, hundreds of row warnings, or a misleading save revision.
 
 After each import, complete **Step 1.3: Confirm Imported Values**. Compare the source row, quantity, gross value, fee, fee currency, and total cost or net proceeds. Gainz keeps economic warnings blocking when a crypto-denominated fee cannot be valued or when source gross, fee, and net values do not reconcile.
 
-If Gainz reports **Inputs not reliable**, stop there. A source quantity, unit price, and USD total materially disagree. Gainz suppresses Form 8949 and year-level calculated comparisons until you inspect the named source row and correct or re-import it. Open **Show import row receipt** to see the source hash, row number, transaction ID, original quantity, interpreted quantity, outcome, and exact reason for every imported or skipped row.
+If Gainz reports **Inputs not reliable**, stop there. A source quantity, unit price, and USD total materially disagree. Gainz suppresses Form 8949, year-level calculated comparisons, and all populated Gains/Sales sheets until you inspect the named source row and correct or re-import it. The workbook contains a `Calculations Suppressed` explanation instead. Open **Show import row receipt** to see the source hash, row number, transaction ID, original quantity, interpreted quantity, outcome, and exact reason for every imported or skipped row.
 
 After the imported economics look correct and source warnings have a decision, use **Step 1.4: Continue to Declare Holdings**.
 
@@ -73,6 +75,7 @@ Supported workflows currently include:
 - Coinbase official raw dual-leg exports
 - Coinbase Convert rows
 - Coinbase Pro / GDAX fills
+- Ledger Live operations exports
 - Kraken and other custom CSVs through Advanced Import / Column Mapping
 - Batch manual transaction entry
 
@@ -147,6 +150,8 @@ Unresolved warnings stay visible in Reports & Export and the audit packet.
 Open **Tax Evidence** before generating a packet for a real filing review.
 
 Use **Tax Evidence Inventory** to scan a local tax evidence folder or add one item at a time. Gainz classifies filenames and notes as filed returns, Form 8949, Schedule D, payment receipts, crypto workbooks, broker forms, transaction CSVs, estimates, or zero/not-applicable confirmations.
+
+For supported CSV and XLSX evidence, Gainz can find multiple years from explicit `Year` or `Tax Year` columns and tax-year wording inside the file. It does not treat an unrelated four-digit dollar amount or generated date as a filing year. An IRS Record of Account is listed as filed-return/account evidence; it is not counted as a payment receipt or proof of a payment amount.
 
 For broad folder scans, use the year, file type, include-keyword, and exclude-keyword filters. Scanned files are recorded as local references by default; Gainz does not copy them into audit packets unless you explicitly choose packet copy for a curated folder or evidence item.
 

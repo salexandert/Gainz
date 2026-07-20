@@ -266,10 +266,12 @@
         <div class="mt-4">
           <h6>Import Filed Totals from CSV</h6>
           <p class="text-muted small">Upload a CSV file with historical tax filing totals to populate Tax Filing Review records.</p>
-          <form method="POST" action="{{ url_for('tax_filing_review_blueprint.import_filed_totals_csv', guided=1) if guided_mode else url_for('tax_filing_review_blueprint.import_filed_totals_csv') }}" enctype="multipart/form-data" class="form-inline">
+          <form method="POST" action="{{ url_for('tax_filing_review_blueprint.import_filed_totals_csv', guided=1) if guided_mode else url_for('tax_filing_review_blueprint.import_filed_totals_csv') }}" enctype="multipart/form-data" class="form-inline gainz-file-picker-row">
             <div class="form-group mb-2 mr-2">
-              <input id="csv_file" name="csv_file" type="file" class="form-control-file" accept=".csv" required>
+              <label for="csv_file" class="btn btn-outline-primary mb-0" role="button" tabindex="0">Choose Filed Totals CSV</label>
+              <input id="csv_file" name="csv_file" type="file" class="gainz-accessible-upload-input" accept=".csv,text/csv" aria-describedby="filed_totals_file_status" required>
             </div>
+            <span id="filed_totals_file_status" class="text-muted mb-2 mr-2" role="status">No filed totals CSV selected.</span>
             <button type="submit" class="btn btn-info mb-2">Import CSV</button>
           </form>
         </div>
@@ -424,7 +426,7 @@
                 <tr>
                   <th>Year</th>
                   <th>Gainz Calculated Totals</th>
-                  <th>Filed Return Evidence</th>
+                  <th>Filed Return / Account Evidence</th>
                   <th>Payment Evidence</th>
                   <th>Crypto Totals Evidence</th>
                   <th>Status</th>

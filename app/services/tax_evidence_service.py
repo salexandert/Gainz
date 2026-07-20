@@ -1,11 +1,34 @@
+import csv
 import os
 import re
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
+from zipfile import BadZipFile
+
+from openpyxl import load_workbook
+from openpyxl.utils.exceptions import InvalidFileException
 
 
 YEAR_RE = re.compile(r"(?:19|20)\d{2}")
+EXACT_YEAR_RE = re.compile(r"^(?:19|20)\d{2}(?:\.0+)?$")
+CONTEXT_YEAR_RES = (
+    re.compile(
+        r"\b(?:tax|filing|calendar|reporting|return)\s*(?:year|period)?\s*[:#-]?\s*((?:19|20)\d{2})\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b((?:19|20)\d{2})\s+(?:tax|filing|calendar|reporting)\s+(?:year|return|period)\b",
+        re.IGNORECASE,
+    ),
+)
+YEAR_COLUMN_LABELS = {
+    "year",
+    "tax year",
+    "filing year",
+    "calendar year",
+    "reporting year",
+}
 
 TAX_EVIDENCE_TYPES = {
     "filed_return": "Filed return",
@@ -62,6 +85,77 @@ def infer_tax_evidence_year(*values):
                 return year
 
     return None
+
+
+def infer_tax_evidence_years_from_file(path, max_rows=300, max_sheets=8):
+    """Find tax years in supported local evidence without interpreting money values."""
+    path = Path(path)
+    years = set()
+
+    def add_unqualified_years(value):
+        for match in YEAR_RE.findall(str(value or "")):
+            year = int(match)
+            if 2009 <= year <= 2100:
+                years.add(year)
+
+    def add_exact_year(value):
+        text = str(value or "").strip()
+        if not EXACT_YEAR_RE.fullmatch(text):
+            return
+        year = int(float(text))
+        if 2009 <= year <= 2100:
+            years.add(year)
+
+    def add_context_years(value):
+        text = str(value or "")
+        for pattern in CONTEXT_YEAR_RES:
+            for match in pattern.findall(text):
+                year = int(match)
+                if 2009 <= year <= 2100:
+                    years.add(year)
+
+    def add_table_years(rows):
+        year_columns = set()
+        for row_index, row in enumerate(rows):
+            if row_index >= max_rows:
+                break
+            values = list(row or [])
+            for column_index, value in enumerate(values):
+                normalized = _normalized_text(value)
+                if normalized in YEAR_COLUMN_LABELS:
+                    year_columns.add(column_index)
+                add_context_years(value)
+            for column_index in year_columns:
+                if column_index < len(values):
+                    add_exact_year(values[column_index])
+
+    # A year in the file name is a useful label. A parent directory is accepted
+    # only when its entire name is the year, so a scan/run date does not create a
+    # false filing requirement.
+    add_unqualified_years(path.name)
+    add_exact_year(path.parent.name)
+    try:
+        if path.suffix.lower() == ".csv":
+            with path.open(newline="", encoding="utf-8-sig", errors="replace") as file:
+                add_table_years(csv.reader(file))
+        elif path.suffix.lower() == ".txt":
+            with path.open(encoding="utf-8", errors="replace") as file:
+                for row_index, line in enumerate(file):
+                    if row_index >= max_rows:
+                        break
+                    add_context_years(line)
+        elif path.suffix.lower() == ".xlsx":
+            workbook = load_workbook(path, read_only=True, data_only=True)
+            try:
+                for sheet in workbook.worksheets[:max_sheets]:
+                    add_context_years(sheet.title)
+                    add_table_years(sheet.iter_rows(values_only=True))
+            finally:
+                workbook.close()
+    except (OSError, ValueError, csv.Error, BadZipFile, InvalidFileException):
+        pass
+
+    return sorted(years)
 
 
 def classify_tax_evidence(reference="", notes="", selected_type="auto"):
@@ -247,8 +341,7 @@ def _legacy_evidence_records(tax_record):
 
 def _year_inventory_status(year, calculated, tax_record, records, alignment_row):
     has_filed_return = _has_evidence(records, "filed_return")
-    has_account_transcript = _has_evidence(records, "account_transcript")
-    has_payment = _has_evidence(records, "payment_receipt") or has_account_transcript
+    has_payment = _has_evidence(records, "payment_receipt")
     has_workbook = _has_evidence(records, "crypto_workbook")
     has_estimate = _has_evidence(records, "estimate")
     has_zero_confirmation = _has_evidence(records, "zero_confirmation")
@@ -337,8 +430,8 @@ def get_tax_evidence_inventory_summary(transactions, alignment=None):
                 f"{currency(calculated['gain_loss'])} gain/loss from "
                 f"{currency(calculated['proceeds'])} proceeds and {currency(calculated['cost_basis'])} basis"
             ),
-            "filed_return_evidence": _evidence_labels(records, {"filed_return"}),
-            "payment_evidence": _evidence_labels(records, {"payment_receipt", "account_transcript"}),
+            "filed_return_evidence": _evidence_labels(records, {"filed_return", "account_transcript"}),
+            "payment_evidence": _evidence_labels(records, {"payment_receipt"}),
             "crypto_total_evidence": _evidence_labels(records, {"form_8949", "schedule_d", "crypto_workbook", "broker_form", "estimate"}),
             "status": status,
             "status_class": status_class,
