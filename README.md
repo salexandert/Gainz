@@ -6,20 +6,7 @@ It helps import transactions, link dispositions to acquisition lots, review unre
 
 Gainz is best understood as **private offline crypto tax reconciliation**. It does not try to be a hosted tax service. It helps you turn messy exchange exports into traceable basis links, Form 8949-style rows, current holdings reconciliation, and a documentation packet you can review with a qualified tax professional without uploading your transaction history.
 
-## OpenAI Build Week 2026
-
-Gainz is a pre-existing open-source project. The Build Week submission evaluates the meaningful extension built after the event submission period began, not the entire prior application.
-
-- Pre-event baseline: [`6caf421` from July 8, 2026](https://github.com/salexandert/Gainz/commit/6caf421)
-- Build Week work began after July 13, 2026.
-- Validated Build Week release baseline: [`905e57f`, Gainz 0.2.44](https://github.com/salexandert/Gainz/commit/905e57f)
-- Public Build Week release: [Gainz v0.2.46](https://github.com/salexandert/Gainz/releases/tag/v0.2.46)
-
-The Build Week contribution turns an unresolved missing-basis sale into an explicit professional workflow: preserve source-reported gross value, fees, and net proceeds; separate supported FIFO quantity from unresolved quantity; select a treatment for an exact disposition; preview the before/change/after Form 8949 impact; apply or reverse the treatment; and preserve calculation receipts, professional workpapers, material assumptions, and CPA handoff documents in the audit packet. This period also added stronger guided UX, packaged-release verification, and synthetic public demonstration assets.
-
-Codex with GPT-5.6 was used as an implementation and product-review partner for code changes, browser-first workflow testing, edge-case discovery, regression tests, release QA, and documentation. The human set the product boundaries: private/offline positioning, a conservative tax posture, professional-directed treatment rather than autonomous tax advice, exact-disposition selection, and refusal to invent missing transaction history.
-
-### Five-Minute Judge Path
+## Five-Minute Missing-Basis Demo
 
 1. Download and launch the current packaged build from the [Gainz download page](https://cryptogainz.store/download/).
 2. Open **Import** and click **Try Missing-Basis Demo**.
@@ -146,7 +133,7 @@ The `demo_data/` folder contains synthetic CSVs that are safe to use for testing
 - `demo_data/cash_app_sample.csv`
 - `demo_data/coinbase_sample.csv`
 - `demo_data/coinbase_convert_sample.csv`
-- `demo_data/coinbase_partial_basis_fee_sample.csv` for the Build Week missing-basis workflow
+- `demo_data/coinbase_partial_basis_fee_sample.csv` for the missing-basis workflow
 
 A good demo run is:
 
