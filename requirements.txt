@@ -27,6 +27,6 @@ SQLAlchemy==2.0.36
 typing_extensions==4.12.2
 tzdata==2024.2
 urllib3==2.7.0
-Werkzeug==3.1.6
+Werkzeug==3.1.9
 WTForms==3.2.1
 xlsxwriter==3.1.2
